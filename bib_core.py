@@ -1054,7 +1054,7 @@ def ler_do_disco() -> tuple[list[dict], dict]:
         except Exception as e:
             fontes.append({"fonte": nome, "ok": False, "n": 0,
                            "detalhe": f"falha: {e}"})
-    pont = [pontuar(j) for j in itens]
+    pont = fundir_duplicados(itens)
     pont.sort(key=lambda j: j["titulo"].lower())
     return pont, {"fontes": fontes, "total": len(pont)}
 
@@ -1409,7 +1409,8 @@ def analisar_arquivo(caminho: str) -> dict:
 def preview_pasta(roots: list[str] | None = None) -> tuple[list[str], list[dict], dict]:
     """Uma varredura só: jogos de PC + ROMs nas mesmas raízes.
 
-    (raízes_usadas, itens pontuados mistos, info{vistos, truncado, raizes, emu}).
+    (raízes_usadas, itens pontuados mistos e sem duplicatas,
+    info{vistos, truncado, raizes, emu}).
     ROMs sem emulador vêm com exe vazio (importam; o play orienta).
     """
     if not roots:
@@ -1420,11 +1421,101 @@ def preview_pasta(roots: list[str] | None = None) -> tuple[list[str], list[dict]
         roots = vistas
     roots_u, itens_disco, info_d = preview_scan(roots)
     _r, itens_rom, info_r, emu = preview_roms(roots, None)
-    itens = sorted(itens_disco + itens_rom, key=lambda j: j["titulo"].lower())
+    itens = sorted(fundir_duplicados(itens_disco + itens_rom),
+                   key=lambda j: j["titulo"].lower())
     info = {"vistos": info_d["vistos"] + info_r["vistos"],
             "truncado": info_d["truncado"] or info_r["truncado"],
             "raizes": info_d["raizes"], "emu": emu}
     return roots_u, itens, info
+
+
+def _norm_titulo(t) -> str:
+    return " ".join((t or "").casefold().split())
+
+
+def _norm_caminho(c) -> str:
+    """Mesmo arquivo em SOs distintos compara igual (D:\… == /run/media/…)."""
+    c = (c or "").strip()
+    if not c:
+        return ""
+    return win_para_linux(c).lower()
+
+
+def _dobrar_fundido(atual: dict, novo: dict) -> None:
+    """Funde `novo` dentro de `atual` (mesmo jogo, outra fonte)."""
+    exe_a, exe_n = (atual.get("executable_path") or ""), (novo.get("executable_path") or "")
+    # o exe que existe neste ou no outro SO vence; senão, o não-vazio
+    troca = False
+    for cand in (exe_n, exe_a):
+        if cand and existe_aqui_ou_traduzido(cand)[0]:
+            if cand != exe_a:
+                atual["executable_path"] = cand
+                atual["launch_options"] = novo.get("launch_options") or atual.get("launch_options")
+                troca = True
+            break
+    else:
+        if exe_n and not exe_a:
+            atual["executable_path"] = exe_n
+            atual["launch_options"] = novo.get("launch_options") or atual.get("launch_options")
+            troca = True
+    if (novo.get("horas") or 0) > (atual.get("horas") or 0):
+        atual["horas"] = novo["horas"]
+    for campo in ("shop", "object_id", "game_code", "regiao", "rom_path"):
+        if not (atual.get(campo) or "") and (novo.get(campo) or ""):
+            atual[campo] = novo[campo]
+    if novo.get("tem_metadados"):
+        atual["tem_metadados"] = True
+    for f in novo.get("fontes", [novo.get("fonte") or novo.get("origem") or "?"]):
+        if f and f not in atual["fontes"]:
+            atual["fontes"].append(f)
+    atual["fonte"] = "+".join(atual["fontes"])
+
+
+def _compativel(atual: dict, novo: dict) -> bool:
+    """Podem ser o mesmo jogo? ROMs: mesma rom. PC: exe igual ou ausente."""
+    if (atual.get("origem") or "") == "rom-3ds":
+        return _norm_caminho(atual.get("rom_path")) == _norm_caminho(novo.get("rom_path"))
+    ea, en = _norm_caminho(atual.get("executable_path")), _norm_caminho(novo.get("executable_path"))
+    return (not ea) or (not en) or (ea == en)
+
+
+def fundir_duplicados(itens: list[dict]) -> list[dict]:
+    """Junta achados repetidos do preview (mesmo jogo em N fontes).
+
+    Grupo = mesmo título normalizado + mesmo kind (rom/pc). Dentro do grupo,
+    exes diferentes e não-vazios = instalações distintas (separa); resto funde:
+    herda o melhor exe, soma fontes/horas e re-pontua. Itens já pontuados são
+    re-pontuados (idempotente).
+    """
+    grupos: dict[tuple, list[dict]] = {}
+    ordem: list[tuple] = []
+    for it in itens:
+        t = _norm_titulo(it.get("titulo"))
+        kind = "rom" if (it.get("origem") or "") == "rom-3ds" else "pc"
+        chave = (kind, t) if t else ("unico", id(it))
+        if chave not in grupos:
+            grupos[chave] = []
+            ordem.append(chave)
+        grupos[chave].append(dict(it))
+    saidas: list[dict] = []
+    for chave in ordem:
+        fundidos: list[dict] = []
+        for it in grupos[chave]:
+            it["fontes"] = [it.get("fonte") or it.get("origem") or "?"]
+            for f in fundidos:
+                if _compativel(f, it):
+                    _dobrar_fundido(f, it)
+                    break
+            else:
+                fundidos.append(it)
+        for f in fundidos:
+            f["fonte"] = "+".join(f["fontes"])
+            saida = pontuar(f)
+            if len(f["fontes"]) > 1:
+                saida["motivos"] = [*saida.get("motivos", []),
+                                    f"achado também em: {', '.join(f['fontes'][1:])}"]
+            saidas.append(saida)
+    return saidas
 
 
 # --------------------------------------------------------------------------
