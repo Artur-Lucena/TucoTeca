@@ -28,6 +28,7 @@ Opções comuns: `--db outro.db` (padrão: `biblioteca.db` na casa), `--selftest
 - ➕ Cadastrar / editar / excluir: **título + executável** + status (`backlog`, `jogando`, `zerado`, `pausado`, `abandonado`), nota 0–10, favorito, horas, wine prefix, opções, observações, **capa local** (png/jpg/webp até 2 MB).
 - 🔎 Buscar + filtrar por status / favoritos; selo **● exe ok / ○ exe?**.
 - ▶️ **Executar**: traduz o caminho para o SO atual antes de abrir. Se o jogo exigir administrador (WinError 740), oferece relançar com elevação (UAC).
+- ⏱️ **Horas automáticas**: ao jogar, o tempo do processo é somado sozinho (sessões ≥ 30 s). Limite honesto: fechar o launcher antes do jogo perde a sessão; com UAC/startfile as horas seguem manuais.
 - 🖥️ **Executável por SO**: `exe_win` / `exe_linux` vencem o caminho único (útil p/ emulador `.exe` no Win e `.AppImage` no Linux).
 - 🎮 **Scan de ROMs 3DS** (`.cci/.cxi/.3ds/.3dsx/.elf/.app/.axf`): já liga cada ROM no emulador via opções de lançamento, com preview + confiança.
 
@@ -39,13 +40,15 @@ Opções comuns: `--db outro.db` (padrão: `biblioteca.db` na casa), `--selftest
 - O scan **lê título, código e região de dentro da ROM** e **cola o ícone da ROM como capa** automaticamente.
 - Boot direto em tela cheia (`-f`; desligue com `BIBLIOTECA_AZAHAR_FLAGS=` vazio). Status do Azahar (instalado/user/chaves) na barra da GUI e do TUI.
 - **Backup de saves 3DS** (`sdmc/` + `states/`) em botão próprio, separado do backup do banco.
+- 🎛️ **Preset por jogo**: cada ROM pode ter um preset (foto da config atual do Azahar em `presets/*.ini`); o launcher mescla no `qt-config.ini` antes de abrir e avisa se falhar (nunca bloqueia o play). Backup pré-preset em `qt-config.ini.bak`.
 - No Linux, prefira o AppImage; `sdmc/` (saves) pode ser linkado pra partilha, `config/` fica local.
 - Chaves AES + arquivos de sistema: dumpe do seu próprio 3DS (ver wiki do Azahar).
 - 🔁 **Tradução determinística**: `D:\…` ↔ `/run/media/tuco/Games/…`. Overrides: `BIBLIOTECA_WIN_ROOT`, `BIBLIOTECA_LINUX_ROOT`, `BIBLIOTECA_HOME`.
 - 🔍 **Preview Hydra com confiança** (score 0–1 + motivos; pré-marca ≥ 0.3).
 - 💽 **Scan disco com confiança** (`.exe` menos instaladores + manifests Steam; raízes padrão `D:\Games`, `D:\SteamLibrary`, `D:\Riot Games` no Win; override `BIBLIOTECA_SCAN_ROOTS` com `;`; GUI/TUI aceitam pasta custom; avisa se a lista for parcial pelo teto de varredura).
 - 💾 **Backup versionado** (`backups/biblioteca-AAAAmmdd-HHMMSS.db` + `.json`, mantém 10).
-- 📦 Exportar / importar JSON (GUI e TUI).
+- 📦 Exportar / importar JSON (GUI e TUI; no TUI o importar aceita `.zip`).
+- 📦 **Pacote portátil** (`P` no TUI, 📦/📥 na GUI): um `.zip` com banco + capas (remapeadas p/ os ids novos na volta) + presets + saves 3DS (`sdmc/`). Importação valida todos os nomes antes de aplicar qualquer coisa (anti path-traversal).
 
 Onde o Hydra guarda os dados:
 
@@ -55,12 +58,13 @@ Onde o Hydra guarda os dados:
 ## Backup
 
 1. **💾 Backup** na interface (vai para `backups/` na casa canônica), ou
-2. **Exportar JSON** (GUI ou TUI), ou
-3. Copie `biblioteca.db` com tudo fechado.
+2. **📦 Pacote portátil** (banco + capas + presets + saves — o jeito de levar pra outra máquina), ou
+3. **Exportar JSON** (GUI ou TUI), ou
+4. Copie `biblioteca.db` com tudo fechado.
 
 ## Estrutura
 
 - `bib_core.py` — regras (banco, tradução, scans, backup, execução).
 - `app_win.py` / `app_tui.py` — frontends GUI (Windows) / terminal (Linux).
 - `biblioteca.db` — criado no primeiro run (SQLite, journal `DELETE`, sem sidecars).
-- `backups/` — backups versionados. `capas/` — capas locais.
+- `backups/` — backups versionados. `capas/` — capas locais. `presets/` — presets do Azahar (`*.ini`).

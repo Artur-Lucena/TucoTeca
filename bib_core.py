@@ -8,13 +8,15 @@ Usado pelos dois frontends, todos nesta mesma pasta:
     app_tui.py  aplicativo de terminal com curses (Linux)
 
 Tudo que é regra de negócio mora aqui: caminhos canônicos e tradução
-Win<->Linux, SQLite (+migração v1->v2), validação, CRUD, pontuação de
+Win<->Linux, SQLite (+migrações), validação, CRUD, pontuação de
 confiança, varredura do Hydra, scanner de disco, importação, backup
-versionado, capas locais e execução de jogos.
+versionado, capas locais, execução com horas automáticas, presets do
+Azahar, pacote portátil (.zip) e execução de jogos.
 """
 from __future__ import annotations
 
 import base64
+import configparser
 import datetime
 import hashlib
 import json
@@ -25,6 +27,8 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
+import threading
+import time
 import unicodedata
 import urllib.request
 import zipfile
@@ -60,12 +64,14 @@ HOME_DIR = resolve_home()
 DEFAULT_DB = HOME_DIR / "biblioteca.db"
 BACKUP_DIR = HOME_DIR / "backups"
 CAPAS_DIR = HOME_DIR / "capas"
+PRESETS_DIR = HOME_DIR / "presets"
 
 
 def garantir_dirs() -> None:
     HOME_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     CAPAS_DIR.mkdir(parents=True, exist_ok=True)
+    PRESETS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _com_barra(p: str) -> str:
@@ -150,13 +156,15 @@ CREATE TABLE IF NOT EXISTS jogos (
     exe_linux TEXT DEFAULT '',
     game_code TEXT DEFAULT '',
     regiao TEXT DEFAULT '',
+    azahar_preset TEXT DEFAULT '',
     criado_em TEXT,
     atualizado_em TEXT,
     UNIQUE(titulo, executable_path, launch_options)
 );
 """
 
-# Migração de bancos criados pela v1 (sem capa/confianca) e v2 (sem exe por SO).
+# Migração de bancos antigos: v1 (sem capa/confianca), v2 (sem exe por SO),
+# v3 (sem game_code/regiao), v4 (sem azahar_preset).
 MIGRACOES = (
     "ALTER TABLE jogos ADD COLUMN capa TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN confianca REAL DEFAULT 0",
@@ -164,12 +172,13 @@ MIGRACOES = (
     "ALTER TABLE jogos ADD COLUMN exe_linux TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN game_code TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN regiao TEXT DEFAULT ''",
+    "ALTER TABLE jogos ADD COLUMN azahar_preset TEXT DEFAULT ''",
 )
 
 CAMPOS_EDITAVEIS = ("titulo", "executable_path", "exe_win", "exe_linux",
                     "wine_prefix", "launch_options", "status", "nota", "favorito",
                     "horas", "observacoes", "shop", "object_id", "origem",
-                    "game_code", "regiao")
+                    "game_code", "regiao", "azahar_preset")
 
 
 def agora_iso() -> str:
@@ -216,7 +225,7 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
     cols = ["id", "titulo", "executable_path", "exe_win", "exe_linux", "wine_prefix",
             "launch_options", "status", "nota", "favorito", "horas", "ultima_execucao",
             "observacoes", "origem", "shop", "object_id", "game_code", "regiao",
-            "capa", "confianca", "criado_em", "atualizado_em"]
+            "azahar_preset", "capa", "confianca", "criado_em", "atualizado_em"]
     todos = ", ".join(cols)
     con.executescript(f"""
         CREATE TABLE jogos_nova (
@@ -238,6 +247,7 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
             object_id TEXT DEFAULT '',
             game_code TEXT DEFAULT '',
             regiao TEXT DEFAULT '',
+            azahar_preset TEXT DEFAULT '',
             capa TEXT DEFAULT '',
             confianca REAL DEFAULT 0,
             criado_em TEXT,
@@ -292,7 +302,7 @@ def validar_dados(dados: dict, parcial: bool = False) -> dict:
         limpo["titulo"] = titulo
     if "executable_path" in dados or not parcial:
         limpo["executable_path"] = _desaspas(_txt(dados.get("executable_path")))
-    for campo in ("exe_win", "exe_linux", "game_code", "regiao"):
+    for campo in ("exe_win", "exe_linux", "game_code", "regiao", "azahar_preset"):
         if campo in dados or not parcial:
             v = _txt(dados.get(campo))
             limpo[campo] = _desaspas(v) if campo.startswith("exe_") else v
@@ -359,14 +369,14 @@ def criar_jogo(con: sqlite3.Connection, dados: dict) -> dict:
         cur = con.execute(
             """INSERT INTO jogos (titulo, executable_path, exe_win, exe_linux, wine_prefix,
                launch_options, status, nota, favorito, horas, observacoes, origem, shop,
-               object_id, game_code, regiao, criado_em, atualizado_em)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               object_id, game_code, regiao, azahar_preset, criado_em, atualizado_em)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
              (limpo["titulo"], limpo["executable_path"], limpo["exe_win"],
              limpo["exe_linux"], limpo["wine_prefix"],
              limpo["launch_options"], limpo["status"], limpo["nota"],
              limpo["favorito"], limpo["horas"], limpo["observacoes"],
              limpo["origem"], limpo["shop"], limpo["object_id"],
-             limpo["game_code"], limpo["regiao"], agora, agora),
+             limpo["game_code"], limpo["regiao"], limpo["azahar_preset"], agora, agora),
         )
         con.commit()
     except sqlite3.IntegrityError:
@@ -384,12 +394,13 @@ def atualizar_jogo(con: sqlite3.Connection, gid: int, dados: dict) -> dict:
         """UPDATE jogos SET titulo=?, executable_path=?, exe_win=?, exe_linux=?,
            wine_prefix=?, launch_options=?, status=?, nota=?, favorito=?, horas=?,
            observacoes=?, shop=?, object_id=?, origem=?, game_code=?, regiao=?,
-           atualizado_em=? WHERE id=?""",
+           azahar_preset=?, atualizado_em=? WHERE id=?""",
         (limpo["titulo"], limpo["executable_path"], limpo["exe_win"],
          limpo["exe_linux"], limpo["wine_prefix"], limpo["launch_options"],
          limpo["status"], limpo["nota"], limpo["favorito"],
          limpo["horas"], limpo["observacoes"], limpo["shop"], limpo["object_id"],
-         limpo["origem"], limpo["game_code"], limpo["regiao"], agora_iso(), gid),
+         limpo["origem"], limpo["game_code"], limpo["regiao"],
+         limpo["azahar_preset"], agora_iso(), gid),
     )
     con.commit()
     return row_to_dict(con.execute("SELECT * FROM jogos WHERE id=?", (gid,)).fetchone())
@@ -1268,8 +1279,8 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                 """INSERT OR IGNORE INTO jogos
                    (titulo, executable_path, exe_win, exe_linux, wine_prefix, launch_options,
                     status, nota, favorito, horas, observacoes, origem, shop, object_id,
-                    game_code, regiao, confianca, criado_em, atualizado_em)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    game_code, regiao, azahar_preset, confianca, criado_em, atualizado_em)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (titulo, (j.get("executable_path") or "").strip(),
                  (j.get("exe_win") or "").strip(), (j.get("exe_linux") or "").strip(),
                  (j.get("wine_prefix") or ""), (j.get("launch_options") or ""),
@@ -1278,8 +1289,8 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                  horas, (j.get("observacoes") or ""),
                  j.get("origem") or "manual", (j.get("shop") or ""),
                  (j.get("object_id") or ""), (j.get("game_code") or "").strip(),
-                 (j.get("regiao") or "").strip(), confianca,
-                 agora, agora),
+                 (j.get("regiao") or "").strip(), (j.get("azahar_preset") or "").strip(),
+                 confianca, agora, agora),
             )
             novos += cur.rowcount
             if cur.rowcount and (j.get("origem") or "") == "rom-3ds":
@@ -1309,8 +1320,7 @@ def fazer_backup(db_path: Path, manter: int = 10) -> dict:
     dest_json = BACKUP_DIR / f"biblioteca-{ts}.json"
     con = get_db(db_path)
     try:
-        rows = con.execute("SELECT * FROM jogos ORDER BY id").fetchall()
-        dados = {"exportado_em": agora_iso(), "jogos": [row_to_dict(r) for r in rows]}
+        dados = _dados_exportacao(con)
         dst = sqlite3.connect(str(dest_db))
         try:
             con.backup(dst)
@@ -1470,17 +1480,21 @@ def executar_elevado(executable_path: str, launch_options: str = "") -> dict:
     return {"ok": False, "erro": "elevação só existe no Windows"}
 
 
-def executar_jogo(executable_path: str, wine_prefix: str = "", launch_options: str = "",
-                  elevar: bool = False) -> dict:
+def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "",
+            elevar: bool = False) -> tuple[dict, object | None]:
+    """Núcleo do lançamento. Retorna (resultado, Popen|None).
+
+    Processo None = sem handle rastreável (startfile, UAC, erro, sem exe).
+    """
     exe = (executable_path or "").strip()
     if not exe:
-        return {"ok": False, "erro": "Jogo sem caminho de executável cadastrado."}
+        return {"ok": False, "erro": "Jogo sem caminho de executável cadastrado."}, None
     if elevar:
-        return executar_elevado(exe, launch_options)
+        return executar_elevado(exe, launch_options), None
     exe = traduzir_para_atual(exe)  # gravado num SO, executando no outro
     p = Path(exe)
     if not p.exists():
-        return {"ok": False, "erro": f"Executável não encontrado: {exe}"}
+        return {"ok": False, "erro": f"Executável não encontrado: {exe}"}, None
 
     env = os.environ.copy()
     if wine_prefix.strip():
@@ -1494,36 +1508,42 @@ def executar_jogo(executable_path: str, wine_prefix: str = "", launch_options: s
             ext = p.suffix.lower()
             if ext in (".lnk", ".url") or p.is_dir():
                 os.startfile(str(p))  # type: ignore[attr-defined]
-                return {"ok": True, "modo": "startfile"}
+                return {"ok": True, "modo": "startfile"}, None
             creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-            subprocess.Popen([str(p), *extra], cwd=cwd, env=env,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             stdin=subprocess.DEVNULL, creationflags=creationflags,
-                             close_fds=True)
-            return {"ok": True, "modo": "popen-windows"}
+            proc = subprocess.Popen([str(p), *extra], cwd=cwd, env=env,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    stdin=subprocess.DEVNULL, creationflags=creationflags,
+                                    close_fds=True)
+            return {"ok": True, "modo": "popen-windows"}, proc
         else:
             if not os.access(str(p), os.X_OK):
                 return {"ok": False,
-                        "erro": f"Sem permissão de execução: {exe} (rode chmod +x?)"}
+                        "erro": f"Sem permissão de execução: {exe} (rode chmod +x?)"}, None
             cmd = [str(p), *extra]
-            subprocess.Popen(cmd, cwd=cwd, env=env,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             stdin=subprocess.DEVNULL, start_new_session=True,
-                             close_fds=True)
-            return {"ok": True, "modo": "popen-linux"}
+            proc = subprocess.Popen(cmd, cwd=cwd, env=env,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    stdin=subprocess.DEVNULL, start_new_session=True,
+                                    close_fds=True)
+            return {"ok": True, "modo": "popen-linux"}, proc
     except Exception as e:
         if _eh_elevacao_necessaria(e):
             return {"ok": False, "requer_elevacao": True,
-                    "erro": f"{type(e).__name__}: {e} — o executável exige administrador."}
-        return {"ok": False, "erro": f"{type(e).__name__}: {e}"}
+                    "erro": f"{type(e).__name__}: {e} — o executável exige administrador."}, None
+        return {"ok": False, "erro": f"{type(e).__name__}: {e}"}, None
 
 
-def executar_jogo_dict(jogo: dict, elevar: bool = False) -> dict:
-    """Resolve o exe do SO atual (exe_win/exe_linux vencem) e executa."""
+def executar_jogo(executable_path: str, wine_prefix: str = "", launch_options: str = "",
+                  elevar: bool = False) -> dict:
+    res, _proc = _lancar(executable_path, wine_prefix, launch_options, elevar)
+    return res
+
+
+def _lancar_jogo_dict(jogo: dict, elevar: bool = False) -> tuple[dict, object | None]:
+    """Resolve o exe do SO atual (exe_win/exe_linux vencem) e lança."""
     exe, _origem = resolver_exe(jogo)
     if not exe and (jogo.get("origem") or "") == "rom-3ds":
         return {"ok": False, "erro": ("Azahar não encontrado — instale em "
-                                      "Games/Emuladores/Azahar ou defina BIBLIOTECA_EMULADOR_3DS.")}
+                                      "Games/Emuladores/Azahar ou defina BIBLIOTECA_EMULADOR_3DS.")}, None
     launch = (jogo.get("launch_options") or "")
     if (jogo.get("origem") or "") == "rom-3ds" and launch.strip():
         rom = launch.strip()
@@ -1531,7 +1551,13 @@ def executar_jogo_dict(jogo: dict, elevar: bool = False) -> dict:
             rom = f'"{rom}"'
         flags = " ".join(azahar_flags())
         launch = (flags + " " if flags else "") + rom
-    return executar_jogo(exe, (jogo.get("wine_prefix") or ""), launch, elevar=elevar)
+    return _lancar(exe, (jogo.get("wine_prefix") or ""), launch, elevar=elevar)
+
+
+def executar_jogo_dict(jogo: dict, elevar: bool = False) -> dict:
+    """Resolve o exe do SO atual (exe_win/exe_linux vencem) e executa."""
+    res, _proc = _lancar_jogo_dict(jogo, elevar)
+    return res
 
 
 def azahar_flags() -> list[str]:
@@ -1545,3 +1571,361 @@ def marcar_execucao(con: sqlite3.Connection, gid: int) -> None:
     con.execute("UPDATE jogos SET ultima_execucao=?, atualizado_em=? WHERE id=?",
                 (agora, agora, gid))
     con.commit()
+
+
+# --------------------------------------------------------------------------
+# Sessões rastreadas: horas automáticas (mede o processo lançado)
+# --------------------------------------------------------------------------
+
+LIMIAR_SESSAO_S = 30  # sessões mais curtas não contam (clique de teste)
+
+
+def adicionar_horas(con: sqlite3.Connection, gid: int, delta_h: float) -> dict:
+    """Soma horas ao jogo (atômico). Retorna total novo."""
+    try:
+        delta = float(delta_h or 0)
+    except (TypeError, ValueError):
+        return {"ok": False, "erro": "delta inválido"}
+    if delta <= 0:
+        return {"ok": False, "erro": "nada a somar"}
+    cur = con.execute("SELECT horas FROM jogos WHERE id=?", (gid,)).fetchone()
+    if cur is None:
+        return {"ok": False, "erro": "jogo inexistente"}
+    total = round((cur["horas"] or 0) + delta, 2)
+    con.execute("UPDATE jogos SET horas=?, atualizado_em=? WHERE id=?",
+                (total, agora_iso(), gid))
+    con.commit()
+    return {"ok": True, "somado": round(delta, 2), "total": total}
+
+
+def _vigiar_processo(proc, limiar_s: float, ao_fim) -> None:
+    t0 = time.monotonic()
+    try:
+        proc.wait()
+    except Exception:
+        pass  # processo já morreu ou handle inválido: conta o decorrido
+    decorrido = time.monotonic() - t0
+    sessao = round(decorrido / 3600.0, 2) if decorrido >= limiar_s else 0.0
+    try:
+        ao_fim(sessao, True)
+    except Exception:
+        pass
+
+
+def executar_monitorado(jogo: dict, ao_fim=None,
+                        limiar_s: float = LIMIAR_SESSAO_S) -> dict:
+    """Lança e, havendo handle (Popen), vigia o fim em thread daemon.
+
+    ao_fim(sessao_horas, rastreado) roda na thread vigia — o frontend deve
+    despachar para a thread de UI. Sem handle (startfile/UAC) e com ok:
+    chama ao_fim(0.0, False) direto. Limite honesto: fechar o launcher
+    antes do jogo mata a vigia e perde a sessão.
+    """
+    res, proc = _lancar_jogo_dict(jogo)
+    rastreavel = bool(res.get("ok")) and proc is not None
+    res["rastreado"] = rastreavel
+    if ao_fim is None:
+        return res
+    if rastreavel:
+        threading.Thread(target=_vigiar_processo, args=(proc, limiar_s, ao_fim),
+                         daemon=True).start()
+    elif res.get("ok"):
+        ao_fim(0.0, False)
+    return res
+
+
+# --------------------------------------------------------------------------
+# Presets por jogo do Azahar (mescla no qt-config.ini antes de lançar)
+# --------------------------------------------------------------------------
+
+def presets_dir() -> Path:
+    PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+    return PRESETS_DIR
+
+
+def listar_presets() -> list[str]:
+    try:
+        return sorted(p.stem for p in presets_dir().glob("*.ini") if p.is_file())
+    except OSError:
+        return []
+
+
+def azahar_config_atual() -> Path | None:
+    ud = azahar_user_dir()
+    if ud:
+        cfgdir = Path(ud) / "config"
+        cfg = cfgdir / "qt-config.ini"
+        if cfg.is_file():
+            return cfg
+        try:
+            alts = sorted(p for p in cfgdir.glob("*.ini") if p.is_file())
+        except OSError:
+            alts = []
+        if alts:
+            return alts[0]
+    return None
+
+
+def salvar_preset_de_atual(nome: str) -> dict:
+    """Fotografa o qt-config.ini atual como presets/<nome>.ini."""
+    cfg = azahar_config_atual()
+    if cfg is None:
+        return {"ok": False,
+                "erro": "config do Azahar não encontrada (abra o Azahar uma vez)."}
+    slug = slugify(nome or "")
+    if not slug:
+        return {"ok": False, "erro": "nome de preset vazio."}
+    dest = presets_dir() / f"{slug}.ini"
+    try:
+        shutil.copy2(str(cfg), str(dest))
+    except OSError as e:
+        return {"ok": False, "erro": f"falha ao copiar: {e}"}
+    return {"ok": True, "preset": slug, "arquivo": str(dest)}
+
+
+def aplicar_preset(nome: str) -> dict:
+    """Mescla presets/<nome>.ini sobre o qt-config.ini (backup .bak uma vez)."""
+    nome = (nome or "").strip()
+    if not nome:
+        return {"ok": False, "erro": "sem preset"}
+    base = presets_dir()
+    alvo = base / Path(nome).name
+    if not alvo.suffix:
+        alvo = alvo.with_name(alvo.name + ".ini")  # aceita stem ("up-2x") ou "up-2x.ini"
+    try:
+        dentro = alvo.resolve().parent == base.resolve()
+    except OSError:
+        dentro = False
+    if not dentro or alvo.suffix.lower() != ".ini" or not alvo.is_file():
+        return {"ok": False, "erro": f"preset '{nome}' não existe em presets/."}
+    cfg = azahar_config_atual()
+    if cfg is None:
+        return {"ok": False, "erro": "config do Azahar não encontrada."}
+    try:
+        bak = cfg.with_name(cfg.name + ".bak")
+        if not bak.is_file():
+            shutil.copy2(str(cfg), str(bak))  # estado pré-preset, uma única vez
+        atual, novo = configparser.ConfigParser(), configparser.ConfigParser()
+        atual.optionxform = str  # type: ignore[assignment]  # Qt usa camelCase
+        novo.optionxform = str  # type: ignore[assignment]
+        atual.read(cfg, encoding="utf-8")
+        novo.read(alvo, encoding="utf-8")
+        for sec in novo.sections():
+            if not atual.has_section(sec):
+                atual.add_section(sec)
+            for chave, valor in novo.items(sec):
+                atual.set(sec, chave, valor)
+        with cfg.open("w", encoding="utf-8") as fh:
+            atual.write(fh)
+    except (OSError, configparser.Error) as e:
+        return {"ok": False, "erro": f"falha ao mesclar: {e}"}
+    return {"ok": True, "preset": alvo.stem, "config": str(cfg)}
+
+
+def restaurar_config_azahar() -> dict:
+    """Volta o qt-config.ini ao estado pré-preset (.bak)."""
+    cfg = azahar_config_atual()
+    if cfg is None:
+        return {"ok": False, "erro": "config do Azahar não encontrada."}
+    bak = cfg.with_name(cfg.name + ".bak")
+    if not bak.is_file():
+        return {"ok": False, "erro": "sem backup pré-preset (.bak ausente)."}
+    try:
+        shutil.copy2(str(bak), str(cfg))
+    except OSError as e:
+        return {"ok": False, "erro": f"falha ao restaurar: {e}"}
+    return {"ok": True, "config": str(cfg)}
+
+
+def preparar_lancamento(jogo: dict) -> dict:
+    """Aplica o preset Azahar do jogo (só rom-3ds). Nunca bloqueia o play."""
+    if (jogo.get("origem") or "") != "rom-3ds":
+        return {"preset_aplicado": None, "aviso": None}
+    nome = (jogo.get("azahar_preset") or "").strip()
+    if not nome:
+        return {"preset_aplicado": None, "aviso": None}
+    r = aplicar_preset(nome)
+    if r.get("ok"):
+        return {"preset_aplicado": r["preset"], "aviso": None}
+    return {"preset_aplicado": None,
+            "aviso": f"Preset '{nome}' falhou ({r['erro']}); abrindo com config atual."}
+
+
+# --------------------------------------------------------------------------
+# Pacote portátil (.zip): banco + capas + presets + saves 3DS
+# --------------------------------------------------------------------------
+
+PACOTE_ESQUEMA = 1
+PACOTE_INFO = "pacote-info.json"
+PACOTE_JSON = "biblioteca.json"
+PACOTE_MANIFESTO = "capas-manifesto.json"
+
+
+def _dados_exportacao(con: sqlite3.Connection) -> dict:
+    rows = con.execute("SELECT * FROM jogos ORDER BY id").fetchall()
+    return {"exportado_em": agora_iso(), "jogos": [row_to_dict(r) for r in rows]}
+
+
+def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
+    """Empacota tudo para levar a outra máquina (ou guardar)."""
+    destino = Path(destino)
+    if destino.suffix.lower() != ".zip":
+        destino = destino.with_suffix(".zip")
+    if str(destino.parent):
+        destino.parent.mkdir(parents=True, exist_ok=True)
+    garantir_dirs()
+    con = get_db(Path(db_path) if db_path else DEFAULT_DB)
+    try:
+        dados = _dados_exportacao(con)
+    finally:
+        con.close()
+    ud = azahar_user_dir()
+    sdmc = Path(ud) / "sdmc" if ud else None
+    com_saves = bool(incluir_saves and sdmc is not None and sdmc.is_dir())
+    info = {"app": "biblioteca-jogos", "esquema": PACOTE_ESQUEMA,
+            "exportado_em": dados["exportado_em"], "jogos": len(dados["jogos"]),
+            "inclui_saves": com_saves, "azahar_versao": azahar_versao_local()}
+    manifesto = {}
+    for j in dados["jogos"]:
+        if j.get("capa"):
+            manifesto[Path(j["capa"]).name] = j["titulo"]
+    n = 0
+    try:
+        with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr(PACOTE_INFO, json.dumps(info, ensure_ascii=False, indent=2))
+            z.writestr(PACOTE_JSON, json.dumps(dados, ensure_ascii=False, indent=2))
+            z.writestr(PACOTE_MANIFESTO,
+                       json.dumps(manifesto, ensure_ascii=False, indent=2))
+            n += 3
+            for arq in sorted(CAPAS_DIR.glob("*")):
+                if arq.is_file() and arq.suffix.lower() in CAPA_EXTS:
+                    z.write(arq, f"capas/{arq.name}")
+                    n += 1
+            for arq in sorted(presets_dir().glob("*.ini")):
+                if arq.is_file():
+                    z.write(arq, f"presets/{arq.name}")
+                    n += 1
+            if com_saves:
+                for arq in sorted(sdmc.rglob("*")):  # type: ignore[union-attr]
+                    if arq.is_file():
+                        rel = arq.relative_to(sdmc).as_posix()  # type: ignore[arg-type]
+                        z.write(arq, "azahar-user/sdmc/" + rel)
+                        n += 1
+    except OSError as e:
+        return {"ok": False, "erro": f"falha ao gravar pacote: {e}"}
+    return {"ok": True, "destino": str(destino), "arquivos": n,
+            "bytes": destino.stat().st_size, "jogos": len(dados["jogos"]),
+            "inclui_saves": com_saves}
+
+
+def _membro_pacote_ok(nome: str) -> str | None:
+    """Categoria do membro ('json','info','manifesto','capa','preset','save')
+    ou None se proibido (traversal, absoluto, fora da allowlist)."""
+    if not nome:
+        return None
+    n = nome.replace("\\", "/")
+    if ".." in n.split("/") or n.startswith("/") or (len(n) > 1 and n[1] == ":"):
+        return None
+    if n == PACOTE_JSON:
+        return "json"
+    if n == PACOTE_INFO:
+        return "info"
+    if n == PACOTE_MANIFESTO:
+        return "manifesto"
+    if n.startswith("capas/") and "/" not in n[6:] \
+            and Path(n).suffix.lower() in CAPA_EXTS:
+        return "capa"
+    if n.startswith("presets/") and "/" not in n[8:] and n.lower().endswith(".ini"):
+        return "preset"
+    if n.startswith("azahar-user/sdmc/") and not n.endswith("/"):
+        return "save"
+    return None
+
+
+def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict:
+    """Restaura um pacote: valida TODOS os nomes antes de aplicar qualquer
+    coisa (nada parcial em pacote hostil). Capas voltam remapeadas para os
+    ids novos via manifesto {arquivo: titulo}."""
+    origem = Path(origem)
+    try:
+        zf = zipfile.ZipFile(origem)
+    except (OSError, zipfile.BadZipFile) as e:
+        return {"ok": False, "erro": f"pacote inválido: {e}"}
+    with zf:
+        nomes = [i.filename for i in zf.infolist() if not i.is_dir()]
+        cats: dict[str, str] = {}
+        for nm in nomes:
+            cat = _membro_pacote_ok(nm)
+            if cat is None:
+                return {"ok": False,
+                        "erro": f"membro proibido no pacote: {nm!r} (nada foi aplicado)"}
+            cats[nm] = cat
+        if PACOTE_JSON not in cats:
+            return {"ok": False, "erro": "pacote sem biblioteca.json"}
+        try:
+            dados = json.loads(zf.read(PACOTE_JSON).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError) as e:
+            return {"ok": False, "erro": f"biblioteca.json inválida: {e}"}
+        lista = dados if isinstance(dados, list) else dados.get("jogos", [])
+        if not isinstance(lista, list):
+            return {"ok": False, "erro": "biblioteca.json deve ser lista ou {jogos:[...]}"}
+        try:
+            manifesto = json.loads(zf.read(PACOTE_MANIFESTO).decode("utf-8")) \
+                if PACOTE_MANIFESTO in cats else {}
+        except (ValueError, UnicodeDecodeError):
+            manifesto = {}
+        if not isinstance(manifesto, dict):
+            manifesto = {}
+        con = get_db(Path(db_path) if db_path else DEFAULT_DB)
+        try:
+            res = importar_lista(con, lista)
+            capas = 0
+            for arq, titulo in manifesto.items():
+                cat = cats.get(f"capas/{Path(arq).name}")
+                if cat != "capa" or not isinstance(titulo, str) or not titulo.strip():
+                    continue
+                try:
+                    raw = zf.read(f"capas/{Path(arq).name}")
+                except KeyError:
+                    continue
+                alvo = con.execute(
+                    "SELECT id FROM jogos WHERE titulo=? ORDER BY id LIMIT 1",
+                    (titulo.strip(),)).fetchone()
+                if alvo is None:
+                    continue
+                r = salvar_capa_bytes(con, alvo["id"], Path(arq).name, raw)
+                if r.get("ok"):
+                    capas += 1
+            presets = 0
+            garantir_dirs()
+            for nm, cat in cats.items():
+                if cat != "preset":
+                    continue
+                try:
+                    (presets_dir() / Path(nm).name).write_bytes(zf.read(nm))
+                    presets += 1
+                except OSError:
+                    pass
+            saves, saves_ignorados = 0, 0
+            tem_saves = any(c == "save" for c in cats.values())
+            if tem_saves and restaurar_saves:
+                ud = azahar_user_dir()
+                if not ud:
+                    saves_ignorados = sum(1 for c in cats.values() if c == "save")
+                else:
+                    sdmc = Path(ud) / "sdmc"
+                    for nm, cat in cats.items():
+                        if cat != "save":
+                            continue
+                        try:
+                            dest = sdmc / Path(*nm.split("/")[2:])
+                            dest.parent.mkdir(parents=True, exist_ok=True)
+                            dest.write_bytes(zf.read(nm))
+                            saves += 1
+                        except (OSError, ValueError):
+                            saves_ignorados += 1
+        finally:
+            con.close()
+    return {"ok": True, "novos": res["novos"], "total_no_banco": res["total_no_banco"],
+            "capas": capas, "presets": presets, "saves": saves,
+            "saves_ignorados": saves_ignorados}

@@ -10,9 +10,12 @@ Uso:
 Teclas (lista): ↑/↓ ou j/k navegar · PgUp/PgDn · / buscar · f status ·
   * favoritos · Enter jogar · a adicionar · e editar · d excluir ·
   h preview Hydra · s scan disco · R ROMs 3DS · b backup · U saves 3DS ·
-  E exportar JSON · I importar JSON · A atualizar Azahar ·
-  r recarregar · q sair
+  E exportar JSON · I importar (JSON ou pacote .zip) · P pacote portátil ·
+  A atualizar Azahar · r recarregar · q sair
 Preview: Espaço marca/desmarca · i importa marcados · q volta
+
+Horas automáticas: ao jogar, o tempo do processo é somado sozinho
+(sessões ≥30 s; fechar o launcher antes do jogo perde a sessão).
 """
 from __future__ import annotations
 
@@ -43,6 +46,7 @@ class Tui:
         self.si = 0
         self.fav = False
         self.msg = ""
+        self.sessoes_pendentes: list = []  # (gid, sessao_h, rastreado) da vigia
         self._cores()
         self.recarregar()
 
@@ -90,7 +94,7 @@ class Tui:
         s = self.stdscr
         s.erase()
         rows, cols = s.getmaxyx()
-        titulo = "🎮 Biblioteca  │  / busca · f status · * fav · Enter joga · a/e/d · h hydra · s scan · R roms · b/U/E/I/A · q sai"
+        titulo = "🎮 Biblioteca  │  / busca · f status · * fav · Enter joga · a/e/d · h hydra · s scan · R roms · b/U/E/I/P/A · q sai"
         s.addnstr(0, 0, titulo, cols - 1, self.cor["mut"])
         az = core.azahar_status()
         azg = "🎮✓" if az["instalado"] and az["chaves"] else ("🎮!" if az["instalado"] else "🎮✗")
@@ -154,19 +158,49 @@ class Tui:
         j = self.atual()
         if not j:
             return
-        if not j["executable_path"]:
-            self.msg = "Jogo sem executável cadastrado."
-            return
+        prep = core.preparar_lancamento(j)
+        aviso = f" [{prep['aviso']}]" if prep.get("aviso") else ""
         con = self._con()
         try:
-            res = core.executar_jogo_dict(j)
+            res = core.executar_monitorado(
+                j, ao_fim=lambda sessao, rastreado, _gid=j["id"]:
+                    self.sessoes_pendentes.append((_gid, sessao, rastreado)))
             if res.get("requer_elevacao") and self.confirmar("Exige administrador. Elevar?"):
                 res = core.executar_jogo_dict(j, elevar=True)
-            if res.get("ok"):
+                if res.get("ok"):
+                    core.marcar_execucao(con, j["id"])
+                    self.msg = f"Executando ✓ (UAC — horas manuais){aviso}"
+                else:
+                    self.msg = f"Falha: {res.get('erro')}{aviso}"
+            elif res.get("ok"):
                 core.marcar_execucao(con, j["id"])
-                self.msg = f"Executando ✓ ({res.get('modo')})"
+                extra = " ⏱ tempo será registrado" if res.get("rastreado") else ""
+                self.msg = f"Executando ✓ ({res.get('modo')}){extra}{aviso}"
             else:
-                self.msg = f"Falha: {res.get('erro')}"
+                self.msg = f"Falha: {res.get('erro')}{aviso}"
+        finally:
+            con.close()
+
+    def _aplicar_sessoes(self):
+        """Soma as sessões que a vigia encerrou (thread-safe: só append/limpa)."""
+        if not self.sessoes_pendentes:
+            return
+        pend, self.sessoes_pendentes = self.sessoes_pendentes, []
+        con = self._con()
+        try:
+            msgs = []
+            for gid, sessao, rastreado in pend:
+                if not rastreado:
+                    continue
+                if sessao <= 0:
+                    msgs.append("sessão curta: nada registrado")
+                    continue
+                r = core.adicionar_horas(con, gid, sessao)
+                msgs.append(f"+{r['somado']}h (total {r['total']}h)"
+                            if r.get("ok") else f"sessão: {r.get('erro')}")
+            if msgs:
+                self.msg = " · ".join(msgs)
+                self.recarregar()
         finally:
             con.close()
 
@@ -187,6 +221,8 @@ class Tui:
                                        "s" if j and j["favorito"] else ""),
             "launch_options": self.perguntar("Opções lançamento: ",
                                              j["launch_options"] if j else ""),
+            "azahar_preset": self.perguntar("Preset Azahar p/ ROMs (vazio=nenhum): ",
+                                            (j.get("azahar_preset") if j else "") or ""),
             "wine_prefix": self.perguntar("Wine prefix (Linux): ",
                                           j["wine_prefix"] if j else ""),
             "observacoes": self.perguntar("Observações: ", j["observacoes"] if j else ""),
@@ -205,6 +241,7 @@ class Tui:
                 "horas": float((vals["horas"] or "0").strip() or 0),
                 "favorito": (vals["favorito"] or "").strip().lower() in ("s", "sim", "y"),
                 "launch_options": (vals["launch_options"] or "").strip(),
+                "azahar_preset": (vals["azahar_preset"] or "").strip(),
                 "wine_prefix": (vals["wine_prefix"] or "").strip(),
                 "observacoes": (vals["observacoes"] or "").strip(),
             }
@@ -392,11 +429,15 @@ class Tui:
         self.msg = f"Exportados {len(jogos)} jogo(s)."
 
     def importar_json(self):
-        arq = self.perguntar("Importar JSON de: ")
+        arq = self.perguntar("Importar de (JSON ou pacote .zip): ")
         if not arq:
             return
+        arq = arq.strip()
+        if arq.lower().endswith(".zip"):
+            self.importar_pacote(arq)
+            return
         try:
-            dados = json.loads(Path(arq.strip()).read_text(encoding="utf-8"))
+            dados = json.loads(Path(arq).read_text(encoding="utf-8"))
         except (OSError, ValueError) as e:
             self.msg = f"JSON inválido: {e}"
             return
@@ -410,6 +451,40 @@ class Tui:
         finally:
             con.close()
         self.msg = f"Novos: {res['novos']} (total {res['total_no_banco']})."
+        self.recarregar()
+
+    def exportar_pacote(self):
+        dest = self.perguntar("Pacote (.zip) destino: ",
+                              str(core.BACKUP_DIR / "biblioteca-pacote.zip"))
+        if not dest:
+            return
+        try:
+            res = core.exportar_pacote(dest.strip(), db_path=self.db_path,
+                                       incluir_saves=True)
+        except Exception as e:
+            self.msg = f"Pacote falhou: {e}"
+            return
+        if not res.get("ok"):
+            self.msg = f"Pacote: {res.get('erro')}"
+            return
+        kb = res["bytes"] // 1024
+        self.msg = (f"Pacote: {res['jogos']} jogo(s), {res['arquivos']} arq, "
+                    f"{kb} KB{' +saves' if res['inclui_saves'] else ''}.")
+
+    def importar_pacote(self, arq: str):
+        try:
+            res = core.importar_pacote(
+                arq, db_path=self.db_path,
+                restaurar_saves=self.confirmar("Restaurar os saves 3DS do pacote?"))
+        except Exception as e:
+            self.msg = f"Pacote falhou: {e}"
+            return
+        if not res.get("ok"):
+            self.msg = f"Pacote: {res.get('erro')}"
+            return
+        self.msg = (f"Pacote: novos {res['novos']} (total {res['total_no_banco']}) · "
+                    f"capas {res['capas']} · presets {res['presets']} · "
+                    f"saves {res['saves']}")
         self.recarregar()
 
     def atualizar_azahar(self):
@@ -452,6 +527,7 @@ class Tui:
     def rodar(self):
         s = self.stdscr
         while True:
+            self._aplicar_sessoes()
             self.desenhar()
             ch = s.getch()
             if ch in (ord("q"),):
@@ -500,6 +576,8 @@ class Tui:
                 self.exportar_json()
             elif ch == ord("I"):
                 self.importar_json()
+            elif ch == ord("P"):
+                self.exportar_pacote()
             elif ch == ord("A"):
                 self.atualizar_azahar()
             elif ch == ord("r"):

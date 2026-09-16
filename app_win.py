@@ -18,7 +18,7 @@ import sys
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bib_core as core
@@ -156,7 +156,9 @@ class App:
         for rotulo, cmd in (("💾 Backup agora", self.backup),
                             ("💾 Saves 3DS", self.backup_saves),
                             ("⬇ Atualizar Azahar", self.atualizar_azahar),
-                            ("💾 Exportar JSON…", self.exportar_json)):
+                            ("💾 Exportar JSON…", self.exportar_json),
+                            ("📦 Pacote…", self.exportar_pacote),
+                            ("📥 Pacote…", self.importar_pacote)):
             ttk.Button(side, text=rotulo, style="Side.TButton",
                        command=cmd).pack(fill="x", padx=8, pady=1)
         self._pintar_nav()
@@ -405,6 +407,7 @@ class App:
         self.det_meta.configure(
             text=f"{j['status']}{nota}{horas} · {j['origem']}"
             + (f"\n🔖 {' · '.join(fichas)}" if fichas else "")
+            + (f"\n🎛 preset {j['azahar_preset']}" if j.get("azahar_preset") else "")
             + (f"\n▶ {j['ultima_execucao']}" if j.get("ultima_execucao") else "")
             + (f"\n📝 {j['observacoes']}" if j.get("observacoes") else ""))
         exe = j["exe_traduzido"] or j["executable_path"] or "(sem executável)"
@@ -424,23 +427,54 @@ class App:
         j = self.selecionado()
         if not j:
             return
-        if not j["executable_path"]:
-            messagebox.showwarning("Jogar", "Jogo sem executável cadastrado.")
-            return
+        prep = core.preparar_lancamento(j)
+        if prep.get("aviso"):
+            messagebox.showwarning("Preset Azahar", prep["aviso"])
         con = self._con()
         try:
-            res = core.executar_jogo_dict(j)
+            res = core.executar_monitorado(
+                j, ao_fim=lambda sessao, rastreado, _gid=j["id"]:
+                    self._depois(lambda: self._sessao_fim(_gid, sessao, rastreado)))
             if res.get("requer_elevacao") and messagebox.askyesno(
                     "Jogar", "Esse jogo exige administrador.\nTentar com elevação (UAC)?"):
                 res = core.executar_jogo_dict(j, elevar=True)
-            if res.get("ok"):
+                if res.get("ok"):
+                    core.marcar_execucao(con, j["id"])
+                    messagebox.showinfo("Jogar", "Executando ✓ (UAC — horas manuais)")
+                else:
+                    messagebox.showerror("Jogar", res.get("erro", "falha"))
+            elif res.get("ok"):
                 core.marcar_execucao(con, j["id"])
-                messagebox.showinfo("Jogar", f"Executando ✓ ({res.get('modo')})")
+                extra = " ⏱ tempo será registrado" if res.get("rastreado") else ""
+                messagebox.showinfo("Jogar", f"Executando ✓ ({res.get('modo')}){extra}")
             else:
                 messagebox.showerror("Jogar", res.get("erro", "falha"))
         finally:
             con.close()
         self.recarregar()
+
+    def _sessao_fim(self, gid: int, sessao: float, rastreado: bool) -> None:
+        """Callback da vigia (já na thread de UI): soma, recarrega, avisa."""
+        if not rastreado:
+            return
+        con = self._con()
+        try:
+            ok, msg = self._registrar_sessao(con, gid, sessao)
+        finally:
+            con.close()
+        self.recarregar()
+        if ok:
+            messagebox.showinfo("Sessão registrada", msg)
+
+    @staticmethod
+    def _registrar_sessao(con, gid: int, sessao: float) -> tuple[bool, str]:
+        """Soma a sessão e devolve (ok, mensagem). Sem Tk: testável."""
+        if sessao <= 0:
+            return False, "Sessão curta (<30 s): nada registrado."
+        r = core.adicionar_horas(con, gid, sessao)
+        if not r.get("ok"):
+            return False, f"Sessão não registrada: {r.get('erro')}"
+        return True, f"+{r['somado']}h registradas (total {r['total']}h)."
 
     def excluir(self):
         j = self.selecionado()
@@ -512,6 +546,31 @@ class App:
         ttk.Checkbutton(frow, text="★ favorito", variable=var_fav).pack(side="left")
         campos["nota"], campos["horas"], campos["favorito"] = var_nota, var_horas, var_fav
         linha("Opções de lançamento", "launch_options", j["launch_options"] if j else "")
+        ttk.Label(dlg, text="Preset Azahar (só ROMs 3DS; vazio = nenhum)").pack(
+            anchor="w", padx=10, pady=(6, 0))
+        var_preset = tk.StringVar(
+            value=(j.get("azahar_preset") if j else "") or "")
+        cmb_preset = ttk.Combobox(dlg, textvariable=var_preset,
+                                  values=core.listar_presets())
+        cmb_preset.pack(fill="x", padx=10)
+        campos["azahar_preset"] = var_preset
+
+        def foto_preset():
+            nome = simpledialog.askstring(
+                "Preset Azahar",
+                "Nome do preset (fotografa a config atual do Azahar):",
+                parent=dlg)
+            if not nome:
+                return
+            r = core.salvar_preset_de_atual(nome)
+            if r.get("ok"):
+                cmb_preset.configure(values=core.listar_presets())
+                var_preset.set(r["preset"])
+            else:
+                messagebox.showwarning("Preset Azahar", r.get("erro", "falha"))
+
+        ttk.Button(dlg, text="📸 Fotografar config atual como preset...",
+                   command=foto_preset).pack(anchor="e", padx=10)
         ttk.Label(dlg, text="Observações").pack(anchor="w", padx=10, pady=(6, 0))
         txt = tk.Text(dlg, height=3, bg="#0b0d12", fg=TXT, insertbackground=TXT)
         txt.pack(fill="x", padx=10)
@@ -556,6 +615,7 @@ class App:
                     "favorito": var_fav.get(),
                     "wine_prefix": "",
                     "launch_options": campos["launch_options"].get().strip(),
+                    "azahar_preset": campos["azahar_preset"].get().strip(),
                     "observacoes": txt.get("1.0", "end").strip(),
                 }
             except ValueError:
@@ -893,6 +953,50 @@ class App:
         self.recarregar()
         messagebox.showinfo("Importar", f"Novos: {res['novos']} "
                                         f"(total {res['total_no_banco']}).")
+
+    def exportar_pacote(self):
+        dest = filedialog.asksaveasfilename(
+            title="Pacote portátil (banco + capas + presets + saves 3DS)",
+            defaultextension=".zip", filetypes=[("ZIP", "*.zip")],
+            initialfile="biblioteca-pacote.zip")
+        if not dest:
+            return
+        try:
+            res = core.exportar_pacote(dest, db_path=self.db_path, incluir_saves=True)
+        except Exception as e:
+            messagebox.showerror("Pacote", f"falha: {e}")
+            return
+        if not res.get("ok"):
+            messagebox.showerror("Pacote", res.get("erro", "falha"))
+            return
+        kb = res["bytes"] // 1024
+        messagebox.showinfo("Pacote",
+                            f"{res['jogos']} jogo(s) · {res['arquivos']} arquivo(s) · "
+                            f"{kb} KB{' · +saves 3DS' if res['inclui_saves'] else ''}\n"
+                            f"{res['destino']}")
+
+    def importar_pacote(self):
+        arq = filedialog.askopenfilename(
+            title="Pacote portátil", filetypes=[("ZIP", "*.zip")])
+        if not arq:
+            return
+        try:
+            res = core.importar_pacote(
+                arq, db_path=self.db_path,
+                restaurar_saves=messagebox.askyesno(
+                    "Pacote", "Restaurar os saves 3DS do pacote?"))
+        except Exception as e:
+            messagebox.showerror("Pacote", f"falha: {e}")
+            return
+        if not res.get("ok"):
+            messagebox.showerror("Pacote", res.get("erro", "falha"))
+            return
+        self.sel = None
+        self.recarregar()
+        messagebox.showinfo("Pacote",
+                            f"Novos: {res['novos']} (total {res['total_no_banco']}) · "
+                            f"capas {res['capas']} · presets {res['presets']} · "
+                            f"saves {res['saves']}")
 
 
 def main(argv: list[str] | None = None) -> int:
