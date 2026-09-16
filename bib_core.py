@@ -1199,25 +1199,97 @@ def azahar_release_info(timeout: int = 25) -> dict:
     return {"erro": "asset deste SO não encontrado no release"}
 
 
-def _fundir(orig: Path, dst: Path) -> None:
-    """Move orig p/ dentro de dst mesclando pastas (nunca apaga o que já há)."""
+AZAHAR_EXE_MINIMO = 10_000_000  # sanidade: menor que isso não é o Azahar
+
+
+def _fundir(orig: Path, dst: Path) -> int:
+    """Move orig p/ dentro de dst mesclando pastas. Retorna nº de falhas
+    (antes engolia quieto e o update anunciava ok incompleto)."""
+    falhas = 0
     for item in orig.iterdir():
         alvo = dst / item.name
         if item.is_dir():
-            alvo.mkdir(exist_ok=True)
-            _fundir(item, alvo)
+            try:
+                alvo.mkdir(exist_ok=True)
+            except OSError:
+                falhas += 1
+                continue
+            falhas += _fundir(item, alvo)
         else:
             try:
                 if alvo.exists():
                     alvo.unlink()
                 shutil.move(str(item), str(alvo))
             except OSError:
+                falhas += 1
+    return falhas
+
+
+def _guardar_anterior(dest: Path):
+    """Move os binários atuais p/ dest.anterior (user/ fica no lugar).
+
+    Retorna o Path do anterior, ou None em instalação limpa. Uma geração só.
+    """
+    exe_atual = (dest / "azahar.exe") if os.name == "nt" else (dest / "azahar.AppImage")
+    if not exe_atual.is_file():
+        return None
+    anterior = dest.parent / (dest.name + ".anterior")
+    if anterior.exists():
+        shutil.rmtree(anterior, ignore_errors=True)
+    anterior.mkdir(parents=True)
+    movidos: list[str] = []
+    try:
+        for item in list(dest.iterdir()):
+            if item.name == "user":
+                continue  # saves/config/mods nunca saem do lugar
+            shutil.move(str(item), str(anterior / item.name))
+            movidos.append(item.name)
+    except OSError:
+        for nome in movidos:  # devolve o que já saiu; nada se perde
+            try:
+                shutil.move(str(anterior / nome), str(dest / nome))
+            except OSError:
                 pass
+        try:
+            anterior.rmdir()
+        except OSError:
+            pass
+        raise
+    return anterior
+
+
+def _restaurar_anterior(dest: Path, anterior) -> bool:
+    """Desfaz: remove binários novos, traz os antigos de volta. user/ intacto."""
+    if anterior is None or not anterior.is_dir():
+        return False
+    for item in list(dest.iterdir()):
+        if item.name == "user":
+            continue
+        try:
+            if item.is_dir() and not item.is_symlink():
+                shutil.rmtree(item, ignore_errors=True)
+            else:
+                item.unlink()
+        except OSError:
+            pass
+    for item in list(anterior.iterdir()):
+        try:
+            shutil.move(str(item), str(dest / item.name))
+        except OSError:
+            pass
+    try:
+        anterior.rmdir()
+    except OSError:
+        pass
+    return True
 
 
 def azahar_instalar(info: dict, progresso=None) -> dict:
     """Baixa o asset, confere tamanho+sha256 e instala preservando user/.
 
+    Instalação em 2 tempos com rollback: a versão atual vai p/ dest.anterior
+    (uma geração) antes de entrar a nova; qualquer falha restaura e retorna
+    ok False — nunca anuncia sucesso incompleto. ok True = exe verificado.
     progresso(feitos_bytes, total_bytes) é chamado durante o download.
     Roda em thread na GUI; aqui é bloqueante.
     """
@@ -1262,6 +1334,7 @@ def azahar_instalar(info: dict, progresso=None) -> dict:
             pass
         return {"ok": False, "erro": "sha256 divergente (arquivo descartado)"}
     stage = None
+    anterior = None
     try:
         dest.mkdir(parents=True, exist_ok=True)
         if os.name == "nt":
@@ -1275,17 +1348,55 @@ def azahar_instalar(info: dict, progresso=None) -> dict:
                     break
             if raiz is None:
                 return {"ok": False, "erro": "azahar.exe não encontrado no pacote"}
-            _fundir(raiz, dest)
+            if (raiz / "azahar.exe").stat().st_size < AZAHAR_EXE_MINIMO:
+                return {"ok": False, "erro": "azahar.exe suspeito (pequeno demais)"}
+            try:
+                anterior = _guardar_anterior(dest)
+            except OSError as e:
+                _restaurar_anterior(dest, anterior)
+                return {"ok": False, "erro": f"não consegui preservar a atual: {e}"}
+            try:
+                falhas = _fundir(raiz, dest)
+            except OSError as e:
+                _restaurar_anterior(dest, anterior)
+                return {"ok": False,
+                        "erro": f"falha ao copiar ({e}); versão anterior restaurada"}
+            if falhas:
+                _restaurar_anterior(dest, anterior)
+                return {"ok": False,
+                        "erro": f"{falhas} arquivo(s) falharam; versão anterior restaurada"}
+            exe_final = dest / "azahar.exe"
+            if not exe_final.is_file() or exe_final.stat().st_size < AZAHAR_EXE_MINIMO:
+                _restaurar_anterior(dest, anterior)
+                return {"ok": False,
+                        "erro": "exe final inválido; versão anterior restaurada"}
         else:
             alvo = dest / "azahar.AppImage"
+            ant = dest / "azahar.AppImage.anterior"
+            if alvo.is_file():
+                if ant.exists():
+                    ant.unlink()
+                shutil.move(str(alvo), str(ant))
+                anterior = ant
             try:
-                if alvo.exists():
-                    alvo.unlink()
                 shutil.move(str(tmpzip), str(alvo))
                 tmpzip = None  # virou o AppImage final
                 os.chmod(alvo, 0o755)
             except OSError as e:
+                if anterior is not None and anterior.is_file():
+                    try:
+                        shutil.move(str(anterior), str(alvo))
+                    except OSError:
+                        pass
                 return {"ok": False, "erro": f"falha ao instalar AppImage: {e}"}
+            if alvo.stat().st_size < AZAHAR_EXE_MINIMO:
+                if anterior is not None and anterior.is_file():
+                    try:
+                        alvo.unlink()
+                        shutil.move(str(anterior), str(alvo))
+                    except OSError:
+                        pass
+                return {"ok": False, "erro": "AppImage final inválido; anterior restaurado"}
         (dest / AZAHAR_VERSAO_ARQ).write_text(tag, encoding="utf-8")
     except Exception as e:
         return {"ok": False, "erro": f"instalação falhou: {type(e).__name__}: {e}"}
@@ -1297,9 +1408,18 @@ def azahar_instalar(info: dict, progresso=None) -> dict:
             pass
         if stage is not None:
             shutil.rmtree(stage, ignore_errors=True)
-    exe = default_emu_3ds()
-    return {"ok": True, "tag": tag, "exe": exe,
-            "exe_existe": bool(exe) and Path(exe).is_file()}
+    exe_final = (dest / "azahar.exe") if os.name == "nt" else (dest / "azahar.AppImage")
+    try:
+        ok_final = exe_final.is_file() and exe_final.stat().st_size >= AZAHAR_EXE_MINIMO
+    except OSError:
+        ok_final = False
+    if not ok_final:
+        return {"ok": False,
+                "erro": "instalação terminou sem exe válido"
+                        + (f" (anterior em {anterior})" if anterior else "")}
+    exe = default_emu_3ds() or str(exe_final)
+    return {"ok": True, "tag": tag, "exe": exe, "exe_existe": True,
+            "anterior": str(anterior) if anterior else None}
 
 
 ROM_TAGS_LIXO_RE = re.compile(
