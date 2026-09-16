@@ -41,7 +41,6 @@ STATUS_CORES = {"backlog": MUT, "jogando": "#7aa2ff", "zerado": OK_C,
 # (rótulo, filtro_status, só_favoritos)
 NAV = [("📚 Biblioteca", "", False),
        ("▶ Jogando", "jogando", False),
-       ("🕹 Backlog", "backlog", False),
        ("✓ Zerados", "zerado", False),
        ("★ Favoritos", "", True)]
 
@@ -84,6 +83,8 @@ class App:
         self.jogos: list[dict] = []
         self.sel: int | None = None
         self.nav_idx = 0
+        self.filtro_prov: str | None = None  # chave do provider (fundo, não jogo)
+        self.prov_btns: dict[str, ttk.Button] = {}
         self._deb = None
         self.cards: list[dict] = []  # {frame, jogo}
         self._imgs_cards: list = []  # retém miniaturas da grade
@@ -141,6 +142,14 @@ class App:
                            command=lambda i=i: self._ir_nav(i))
             b.pack(fill="x", padx=8, pady=1)
             self.nav_btns.append(b)
+        ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
+        ttk.Label(side, text="PROVEDORES", style="Panel.TLabel",
+                  font=("Segoe UI", 9, "bold"), foreground=MUT).pack(anchor="w", padx=12)
+        for chave in core.provedores():
+            b = ttk.Button(side, text=chave, style="Side.TButton",
+                           command=lambda c=chave: self._ir_prov(c))
+            b.pack(fill="x", padx=8, pady=1)
+            self.prov_btns[chave] = b
         ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
         ttk.Label(side, text="IMPORTAR", style="Panel.TLabel",
                   font=("Segoe UI", 9, "bold"), foreground=MUT).pack(anchor="w", padx=12)
@@ -221,9 +230,16 @@ class App:
     def _pintar_nav(self):
         for i, b in enumerate(self.nav_btns):
             b.configure(style="SideAct.TButton" if i == self.nav_idx else "Side.TButton")
+        for chave, b in self.prov_btns.items():
+            b.configure(style="SideAct.TButton" if chave == self.filtro_prov else "Side.TButton")
 
     def _ir_nav(self, i: int):
         self.nav_idx = i
+        self._pintar_nav()
+        self.recarregar()
+
+    def _ir_prov(self, chave: str):
+        self.filtro_prov = None if self.filtro_prov == chave else chave
         self._pintar_nav()
         self.recarregar()
 
@@ -271,6 +287,13 @@ class App:
         try:
             self.jogos = core.listar_jogos(
                 con, q=self.var_q.get().strip(), status=status, favorito=fav)
+            if self.filtro_prov:
+                self.jogos = core.jogos_do_provedor(self.jogos, self.filtro_prov)
+            for r in core.provedores_resumo(con):
+                b = self.prov_btns.get(r["chave"])
+                if b is not None:
+                    marca = "✓" if r["instalado"] else "!"
+                    b.configure(text=f"🎮{marca} {r['nome']} · {r['n']}")
         finally:
             con.close()
         for w in self.grade.winfo_children():
@@ -290,8 +313,7 @@ class App:
             "🎮 Azahar !" if az["instalado"] else "🎮 Azahar ✗")
         self.lbl_cont.configure(text=f"{n} jogo(s) · {az_txt}")
         if n == 0:
-            self.lbl_vazio.configure(
-                text="Nada aqui — importe do Hydra ou faça um scan do disco. 📥")
+            self.lbl_vazio.configure(text="Nada aqui — use 📥 Importar…")
             self.lbl_vazio.pack(anchor="w", padx=14)
         else:
             self.lbl_vazio.pack_forget()

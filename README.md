@@ -58,7 +58,7 @@ Onde o Hydra guarda os dados:
 
 ## HUB de emulação (provedores)
 
-O núcleo tem um **registro de emuladores** (`provedores()` em `bib_core.py`): cada provider diz que origens atende, onde está o exe, onde ficam config/saves, como montar o launch e como aplicar preset. Lançamento, horas automáticas, pacote e backup de saves falam com o registro — **o Azahar é só o provider nº 1**. O próximo sistema (NDS, GBA…) entra como provider novo sem tocar em lançamento ou frontends.
+O núcleo tem um **registro de emuladores** (`provedores()` em `bib_core.py`): cada provider diz que origens atende, onde está o exe, onde ficam config/saves, como montar o launch e como aplicar preset. Lançamento, horas automáticas, pacote e backup de saves falam com o registro — **o Azahar é só o provider nº 1**. O próximo sistema (NDS, GBA…) entra como provider novo sem tocar em lançamento ou frontends. Na GUI, provedores ficam numa seção própria (recurso de fundo, com nº de jogos e ✓ de instalado) — clicar filtra os jogos que ele roda; o emulador não entra na lista de jogos.
 
 ## Portátil Windows
 

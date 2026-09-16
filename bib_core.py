@@ -2105,6 +2105,33 @@ def provedor_nome(jogo_ou_origem) -> str:
     return f"{prov['nome']} · {'/'.join(prov['sistemas'])}"
 
 
+def jogos_do_provedor(jogos: list[dict], chave: str) -> list[dict]:
+    """Só os jogos que o provider consegue rodar (p/ filtro da UI)."""
+    return [j for j in (jogos or [])
+            if (provedor_por_origem(j.get("origem") or "") or {}).get("chave") == chave]
+
+
+def contar_por_origem(con: sqlite3.Connection) -> dict:
+    rows = con.execute("SELECT origem, COUNT(*) AS n FROM jogos GROUP BY origem").fetchall()
+    return {(r["origem"] or ""): r["n"] for r in rows}
+
+
+def provedores_resumo(con: sqlite3.Connection) -> list[dict]:
+    """Um item por provider: chave, nome, sistemas, nº de jogos, instalado."""
+    cont = contar_por_origem(con)
+    out = []
+    for chave, prov in provedores().items():
+        n = sum(cont.get(o, 0) for o in prov["origens"])
+        try:
+            exe = prov["exe"]() or ""
+        except Exception:
+            exe = ""
+        out.append({"chave": chave, "nome": prov["nome"],
+                    "sistemas": prov["sistemas"], "n": n,
+                    "instalado": bool(exe)})
+    return out
+
+
 def montar_launch_rom(prov: dict, rom_path: str) -> str:
     """flags do provider + ROM entre aspas quando tem espaço."""
     rom = (rom_path or "").strip()
