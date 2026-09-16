@@ -9,8 +9,8 @@ Uso:
 
 Teclas (lista): ↑/↓ ou j/k navegar · PgUp/PgDn · / buscar · f status ·
   * favoritos · Enter jogar · a adicionar · e editar · d excluir ·
-  h preview Hydra · s scan disco · R ROMs 3DS · b backup · U saves 3DS ·
-  E exportar JSON · I importar (JSON ou pacote .zip) · P pacote portátil ·
+  I importar (arquivo, pasta ou Hydra — ROM liga no emu sozinha) ·
+  b backup · U saves 3DS · E exportar JSON · P pacote portátil ·
   A atualizar Azahar · r recarregar · q sair
 Preview: Espaço marca/desmarca · i importa marcados · q volta
 
@@ -94,7 +94,7 @@ class Tui:
         s = self.stdscr
         s.erase()
         rows, cols = s.getmaxyx()
-        titulo = "🎮 Biblioteca  │  / busca · f status · * fav · Enter joga · a/e/d · h hydra · s scan · R roms · b/U/E/I/P/A · q sai"
+        titulo = "🎮 Biblioteca  │  / busca · f status · * fav · Enter joga · a/e/d · I importa · b/U/E/P/A · q sai"
         s.addnstr(0, 0, titulo, cols - 1, self.cor["mut"])
         az = core.azahar_status()
         azg = "🎮✓" if az["instalado"] and az["chaves"] else ("🎮!" if az["instalado"] else "🎮✗")
@@ -361,35 +361,66 @@ class Tui:
             return
         self.tela_prev(f"Hydra: {len(itens)} achado(s)", itens)
 
-    def prev_scan(self):
-        r = self.perguntar("Raízes (; separadas, vazio=padrão): ")
+    def importar_unificado(self):
+        """Um ponto de entrada: arquivo, pasta ou Hydra (emu detectado só)."""
+        r = self.perguntar("Importar: [A]rquivo, [P]asta, [H]ydra, [C]ancela? ")
         if r is None:
             return
-        roots = [x.strip() for x in r.split(";") if x.strip()] or None
-        self.msg = "Varrendo disco (só leitura)..."
-        self.desenhar()
-        _roots_u, itens, info = core.preview_scan(roots)
-        sub = f"Disco: {len(itens)} achado(s)"
-        if info.get("truncado"):
-            sub += " (PARCIAL: teto de varredura)"
-        self.tela_prev(sub, itens)
+        op = r.strip().lower()
+        if op in ("a", "arq", "arquivo"):
+            arq = self.perguntar("Arquivo (exe, ROM, JSON, .zip): ")
+            if not arq:
+                return
+            self._importar_arquivo(arq.strip())
+        elif op in ("p", "pasta"):
+            r = self.perguntar("Pasta (; separadas, vazio=tudo): ")
+            if r is None:
+                return
+            roots = [x.strip() for x in r.split(";") if x.strip()] or None
+            self._prev_pasta(roots)
+        elif op in ("h", "hydra"):
+            self.prev_hydra()
+        # resto = cancela
 
-    def prev_roms(self):
-        emu = self.perguntar(f"Emulador (vazio={core.default_emu_3ds() or 'auto'}): ")
-        if emu is None:
-            return
-        emu = emu.strip() or None
-        r = self.perguntar("Raízes (; separadas, vazio=padrão): ")
-        if r is None:
-            return
-        roots = [x.strip() for x in r.split(";") if x.strip()] or None
-        self.msg = "Procurando ROMs (só leitura)..."
+    def _prev_pasta(self, roots):
+        self.msg = "Varrendo (só leitura)..."
         self.desenhar()
-        _ru, itens, info, emu_u = core.preview_roms(roots, emu)
-        sub = f"ROMs: {len(itens)} achado(s) [{emu_u or 'sem emu'}]"
+        try:
+            _ru, itens, info = core.preview_pasta(roots)
+        except Exception as e:
+            self.msg = f"Falha: {e}"
+            return
+        sub = f"Pasta: {len(itens)} achado(s)"
         if info.get("truncado"):
             sub += " (PARCIAL)"
+        if not info.get("emu"):
+            sub += " [Azahar ausente: ROMs importam; instale com A]"
         self.tela_prev(sub, itens)
+
+    def _importar_arquivo(self, arq: str):
+        ana = core.analisar_arquivo(arq)
+        tipo = ana["tipo"]
+        if tipo == "pasta":
+            self._prev_pasta([arq])
+        elif tipo == "json":
+            self.importar_json(arq)
+        elif tipo == "pacote":
+            self.importar_pacote(arq)
+        elif tipo in ("rom", "jogo"):
+            if ana.get("aviso") and not self.confirmar(f"{ana['aviso']} Importar?"):
+                return
+            con = self._con()
+            try:
+                res = core.importar_lista(con, [ana["item"]])
+            finally:
+                con.close()
+            if res["novos"]:
+                self.msg = f"{ana['detalhe']} ✓"
+            else:
+                self.msg = "Já estava na biblioteca (nada novo)."
+            self.recarregar()
+        else:
+            self.msg = ana["detalhe"] or "não suportado."
 
     def backup(self):
         try:
@@ -428,11 +459,12 @@ class Tui:
             return
         self.msg = f"Exportados {len(jogos)} jogo(s)."
 
-    def importar_json(self):
-        arq = self.perguntar("Importar de (JSON ou pacote .zip): ")
+    def importar_json(self, arq: str | None = None):
         if not arq:
-            return
-        arq = arq.strip()
+            arq = self.perguntar("Importar de (JSON ou pacote .zip): ")
+            if not arq:
+                return
+            arq = arq.strip()
         if arq.lower().endswith(".zip"):
             self.importar_pacote(arq)
             return
@@ -562,12 +594,6 @@ class Tui:
                 self.editar()
             elif ch == ord("d"):
                 self.excluir()
-            elif ch == ord("h"):
-                self.prev_hydra()
-            elif ch == ord("s"):
-                self.prev_scan()
-            elif ch == ord("R"):
-                self.prev_roms()
             elif ch == ord("b"):
                 self.backup()
             elif ch == ord("U"):
@@ -575,7 +601,7 @@ class Tui:
             elif ch == ord("E"):
                 self.exportar_json()
             elif ch == ord("I"):
-                self.importar_json()
+                self.importar_unificado()
             elif ch == ord("P"):
                 self.exportar_pacote()
             elif ch == ord("A"):

@@ -967,6 +967,32 @@ def _titulo_de_rom(p: Path) -> str:
     return re.sub(r"\s+", " ", nome) or p.stem
 
 
+def _item_rom(full: str, emu_exe: str = "") -> dict:
+    """Um achado de ROM (título/código/região lidos de dentro do arquivo)."""
+    item = {
+        "titulo": _titulo_de_rom(Path(full)),
+        "executable_path": emu_exe,
+        "launch_options": full,
+        "shop": "", "object_id": "",
+        "horas": 0.0, "origem": "rom-3ds",
+        "rom_path": full,
+        "game_code": "", "regiao": "",
+        "tem_metadados": False,
+    }
+    try:
+        m = ler_metadados_3ds(full)
+    except Exception:
+        m = {}
+    if m.get("titulo"):
+        item["titulo"] = m["titulo"]
+        item["tem_metadados"] = True
+    if m.get("game_code"):
+        item["game_code"] = m["game_code"]
+    if m.get("regiao"):
+        item["regiao"] = m["regiao"]
+    return item
+
+
 def scan_roms(roots: list[str], emu_exe: str = "", prof_max: int = 4,
               retornar_info: bool = False) -> list[dict] | tuple[list[dict], dict]:
     """Procura ROMs 3DS. Leitura apenas. Itens já vêm com o emu em executable_path."""
@@ -1005,28 +1031,7 @@ def scan_roms(roots: list[str], emu_exe: str = "", prof_max: int = 4,
                 full = str(Path(dirpath) / fn)
                 chave = full.lower()
                 if chave not in achados:
-                    item = {
-                        "titulo": _titulo_de_rom(Path(full)),
-                        "executable_path": emu_exe,
-                        "launch_options": full,
-                        "shop": "", "object_id": "",
-                        "horas": 0.0, "origem": "rom-3ds",
-                        "rom_path": full,
-                        "game_code": "", "regiao": "",
-                        "tem_metadados": False,
-                    }
-                    try:
-                        m = ler_metadados_3ds(full)
-                    except Exception:
-                        m = {}
-                    if m.get("titulo"):
-                        item["titulo"] = m["titulo"]
-                        item["tem_metadados"] = True
-                    if m.get("game_code"):
-                        item["game_code"] = m["game_code"]
-                    if m.get("regiao"):
-                        item["regiao"] = m["regiao"]
-                    achados[chave] = item
+                    achados[chave] = _item_rom(full, emu_exe)
     return _final()
 
 
@@ -1037,6 +1042,79 @@ def preview_roms(roots: list[str] | None = None,
     emu = emu_exe if emu_exe is not None else default_emu_3ds()
     achados, info = scan_roms(roots, emu_exe=emu, retornar_info=True)
     return roots, [pontuar(j) for j in achados], info, emu
+
+
+EXE_IMPORTAVEIS = {".exe", ".lnk", ".bat", ".cmd", ".sh", ".AppImage"}
+
+
+def analisar_arquivo(caminho: str) -> dict:
+    """Classifica UM caminho p/ a importação unificada. Só leitura.
+
+    Retorna {"tipo", "item", "provedor", "detalhe", "aviso"} onde tipo é
+    'pasta' | 'rom' | 'jogo' | 'json' | 'pacote' | 'desconhecido'.
+    Emulador ausente NÃO bloqueia: a ROM importa e o aviso orienta (⬇).
+    """
+    vazio = {"tipo": "desconhecido", "item": None, "provedor": None,
+             "detalhe": "", "aviso": None}
+    p = Path((caminho or "").strip())
+    if not p.exists():
+        return {**vazio, "detalhe": "caminho não existe."}
+    if p.is_dir():
+        return {**vazio, "tipo": "pasta",
+                "detalhe": f"pasta: varre jogos de PC + ROMs ({p})."}
+    ext = p.suffix.lower()
+    if ext == ".json":
+        return {**vazio, "tipo": "json", "detalhe": "lista de jogos (JSON)."}
+    if ext == ".zip":
+        return {**vazio, "tipo": "pacote",
+                "detalhe": "pacote portátil (.zip) — tenta restaurar."}
+    prov = provedor_por_extensao(ext)
+    if prov is not None:
+        emu = prov["exe"]() or ""
+        item = pontuar(_item_rom(str(p), emu))
+        aviso = None
+        if not emu:
+            aviso = (f"{prov['nome']} não instalado — a ROM importa mesmo assim; "
+                     f"depois instale com 'Atualizar {prov['nome']}'.")
+        return {"tipo": "rom", "item": item, "provedor": prov["chave"],
+                "detalhe": (f"ROM { '/'.join(prov['sistemas'])} → {prov['nome']} "
+                            f"· '{item['titulo']}'"),
+                "aviso": aviso}
+    if ext in EXE_IMPORTAVEIS or not ext:
+        item = pontuar({
+            "titulo": _titulo_de_exe(p), "executable_path": str(p),
+            "shop": "", "object_id": "",
+            "horas": 0.0, "origem": "scan-disco",
+        })
+        aviso = None
+        if SKIP_EXE_RE.search(p.name):
+            aviso = "parece instalador/suporte (setup, redist…) — confira antes."
+        return {"tipo": "jogo", "item": item, "provedor": None,
+                "detalhe": f"jogo de PC (roda direto, sem emulador) · '{item['titulo']}'",
+                "aviso": aviso}
+    return {**vazio, "detalhe": (f"extensão '{ext or '?'}' não suportada "
+                                 "(exe, ROM 3DS, .json, .zip ou pasta).")}
+
+
+def preview_pasta(roots: list[str] | None = None) -> tuple[list[str], list[dict], dict]:
+    """Uma varredura só: jogos de PC + ROMs nas mesmas raízes.
+
+    (raízes_usadas, itens pontuados mistos, info{vistos, truncado, raizes, emu}).
+    ROMs sem emulador vêm com exe vazio (importam; o play orienta).
+    """
+    if not roots:
+        vistas: list[str] = []
+        for r in default_scan_roots() + default_roms_roots():
+            if r not in vistas:
+                vistas.append(r)
+        roots = vistas
+    roots_u, itens_disco, info_d = preview_scan(roots)
+    _r, itens_rom, info_r, emu = preview_roms(roots, None)
+    itens = sorted(itens_disco + itens_rom, key=lambda j: j["titulo"].lower())
+    info = {"vistos": info_d["vistos"] + info_r["vistos"],
+            "truncado": info_d["truncado"] or info_r["truncado"],
+            "raizes": info_d["raizes"], "emu": emu}
+    return roots_u, itens, info
 
 
 # --------------------------------------------------------------------------
@@ -1554,6 +1632,7 @@ def _prov_azahar() -> dict:
         "user_dir": azahar_user_dir,     # (exe="") -> str
         "saves_subs": ("sdmc", "states"),
         "pacote_subs": ("sdmc",),        # states travam à versão: fora do pacote
+        "rom_exts": ROM_EXTS_3DS,
         "flags": azahar_flags,           # () -> list[str]
         "aplicar_preset": aplicar_preset,  # (nome) -> dict
         "dica_instalacao": ("Azahar não encontrado — instale em "
@@ -1569,6 +1648,17 @@ def provedores() -> dict:
 def provedor_por_origem(origem: str) -> dict | None:
     for prov in provedores().values():
         if (origem or "") in prov["origens"]:
+            return prov
+    return None
+
+
+def provedor_por_extensao(ext: str) -> dict | None:
+    """Provider que abre essa extensão de ROM ('.3ds' -> Azahar). None = PC."""
+    ext = (ext or "").strip().lower()
+    if not ext.startswith("."):
+        ext = "." + ext
+    for prov in provedores().values():
+        if ext in prov.get("rom_exts", ()):
             return prov
     return None
 

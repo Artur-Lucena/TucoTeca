@@ -144,10 +144,7 @@ class App:
         ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
         ttk.Label(side, text="IMPORTAR", style="Panel.TLabel",
                   font=("Segoe UI", 9, "bold"), foreground=MUT).pack(anchor="w", padx=12)
-        for rotulo, cmd in (("🔍 do Hydra", self.prev_hydra),
-                            ("💽 do Disco", self.prev_scan),
-                            ("🎮 ROMs 3DS", self.prev_roms),
-                            ("📦 JSON…", self.importar_json)):
+        for rotulo, cmd in (("📥 Importar…", self.importar_unificado),):
             ttk.Button(side, text=rotulo, style="Side.TButton",
                        command=cmd).pack(fill="x", padx=8, pady=1)
         ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
@@ -157,8 +154,7 @@ class App:
                             ("💾 Saves 3DS", self.backup_saves),
                             ("⬇ Atualizar Azahar", self.atualizar_azahar),
                             ("💾 Exportar JSON…", self.exportar_json),
-                            ("📦 Pacote…", self.exportar_pacote),
-                            ("📥 Pacote…", self.importar_pacote)):
+                            ("📦 Pacote…", self.exportar_pacote)):
             ttk.Button(side, text=rotulo, style="Side.TButton",
                        command=cmd).pack(fill="x", padx=8, pady=1)
         self._pintar_nav()
@@ -657,6 +653,121 @@ class App:
         ttk.Button(dlg, text="Salvar", command=salvar,
                    style="Accent.TButton").pack(pady=10)
 
+    # -- importação unificada (pasta ou arquivo; emulador detectado sozinho)
+    def importar_unificado(self):
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Importar")
+        dlg.configure(bg=BG)
+        dlg.transient(self.root)
+        dlg.grab_set()
+        ttk.Label(dlg, wraplength=420, justify="left", text=(
+            "Escolha uma PASTA (varre jogos de PC + ROMs de uma vez) ou um "
+            "ARQUIVO (exe, ROM, JSON ou pacote .zip).\n"
+            "ROMs são ligadas no emulador sozinhas; sem emulador, importam "
+            "mesmo assim e o play orienta.")).pack(anchor="w", padx=14, pady=12)
+
+        def de_pasta():
+            pasta = filedialog.askdirectory(title="Pasta para varrer", parent=dlg)
+            if not pasta:
+                return
+            dlg.destroy()
+            self._importar_pasta(pasta)
+
+        def de_arquivo():
+            arq = filedialog.askopenfilename(
+                title="Arquivo para importar", parent=dlg,
+                filetypes=[("Suportados",
+                            "*.exe *.lnk *.bat *.cmd *.3ds *.3dsx *.cci *.cxi "
+                            "*.elf *.app *.axf *.json *.zip"),
+                           ("Executáveis", "*.exe *.lnk *.bat *.cmd"),
+                           ("ROMs 3DS", "*.3ds *.3dsx *.cci *.cxi *.elf *.app *.axf"),
+                           ("JSON", "*.json"), ("Pacote", "*.zip"),
+                           ("Todos", "*.*")])
+            if not arq:
+                return
+            dlg.destroy()
+            self._importar_arquivo(arq)
+
+        def do_hydra():
+            dlg.destroy()
+            self.prev_hydra()
+
+        for rotulo, cmd in (("📁 Escolher pasta…", de_pasta),
+                            ("📄 Escolher arquivo…", de_arquivo),
+                            ("🔍 Ler do Hydra", do_hydra)):
+            ttk.Button(dlg, text=rotulo, command=cmd).pack(fill="x", padx=14, pady=3)
+        ttk.Button(dlg, text="Cancelar", command=dlg.destroy).pack(pady=(3, 12))
+
+    def _importar_pasta(self, pasta: str):
+        prog = tk.Toplevel(self.root)
+        prog.title("Importar pasta")
+        prog.transient(self.root)
+        ttk.Label(prog, text="Varrendo pasta (só leitura)...").pack(padx=24, pady=24)
+        prog.update()
+
+        def trabalho():
+            def na_ui(fn):
+                try:
+                    self.root.after(0, fn)
+                except tk.TclError:
+                    pass  # janela fechada no meio do scan
+
+            def falhou(e):
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    return
+                messagebox.showerror("Importar pasta", f"falha na varredura: {e}")
+
+            try:
+                _roots_u, itens, info = core.preview_pasta([pasta])
+            except Exception as e:
+                na_ui(lambda: falhou(e))
+                return
+
+            def pronto():
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    return
+                sub = f"{len(itens)} achado(s)."
+                if info.get("truncado"):
+                    sub += " LISTA PARCIAL (teto de varredura)."
+                if not info.get("emu"):
+                    sub += (" ROMs importam sem executável (Azahar ausente) — "
+                            "instale com 'Atualizar Azahar'.")
+                self._dlg_prev("Preview — Pasta",
+                               sub + " Pré-marcados: score ≥ 0.3.", itens)
+            na_ui(pronto)
+
+        threading.Thread(target=trabalho, daemon=True).start()
+
+    def _importar_arquivo(self, arq: str):
+        ana = core.analisar_arquivo(arq)
+        tipo = ana["tipo"]
+        if tipo == "pasta":
+            self._importar_pasta(arq)
+        elif tipo == "json":
+            self.importar_json(arq)
+        elif tipo == "pacote":
+            self.importar_pacote(arq)
+        elif tipo in ("rom", "jogo"):
+            if ana.get("aviso") and not messagebox.askyesno("Importar", f"{ana['aviso']}\n\nImportar mesmo assim?"):
+                return
+            con = self._con()
+            try:
+                res = core.importar_lista(con, [ana["item"]])
+            finally:
+                con.close()
+            self.sel = None
+            self.recarregar()
+            if res["novos"]:
+                messagebox.showinfo("Importar", f"{ana['detalhe']} ✓")
+            else:
+                messagebox.showinfo("Importar", "Já estava na biblioteca (nada novo).")
+        else:
+            messagebox.showwarning("Importar", ana["detalhe"] or "não suportado.")
+
     # -- preview / importação
     def _dlg_prev(self, titulo: str, sub: str, itens: list[dict]):
         dlg = tk.Toplevel(self.root)
@@ -704,107 +815,6 @@ class App:
             return
         self._dlg_prev("Preview — Hydra", f"{len(itens)} achado(s) em {db}. "
                                           "Pré-marcados: score ≥ 0.3.", itens)
-
-    def prev_scan(self):
-        padrao = core.default_scan_roots()
-        resp = messagebox.askquestion(
-            "Scan disco", "Varrer as raízes padrão (só leitura)?\n"
-            + "; ".join(padrao) + "\n\nSim = padrão · Não = escolher pasta")
-        if resp == "no":
-            pasta = filedialog.askdirectory(title="Pasta para varrer")
-            if not pasta:
-                return
-            roots = [pasta]
-        else:
-            roots = padrao
-        prog = tk.Toplevel(self.root)
-        prog.title("Scan disco")
-        prog.transient(self.root)
-        ttk.Label(prog, text="Varrendo disco (só leitura)...").pack(padx=24, pady=24)
-        prog.update()
-
-        def trabalho():
-            def na_ui(fn):
-                try:
-                    self.root.after(0, fn)
-                except tk.TclError:
-                    pass  # janela fechada no meio do scan
-
-            def falhou(e):
-                try:
-                    prog.destroy()
-                except tk.TclError:
-                    return
-                messagebox.showerror("Scan disco", f"falha na varredura: {e}")
-
-            try:
-                _roots_u, itens, info = core.preview_scan(roots)
-            except Exception as e:
-                na_ui(lambda: falhou(e))
-                return
-
-            def pronto():
-                try:
-                    prog.destroy()
-                except tk.TclError:
-                    return
-                sub = f"{len(itens)} achado(s)."
-                if info.get("truncado"):
-                    sub += " LISTA PARCIAL (teto de varredura)."
-                self._dlg_prev("Preview — Disco",
-                               sub + " Pré-marcados: score ≥ 0.3.", itens)
-            na_ui(pronto)
-
-        threading.Thread(target=trabalho, daemon=True).start()
-
-    def prev_roms(self):
-        emu = core.default_emu_3ds()
-        if not emu:
-            arq = filedialog.askopenfilename(
-                title="Onde está o Azahar?",
-                filetypes=[("Executáveis", "*.exe *.AppImage"), ("Todos", "*.*")])
-            if not arq:
-                return
-            emu = arq
-        prog = tk.Toplevel(self.root)
-        prog.title("ROMs 3DS")
-        prog.transient(self.root)
-        ttk.Label(prog, text="Procurando ROMs (só leitura)...").pack(padx=24, pady=24)
-        prog.update()
-
-        def trabalho():
-            def na_ui(fn):
-                try:
-                    self.root.after(0, fn)
-                except tk.TclError:
-                    pass  # janela fechada no meio do scan
-
-            def falhou(e):
-                try:
-                    prog.destroy()
-                except tk.TclError:
-                    return
-                messagebox.showerror("ROMs 3DS", f"falha na busca: {e}")
-
-            try:
-                _roots_u, itens, info, emu_u = core.preview_roms(None, emu)
-            except Exception as e:
-                na_ui(lambda: falhou(e))
-                return
-
-            def pronto():
-                try:
-                    prog.destroy()
-                except tk.TclError:
-                    return
-                sub = f"{len(itens)} achado(s) [{emu_u or 'sem emu'}]."
-                if info.get("truncado"):
-                    sub += " LISTA PARCIAL (teto de varredura)."
-                self._dlg_prev("Preview — ROMs 3DS",
-                               sub + " Pré-marcados: score ≥ 0.3.", itens)
-            na_ui(pronto)
-
-        threading.Thread(target=trabalho, daemon=True).start()
 
     def backup_saves(self):
         try:
@@ -930,11 +940,12 @@ class App:
             return
         messagebox.showinfo("Exportar", f"Exportados {len(jogos)} jogo(s).")
 
-    def importar_json(self):
-        arq = filedialog.askopenfilename(
-            title="Importar JSON", filetypes=[("JSON", "*.json")])
+    def importar_json(self, arq: str | None = None):
         if not arq:
-            return
+            arq = filedialog.askopenfilename(
+                title="Importar JSON", filetypes=[("JSON", "*.json")])
+            if not arq:
+                return
         try:
             dados = json.loads(Path(arq).read_text(encoding="utf-8"))
         except (OSError, ValueError) as e:
@@ -975,11 +986,12 @@ class App:
                             f"{kb} KB{' · +saves 3DS' if res['inclui_saves'] else ''}\n"
                             f"{res['destino']}")
 
-    def importar_pacote(self):
-        arq = filedialog.askopenfilename(
-            title="Pacote portátil", filetypes=[("ZIP", "*.zip")])
+    def importar_pacote(self, arq: str | None = None):
         if not arq:
-            return
+            arq = filedialog.askopenfilename(
+                title="Pacote portátil", filetypes=[("ZIP", "*.zip")])
+            if not arq:
+                return
         try:
             res = core.importar_pacote(
                 arq, db_path=self.db_path,

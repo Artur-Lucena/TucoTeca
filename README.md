@@ -31,6 +31,7 @@ Opções comuns: `--db outro.db` (padrão: `biblioteca.db` na casa), `--selftest
 - ⏱️ **Horas automáticas**: ao jogar, o tempo do processo é somado sozinho (sessões ≥ 30 s). Limite honesto: fechar o launcher antes do jogo perde a sessão; com UAC/startfile as horas seguem manuais.
 - 🖥️ **Executável por SO**: `exe_win` / `exe_linux` vencem o caminho único (útil p/ emulador `.exe` no Win e `.AppImage` no Linux).
 - 🎮 **Scan de ROMs 3DS** (`.cci/.cxi/.3ds/.3dsx/.elf/.app/.axf`): já liga cada ROM no emulador via opções de lançamento, com preview + confiança.
+- 📥 **Importar unificado**: um botão só — pasta (varre jogos de PC + ROMs juntos), arquivo (exe, ROM, JSON ou pacote `.zip`) ou Hydra. A ROM é ligada no emulador sozinha; sem emulador, importa mesmo assim e o play orienta.
 
 ## Emulação 3DS (Azahar)
 
