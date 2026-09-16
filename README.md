@@ -64,7 +64,7 @@ O núcleo tem um **registro de emuladores** (`provedores()` em `bib_core.py`): c
 
 `python ferramentas/montar_portatil.py` gera `dist/BibliotecaHub-portatil-AAAAmmdd.zip` (~18 MB): Python embutido + tkinter transplantado + scripts Tcl/Tk do fonte oficial + app + launchers. É só extrair e abrir `BibliotecaHub.bat` (a casa vai em `dados/` dentro do pacote).
 
-Modelo **net-install de propósito**: o zip não leva emulador (binário GPL de terceiros + chaves/sysdata, que são dump pessoal e intransferíveis). Na primeira execução, use ⬇ Atualizar Azahar — ele baixa o build oficial e instala sozinho.
+Com `--com-azahar`, o Azahar instalado vai junto (`emuladores/Azahar/`, com `COPYING.txt` + `FONTE.txt` da GPL e só `user/` essencial: config + saves — nunca nand, chaves, log ou shaders). Os `.bat` apontam `BIBLIOTECA_AZAHAR_DIR` pro embutido (override honesto: pasta ausente = ignora e usa o padrão), e o botão ⬇ atualiza o emulador dentro do pacote. Sem a flag, vale o net-install: na primeira execução, use ⬇ Atualizar Azahar — ele baixa o build oficial e instala sozinho. O repo git nunca recebe binários (`dist/` ignorado).
 
 ## Backup
 

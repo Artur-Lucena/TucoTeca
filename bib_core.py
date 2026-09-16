@@ -1077,11 +1077,28 @@ def default_roms_roots() -> list[str]:
     return [f"{base}/Games/Roms", f"{base}/Games/Roms/3DS"]
 
 
+def azahar_dir_override() -> Path | None:
+    """Pasta do Azahar via BIBLIOTECA_AZAHAR_DIR (bundle portátil). None = padrão."""
+    env = (os.environ.get("BIBLIOTECA_AZAHAR_DIR") or "").strip()
+    if env and Path(env).is_dir():
+        return Path(env)
+    return None
+
+
 def default_emu_3ds() -> str:
-    """Caminho do Azahar neste SO (env BIBLIOTECA_EMULADOR_3DS vence). "" se ausente."""
+    """Caminho do Azahar neste SO (BIBLIOTECA_EMULADOR_3DS > BIBLIOTECA_AZAHAR_DIR > padrão)."""
     env = os.environ.get("BIBLIOTECA_EMULADOR_3DS")
     if env:
         return env
+    ov = azahar_dir_override()
+    if ov is not None:
+        if os.name == "nt":
+            cand = ov / "azahar.exe"
+            return str(cand) if cand.is_file() else ""
+        imgs = sorted(ov.glob("azahar*.AppImage"))
+        if imgs:
+            return str(imgs[-1])
+        return ""
     if os.name == "nt":
         cand = Path(WIN_ROOT) / "Games/Emuladores/Azahar/azahar.exe"
         return str(cand) if cand.is_file() else ""
@@ -1132,6 +1149,9 @@ AZAHAR_VERSAO_ARQ = "versao-azahar.txt"
 
 
 def _emu_dir() -> Path:
+    ov = azahar_dir_override()
+    if ov is not None:
+        return ov  # bundle: atualiza o emulador dentro do pacote
     if os.name == "nt":
         return Path(WIN_ROOT) / "Games/Emuladores/Azahar"
     return Path(LINUX_ROOT) / "Games/Emuladores/Azahar"

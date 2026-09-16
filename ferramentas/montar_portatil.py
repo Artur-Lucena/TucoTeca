@@ -5,9 +5,12 @@ Monta o HUB portátil Windows: Python embutido + tkinter + app, tudo num .zip.
 
     python ferramentas/montar_portatil.py [--só-verificar]
 
-Modelo net-install de propósito: o .zip NÃO leva emulador (binário GPL de
-terceiros + chaves/sysdata que são dump pessoal e intransferíveis). Na
-primeira execução, o botão "Atualizar Azahar" baixa o build oficial.
+Modelo: por padrão o .zip NÃO leva emulador (net-install: o botão
+"Atualizar Azahar" baixa o build oficial na primeira execução). Com
+--com-azahar, o Azahar instalado é copiado para dentro do pacote
+(emuladores/Azahar/), com licença GPL (COPYING.txt), nota de fonte
+(FONTE.txt) e esqueleto de user/ (config + saves; NUNCA nand, sysdata
+com chaves, log ou shaders). O repo git nunca recebe binários.
 
 Layout do portátil:
     BibliotecaHub.bat      abre a GUI sem console (pythonw)
@@ -40,6 +43,7 @@ APP_ARQS = ("bib_core.py", "app_win.py", "app_tui.py", "README.md")
 BAT_GUI = """@echo off
 setlocal
 set BIBLIOTECA_HOME=%~dp0dados
+set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
 set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
 start "BibliotecaHub" "%~dp0python\\pythonw.exe" "%~dp0app\\app_win.py"
@@ -48,6 +52,7 @@ start "BibliotecaHub" "%~dp0python\\pythonw.exe" "%~dp0app\\app_win.py"
 BAT_DEBUG = """@echo off
 setlocal
 set BIBLIOTECA_HOME=%~dp0dados
+set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
 set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
 "%~dp0python\\python.exe" "%~dp0app\\app_win.py" %*
@@ -59,18 +64,20 @@ LEIAME_PORTATIL = """BIBLIOTECA HUB (portátil Windows) — sem instalar nada.
 COMO USAR
 1. Extraia esta pasta onde quiser (inclusive pendrive).
 2. Duplo-clique em BibliotecaHub.bat.
-3. Na primeira vez: sidebar BANCO > "Atualizar Azahar" (~60 MB, build
-   oficial) e configure as chaves do seu próprio 3DS no emulador.
+3. Sem emulador junto? Sidebar BANCO > "Atualizar Azahar" (~60 MB, build
+   oficial). Com emulador junto (emuladores/Azahar/): já sai jogando.
 
 ONDE FICA O QUÊ
 - dados/ ........... sua casa: banco, backups, capas, presets
 - app/ ............. código do launcher (pode atualizar por cima)
 - python/ .......... Python embutido (não usa o do sistema)
+- emuladores/ ...... Azahar incluído, se o pacote veio --com-azahar
 - Debug-Console.bat  abre com janela de texto (para ver erros)
 
+O botão "Atualizar Azahar" atualiza o emulador DENTRO do pacote.
+Chaves (aes_keys.txt) nunca vêm junto: dump do seu 3DS em
+emuladores/Azahar/user/sysdata/ quando precisar.
 Leve a pasta inteira para outra máquina, ou gere um .zip dela.
-Emuladores e saves do Azahar ficam em dados/ se BIBLIOTECA_HOME apontar
-para cá — por padrão o Azahar usa Games/Emuladores/Azahar na partilha.
 """
 
 
@@ -181,7 +188,95 @@ def garantir_tcl_scripts(py_dir: Path) -> str:
     raise SystemExit("não consegui os scripts Tcl/Tk do fonte oficial.")
 
 
-def montar() -> Path:
+AZAHAR_USER_INCLUIR = ("config", "cheats", "sdmc", "states")
+AZAHAR_USER_EXCLUIR = ("nand", "sysdata", "log", "shaders")
+GPL_URL = "https://www.gnu.org/licenses/gpl-2.0.txt"
+AZAHAR_URL = "https://github.com/azahar-emu/azahar"
+
+
+def azahar_instalado_dir() -> Path:
+    """De onde copiar o Azahar (instalação real; nunca o bundle)."""
+    env = (os.environ.get("BIBLIOTECA_EMULADOR_3DS") or "").strip()
+    if env and Path(env).is_file():
+        return Path(env).parent
+    if os.name == "nt":
+        cand = Path("D:/Games/Emuladores/Azahar")
+        if (cand / "azahar.exe").is_file():
+            return cand
+    else:
+        cand = Path("/run/media/tuco/Games/Games/Emuladores/Azahar")
+        if list(cand.glob("azahar*.AppImage")):
+            return cand
+    raise SystemExit("Azahar instalado não achado (instale com o botão ⬇ primeiro).")
+
+
+def garantir_gpl() -> Path:
+    """Texto da GPL-2.0 (acompanha o binário redistribuído)."""
+    dest = CACHE / "gpl-2.0.txt"
+    if dest.is_file() and dest.stat().st_size > 10_000:
+        return dest
+    try:
+        req = urllib.request.Request(GPL_URL, headers={"User-Agent": "biblioteca-hub"})
+        with urllib.request.urlopen(req, timeout=60) as r, open(dest, "wb") as f:
+            shutil.copyfileobj(r, f, 1024 * 64)
+    except Exception as e:
+        raise SystemExit(f"sem a GPL-2.0 não dá p/ redistribuir: {e}")
+    if dest.stat().st_size < 10_000:
+        raise SystemExit("GPL-2.0 baixada veio curta demais.")
+    return dest
+
+
+def incluir_azahar(dest_base: Path) -> str:
+    """Copia o Azahar instalado p/ emuladores/Azahar. Retorna a versão."""
+    src = azahar_instalado_dir()
+    dst = dest_base / "emuladores" / "Azahar"
+    if dst.exists():
+        shutil.rmtree(dst)
+    dst.mkdir(parents=True)
+    for item in sorted(src.iterdir()):
+        if item.name == "user":
+            u_dst = dst / "user"
+            u_dst.mkdir()
+            src_user = src / "user"
+            for sub in AZAHAR_USER_INCLUIR:
+                s = src_user / sub
+                if s.is_dir():
+                    shutil.copytree(s, u_dst / sub)
+            for sub in ("sdmc", "states", "cheats"):
+                (u_dst / sub).mkdir(parents=True, exist_ok=True)
+            continue
+        if item.is_dir():
+            shutil.copytree(item, dst / item.name)
+        else:
+            shutil.copy2(item, dst / item.name)
+    ver = ""
+    varq = src / "versao-azahar.txt"
+    if varq.is_file():
+        try:
+            ver = varq.read_text(encoding="utf-8", errors="ignore").strip()
+        except OSError:
+            pass
+    (dst / "FONTE.txt").write_text(
+        "Azahar — emulador de Nintendo 3DS (terceiros, sem modificação).\n"
+        f"Versão empacotada: {ver or 'desconhecida'}\n"
+        f"Fonte: {AZAHAR_URL} (código-fonte e releases oficiais)\n"
+        "Licença: GPL-2.0-or-later (texto em COPYING.txt).\n"
+        "\n"
+        "Este pacote agrega dois programas SEPARADOS: o launcher próprio\n"
+        "(código neste repo) e o Azahar. O launcher apenas EXECUTA o\n"
+        "emulador como processo filho (mere aggregation).\n"
+        "\n"
+        "NÃO acompanha: chaves (aes_keys.txt), sysdata da NAND, shaders ou\n"
+        "log — dump pessoal e intransferível. ROMs criptografadas exigem as\n"
+        "SUAS chaves (GodMode9) em emuladores/Azahar/user/sysdata/.\n",
+        encoding="utf-8")
+    shutil.copy2(garantir_gpl(), dst / "COPYING.txt")
+    mb = sum(f.stat().st_size for f in dst.rglob("*") if f.is_file()) / 1048576
+    print(f"[ok] Azahar {ver or '?'} embutido ({mb:.0f} MB; user/ só config+saves)")
+    return ver
+
+
+def montar(com_azahar: bool = False) -> Path:
     if os.name != "nt":
         raise SystemExit("o portátil Windows só é montado no Windows.")
     vi = sys.version_info
@@ -220,6 +315,8 @@ def montar() -> Path:
     (BUILD / "README-PORTATIL.txt").write_text(LEIAME_PORTATIL, encoding="utf-8")
     for sub in ("dados", "dados/backups", "dados/capas", "dados/presets"):
         (BUILD / sub).mkdir(parents=True, exist_ok=True)
+    if com_azahar:
+        incluir_azahar(BUILD)
 
     # prova real: o python embutido importa tkinter e monta a UI oculta
     py = py_dir / "python.exe"
@@ -241,10 +338,34 @@ def montar() -> Path:
     if r.returncode != 0 or "[ok] selftest" not in r.stdout:
         raise SystemExit(f"selftest falhou no portátil:\n{r.stdout[-1500:]}\n{r.stderr[-1500:]}")
     print(f"[ok] {r.stdout.strip()} (casa de prova: {prova_home.name}/)")
+    if com_azahar:
+        az = BUILD / "emuladores" / "Azahar" / (
+            "azahar.exe" if os.name == "nt" else "azahar.AppImage")
+        exe_ok = az.is_file() if os.name == "nt" else bool(
+            list((BUILD / "emuladores" / "Azahar").glob("azahar*.AppImage")))
+        if not exe_ok or not (BUILD / "emuladores" / "Azahar" / "COPYING.txt").is_file() \
+                or not (BUILD / "emuladores" / "Azahar" / "FONTE.txt").is_file():
+            raise SystemExit("bundle --com-azahar incompleto (exe/COPYING/FONTE).")
+        if (BUILD / "emuladores" / "Azahar" / "user" / "nand").exists():
+            raise SystemExit("nand vazou para o bundle!")
+        print("[ok] bundle com Azahar + COPYING + FONTE, sem nand")
+        env2 = dict(env)
+        env2.pop("BIBLIOTECA_EMULADOR_3DS", None)  # override perde p/ exe explícito
+        env2["BIBLIOTECA_AZAHAR_DIR"] = str(BUILD / "emuladores" / "Azahar")
+        r = subprocess.run(
+            [str(py), "-c",
+             f"import sys; sys.path.insert(0, {str(app_dir)!r}); "
+             "import bib_core as c; print(c.default_emu_3ds())"],
+            capture_output=True, text=True, timeout=60, env=env2)
+        alvo = str(BUILD / "emuladores" / "Azahar" / "azahar.exe")
+        if r.returncode != 0 or alvo not in (r.stdout or ""):
+            raise SystemExit(f"override não resolve o embutido:\n{r.stdout[-800:]}\n{r.stderr[-800:]}")
+        print("[ok] BIBLIOTECA_AZAHAR_DIR resolve o embutido")
 
     DIST.mkdir(parents=True, exist_ok=True)
     hoje = datetime.date.today().strftime("%Y%m%d")
-    saida = DIST / f"BibliotecaHub-portatil-{hoje}.zip"
+    sufixo = "-com-azahar" if com_azahar else ""
+    saida = DIST / f"BibliotecaHub-portatil-{hoje}{sufixo}.zip"
     with zipfile.ZipFile(saida, "w", zipfile.ZIP_DEFLATED) as z:
         for arq in sorted(BUILD.rglob("*")):
             z.write(arq, arq.relative_to(BUILD))
@@ -255,9 +376,11 @@ def montar() -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Monta o HUB portátil Windows.")
-    ap.parse_args(argv)
+    ap.add_argument("--com-azahar", action="store_true",
+                    help="embute o Azahar instalado (GPL: leva COPYING+FONTE)")
+    args = ap.parse_args(argv)
     try:
-        montar()
+        montar(com_azahar=args.com_azahar)
     except SystemExit as e:
         print(f"ERRO: {e}", file=sys.stderr)
         return 1
