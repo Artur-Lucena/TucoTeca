@@ -31,7 +31,7 @@ Opções comuns: `--db outro.db` (padrão: `biblioteca.db` na casa), `--selftest
 - ⏱️ **Horas automáticas**: ao jogar, o tempo do processo é somado sozinho (sessões ≥ 30 s). Limite honesto: fechar o launcher antes do jogo perde a sessão; com UAC/startfile as horas seguem manuais.
 - 🖥️ **Executável por SO**: `exe_win` / `exe_linux` vencem o caminho único (útil p/ emulador `.exe` no Win e `.AppImage` no Linux).
 - 🎮 **Scan de ROMs 3DS** (`.cci/.cxi/.3ds/.3dsx/.elf/.app/.axf`): já liga cada ROM no emulador via opções de lançamento, com preview + confiança.
-- 📥 **Importar unificado**: um botão só — pasta (varre jogos de PC + ROMs juntos), arquivo (exe, ROM, JSON ou pacote `.zip`) ou Hydra. A ROM é ligada no emulador sozinha; sem emulador, importa mesmo assim e o play orienta.
+- 📥 **Importar unificado**: um botão só — pasta (varre jogos de PC + ROMs juntos), arquivo (exe, ROM, JSON ou pacote `.zip`) ou **ler do disco** (Hydra + Steam + Epic + GOG + Riot + programas instalados, cada achado marcado com a fonte). A ROM é ligada no emulador sozinha; sem emulador, importa mesmo assim e o play orienta.
 
 ## Emulação 3DS (Azahar)
 
@@ -45,8 +45,8 @@ Opções comuns: `--db outro.db` (padrão: `biblioteca.db` na casa), `--selftest
 - No Linux, prefira o AppImage; `sdmc/` (saves) pode ser linkado pra partilha, `config/` fica local.
 - Chaves AES + arquivos de sistema: dumpe do seu próprio 3DS (ver wiki do Azahar).
 - 🔁 **Tradução determinística**: `D:\…` ↔ `/run/media/tuco/Games/…`. Overrides: `BIBLIOTECA_WIN_ROOT`, `BIBLIOTECA_LINUX_ROOT`, `BIBLIOTECA_HOME`.
-- 🔍 **Preview Hydra com confiança** (score 0–1 + motivos; pré-marca ≥ 0.3).
-- 💽 **Scan disco com confiança** (`.exe` menos instaladores + manifests Steam; raízes padrão `D:\Games`, `D:\SteamLibrary`, `D:\Riot Games` no Win; override `BIBLIOTECA_SCAN_ROOTS` com `;`; GUI/TUI aceitam pasta custom; avisa se a lista for parcial pelo teto de varredura).
+- 🔍 **Preview Hydra com confiança** (score 0–1 + motivos; pré-marca ≥ 0.3) — incluído no "ler do disco".
+- 💽 **Scan disco com confiança** (`.exe` menos instaladores + manifests Steam; raízes padrão `D:\Games`, `D:\SteamLibrary`, `D:\Riot Games` no Win; override `BIBLIOTECA_SCAN_ROOTS` com `;`; avisa se a lista for parcial pelo teto de varredura). Jogos do Xbox/MS Store não são detectados (loja fechada) — cadastre o exe à mão.
 - 💾 **Backup versionado** (`backups/biblioteca-AAAAmmdd-HHMMSS.db` + `.json`, mantém 10).
 - 📦 Exportar / importar JSON (GUI e TUI; no TUI o importar aceita `.zip`).
 - 📦 **Pacote portátil** (`P` no TUI, 📦/📥 na GUI): um `.zip` com banco + capas (remapeadas p/ os ids novos na volta) + presets + saves 3DS (`sdmc/`). Importação valida todos os nomes antes de aplicar qualquer coisa (anti path-traversal).

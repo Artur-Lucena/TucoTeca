@@ -9,7 +9,7 @@ Uso:
 
 Teclas (lista): ↑/↓ ou j/k navegar · PgUp/PgDn · / buscar · f status ·
   * favoritos · Enter jogar · a adicionar · e editar · d excluir ·
-  I importar (arquivo, pasta ou Hydra — ROM liga no emu sozinha) ·
+  I importar (arquivo, pasta ou disco — ROM liga no emu sozinha) ·
   b backup · U saves 3DS · E exportar JSON · P pacote portátil ·
   A atualizar Azahar · r recarregar · q sair
 Preview: Espaço marca/desmarca · i importa marcados · q volta
@@ -323,7 +323,7 @@ class Tui:
                 chk = "[x]" if idx in marcados else "[ ]"
                 bola = "●" if it["exe_existe"] else "○"
                 tag = f" [{it['regiao']}]" if it.get("regiao") else ""
-                linha = f"{chk} {bola} [{it['score']:.2f}] {it['titulo']}{tag} ({it['origem']})"
+                linha = f"{chk} {bola} [{it['score']:.2f}] {it['titulo']}{tag} ({it.get('fonte') or it['origem']})"
                 attr = self.cor["acc"] if idx == cur else self.cor["txt"]
                 s.addnstr(1 + i, 0, linha, cols - 1, attr)
             s.addnstr(rows - 1, 0, f"{len(marcados)} marcado(s) de {len(itens)}",
@@ -354,16 +354,9 @@ class Tui:
                 self.recarregar()
                 return
 
-    def prev_hydra(self):
-        db, itens = core.preview_hydra()
-        if db is None:
-            self.msg = "hydra-db não encontrado neste PC."
-            return
-        self.tela_prev(f"Hydra: {len(itens)} achado(s)", itens)
-
     def importar_unificado(self):
-        """Um ponto de entrada: arquivo, pasta ou Hydra (emu detectado só)."""
-        r = self.perguntar("Importar: [A]rquivo, [P]asta, [H]ydra, [C]ancela? ")
+        """Um ponto de entrada: arquivo, pasta ou disco (emu detectado só)."""
+        r = self.perguntar("Importar: [A]rquivo, [P]asta, [D]isco, [C]ancela? ")
         if r is None:
             return
         op = r.strip().lower()
@@ -378,9 +371,22 @@ class Tui:
                 return
             roots = [x.strip() for x in r.split(";") if x.strip()] or None
             self._prev_pasta(roots)
-        elif op in ("h", "hydra"):
-            self.prev_hydra()
+        elif op in ("d", "disco"):
+            self._prev_disco()
         # resto = cancela
+
+    def _prev_disco(self):
+        self.msg = "Lendo Hydra, lojas e programas (só leitura)..."
+        self.desenhar()
+        try:
+            itens, info = core.ler_do_disco()
+        except Exception as e:
+            self.msg = f"Falha: {e}"
+            return
+        partes = [f"{f['fonte']}: {f['n']}" for f in info["fontes"]
+                  if f["ok"] and f["n"]]
+        sub = f"Disco: {len(itens)} achado(s) ({'; '.join(partes) or 'nada'})"
+        self.tela_prev(sub, itens)
 
     def _prev_pasta(self, roots):
         self.msg = "Varrendo (só leitura)..."

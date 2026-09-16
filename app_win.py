@@ -661,8 +661,9 @@ class App:
         dlg.transient(self.root)
         dlg.grab_set()
         ttk.Label(dlg, wraplength=420, justify="left", text=(
-            "Escolha uma PASTA (varre jogos de PC + ROMs de uma vez) ou um "
-            "ARQUIVO (exe, ROM, JSON ou pacote .zip).\n"
+            "Escolha uma PASTA (varre jogos de PC + ROMs de uma vez), um "
+            "ARQUIVO (exe, ROM, JSON ou pacote .zip) ou LEIA DO DISCO "
+            "(Hydra + Steam + Epic + GOG + Riot + programas instalados).\n"
             "ROMs são ligadas no emulador sozinhas; sem emulador, importam "
             "mesmo assim e o play orienta.")).pack(anchor="w", padx=14, pady=12)
 
@@ -688,13 +689,13 @@ class App:
             dlg.destroy()
             self._importar_arquivo(arq)
 
-        def do_hydra():
+        def do_disco():
             dlg.destroy()
-            self.prev_hydra()
+            self._ler_do_disco()
 
         for rotulo, cmd in (("📁 Escolher pasta…", de_pasta),
                             ("📄 Escolher arquivo…", de_arquivo),
-                            ("🔍 Ler do Hydra", do_hydra)):
+                            ("💽 Ler do disco", do_disco)):
             ttk.Button(dlg, text=rotulo, command=cmd).pack(fill="x", padx=14, pady=3)
         ttk.Button(dlg, text="Cancelar", command=dlg.destroy).pack(pady=(3, 12))
 
@@ -783,7 +784,7 @@ class App:
         for i, it in enumerate(itens):
             bola = "●" if it["exe_existe"] else "○"
             tag = f" [{it['regiao']}]" if it.get("regiao") else ""
-            lb.insert("end", f"{bola} [{it['score']:.2f}] {it['titulo']}{tag} — {it['origem']}"
+            lb.insert("end", f"{bola} [{it['score']:.2f}] {it['titulo']}{tag} — {it.get('fonte') or it['origem']}"
                              + (f" · {it['shop']}" if it.get("shop") else ""))
             if it["score"] >= 0.3:
                 lb.selection_set(i)
@@ -808,13 +809,51 @@ class App:
         ttk.Button(dlg, text="Importar selecionados", command=importar,
                    style="Accent.TButton").pack(pady=8)
 
-    def prev_hydra(self):
-        db, itens = core.preview_hydra()
-        if db is None:
-            messagebox.showwarning("Hydra", "hydra-db não encontrado neste PC.")
-            return
-        self._dlg_prev("Preview — Hydra", f"{len(itens)} achado(s) em {db}. "
-                                          "Pré-marcados: score ≥ 0.3.", itens)
+    def _ler_do_disco(self):
+        prog = tk.Toplevel(self.root)
+        prog.title("Ler do disco")
+        prog.transient(self.root)
+        ttk.Label(prog, text="Lendo Hydra, lojas e programas (só leitura)...").pack(
+            padx=24, pady=24)
+        prog.update()
+
+        def trabalho():
+            def na_ui(fn):
+                try:
+                    self.root.after(0, fn)
+                except tk.TclError:
+                    pass  # janela fechada no meio da leitura
+
+            def falhou(e):
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    return
+                messagebox.showerror("Ler do disco", f"falha na leitura: {e}")
+
+            try:
+                itens, info = core.ler_do_disco()
+            except Exception as e:
+                na_ui(lambda: falhou(e))
+                return
+
+            def pronto():
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    return
+                partes = []
+                for f in info["fontes"]:
+                    if f["ok"] and f["n"]:
+                        partes.append(f"{f['fonte']}: {f['n']}")
+                    elif not f["ok"]:
+                        partes.append(f"{f['fonte']}: falha")
+                sub = f"{len(itens)} achado(s) ({'; '.join(partes) or 'nada'})."
+                self._dlg_prev("Preview — Disco",
+                               sub + " Pré-marcados: score ≥ 0.3.", itens)
+            na_ui(pronto)
+
+        threading.Thread(target=trabalho, daemon=True).start()
 
     def backup_saves(self):
         try:
