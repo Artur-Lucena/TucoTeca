@@ -1395,47 +1395,7 @@ def salvar_capa_bytes(con: sqlite3.Connection, gid: int, filename: str, raw: byt
 
 def backup_saves_azahar(manter: int = 10) -> dict:
     """Zipa sdmc/ + states/ do Azahar em backups/. Retorna dict (sempre)."""
-    st = azahar_status()
-    ud = st.get("user_dir") or ""
-    if not ud:
-        return {"ok": False, "erro": "Azahar não instalado"}
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    dest = BACKUP_DIR / f"azahar-saves-{ts}.zip"
-    n = 0
-    try:
-        with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
-            for sub in ("sdmc", "states"):
-                d = Path(ud) / sub
-                if not d.is_dir():
-                    continue
-                for f in sorted(d.rglob("*")):
-                    if f.is_file():
-                        try:
-                            z.write(f, f.relative_to(ud))
-                            n += 1
-                        except OSError:
-                            continue
-    except Exception as e:
-        try:
-            dest.unlink()
-        except OSError:
-            pass
-        return {"ok": False, "erro": f"backup de saves falhou: {e}"}
-    if n == 0:
-        try:
-            dest.unlink()
-        except OSError:
-            pass
-        return {"ok": False, "erro": "sem saves ainda (sdmc/ vazio ou ausente)"}
-    for padrao in ("azahar-saves-*.zip",):
-        arqs = sorted(BACKUP_DIR.glob(padrao), key=lambda p: p.name, reverse=True)
-        for velho in arqs[manter:]:
-            try:
-                velho.unlink()
-            except OSError:
-                pass
-    return {"ok": True, "arquivo": str(dest), "arquivos": n}
+    return backup_saves_emu("azahar", manter)
 
 
 def caminho_capa(nome: str) -> Path | None:
@@ -1539,18 +1499,20 @@ def executar_jogo(executable_path: str, wine_prefix: str = "", launch_options: s
 
 
 def _lancar_jogo_dict(jogo: dict, elevar: bool = False) -> tuple[dict, object | None]:
-    """Resolve o exe do SO atual (exe_win/exe_linux vencem) e lança."""
+    """Resolve o exe do SO atual (exe_win/exe_linux vencem) e lança.
+
+    Origens com provider (ex.: rom-3ds) usam o exe e as flags do provider.
+    """
+    origem = (jogo.get("origem") or "")
+    prov = provedor_por_origem(origem)
     exe, _origem = resolver_exe(jogo)
-    if not exe and (jogo.get("origem") or "") == "rom-3ds":
-        return {"ok": False, "erro": ("Azahar não encontrado — instale em "
-                                      "Games/Emuladores/Azahar ou defina BIBLIOTECA_EMULADOR_3DS.")}, None
+    if not exe and prov is not None:
+        exe = prov["exe"]() or ""  # linha sem emu (ou apagado): o instalado vale
+    if not exe and prov is not None:
+        return {"ok": False, "erro": prov["dica_instalacao"]}, None
     launch = (jogo.get("launch_options") or "")
-    if (jogo.get("origem") or "") == "rom-3ds" and launch.strip():
-        rom = launch.strip()
-        if " " in rom and not (rom.startswith('"') and rom.endswith('"')):
-            rom = f'"{rom}"'
-        flags = " ".join(azahar_flags())
-        launch = (flags + " " if flags else "") + rom
+    if prov is not None and launch.strip():
+        launch = montar_launch_rom(prov, launch)
     return _lancar(exe, (jogo.get("wine_prefix") or ""), launch, elevar=elevar)
 
 
@@ -1571,6 +1533,106 @@ def marcar_execucao(con: sqlite3.Connection, gid: int) -> None:
     con.execute("UPDATE jogos SET ultima_execucao=?, atualizado_em=? WHERE id=?",
                 (agora, agora, gid))
     con.commit()
+
+
+# --------------------------------------------------------------------------
+# Provedores de emulação (HUB): um registro, N emuladores
+#
+# Cada provider descreve UM emulador: que origens de jogo ele atende, onde
+# está o exe, onde ficam config/saves, como montar a linha de lançamento e
+# como aplicar preset. Azahar é o provider nº 1; o próximo (ex.: NDS, GBA)
+# entra aqui sem tocar em lançamento, pacote ou frontends.
+# --------------------------------------------------------------------------
+
+def _prov_azahar() -> dict:
+    return {
+        "chave": "azahar",
+        "nome": "Azahar",
+        "sistemas": ("Nintendo 3DS",),
+        "origens": ("rom-3ds",),
+        "exe": default_emu_3ds,          # () -> str
+        "user_dir": azahar_user_dir,     # (exe="") -> str
+        "saves_subs": ("sdmc", "states"),
+        "pacote_subs": ("sdmc",),        # states travam à versão: fora do pacote
+        "flags": azahar_flags,           # () -> list[str]
+        "aplicar_preset": aplicar_preset,  # (nome) -> dict
+        "dica_instalacao": ("Azahar não encontrado — instale em "
+                            "Games/Emuladores/Azahar ou defina BIBLIOTECA_EMULADOR_3DS."),
+    }
+
+
+def provedores() -> dict:
+    """chave -> spec. Construído sob demanda (as funções existem no import)."""
+    return {"azahar": _prov_azahar()}
+
+
+def provedor_por_origem(origem: str) -> dict | None:
+    for prov in provedores().values():
+        if (origem or "") in prov["origens"]:
+            return prov
+    return None
+
+
+def provedor_nome(jogo_ou_origem) -> str:
+    """'Azahar · Nintendo 3DS' p/ ROMs; origem crua p/ jogos de PC."""
+    origem = jogo_ou_origem.get("origem") if isinstance(jogo_ou_origem, dict) \
+        else jogo_ou_origem
+    prov = provedor_por_origem(origem or "")
+    if prov is None:
+        return origem or ""
+    return f"{prov['nome']} · {'/'.join(prov['sistemas'])}"
+
+
+def montar_launch_rom(prov: dict, rom_path: str) -> str:
+    """flags do provider + ROM entre aspas quando tem espaço."""
+    rom = (rom_path or "").strip()
+    if " " in rom and not (rom.startswith('"') and rom.endswith('"')):
+        rom = f'"{rom}"'
+    flags = " ".join(prov["flags"]())
+    return (flags + " " if flags else "") + rom
+
+
+def backup_saves_emu(chave: str, manter: int = 10) -> dict:
+    """Zipa as pastas de save do provider em backups/. Retorna dict (sempre)."""
+    prov = provedores().get(chave)
+    if prov is None:
+        return {"ok": False, "erro": f"emulador '{chave}' desconhecido"}
+    ud = prov["user_dir"]() or ""
+    if not ud:
+        return {"ok": False, "erro": f"{prov['nome']} não instalado"}
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    dest = BACKUP_DIR / f"{chave}-saves-{ts}.zip"
+    n = 0
+    try:
+        with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
+            for sub in prov["saves_subs"]:
+                d = Path(ud) / sub
+                if not d.is_dir():
+                    continue
+                for f in sorted(d.rglob("*")):
+                    if f.is_file():
+                        try:
+                            z.write(f, f.relative_to(ud))
+                            n += 1
+                        except OSError:
+                            pass
+    except OSError as e:
+        return {"ok": False, "erro": f"falha ao zipar: {e}"}
+    if n == 0:
+        try:
+            dest.unlink()
+        except OSError:
+            pass
+        return {"ok": False, "erro": "sem saves ainda (saves vazios ou ausentes)"}
+    for padrao in (f"{chave}-saves-*.zip", "azahar-saves-*.zip"):
+        arqs = sorted(BACKUP_DIR.glob(padrao), key=lambda p: p.name, reverse=True)
+        for velho in arqs[manter:]:
+            try:
+                velho.unlink()
+            except OSError:
+                pass
+    return {"ok": True, "arquivo": str(dest), "arquivos": n}
 
 
 # --------------------------------------------------------------------------
@@ -1738,13 +1800,15 @@ def restaurar_config_azahar() -> dict:
 
 
 def preparar_lancamento(jogo: dict) -> dict:
-    """Aplica o preset Azahar do jogo (só rom-3ds). Nunca bloqueia o play."""
-    if (jogo.get("origem") or "") != "rom-3ds":
+    """Aplica o preset do provider do jogo. Nunca bloqueia o play."""
+    origem = (jogo.get("origem") or "")
+    prov = provedor_por_origem(origem)
+    if prov is None:
         return {"preset_aplicado": None, "aviso": None}
     nome = (jogo.get("azahar_preset") or "").strip()
     if not nome:
         return {"preset_aplicado": None, "aviso": None}
-    r = aplicar_preset(nome)
+    r = prov["aplicar_preset"](nome)
     if r.get("ok"):
         return {"preset_aplicado": r["preset"], "aviso": None}
     return {"preset_aplicado": None,
@@ -1766,6 +1830,37 @@ def _dados_exportacao(con: sqlite3.Connection) -> dict:
     return {"exportado_em": agora_iso(), "jogos": [row_to_dict(r) for r in rows]}
 
 
+def _saves_para_pacote() -> list[tuple[str, Path]]:
+    """[(membro_no_zip, caminho)] dos saves de todos os providers instalados.
+
+    Nomes estáveis por provider: 'azahar-user/sdmc/...' (compat com pacotes
+    já exportados).
+    """
+    pares: list[tuple[str, Path]] = []
+    for prov in provedores().values():
+        try:
+            ud = prov["user_dir"]() or ""
+        except Exception:
+            continue
+        if not ud:
+            continue
+        for sub in prov["pacote_subs"]:
+            base = Path(ud) / sub
+            if not base.is_dir():
+                continue
+            try:
+                arquivos = sorted(p for p in base.rglob("*") if p.is_file())
+            except OSError:
+                continue
+            for arq in arquivos:
+                try:
+                    rel = arq.relative_to(base).as_posix()
+                except ValueError:
+                    continue
+                pares.append((f"{prov['chave']}-user/{sub}/{rel}", arq))
+    return pares
+
+
 def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
     """Empacota tudo para levar a outra máquina (ou guardar)."""
     destino = Path(destino)
@@ -1781,10 +1876,12 @@ def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
         con.close()
     ud = azahar_user_dir()
     sdmc = Path(ud) / "sdmc" if ud else None
-    com_saves = bool(incluir_saves and sdmc is not None and sdmc.is_dir())
+    pares_saves = _saves_para_pacote() if incluir_saves else []
+    com_saves = bool(pares_saves)
     info = {"app": "biblioteca-jogos", "esquema": PACOTE_ESQUEMA,
             "exportado_em": dados["exportado_em"], "jogos": len(dados["jogos"]),
-            "inclui_saves": com_saves, "azahar_versao": azahar_versao_local()}
+            "inclui_saves": com_saves, "azahar_versao": azahar_versao_local(),
+            "provedores": sorted(provedores())}
     manifesto = {}
     for j in dados["jogos"]:
         if j.get("capa"):
@@ -1806,11 +1903,9 @@ def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
                     z.write(arq, f"presets/{arq.name}")
                     n += 1
             if com_saves:
-                for arq in sorted(sdmc.rglob("*")):  # type: ignore[union-attr]
-                    if arq.is_file():
-                        rel = arq.relative_to(sdmc).as_posix()  # type: ignore[arg-type]
-                        z.write(arq, "azahar-user/sdmc/" + rel)
-                        n += 1
+                for membro, arq in pares_saves:
+                    z.write(arq, membro)
+                    n += 1
     except OSError as e:
         return {"ok": False, "erro": f"falha ao gravar pacote: {e}"}
     return {"ok": True, "destino": str(destino), "arquivos": n,
@@ -1837,8 +1932,11 @@ def _membro_pacote_ok(nome: str) -> str | None:
         return "capa"
     if n.startswith("presets/") and "/" not in n[8:] and n.lower().endswith(".ini"):
         return "preset"
-    if n.startswith("azahar-user/sdmc/") and not n.endswith("/"):
-        return "save"
+    partes = n.split("/")
+    if len(partes) >= 3 and partes[0].endswith("-user") and not n.endswith("/"):
+        prov = provedores().get(partes[0][:-5])
+        if prov is not None and partes[1] in prov["pacote_subs"]:
+            return "save"
     return None
 
 
@@ -1909,21 +2007,22 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
             saves, saves_ignorados = 0, 0
             tem_saves = any(c == "save" for c in cats.values())
             if tem_saves and restaurar_saves:
-                ud = azahar_user_dir()
-                if not ud:
-                    saves_ignorados = sum(1 for c in cats.values() if c == "save")
-                else:
-                    sdmc = Path(ud) / "sdmc"
-                    for nm, cat in cats.items():
-                        if cat != "save":
-                            continue
-                        try:
-                            dest = sdmc / Path(*nm.split("/")[2:])
-                            dest.parent.mkdir(parents=True, exist_ok=True)
-                            dest.write_bytes(zf.read(nm))
-                            saves += 1
-                        except (OSError, ValueError):
-                            saves_ignorados += 1
+                for nm, cat in cats.items():
+                    if cat != "save":
+                        continue
+                    partes = nm.split("/")
+                    prov = provedores().get(partes[0][:-5])
+                    ud = (prov["user_dir"]() or "") if prov is not None else ""
+                    if not ud:
+                        saves_ignorados += 1
+                        continue
+                    try:
+                        dest = Path(ud) / partes[1] / Path(*partes[2:])
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        dest.write_bytes(zf.read(nm))
+                        saves += 1
+                    except (OSError, ValueError):
+                        saves_ignorados += 1
         finally:
             con.close()
     return {"ok": True, "novos": res["novos"], "total_no_banco": res["total_no_banco"],

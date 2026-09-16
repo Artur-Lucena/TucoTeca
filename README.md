@@ -55,6 +55,16 @@ Onde o Hydra guarda os dados:
 - Windows: `%APPDATA%/hydralauncher/hydra-db` (ou `%APPDATA%/hydra/hydra-db`, antigo)
 - Linux: `~/.config/hydralauncher/hydra-db` (ou `~/.config/hydra/hydra-db`, antigo)
 
+## HUB de emulação (provedores)
+
+O núcleo tem um **registro de emuladores** (`provedores()` em `bib_core.py`): cada provider diz que origens atende, onde está o exe, onde ficam config/saves, como montar o launch e como aplicar preset. Lançamento, horas automáticas, pacote e backup de saves falam com o registro — **o Azahar é só o provider nº 1**. O próximo sistema (NDS, GBA…) entra como provider novo sem tocar em lançamento ou frontends.
+
+## Portátil Windows
+
+`python ferramentas/montar_portatil.py` gera `dist/BibliotecaHub-portatil-AAAAmmdd.zip` (~18 MB): Python embutido + tkinter transplantado + scripts Tcl/Tk do fonte oficial + app + launchers. É só extrair e abrir `BibliotecaHub.bat` (a casa vai em `dados/` dentro do pacote).
+
+Modelo **net-install de propósito**: o zip não leva emulador (binário GPL de terceiros + chaves/sysdata, que são dump pessoal e intransferíveis). Na primeira execução, use ⬇ Atualizar Azahar — ele baixa o build oficial e instala sozinho.
+
 ## Backup
 
 1. **💾 Backup** na interface (vai para `backups/` na casa canônica), ou

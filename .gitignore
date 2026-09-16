@@ -11,3 +11,7 @@ Desktop.ini
 Thumbs.db
 *~
 .vscode/
+# Saída do portátil (ferramentas/montar_portatil.py) — artefato, não fonte
+dist/
+ferramentas/.cache/
+ferramentas/.build/

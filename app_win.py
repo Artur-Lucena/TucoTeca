@@ -405,7 +405,7 @@ class App:
         horas = f" · {j['horas']}h" if j["horas"] else ""
         fichas = [x for x in (j.get("game_code"), j.get("regiao")) if x]
         self.det_meta.configure(
-            text=f"{j['status']}{nota}{horas} · {j['origem']}"
+            text=f"{j['status']}{nota}{horas} · {core.provedor_nome(j)}"
             + (f"\n🔖 {' · '.join(fichas)}" if fichas else "")
             + (f"\n🎛 preset {j['azahar_preset']}" if j.get("azahar_preset") else "")
             + (f"\n▶ {j['ultima_execucao']}" if j.get("ultima_execucao") else "")
