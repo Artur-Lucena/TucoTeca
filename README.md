@@ -27,7 +27,7 @@ Opções comuns: `--db outro.db` (padrão: `biblioteca.db` na casa), `--selftest
 
 - ➕ Cadastrar / editar / excluir: **título + executável** + status (`backlog`, `jogando`, `zerado`, `pausado`, `abandonado`), nota 0–10, favorito, horas, wine prefix, opções, observações, **capa local** (png/jpg/webp até 2 MB).
 - 🔎 Buscar + filtrar por status / favoritos; selo **● exe ok / ○ exe?**.
-- ▶️ **Executar**: traduz o caminho para o SO atual antes de abrir. Se o jogo exigir administrador (WinError 740), oferece relançar com elevação (UAC).
+- ▶️ **Executar**: traduz o caminho para o SO atual antes de abrir. Se o jogo exigir administrador (WinError 740), oferece relançar com elevação (UAC). Se o emulador gravado sumiu mas há outro instalado, pergunta (usar+gravar, só desta vez, cancelar); se a ROM sumiu, procura pelo nome nas raízes e oferece religar.
 - ⏱️ **Horas automáticas**: ao jogar, o tempo do processo é somado sozinho (sessões ≥ 30 s). Limite honesto: fechar o launcher antes do jogo perde a sessão; com UAC/startfile as horas seguem manuais.
 - 🖥️ **Executável por SO**: `exe_win` / `exe_linux` vencem o caminho único (útil p/ emulador `.exe` no Win e `.AppImage` no Linux).
 - 🎮 **Scan de ROMs 3DS** (`.cci/.cxi/.3ds/.3dsx/.elf/.app/.axf`): já liga cada ROM no emulador via opções de lançamento, com preview + confiança.
@@ -49,7 +49,7 @@ Opções comuns: `--db outro.db` (padrão: `biblioteca.db` na casa), `--selftest
 - 💽 **Scan disco com confiança** (`.exe` menos instaladores + manifests Steam; raízes padrão `D:\Games`, `D:\SteamLibrary`, `D:\Riot Games` no Win; override `BIBLIOTECA_SCAN_ROOTS` com `;`; avisa se a lista for parcial pelo teto de varredura). Jogos do Xbox/MS Store não são detectados (loja fechada) — cadastre o exe à mão.
 - 💾 **Backup versionado** (`backups/biblioteca-AAAAmmdd-HHMMSS.db` + `.json`, mantém 10).
 - 📦 Exportar / importar JSON (GUI e TUI; no TUI o importar aceita `.zip`).
-- 📦 **Pacote portátil** (`P` no TUI, 📦/📥 na GUI): um `.zip` com banco + capas (remapeadas p/ os ids novos na volta) + presets + saves 3DS (`sdmc/`). Importação valida todos os nomes antes de aplicar qualquer coisa (anti path-traversal).
+- 📦 **Pacote portátil** (`P` no TUI, 📦/📥 na GUI): um `.zip` com banco + capas (casadas por uuid) + presets + saves 3DS (`sdmc/`). Restaurar preserva horas e última execução; relatório diz novos/atualizados/ignorados/erros. Importação valida todos os nomes antes de aplicar qualquer coisa (anti path-traversal).
 
 Onde o Hydra guarda os dados:
 

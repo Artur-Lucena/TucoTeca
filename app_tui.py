@@ -159,10 +159,13 @@ class Tui:
         j = self.atual()
         if not j:
             return
-        prep = core.preparar_lancamento(j)
-        aviso = f" [{prep['aviso']}]" if prep.get("aviso") else ""
         con = self._con()
         try:
+            j = self._resolver_antes_de_jogar(con, j)
+            if j is None:
+                return
+            prep = core.preparar_lancamento(j)
+            aviso = f" [{prep['aviso']}]" if prep.get("aviso") else ""
             res = core.executar_monitorado(
                 j, ao_fim=lambda sessao, rastreado, _gid=j["id"]:
                     self.sessoes_pendentes.append((_gid, sessao, rastreado)))
@@ -181,6 +184,44 @@ class Tui:
                 self.msg = f"Falha: {res.get('erro')}{aviso}"
         finally:
             con.close()
+
+    def _resolver_antes_de_jogar(self, con, j):
+        """Perguntar-antes (TUI): emulador trocado? ROM sumida? Jogo ou None."""
+        diag = core.diagnosticar_exe(j)
+        if diag["estado"] == "trocou-emulador":
+            r = self.perguntar(
+                f"Emulador gravado sumiu. Usar o atual ({diag['nome']}) e "
+                "[G]ravar, só desta [V]ez ou [C]ancelar? ")
+            if r is None:
+                return None
+            op = r.strip().lower()
+            if op in ("g", "gravar"):
+                j = core.atualizar_jogo(con, j["id"], {"executable_path": "",
+                                                       "exe_win": "", "exe_linux": ""})
+            elif op in ("v", "vez"):
+                j = {**j, "executable_path": "", "exe_win": "", "exe_linux": ""}
+            else:
+                return None
+        drom = core.diagnosticar_rom(j)
+        if drom["estado"] == "rom-ausente":
+            launch = (j.get("launch_options") or "").strip()
+            cands = drom["candidatos"]
+            if cands:
+                extra = f" (+{len(cands) - 1})" if len(cands) > 1 else ""
+                r = self.perguntar(
+                    f"ROM sumiu. Religar p/ {cands[0]}{extra} e [J]ogar, "
+                    "jogar [A]ssim mesmo ou [C]ancelar? ")
+                if r is None:
+                    return None
+                op = r.strip().lower()
+                if op in ("j", "jogar"):
+                    j = core.atualizar_jogo(con, j["id"], {"launch_options": cands[0]})
+                elif op not in ("a", "assim"):
+                    return None
+            else:
+                self.msg = f"ROM não encontrada: {launch} (sem candidatas)"
+                return None
+        return j
 
     def _aplicar_sessoes(self):
         """Soma as sessões que a vigia encerrou (thread-safe: só append/limpa)."""

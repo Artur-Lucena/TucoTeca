@@ -31,6 +31,7 @@ import threading
 import time
 import unicodedata
 import urllib.request
+import uuid as uuid_mod
 import zipfile
 from pathlib import Path
 
@@ -157,6 +158,7 @@ CREATE TABLE IF NOT EXISTS jogos (
     game_code TEXT DEFAULT '',
     regiao TEXT DEFAULT '',
     azahar_preset TEXT DEFAULT '',
+    uuid TEXT DEFAULT '',
     criado_em TEXT,
     atualizado_em TEXT,
     UNIQUE(titulo, executable_path, launch_options)
@@ -164,7 +166,7 @@ CREATE TABLE IF NOT EXISTS jogos (
 """
 
 # Migração de bancos antigos: v1 (sem capa/confianca), v2 (sem exe por SO),
-# v3 (sem game_code/regiao), v4 (sem azahar_preset).
+# v3 (sem game_code/regiao), v4 (sem azahar_preset), v5 (sem uuid).
 MIGRACOES = (
     "ALTER TABLE jogos ADD COLUMN capa TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN confianca REAL DEFAULT 0",
@@ -173,6 +175,7 @@ MIGRACOES = (
     "ALTER TABLE jogos ADD COLUMN game_code TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN regiao TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN azahar_preset TEXT DEFAULT ''",
+    "ALTER TABLE jogos ADD COLUMN uuid TEXT DEFAULT ''",
 )
 
 CAMPOS_EDITAVEIS = ("titulo", "executable_path", "exe_win", "exe_linux",
@@ -235,7 +238,7 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
     cols = ["id", "titulo", "executable_path", "exe_win", "exe_linux", "wine_prefix",
             "launch_options", "status", "nota", "favorito", "horas", "ultima_execucao",
             "observacoes", "origem", "shop", "object_id", "game_code", "regiao",
-            "azahar_preset", "capa", "confianca", "criado_em", "atualizado_em"]
+            "azahar_preset", "uuid", "capa", "confianca", "criado_em", "atualizado_em"]
     todos = ", ".join(cols)
     con.executescript(f"""
         CREATE TABLE jogos_nova (
@@ -258,6 +261,7 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
             game_code TEXT DEFAULT '',
             regiao TEXT DEFAULT '',
             azahar_preset TEXT DEFAULT '',
+            uuid TEXT DEFAULT '',
             capa TEXT DEFAULT '',
             confianca REAL DEFAULT 0,
             criado_em TEXT,
@@ -269,6 +273,31 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
         ALTER TABLE jogos_nova RENAME TO jogos;
     """)
     con.commit()
+
+
+def _garantir_uuid(con: sqlite3.Connection) -> None:
+    """v5: toda linha tem uuid único (identidade estável p/ pacotes).
+
+    Preenche vazios e cria índice único. Roda em todo get_db (barato quando ok).
+    """
+    try:
+        vazios = [r["id"] for r in con.execute(
+            "SELECT id FROM jogos WHERE uuid IS NULL OR uuid=''").fetchall()]
+    except sqlite3.OperationalError:
+        return  # coluna ainda não existe (banco legado estranho): MIGRACOES cuidam
+    vistos = {r["uuid"] for r in con.execute(
+        "SELECT uuid FROM jogos WHERE uuid IS NOT NULL AND uuid<>''").fetchall()}
+    agora = agora_iso()
+    for gid in vazios:
+        novo = uuid_mod.uuid4().hex
+        while novo in vistos:
+            novo = uuid_mod.uuid4().hex
+        vistos.add(novo)
+        con.execute("UPDATE jogos SET uuid=?, atualizado_em=? WHERE id=?",
+                    (novo, agora, gid))
+    con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_jogos_uuid ON jogos(uuid)")
+    if vazios:
+        con.commit()
 
 
 def get_db(db_path: Path) -> sqlite3.Connection:
@@ -286,6 +315,7 @@ def get_db(db_path: Path) -> sqlite3.Connection:
         except sqlite3.OperationalError:
             pass  # coluna já existe
     _garantir_unique_triplo(con, db_path)
+    _garantir_uuid(con)
     return con
 
 
@@ -374,19 +404,21 @@ def listar_jogos(con: sqlite3.Connection, q: str = "", status: str = "",
 
 def criar_jogo(con: sqlite3.Connection, dados: dict) -> dict:
     limpo = validar_dados(dados)
+    limpo["uuid"] = _txt(dados.get("uuid")) or uuid_mod.uuid4().hex
     agora = agora_iso()
     try:
         cur = con.execute(
             """INSERT INTO jogos (titulo, executable_path, exe_win, exe_linux, wine_prefix,
                launch_options, status, nota, favorito, horas, observacoes, origem, shop,
-               object_id, game_code, regiao, azahar_preset, criado_em, atualizado_em)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               object_id, game_code, regiao, azahar_preset, uuid, criado_em, atualizado_em)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
              (limpo["titulo"], limpo["executable_path"], limpo["exe_win"],
              limpo["exe_linux"], limpo["wine_prefix"],
              limpo["launch_options"], limpo["status"], limpo["nota"],
              limpo["favorito"], limpo["horas"], limpo["observacoes"],
              limpo["origem"], limpo["shop"], limpo["object_id"],
-             limpo["game_code"], limpo["regiao"], limpo["azahar_preset"], agora, agora),
+             limpo["game_code"], limpo["regiao"], limpo["azahar_preset"],
+             limpo["uuid"], agora, agora),
         )
         con.commit()
     except sqlite3.IntegrityError:
@@ -1887,16 +1919,28 @@ def icone_rom_para_png(caminho: str, alvo_px: int = 144) -> bytes | None:
 # --------------------------------------------------------------------------
 
 def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
+    """Importa jogos. Itens com uuid existente ATUALIZAM progresso (restore);
+    sem uuid (scans) inserem. Retorna relatório (novos/atualizados/ignorados/erros)."""
     antes = con.execute("SELECT COUNT(*) AS n FROM jogos").fetchone()["n"]
     agora = agora_iso()
-    novos = 0
-    for j in itens:
+    novos = atualizados = ignorados = 0
+    erros: list[str] = []
+
+    def _ignorar(motivo: str):
+        nonlocal ignorados
+        ignorados += 1
+        if len(erros) < 20:
+            erros.append(motivo)
+
+    for pos, j in enumerate(itens):
         if not isinstance(j, dict):
+            _ignorar(f"item {pos}: não é objeto")
             continue
         j = {k: (v.replace("\x00", "") if isinstance(v, str) else v)
              for k, v in j.items()}
         titulo = (j.get("titulo") or "").strip()
         if not titulo:
+            _ignorar(f"item {pos}: sem título")
             continue
         try:
             nota = j.get("nota")
@@ -1908,24 +1952,47 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                 horas = 0.0
             confianca = float(j.get("score") or j.get("confianca") or 0)
         except (TypeError, ValueError):
+            _ignorar(f"'{titulo}': nota/horas inválidos")
             continue
+        uid = (j.get("uuid") or "").strip() or None
         try:
+            if uid is not None:
+                alvo = con.execute("SELECT id FROM jogos WHERE uuid=?",
+                                   (uid,)).fetchone()
+            else:
+                alvo = None
+            if alvo is not None:
+                # restore: progresso volta; identidade/caminhos ficam locais
+                ultima = (j.get("ultima_execucao") or "").strip() or None
+                con.execute(
+                    """UPDATE jogos SET horas=?, ultima_execucao=?, status=?, nota=?,
+                       favorito=?, observacoes=?, atualizado_em=? WHERE id=?""",
+                    (horas, ultima,
+                     j.get("status") if j.get("status") in STATUS_VALIDOS else "backlog",
+                     nota, 1 if j.get("favorito") else 0,
+                     (j.get("observacoes") or ""), agora, alvo["id"]),
+                )
+                atualizados += 1
+                continue
+            if uid is None:
+                uid = uuid_mod.uuid4().hex
             cur = con.execute(
                 """INSERT OR IGNORE INTO jogos
                    (titulo, executable_path, exe_win, exe_linux, wine_prefix, launch_options,
-                    status, nota, favorito, horas, observacoes, origem, shop, object_id,
-                    game_code, regiao, azahar_preset, confianca, criado_em, atualizado_em)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    status, nota, favorito, horas, ultima_execucao, observacoes, origem, shop, object_id,
+                    game_code, regiao, azahar_preset, uuid, confianca, criado_em, atualizado_em)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (titulo, (j.get("executable_path") or "").strip(),
                  (j.get("exe_win") or "").strip(), (j.get("exe_linux") or "").strip(),
                  (j.get("wine_prefix") or ""), (j.get("launch_options") or ""),
                  j.get("status") if j.get("status") in STATUS_VALIDOS else "backlog",
                  nota, 1 if j.get("favorito") else 0,
-                 horas, (j.get("observacoes") or ""),
+                 horas, (j.get("ultima_execucao") or "").strip() or None,
+                 (j.get("observacoes") or ""),
                  j.get("origem") or "manual", (j.get("shop") or ""),
                  (j.get("object_id") or ""), (j.get("game_code") or "").strip(),
                  (j.get("regiao") or "").strip(), (j.get("azahar_preset") or "").strip(),
-                 confianca, agora, agora),
+                 uid, confianca, agora, agora),
             )
             novos += cur.rowcount
             if cur.rowcount and (j.get("origem") or "") == "rom-3ds":
@@ -1937,11 +2004,13 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                                           slugify(titulo) + ".png", png)
                 except Exception:
                     pass
-        except Exception:
+        except Exception as e:
+            _ignorar(f"'{titulo}': {type(e).__name__}: {e}")
             continue
     con.commit()
     depois = con.execute("SELECT COUNT(*) AS n FROM jogos").fetchone()["n"]
-    return {"novos": novos, "total_no_banco": depois, "antes": antes}
+    return {"novos": novos, "atualizados": atualizados, "ignorados": ignorados,
+            "erros": erros, "total_no_banco": depois, "antes": antes}
 
 
 def importar_com_min_score(con: sqlite3.Connection, itens: list[dict], min_score: float) -> dict:
@@ -2152,7 +2221,7 @@ def _lancar_jogo_dict(jogo: dict, elevar: bool = False) -> tuple[dict, object | 
         return {"ok": False, "erro": prov["dica_instalacao"]}, None
     launch = (jogo.get("launch_options") or "")
     if prov is not None and launch.strip():
-        launch = montar_launch_rom(prov, launch)
+        launch = montar_launch_rom(prov, traduzir_para_atual(launch))
     return _lancar(exe, (jogo.get("wine_prefix") or ""), launch, elevar=elevar)
 
 
@@ -2160,6 +2229,82 @@ def executar_jogo_dict(jogo: dict, elevar: bool = False) -> dict:
     """Resolve o exe do SO atual (exe_win/exe_linux vencem) e executa."""
     res, _proc = _lancar_jogo_dict(jogo, elevar)
     return res
+
+
+def diagnosticar_exe(jogo: dict) -> dict:
+    """Para o perguntar-antes: o exe gravado existe? E o do provider atual?
+
+    estados: 'ok' | 'sem-exe' | 'trocou-emulador' | 'ausente'.
+    'trocou-emulador' = gravado sumiu mas o provider atual tem exe válido.
+    """
+    exe, _origem = resolver_exe(jogo)
+    if not exe:
+        return {"estado": "sem-exe", "gravado": "", "atual": ""}
+    if existe_aqui_ou_traduzido(exe)[0]:
+        return {"estado": "ok", "gravado": exe, "atual": exe}
+    prov = provedor_por_origem((jogo.get("origem") or ""))
+    atual = ""
+    if prov is not None:
+        try:
+            atual = prov["exe"]() or ""
+        except Exception:
+            atual = ""
+    if atual and Path(atual).is_file():
+        return {"estado": "trocou-emulador", "gravado": exe, "atual": atual,
+                "provider": prov["chave"], "nome": prov["nome"]}
+    return {"estado": "ausente", "gravado": exe, "atual": ""}
+
+
+def diagnosticar_rom(jogo: dict) -> dict:
+    """A ROM (launch_options) existe? Se não, procura candidatas pelo nome."""
+    launch = (jogo.get("launch_options") or "").strip()
+    if not launch:
+        return {"estado": "nao-rom", "candidatos": []}
+    if provedor_por_extensao(Path(launch).suffix) is None:
+        return {"estado": "nao-rom", "candidatos": []}  # flags de PC, não arquivo
+    if existe_aqui_ou_traduzido(launch)[0]:
+        return {"estado": "ok", "candidatos": []}
+    base = Path(launch).name
+    return {"estado": "rom-ausente", "candidatos": procurar_rom(base) if base else []}
+
+
+def procurar_rom(nome_arquivo: str, roots: list[str] | None = None,
+                 max_resultados: int = 20) -> list[str]:
+    """Acha arquivos pelo nome-base nas raízes de ROMs+scan (p/ religar).
+
+    Só leitura, com teto. Compara case-insensitive pelo nome do arquivo.
+    """
+    alvo = (nome_arquivo or "").strip().lower()
+    if not alvo:
+        return []
+    if roots is None:
+        vistas: list[str] = []
+        for r in default_roms_roots() + default_scan_roots():
+            if r not in vistas:
+                vistas.append(r)
+        roots = vistas
+    achados: list[str] = []
+    vistos = 0
+    for raiz in roots:
+        rp = Path(raiz)
+        if not rp.is_dir():
+            continue
+        for dirpath, dirnames, filenames in os.walk(rp):
+            dirnames[:] = [d for d in dirnames if d.lower() not in SKIP_DIRS]
+            try:
+                if len(Path(dirpath).relative_to(rp).parts) > 6:
+                    dirnames[:] = []
+                    continue
+            except ValueError:
+                dirnames[:] = []
+                continue
+            for fn in filenames:
+                vistos += 1
+                if vistos > 30_000 or len(achados) >= max_resultados:
+                    return sorted(achados)
+                if fn.lower() == alvo:
+                    achados.append(str(Path(dirpath) / fn))
+    return sorted(achados)
 
 
 def azahar_flags() -> list[str]:
@@ -2522,7 +2667,7 @@ def azahar_tem_chaves() -> bool:
 # Pacote portátil (.zip): banco + capas + presets + saves 3DS
 # --------------------------------------------------------------------------
 
-PACOTE_ESQUEMA = 1
+PACOTE_ESQUEMA = 2  # v2: manifesto {arquivo: uuid} (v1 title: aceito em leitura)
 PACOTE_INFO = "pacote-info.json"
 PACOTE_JSON = "biblioteca.json"
 PACOTE_MANIFESTO = "capas-manifesto.json"
@@ -2587,8 +2732,8 @@ def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
             "provedores": sorted(provedores())}
     manifesto = {}
     for j in dados["jogos"]:
-        if j.get("capa"):
-            manifesto[Path(j["capa"]).name] = j["titulo"]
+        if j.get("capa") and j.get("uuid"):
+            manifesto[Path(j["capa"]).name] = j["uuid"]
     n = 0
     try:
         with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as z:
@@ -2645,8 +2790,8 @@ def _membro_pacote_ok(nome: str) -> str | None:
 
 def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict:
     """Restaura um pacote: valida TODOS os nomes antes de aplicar qualquer
-    coisa (nada parcial em pacote hostil). Capas voltam remapeadas para os
-    ids novos via manifesto {arquivo: titulo}."""
+    coisa (nada parcial em pacote hostil). Capas voltam exatas via manifesto
+    {arquivo: uuid} (pacotes v1 com {arquivo: titulo} ainda entram)."""
     origem = Path(origem)
     try:
         zf = zipfile.ZipFile(origem)
@@ -2681,17 +2826,20 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
         try:
             res = importar_lista(con, lista)
             capas = 0
-            for arq, titulo in manifesto.items():
+            for arq, ident in manifesto.items():
                 cat = cats.get(f"capas/{Path(arq).name}")
-                if cat != "capa" or not isinstance(titulo, str) or not titulo.strip():
+                if cat != "capa" or not isinstance(ident, str) or not ident.strip():
                     continue
                 try:
                     raw = zf.read(f"capas/{Path(arq).name}")
                 except KeyError:
                     continue
                 alvo = con.execute(
-                    "SELECT id FROM jogos WHERE titulo=? ORDER BY id LIMIT 1",
-                    (titulo.strip(),)).fetchone()
+                    "SELECT id FROM jogos WHERE uuid=?", (ident.strip(),)).fetchone()
+                if alvo is None:  # pacote v1: manifesto {arquivo: titulo}
+                    alvo = con.execute(
+                        "SELECT id FROM jogos WHERE titulo=? ORDER BY id LIMIT 1",
+                        (ident.strip(),)).fetchone()
                 if alvo is None:
                     continue
                 r = salvar_capa_bytes(con, alvo["id"], Path(arq).name, raw)
@@ -2728,6 +2876,8 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                         saves_ignorados += 1
         finally:
             con.close()
-    return {"ok": True, "novos": res["novos"], "total_no_banco": res["total_no_banco"],
+    return {"ok": True, "novos": res["novos"], "atualizados": res["atualizados"],
+            "ignorados": res["ignorados"], "erros": res["erros"],
+            "total_no_banco": res["total_no_banco"],
             "capas": capas, "presets": presets, "saves": saves,
             "saves_ignorados": saves_ignorados}

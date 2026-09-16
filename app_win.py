@@ -445,11 +445,14 @@ class App:
         j = self.selecionado()
         if not j:
             return
-        prep = core.preparar_lancamento(j)
-        if prep.get("aviso"):
-            messagebox.showwarning("Preset Azahar", prep["aviso"])
         con = self._con()
         try:
+            j = self._resolver_antes_de_jogar(con, j)
+            if j is None:
+                return
+            prep = core.preparar_lancamento(j)
+            if prep.get("aviso"):
+                messagebox.showwarning("Preset Azahar", prep["aviso"])
             res = core.executar_monitorado(
                 j, ao_fim=lambda sessao, rastreado, _gid=j["id"]:
                     self._depois(lambda: self._sessao_fim(_gid, sessao, rastreado)))
@@ -470,6 +473,44 @@ class App:
         finally:
             con.close()
         self.recarregar()
+
+    def _resolver_antes_de_jogar(self, con, j):
+        """Perguntar-antes: emulador trocado? ROM sumida? Devolve jogo (talvez
+        religado) ou None (cancelado)."""
+        diag = core.diagnosticar_exe(j)
+        if diag["estado"] == "trocou-emulador":
+            r = messagebox.askyesnocancel(
+                "Jogar",
+                f"O emulador gravado não existe aqui:\n{diag['gravado']}\n\n"
+                f"Atual ({diag['nome']}):\n{diag['atual']}\n\n"
+                "Sim = usar e gravar · Não = só desta vez · Cancelar = voltar")
+            if r is None:
+                return None
+            if r:
+                j = core.atualizar_jogo(con, j["id"],
+                                        {"executable_path": "", "exe_win": "",
+                                         "exe_linux": ""})
+            else:
+                j = {**j, "executable_path": "", "exe_win": "", "exe_linux": ""}
+        drom = core.diagnosticar_rom(j)
+        if drom["estado"] == "rom-ausente":
+            launch = (j.get("launch_options") or "").strip()
+            cands = drom["candidatos"]
+            if cands:
+                extra = f" (+{len(cands) - 1} outra(s))" if len(cands) > 1 else ""
+                r = messagebox.askyesnocancel(
+                    "Jogar",
+                    f"ROM não encontrada:\n{launch}\n\nAchei:\n{cands[0]}{extra}\n\n"
+                    "Sim = religar e jogar · Não = jogar assim mesmo · Cancelar = voltar")
+                if r is None:
+                    return None
+                if r:
+                    j = core.atualizar_jogo(con, j["id"], {"launch_options": cands[0]})
+            else:
+                messagebox.showwarning(
+                    "Jogar", f"ROM não encontrada:\n{launch}\n\nConfira o caminho.")
+                return None
+        return j
 
     def _sessao_fim(self, gid: int, sessao: float, rastreado: bool) -> None:
         """Callback da vigia (já na thread de UI): soma, recarrega, avisa."""
