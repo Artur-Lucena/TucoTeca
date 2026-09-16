@@ -1272,9 +1272,15 @@ def azahar_instalar(info: dict, progresso=None) -> dict:
             "exe_existe": bool(exe) and Path(exe).is_file()}
 
 
+ROM_TAGS_LIXO_RE = re.compile(
+    r"\s*\((USA|EUR|JPN|JAP|KOR|CHN|TWN|AUS|BRA|World|"
+    r"En(?:,[A-Za-z]{2})+|Rev\s*\d+|v\d+[\.\d]*|Decrypted|Trimmed)\)", re.IGNORECASE)
+
+
 def _titulo_de_rom(p: Path) -> str:
     nome = p.stem.replace("_", " ").replace(".", " ").replace("-", " ").strip()
-    return re.sub(r"\s+", " ", nome) or p.stem
+    nome = ROM_TAGS_LIXO_RE.sub("", nome)  # "Pokemon X (USA) (En,Ja…)" -> "Pokemon X"
+    return re.sub(r"\s+", " ", nome).strip() or p.stem
 
 
 def _item_rom(full: str, emu_exe: str = "") -> dict:
@@ -1603,7 +1609,7 @@ def _ler_icon_bin(caminho: str) -> bytes:
             return b""
         for i in range(10):
             e = exeh[i * 16:(i + 1) * 16]
-            if e[:8].rstrip(b"\x00") == b"icon.bin":
+            if e[:8].rstrip(b"\x00") in (b"icon", b"icon.bin"):
                 fo, fs = _u32(e, 8), _u32(e, 12)
                 if not fs or fs > 0x4000:
                     return b""
@@ -1939,7 +1945,12 @@ def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "
     if wine_prefix.strip():
         env["WINEPREFIX"] = wine_prefix.strip()
 
+    # Aspas são só agrupamento p/ o split (Popen recebe lista e cita sozinho):
+    # "C:\com espaco\jogo.cci" vira um arg limpo, sem aspas literais.
     extra = shlex.split(launch_options, posix=(os.name != "nt")) if launch_options.strip() else []
+    if os.name == "nt":
+        extra = [(a[1:-1] if len(a) >= 2 and a[0] == a[-1] and a[0] in "\"'" else a)
+                 for a in extra]
 
     try:
         cwd = str(p.parent) if p.parent.exists() else None
@@ -2296,14 +2307,38 @@ def preparar_lancamento(jogo: dict) -> dict:
     prov = provedor_por_origem(origem)
     if prov is None:
         return {"preset_aplicado": None, "aviso": None}
+    avisos: list[str] = []
+    aplicado = None
     nome = (jogo.get("azahar_preset") or "").strip()
-    if not nome:
-        return {"preset_aplicado": None, "aviso": None}
-    r = prov["aplicar_preset"](nome)
-    if r.get("ok"):
-        return {"preset_aplicado": r["preset"], "aviso": None}
-    return {"preset_aplicado": None,
-            "aviso": f"Preset '{nome}' falhou ({r['erro']}); abrindo com config atual."}
+    if nome:
+        r = prov["aplicar_preset"](nome)
+        if r.get("ok"):
+            aplicado = r["preset"]
+        else:
+            avisos.append(f"Preset '{nome}' falhou ({r['erro']}); abrindo com config atual.")
+    launch = (jogo.get("launch_options") or "").strip()
+    if launch and provedor_por_extensao(Path(launch).suffix) is not None:
+        if rom_parece_criptografada(launch) and not azahar_tem_chaves():
+            avisos.append("ROM parece criptografada e o Azahar está sem aes_keys.txt "
+                          "— o jogo não vai abrir. Faça o dump das chaves do seu 3DS "
+                          "(GodMode9) para user/sysdata/aes_keys.txt.")
+    return {"preset_aplicado": aplicado, "aviso": " ".join(avisos) or None}
+
+
+def rom_parece_criptografada(rom_path: str) -> bool:
+    """ExeFS sem ícone extraível = quase sempre ROM criptografada."""
+    rom = (rom_path or "").strip()
+    if not rom or not Path(rom).is_file():
+        return False  # ausente é outro erro (o play já reporta)
+    try:
+        return not _ler_icon_bin(rom)
+    except Exception:
+        return False
+
+
+def azahar_tem_chaves() -> bool:
+    ud = azahar_user_dir()
+    return bool(ud) and (Path(ud) / "sysdata" / "aes_keys.txt").is_file()
 
 
 # --------------------------------------------------------------------------
