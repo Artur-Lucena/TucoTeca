@@ -1,0 +1,13 @@
+# Banco e dados do usuário — nunca versionar (ficam na máquina)
+biblioteca.db
+backups/
+capas/
+# Histórico local de arquivo único (arquivo, não entrega)
+historico/
+# Caches e temporários
+__pycache__/
+*.py[cod]
+Desktop.ini
+Thumbs.db
+*~
+.vscode/
