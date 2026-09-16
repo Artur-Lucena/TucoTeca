@@ -2,6 +2,7 @@
 biblioteca.db
 backups/
 capas/
+erros.log
 # Histórico local de arquivo único (arquivo, não entrega)
 historico/
 # Caches e temporários

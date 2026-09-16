@@ -185,6 +185,16 @@ def agora_iso() -> str:
     return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
 
 
+def log_erro(contexto: str, detalhe: str) -> None:
+    """Anexa uma linha em erros.log (casa). Nunca levanta; diagnóstico local."""
+    try:
+        HOME_DIR.mkdir(parents=True, exist_ok=True)
+        with open(HOME_DIR / "erros.log", "a", encoding="utf-8") as fh:
+            fh.write(f"{agora_iso()} [{contexto}] {detalhe}\n")
+    except OSError:
+        pass
+
+
 def _txt(v) -> str:
     """Texto limpo: sem NUL (quebra Path/SQLite) e sem espaços nas bordas."""
     if v is None:

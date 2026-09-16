@@ -631,7 +631,8 @@ class App:
                     "nota": None if nota_txt == "" else int(nota_txt),
                     "horas": float(var_horas.get().strip() or 0),
                     "favorito": var_fav.get(),
-                    "wine_prefix": "",
+                    # sem campo na GUI: preserva o gravado (era "" fixo e apagava o do Linux)
+                    "wine_prefix": (j["wine_prefix"] if j else ""),
                     "launch_options": campos["launch_options"].get().strip(),
                     "azahar_preset": campos["azahar_preset"].get().strip(),
                     "observacoes": txt.get("1.0", "end").strip(),
@@ -741,11 +742,13 @@ class App:
                 except tk.TclError:
                     return
                 messagebox.showerror("Importar pasta", f"falha na varredura: {e}")
+                core.log_erro("importar-pasta", str(e))
 
             try:
                 _roots_u, itens, info = core.preview_pasta([pasta])
             except Exception as e:
-                na_ui(lambda: falhou(e))
+                msg_erro = f"{type(e).__name__}: {e}"  # e morre no fim do except; string não
+                na_ui(lambda m=msg_erro: falhou(m))
                 return
 
             def pronto():
@@ -852,11 +855,13 @@ class App:
                 except tk.TclError:
                     return
                 messagebox.showerror("Ler do disco", f"falha na leitura: {e}")
+                core.log_erro("ler-do-disco", str(e))
 
             try:
                 itens, info = core.ler_do_disco()
             except Exception as e:
-                na_ui(lambda: falhou(e))
+                msg_erro = f"{type(e).__name__}: {e}"  # e morre no fim do except; string não
+                na_ui(lambda m=msg_erro: falhou(m))
                 return
 
             def pronto():

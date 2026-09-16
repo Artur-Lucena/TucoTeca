@@ -46,6 +46,7 @@ class Tui:
         self.si = 0
         self.fav = False
         self.msg = ""
+        self.msg_final = ""
         self.sessoes_pendentes: list = []  # (gid, sessao_h, rastreado) da vigia
         self._cores()
         self.recarregar()
@@ -569,6 +570,9 @@ class Tui:
             self.desenhar()
             ch = s.getch()
             if ch in (ord("q"),):
+                antes = self.msg  # desenhar consome; guarda p/ exibir após sair
+                self._aplicar_sessoes()  # vigia pode ter encerrado no último instante
+                self.msg_final = self.msg or antes
                 return
             elif ch in (curses.KEY_DOWN, ord("j")):
                 self.cur = min(len(self.jogos) - 1, self.cur + 1) if self.jogos else 0
@@ -637,9 +641,13 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     def _run(stdscr):
-        Tui(stdscr, Path(args.db)).rodar()
+        app = Tui(stdscr, Path(args.db))
+        app.rodar()
+        return getattr(app, "msg_final", "")
 
-    curses.wrapper(_run)
+    msg_final = curses.wrapper(_run)
+    if msg_final:
+        print(msg_final)
     return 0
 
 
