@@ -5,12 +5,12 @@ Monta o HUB portátil Windows: Python embutido + tkinter + app, tudo num .zip.
 
     python ferramentas/montar_portatil.py [--só-verificar]
 
-Modelo: por padrão o .zip NÃO leva emulador (net-install: o botão
-"Atualizar Azahar" baixa o build oficial na primeira execução). Com
---com-azahar, o Azahar instalado é copiado para dentro do pacote
-(emuladores/Azahar/), com licença GPL (COPYING.txt), nota de fonte
-(FONTE.txt) e esqueleto de user/ (config + saves; NUNCA nand, sysdata
-com chaves, log ou shaders). O repo git nunca recebe binários.
+Modelo: o .zip LEVA o Azahar instalado junto, 100% das vezes
+(emuladores/Azahar/, com licença GPL (COPYING.txt), nota de fonte
+(FONTE.txt) e user/ essencial: config + saves + mods LayeredFS — NUNCA
+nand, sysdata com chaves, log ou shaders). Só com --sem-azahar o pacote
+sai magro (net-install: o botão "Atualizar Azahar" baixa o build oficial
+na primeira execução). O repo git nunca recebe binários.
 
 Layout do portátil:
     BibliotecaHub.bat      abre a GUI sem console (pythonw)
@@ -64,8 +64,8 @@ LEIAME_PORTATIL = """BIBLIOTECA HUB (portátil Windows) — sem instalar nada.
 COMO USAR
 1. Extraia esta pasta onde quiser (inclusive pendrive).
 2. Duplo-clique em BibliotecaHub.bat.
-3. Sem emulador junto? Sidebar BANCO > "Atualizar Azahar" (~60 MB, build
-   oficial). Com emulador junto (emuladores/Azahar/): já sai jogando.
+3. O Azahar já vem junto (emuladores/Azahar/, com seus mods e saves).
+   Pacote magro (--sem-azahar)? Sidebar BANCO > "Atualizar Azahar".
 
 ONDE FICA O QUÊ
 - dados/ ........... sua casa: banco, backups, capas, presets
@@ -188,7 +188,7 @@ def garantir_tcl_scripts(py_dir: Path) -> str:
     raise SystemExit("não consegui os scripts Tcl/Tk do fonte oficial.")
 
 
-AZAHAR_USER_INCLUIR = ("config", "cheats", "sdmc", "states")
+AZAHAR_USER_INCLUIR = ("config", "cheats", "sdmc", "states", "load")
 AZAHAR_USER_EXCLUIR = ("nand", "sysdata", "log", "shaders")
 GPL_URL = "https://www.gnu.org/licenses/gpl-2.0.txt"
 AZAHAR_URL = "https://github.com/azahar-emu/azahar"
@@ -272,11 +272,11 @@ def incluir_azahar(dest_base: Path) -> str:
         encoding="utf-8")
     shutil.copy2(garantir_gpl(), dst / "COPYING.txt")
     mb = sum(f.stat().st_size for f in dst.rglob("*") if f.is_file()) / 1048576
-    print(f"[ok] Azahar {ver or '?'} embutido ({mb:.0f} MB; user/ só config+saves)")
+    print(f"[ok] Azahar {ver or '?'} embutido ({mb:.0f} MB; user/ só config+saves+mods)")
     return ver
 
 
-def montar(com_azahar: bool = False) -> Path:
+def montar(sem_azahar: bool = False) -> Path:
     if os.name != "nt":
         raise SystemExit("o portátil Windows só é montado no Windows.")
     vi = sys.version_info
@@ -315,8 +315,10 @@ def montar(com_azahar: bool = False) -> Path:
     (BUILD / "README-PORTATIL.txt").write_text(LEIAME_PORTATIL, encoding="utf-8")
     for sub in ("dados", "dados/backups", "dados/capas", "dados/presets"):
         (BUILD / sub).mkdir(parents=True, exist_ok=True)
-    if com_azahar:
+    if not sem_azahar:
         incluir_azahar(BUILD)
+    else:
+        print("[aviso] pacote magro, sem emulador (--sem-azahar)")
 
     # prova real: o python embutido importa tkinter e monta a UI oculta
     py = py_dir / "python.exe"
@@ -338,7 +340,7 @@ def montar(com_azahar: bool = False) -> Path:
     if r.returncode != 0 or "[ok] selftest" not in r.stdout:
         raise SystemExit(f"selftest falhou no portátil:\n{r.stdout[-1500:]}\n{r.stderr[-1500:]}")
     print(f"[ok] {r.stdout.strip()} (casa de prova: {prova_home.name}/)")
-    if com_azahar:
+    if not sem_azahar:
         az = BUILD / "emuladores" / "Azahar" / (
             "azahar.exe" if os.name == "nt" else "azahar.AppImage")
         exe_ok = az.is_file() if os.name == "nt" else bool(
@@ -364,7 +366,7 @@ def montar(com_azahar: bool = False) -> Path:
 
     DIST.mkdir(parents=True, exist_ok=True)
     hoje = datetime.date.today().strftime("%Y%m%d")
-    sufixo = "-com-azahar" if com_azahar else ""
+    sufixo = "-slim" if sem_azahar else ""
     saida = DIST / f"BibliotecaHub-portatil-{hoje}{sufixo}.zip"
     with zipfile.ZipFile(saida, "w", zipfile.ZIP_DEFLATED) as z:
         for arq in sorted(BUILD.rglob("*")):
@@ -376,11 +378,11 @@ def montar(com_azahar: bool = False) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Monta o HUB portátil Windows.")
-    ap.add_argument("--com-azahar", action="store_true",
-                    help="embute o Azahar instalado (GPL: leva COPYING+FONTE)")
+    ap.add_argument("--sem-azahar", action="store_true",
+                    help="pacote magro sem emulador (só p/ iteração rápida)")
     args = ap.parse_args(argv)
     try:
-        montar(com_azahar=args.com_azahar)
+        montar(sem_azahar=args.sem_azahar)
     except SystemExit as e:
         print(f"ERRO: {e}", file=sys.stderr)
         return 1
