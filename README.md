@@ -13,7 +13,7 @@ Nunca abra nos dois sistemas ao mesmo tempo; encerre/desmonte antes de trocar de
 
 ## Entradas
 
-Duplo-clique em **`BibliotecaHub.bat`** (raiz do projeto) — sem console, sem VS Code.
+Duplo-clique em **`Biblioteca Hub.vbs`** (raiz do projeto) — abre só o app, sem janela preta (`BibliotecaHub.bat` faz o mesmo com console, pra debug).
 
 | Frontend | Onde | Roda como |
 |---|---|---|
