@@ -885,11 +885,11 @@ class App:
                         selectbackground=ACC, font=("Segoe UI", 10))
         lb.pack(fill="both", expand=True, padx=10)
         for i, it in enumerate(itens):
-            bola = "●" if it["exe_existe"] else "○"
+            bola = "●" if it.get("exe_existe") else "○"
             tag = f" [{it['regiao']}]" if it.get("regiao") else ""
-            lb.insert("end", f"{bola} [{it['score']:.2f}] {it['titulo']}{tag} — {it.get('fonte') or it['origem']}"
+            lb.insert("end", f"{bola} [{it.get('score', 0):.2f}] {it['titulo']}{tag} — {it.get('fonte') or it['origem']}"
                              + (f" · {it['shop']}" if it.get("shop") else ""))
-            if it["score"] >= 0.3:
+            if it.get("score", 0) >= 0.3:
                 lb.selection_set(i)
 
         def importar():
@@ -994,8 +994,17 @@ class App:
         def trabalho():
             info = core.azahar_release_info()
             if info.get("erro"):
-                return self._depois(lambda: (prog.destroy(), messagebox.showerror(
-                    "Azahar", info["erro"])))
+                msg_erro = info["erro"]  # captura já-string (padrão Fase A)
+
+                def mostra_erro(msg=msg_erro):
+                    try:
+                        prog.destroy()
+                    except tk.TclError:
+                        pass
+                    messagebox.showerror("Azahar", msg)
+
+                return self._depois(mostra_erro)
+            local = core.azahar_versao_local()
             local = core.azahar_versao_local()
             tag = info.get("tag") or "?"
 
@@ -1035,7 +1044,14 @@ class App:
                 txt = f"Baixando... {feito // 1048576} MB"
                 if total:
                     txt += f" / {total // 1048576} MB"
-                self._depois(lambda: lbl.configure(text=txt))
+
+                def aplica(texto=txt):
+                    try:
+                        lbl.configure(text=texto)
+                    except tk.TclError:
+                        pass  # janela fechada no meio do download
+
+                self._depois(aplica)
 
             res = core.azahar_instalar(info, progresso=andamento)
 
@@ -1114,19 +1130,49 @@ class App:
             initialfile="biblioteca-pacote.zip")
         if not dest:
             return
-        try:
-            res = core.exportar_pacote(dest, db_path=self.db_path, incluir_saves=True)
-        except Exception as e:
-            messagebox.showerror("Pacote", f"falha: {e}")
-            return
-        if not res.get("ok"):
-            messagebox.showerror("Pacote", res.get("erro", "falha"))
-            return
-        kb = res["bytes"] // 1024
-        messagebox.showinfo("Pacote",
-                            f"{res['jogos']} jogo(s) · {res['arquivos']} arquivo(s) · "
-                            f"{kb} KB{' · +saves 3DS' if res['inclui_saves'] else ''}\n"
-                            f"{res['destino']}")
+        prog = tk.Toplevel(self.root)
+        prog.title("Pacote")
+        prog.transient(self.root)
+        ttk.Label(prog, text="Empacotando (só leitura)...").pack(padx=24, pady=24)
+        prog.update()
+
+        def trabalho():
+            def na_ui(fn):
+                try:
+                    self.root.after(0, fn)
+                except tk.TclError:
+                    pass
+
+            def _falhou(msg):
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    return
+                messagebox.showerror("Pacote", f"falha: {msg}")
+
+            try:
+                res = core.exportar_pacote(dest, db_path=self.db_path, incluir_saves=True)
+            except Exception as e:
+                msg_erro = f"{type(e).__name__}: {e}"
+                return na_ui(lambda m=msg_erro: _falhou(m))
+
+            def pronto():
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    return
+                if not res.get("ok"):
+                    messagebox.showerror("Pacote", res.get("erro", "falha"))
+                    return
+                kb = res["bytes"] // 1024
+                messagebox.showinfo("Pacote",
+                                    f"{res['jogos']} jogo(s) · {res['arquivos']} arquivo(s) · "
+                                    f"{kb} KB{' · +saves 3DS' if res['inclui_saves'] else ''}\n"
+                                    f"{res['destino']}")
+
+            na_ui(pronto)
+
+        threading.Thread(target=trabalho, daemon=True).start()
 
     def importar_pacote(self, arq: str | None = None):
         if not arq:
@@ -1134,23 +1180,52 @@ class App:
                 title="Pacote portátil", filetypes=[("ZIP", "*.zip")])
             if not arq:
                 return
-        try:
-            res = core.importar_pacote(
-                arq, db_path=self.db_path,
-                restaurar_saves=messagebox.askyesno(
-                    "Pacote", "Restaurar os saves 3DS do pacote?"))
-        except Exception as e:
-            messagebox.showerror("Pacote", f"falha: {e}")
-            return
-        if not res.get("ok"):
-            messagebox.showerror("Pacote", res.get("erro", "falha"))
-            return
-        self.sel = None
-        self.recarregar()
-        messagebox.showinfo("Pacote",
-                            core.resumo_importacao(res) + "\n" +
-                            f"capas {res['capas']} · presets {res['presets']} · "
-                            f"saves {res['saves']}")
+        quer_saves = messagebox.askyesno("Pacote", "Restaurar os saves 3DS do pacote?")
+        prog = tk.Toplevel(self.root)
+        prog.title("Pacote")
+        prog.transient(self.root)
+        ttk.Label(prog, text="Restaurando pacote...").pack(padx=24, pady=24)
+        prog.update()
+
+        def trabalho():
+            def na_ui(fn):
+                try:
+                    self.root.after(0, fn)
+                except tk.TclError:
+                    pass
+
+            def _falhou(msg):
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    return
+                messagebox.showerror("Pacote", f"falha: {msg}")
+
+            try:
+                res = core.importar_pacote(arq, db_path=self.db_path,
+                                           restaurar_saves=quer_saves)
+            except Exception as e:
+                msg_erro = f"{type(e).__name__}: {e}"
+                return na_ui(lambda m=msg_erro: _falhou(m))
+
+            def pronto():
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    return
+                if not res.get("ok"):
+                    messagebox.showerror("Pacote", res.get("erro", "falha"))
+                    return
+                self.sel = None
+                self.recarregar()
+                messagebox.showinfo("Pacote",
+                                    core.resumo_importacao(res) + "\n" +
+                                    f"capas {res['capas']} · presets {res['presets']} · "
+                                    f"saves {res['saves']}")
+
+            na_ui(pronto)
+
+        threading.Thread(target=trabalho, daemon=True).start()
 
 
 def main(argv: list[str] | None = None) -> int:

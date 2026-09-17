@@ -359,7 +359,7 @@ class Tui:
             self.msg = "Nada encontrado."
             return
         s = self.stdscr
-        marcados = {i for i, it in enumerate(itens) if it["score"] >= 0.3}
+        marcados = {i for i, it in enumerate(itens) if it.get("score", 0) >= 0.3}
         cur = 0
         while True:
             s.erase()
@@ -376,9 +376,9 @@ class Tui:
                     break
                 it = itens[idx]
                 chk = "[x]" if idx in marcados else "[ ]"
-                bola = "●" if it["exe_existe"] else "○"
+                bola = "●" if it.get("exe_existe") else "○"
                 tag = f" [{it['regiao']}]" if it.get("regiao") else ""
-                linha = f"{chk} {bola} [{it['score']:.2f}] {it['titulo']}{tag} ({it.get('fonte') or it['origem']})"
+                linha = f"{chk} {bola} [{it.get('score', 0):.2f}] {it['titulo']}{tag} ({it.get('fonte') or it['origem']})"
                 attr = self.cor["acc"] if idx == cur else self.cor["txt"]
                 s.addnstr(1 + i, 0, linha, cols - 1, attr)
             s.addnstr(rows - 1, 0, f"{len(marcados)} marcado(s) de {len(itens)}",
