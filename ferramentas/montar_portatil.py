@@ -38,7 +38,8 @@ REPO = Path(__file__).resolve().parent.parent
 CACHE = Path(__file__).resolve().parent / ".cache"
 BUILD = Path(__file__).resolve().parent / ".build" / "hub"
 DIST = REPO / "dist"
-APP_ARQS = ("bib_core.py", "app_win.py", "app_tui.py", "README.md")
+APP_ARQS = ("bib_core.py", "README.md")
+FRONT_ARQS = ("frontends/app_win.py", "frontends/app_tui.py")
 
 BAT_GUI = """@echo off
 setlocal
@@ -321,6 +322,11 @@ def montar(sem_azahar: bool = False) -> Path:
         if not src.is_file():
             raise SystemExit(f"arquivo do app ausente no repo: {nome}")
         shutil.copy2(src, app_dir / nome)
+    for nome in FRONT_ARQS:
+        src = REPO / nome
+        if not src.is_file():
+            raise SystemExit(f"arquivo do app ausente no repo: {nome}")
+        shutil.copy2(src, app_dir / Path(nome).name)
     nucleo_src = REPO / "bib_nucleo"
     if not (nucleo_src / "__init__.py").is_file():
         raise SystemExit("pacote bib_nucleo ausente no repo.")

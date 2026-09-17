@@ -5,7 +5,7 @@ Minha Biblioteca de Jogos — aplicativo de terminal (curses, stdlib).
 Alvo principal: Linux. Mesmo banco e mesmas regras da GUI Windows.
 
 Uso:
-    python app_tui.py [--db ~/.../biblioteca.db]
+    python frontends/app_tui.py [--db ~/.../biblioteca.db]
 
 Teclas (lista): ↑/↓ ou j/k navegar · PgUp/PgDn · / buscar · f status ·
   * favoritos · Enter jogar · a adicionar · e editar · d excluir ·
@@ -26,7 +26,7 @@ from queue import SimpleQueue, Empty
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import bib_core as core
 
 try:

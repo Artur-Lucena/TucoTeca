@@ -13,10 +13,12 @@ Nunca abra nos dois sistemas ao mesmo tempo; encerre/desmonte antes de trocar de
 
 ## Entradas
 
+Duplo-clique em **`BibliotecaHub.bat`** (raiz do projeto) — sem console, sem VS Code.
+
 | Frontend | Onde | Roda como |
 |---|---|---|
-| `app_win.py` | Windows | aplicativo local (tkinter): `python app_win.py` |
-| `app_tui.py` | Linux | aplicativo de terminal (curses): `python app_tui.py` |
+| `frontends/app_win.py` | Windows | aplicativo local (tkinter): `python frontends/app_win.py` |
+| `frontends/app_tui.py` | Linux | aplicativo de terminal (curses): `python frontends/app_tui.py` |
 
 Núcleo compartilhado: `bib_core.py` (caminhos, banco, scans, backup, execução).
 Versão web antiga removida (histórico em `historico/`).
@@ -75,8 +77,11 @@ O Azahar instalado vai junto, 100% das vezes (`emuladores/Azahar/`, com `COPYING
 
 ## Estrutura
 
+- `BibliotecaHub.bat` — **o executável**: duplo-clique abre a GUI (produção/dev).
 - `bib_core.py` — compat: reexporta `bib_nucleo/` (não edite; o código mora nos módulos).
 - `bib_nucleo/` — `base` (caminhos), `banco` (SQLite), `scans` (achados/importação), `emuladores` (providers/Azahar/execução), `pacotes` (backup/zip), `atualizacao` (update transacional).
-- `app_win.py` / `app_tui.py` — frontends GUI (Windows) / terminal (Linux).
+- `frontends/` — `app_win.py` (GUI Windows) / `app_tui.py` (terminal Linux).
+- `ferramentas/` — `montar_portatil.py` (gera o portátil), `testes/` (suíte).
+- `fontes-capas/` — imagens-fonte das capas (já aplicadas; reserva).
 - `biblioteca.db` — criado no primeiro run (SQLite, journal `DELETE`, sem sidecars).
 - `backups/` — backups versionados. `capas/` — capas locais. `presets/` — presets do Azahar (`*.ini`).

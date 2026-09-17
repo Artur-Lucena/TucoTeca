@@ -19,8 +19,10 @@ from pathlib import Path
 
 TESTES_DIR = Path(__file__).resolve().parent
 REPO = TESTES_DIR.parent.parent
+FRONTENDS = REPO / "frontends"
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(FRONTENDS))
 
 
 def afirmar(cond, msg=""):
@@ -101,6 +103,8 @@ def main():
             total += 1
             with tempfile.TemporaryDirectory(prefix="hub-teste-", dir=parent) as tmp:
                 env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8")
+                env["PYTHONPATH"] = os.pathsep.join(
+                    [str(REPO), str(FRONTENDS)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
                 r = subprocess.run([sys.executable, "-B", str(Path(__file__).resolve()),
                                     "--caso", arq.name, nome, "--raiz", tmp],
                                    env=env, capture_output=True, text=True, encoding="utf-8",
