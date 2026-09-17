@@ -128,7 +128,14 @@ class App:
         st.configure("Accent.TButton", background=ACC, foreground="white",
                      borderwidth=0, padding=8, font=("Segoe UI", 11, "bold"))
         st.configure("TEntry", fieldbackground="#0b0d12", foreground=TXT,
-                     borderwidth=1)
+                      borderwidth=1)
+        st.configure("Sec.TLabelframe", background=CARD, borderwidth=0, padding=12)
+        st.configure("Sec.TLabelframe.Label", background=CARD, foreground=ACC,
+                     font=("Segoe UI", 11, "bold"))
+        st.configure("Sec.TLabel", background=CARD, foreground=MUT,
+                     font=("Segoe UI", 10))
+        st.configure("Big.Accent.TButton", background=ACC, foreground="white",
+                     borderwidth=0, padding=12, font=("Segoe UI", 12, "bold"))
         st.configure("Vertical.TScrollbar", background=CARD)
 
     def _montar(self):
@@ -572,41 +579,43 @@ class App:
         dlg.configure(bg=BG)
         dlg.transient(self.root)
         dlg.grab_set()
-        dlg.minsize(540, 0)
+        dlg.minsize(560, 0)
         campos: dict[str, tk.Variable | tk.Text] = {}
 
         def secao(titulo):
-            fr = ttk.LabelFrame(dlg, text=f" {titulo} ", padding=(10, 6))
-            fr.pack(fill="x", padx=10, pady=(8, 0))
+            fr = ttk.LabelFrame(dlg, text=f"  {titulo}  ", style="Sec.TLabelframe")
+            fr.pack(fill="x", padx=12, pady=(10, 0))
+            fr.grid_columnconfigure(1, weight=1)
             return fr
 
-        def linha(pai, rotulo, chave, valor="", largura=40):
-            ttk.Label(pai, text=rotulo, width=16, anchor="w").grid(
-                row=linha.n, column=0, sticky="w", pady=2)
+        def campo(pai, linha_n, rotulo, chave, valor=""):
+            ttk.Label(pai, text=rotulo, style="Sec.TLabel").grid(
+                row=linha_n, column=0, sticky="w", padx=(0, 8), pady=4)
             v = tk.StringVar(value=valor)
-            ttk.Entry(pai, textvariable=v, width=largura).grid(
-                row=linha.n, column=1, sticky="ew", pady=2)
-            pai.grid_columnconfigure(1, weight=1)
+            e = ttk.Entry(pai, textvariable=v, font=("Segoe UI", 10))
+            e.grid(row=linha_n, column=1, sticky="ew", pady=4)
             campos[chave] = v
-            linha.n += 1
-            return v
-        linha.n = 0
+            return e
 
         # -- jogo
         fr_jogo = secao("Jogo")
-        linha.n = 0
-        linha(fr_jogo, "Título *", "titulo", j["titulo"] if j else "")
-        ttk.Label(fr_jogo, text="Status", width=16, anchor="w").grid(
-            row=1, column=0, sticky="w", pady=2)
+        campo(fr_jogo, 0, "Título *", "titulo", j["titulo"] if j else "")
+        ttk.Label(fr_jogo, text="Status", style="Sec.TLabel").grid(
+            row=1, column=0, sticky="w", padx=(0, 8), pady=4)
         var_st = tk.StringVar(value=j["status"] if j else "backlog")
         ttk.Combobox(fr_jogo, textvariable=var_st, values=list(core.STATUS_VALIDOS),
-                     state="readonly", width=18).grid(row=1, column=1, sticky="w", pady=2)
+                     state="readonly", width=16, font=("Segoe UI", 10)).grid(
+                         row=1, column=1, sticky="w", pady=4)
         campos["status"] = var_st
+        var_fav = tk.BooleanVar(value=bool(j and j["favorito"]))
+        ttk.Checkbutton(fr_jogo, text="★ Favorito", variable=var_fav).grid(
+            row=2, column=1, sticky="w", pady=2)
+        campos["favorito"] = var_fav
 
         # -- execução
         fr_exe = secao("Execução")
-        linha.n = 0
-        linha(fr_exe, "Executável", "executable_path", j["executable_path"] if j else "")
+        ent_exe = campo(fr_exe, 0, "Executável", "executable_path",
+                        j["executable_path"] if j else "")
 
         def procurar_exe():
             arq = filedialog.askopenfilename(
@@ -615,37 +624,40 @@ class App:
             if arq:
                 campos["executable_path"].set(arq)
 
-        ttk.Button(fr_exe, text="Procurar...", command=procurar_exe).grid(
-            row=1, column=1, sticky="e", pady=2)
-        linha.n = 2
-        linha(fr_exe, "Exe Windows", "exe_win", j["exe_win"] if j else "")
-        linha(fr_exe, "Exe Linux", "exe_linux", j["exe_linux"] if j else "")
-        linha(fr_exe, "Lançamento", "launch_options", j["launch_options"] if j else "")
+        ttk.Button(fr_exe, text="🔍", width=3, command=procurar_exe).grid(
+            row=0, column=2, padx=(6, 0))
+        campo(fr_exe, 1, "Exe Windows", "exe_win", j["exe_win"] if j else "")
+        campo(fr_exe, 2, "Exe Linux", "exe_linux", j["exe_linux"] if j else "")
+        campo(fr_exe, 3, "Lançamento", "launch_options", j["launch_options"] if j else "")
         ttk.Label(fr_exe, text="Vazio = usa o executável de cima",
-                  style="Mut.TLabel").grid(row=5, column=1, sticky="w")
+                  style="Sec.TLabel", font=("Segoe UI", 9, "italic")).grid(
+                      row=4, column=1, sticky="w")
 
         # -- avaliação
         fr_av = secao("Avaliação")
+        fr_av.grid_columnconfigure(1, weight=0)
         var_nota = tk.StringVar(value="" if not j or j["nota"] is None else str(j["nota"]))
         var_horas = tk.StringVar(value="0" if not j else str(j["horas"] or 0))
-        var_fav = tk.BooleanVar(value=bool(j and j["favorito"]))
-        ttk.Label(fr_av, text="Nota 0–10").pack(side="left")
-        ttk.Entry(fr_av, textvariable=var_nota, width=6).pack(side="left", padx=(2, 14))
-        ttk.Label(fr_av, text="Horas").pack(side="left")
-        ttk.Entry(fr_av, textvariable=var_horas, width=8).pack(side="left", padx=(2, 14))
-        ttk.Checkbutton(fr_av, text="★ favorito", variable=var_fav).pack(side="left")
-        campos["nota"], campos["horas"], campos["favorito"] = var_nota, var_horas, var_fav
+        ttk.Label(fr_av, text="Nota 0–10", style="Sec.TLabel").grid(
+            row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(fr_av, textvariable=var_nota, width=8, font=("Segoe UI", 10)).grid(
+            row=0, column=1, sticky="w", pady=4)
+        ttk.Label(fr_av, text="Horas", style="Sec.TLabel").grid(
+            row=0, column=2, sticky="w", padx=(16, 8), pady=4)
+        ttk.Entry(fr_av, textvariable=var_horas, width=8, font=("Segoe UI", 10)).grid(
+            row=0, column=3, sticky="w", pady=4)
+        campos["nota"], campos["horas"] = var_nota, var_horas
 
         # -- 3ds
         fr_3ds = secao("Nintendo 3DS")
-        ttk.Label(fr_3ds, text="Preset", width=16, anchor="w").grid(
-            row=0, column=0, sticky="w", pady=2)
+        ttk.Label(fr_3ds, text="Preset", style="Sec.TLabel").grid(
+            row=0, column=0, sticky="w", padx=(0, 8), pady=4)
         var_preset = tk.StringVar(
             value=(j.get("azahar_preset") if j else "") or "")
         cmb_preset = ttk.Combobox(fr_3ds, textvariable=var_preset,
-                                  values=core.listar_presets(), width=36)
-        cmb_preset.grid(row=0, column=1, sticky="ew", pady=2)
-        fr_3ds.grid_columnconfigure(1, weight=1)
+                                  values=core.listar_presets(),
+                                  font=("Segoe UI", 10))
+        cmb_preset.grid(row=0, column=1, sticky="ew", pady=4)
         campos["azahar_preset"] = var_preset
 
         def foto_preset():
@@ -662,12 +674,13 @@ class App:
             else:
                 messagebox.showwarning("Preset Azahar", r.get("erro", "falha"))
 
-        ttk.Button(fr_3ds, text="📸 Fotografar config atual...",
-                   command=foto_preset).grid(row=1, column=1, sticky="e", pady=2)
+        ttk.Button(fr_3ds, text="📸", width=3, command=foto_preset).grid(
+            row=0, column=2, padx=(6, 0))
 
         # -- notas
         fr_obs = secao("Observações")
-        txt = tk.Text(fr_obs, height=3, bg="#0b0d12", fg=TXT, insertbackground=TXT)
+        txt = tk.Text(fr_obs, height=3, bg="#0b0d12", fg=TXT, insertbackground=TXT,
+                      font=("Segoe UI", 10))
         txt.pack(fill="x")
         if j and j["observacoes"]:
             txt.insert("1.0", j["observacoes"])
@@ -676,19 +689,22 @@ class App:
         # -- capa
         fr_capa = secao("Capa")
         var_capa = tk.StringVar(value="")
-        lbl_capa = ttk.Label(fr_capa, text=f"Atual: {j['capa']}" if j and j.get("capa") else "Sem capa")
-        lbl_capa.pack(anchor="w")
         self._img_capa = None
+        prev = None
         if j and j.get("capa"):
             alvo = core.caminho_capa(j["capa"])
             if alvo is not None and alvo.suffix.lower() in (".png", ".gif"):
                 try:
                     img = tk.PhotoImage(file=str(alvo))
-                    f = max(1, img.height() // 160)
+                    f = max(1, img.height() // 140)
                     self._img_capa = img.subsample(f, f) if f > 1 else img
-                    ttk.Label(fr_capa, image=self._img_capa).pack(anchor="w", pady=4)
+                    prev = ttk.Label(fr_capa, image=self._img_capa, background=CARD)
+                    prev.grid(row=0, column=0, rowspan=2, padx=(0, 12))
                 except tk.TclError:
-                    pass  # mantém só o nome do arquivo
+                    pass  # segue sem preview
+        lbl_capa = ttk.Label(fr_capa, style="Sec.TLabel",
+                             text=f"{j['capa']}" if j and j.get("capa") else "Sem capa")
+        lbl_capa.grid(row=0, column=1, sticky="w")
 
         def trocar_capa():
             arq = filedialog.askopenfilename(
@@ -696,9 +712,10 @@ class App:
                 filetypes=[("Imagens", "*.png *.jpg *.jpeg *.webp")])
             if arq:
                 var_capa.set(arq)
-                lbl_capa.configure(text=f"Nova capa: {Path(arq).name}")
+                lbl_capa.configure(text=Path(arq).name)
 
-        ttk.Button(fr_capa, text="Escolher capa...", command=trocar_capa).pack(anchor="e")
+        ttk.Button(fr_capa, text="Escolher capa…", command=trocar_capa).grid(
+            row=1, column=1, sticky="w", pady=(4, 0))
 
         def salvar():
             try:
@@ -752,8 +769,8 @@ class App:
             self.recarregar()
             messagebox.showinfo("Biblioteca", "Salvo ✓")
 
-        ttk.Button(dlg, text="Salvar", command=salvar,
-                   style="Accent.TButton").pack(pady=10)
+        ttk.Button(dlg, text="  Salvar  ", command=salvar,
+                   style="Big.Accent.TButton").pack(pady=14)
 
     # -- importação unificada (pasta ou arquivo; emulador detectado sozinho)
     def importar_unificado(self):

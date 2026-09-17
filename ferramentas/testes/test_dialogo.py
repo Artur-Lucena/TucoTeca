@@ -1,0 +1,82 @@
+"""Diálogo de jogo: monta seções escuras e salva de ponta a ponta."""
+import tempfile
+from pathlib import Path
+
+import bib_core as core
+from executar import afirmar
+
+
+def _app_oculto(db_nome="d.db"):
+    import tkinter as tk
+    import app_win
+    try:
+        root = tk.Tk()
+    except tk.TclError:
+        return None, None
+    root.withdraw()
+    tmp = Path(tempfile.mkdtemp(prefix="suite-d-"))
+    return root, app_win.App(root, tmp / db_nome)
+
+
+def _dlg(app, root, jogo=None):
+    app._dlg_jogo(jogo)
+    root.update()
+    dlgs = [w for w in root.winfo_children()
+            if w.winfo_class() == "Toplevel"]
+    afirmar(dlgs, "diálogo não abriu")
+    return dlgs[-1]
+
+
+def teste_dialogo_secoes_escuras():
+    import tkinter as tk
+    root, app = _app_oculto()
+    if root is None:
+        print("(sem display: skip)")
+        return
+    try:
+        dlg = _dlg(app, root, None)
+        secs = [w for w in dlg.winfo_children()
+                if w.winfo_class() == "TLabelframe"]
+        afirmar(len(secs) == 6, [s.cget("text") for s in secs])
+        estilos = {s.cget("style") for s in secs}
+        afirmar(estilos == {"Sec.TLabelframe"}, estilos)
+        dlg.destroy()
+    finally:
+        root.destroy()
+
+
+def teste_dialogo_salva():
+    import tkinter as tk
+    from tkinter import messagebox
+    root, app = _app_oculto("d2.db")
+    if root is None:
+        print("(sem display: skip)")
+        return
+    try:
+        dlg = _dlg(app, root, None)
+        entradas = [w for w in dlg.winfo_children()
+                    for w in ([w] + list(w.winfo_children()))
+                    if w.winfo_class() == "TEntry"]
+        afirmar(entradas, "sem entries")
+        entradas[0].delete(0, tk.END)
+        entradas[0].insert(0, "Jogo Teste Diálogo")
+        botoes = [w for w in dlg.winfo_children()
+                  for w in ([w] + list(w.winfo_children()))
+                  if w.winfo_class() == "TButton" and "Salvar" in str(w.cget("text"))]
+        afirmar(botoes, "sem botão Salvar")
+        orig_info = messagebox.showinfo
+        messagebox.showinfo = lambda *a, **k: None
+        try:
+            botoes[0].invoke()
+            root.update()
+        finally:
+            messagebox.showinfo = orig_info
+        con = core.get_db(app.db_path)
+        try:
+            n = con.execute("SELECT COUNT(*) AS n FROM jogos WHERE titulo=?",
+                            ("Jogo Teste Diálogo",)).fetchone()["n"]
+        finally:
+            con.close()
+        afirmar(n == 1, "linha não foi salva")
+    finally:
+        root.destroy()
