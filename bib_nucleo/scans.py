@@ -90,28 +90,6 @@ def pontuar(item: dict) -> dict:
 
 
 
-def selecionar_prev(corpo: dict) -> list[dict] | None:
-    """Extrai itens {indices, prev} vindos de um preview. None = varrer tudo."""
-    if not isinstance(corpo, dict):
-        return None
-    prev = corpo.get("prev")
-    idx = corpo.get("indices")
-    if isinstance(idx, int):  # tolera cliente que manda escalar
-        idx = [idx]
-    if not isinstance(prev, list) or not isinstance(idx, list):
-        return None
-    sel = []
-    for i in idx:
-        if isinstance(i, int) and 0 <= i < len(prev) and isinstance(prev[i], dict):
-            sel.append(prev[i])
-    return sel
-
-
-
-# --------------------------------------------------------------------------
-# Hydra: localização + varredura sem dependências
-# --------------------------------------------------------------------------
-
 def hydra_db_candidates() -> list[Path]:
     cands: list[Path] = []
     appdata = os.environ.get("APPDATA")
@@ -215,16 +193,6 @@ def scan_hydra_db(db_dir: Path, limite_bytes_por_arquivo: int = 20_000_000) -> l
 
 
 
-def preview_hydra() -> tuple[Path | None, list[dict]]:
-    """(pasta_encontrada, itens pontuados). Pasta None = Hydra ausente."""
-    db = find_hydra_db()
-    if not db:
-        return None, []
-    return db, [pontuar(j) for j in scan_hydra_db(db)]
-
-
-
-# --------------------------------------------------------------------------
 # Scanner de disco (D:\\Games, SteamLibrary, Riot...) + manifests Steam
 # --------------------------------------------------------------------------
 
@@ -827,13 +795,6 @@ def preview_roms(roots: list[str] | None = None,
     return roots, [pontuar(j) for j in achados], info, emu
 
 
-def preview_roms_nds(roots: list[str] | None = None,
-                     emu_exe: str | None = None):
-    """Atalho: preview de ROMs NDS (DeSmuME)."""
-    return preview_roms(roots, emu_exe, "desmume")
-
-
-
 EXE_IMPORTAVEIS = {".exe", ".lnk", ".bat", ".cmd", ".sh", ".AppImage"}
 
 
@@ -1149,7 +1110,6 @@ def ler_metadados_3ds(caminho: str) -> dict:
 NDS_REGIOES = {"E": "América do Norte", "P": "Europa", "J": "Japão",
                "K": "Coreia", "D": "Alemanha", "F": "França", "I": "Itália",
                "S": "Espanha", "U": "Austrália"}
-NDS_IDIOMAS = ("Japonês", "Inglês", "Francês", "Alemão", "Italiano", "Espanhol")
 
 
 def _rgb555(v: int) -> bytes:
@@ -1455,10 +1415,6 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
 
 
 
-def importar_com_min_score(con: sqlite3.Connection, itens: list[dict], min_score: float) -> dict:
-    return importar_lista(con, [j for j in itens if float(j.get("score") or 0) >= min_score])
-
-
 def resumo_importacao(res: dict) -> str:
     texto = (f"Novos: {res.get('novos', 0)} · atualizados: {res.get('atualizados', 0)} · "
              f"ignorados: {res.get('ignorados', 0)} · erros: {len(res.get('erros', []))}")
@@ -1468,7 +1424,5 @@ def resumo_importacao(res: dict) -> str:
         texto += "\n" + "\n".join(res["avisos"][:5])
     return texto
 
-__all__ = ['SHOPS_CONHECIDAS', 'pontuar', 'selecionar_prev', 'hydra_db_candidates', 'find_hydra_db', 'TITLE_RE', 'EXEC_RE', 'SHOP_RE', 'OBJID_RE', 'PLAYTIME_RE', '_unescape', 'scan_hydra_db', 'preview_hydra', 'SKIP_DIRS', 'SKIP_EXE_RE', 'RIOT_EXE', 'ACF_NAME_RE', 'ACF_DIR_RE', 'default_scan_roots', '_titulo_de_exe', 'scan_discos', 'preview_scan', 'JUNK_PROG_RE', '_detector_hydra', '_steamapps_dirs', '_item_steam_manifest', '_detector_steam', '_detector_epic', '_detector_gog', '_detector_riot', '_detector_windows', 'ler_do_disco', 'default_roms_roots', 'ROM_TAGS_LIXO_RE', '_titulo_de_rom', '_item_rom', 'scan_roms', 'preview_roms', 'EXE_IMPORTAVEIS', 'analisar_arquivo', 'preview_pasta', '_norm_titulo', '_norm_caminho', '_dobrar_fundido', '_compativel',  'fundir_duplicados', 'SMDH_IDIOMAS', 'SMDH_REGIOES', '_u32', '_parse_smdh',
- 'NDS_REGIOES', 'NDS_IDIOMAS', '_rgb555', '_ler_banner_nds', 'ler_metadados_nds',
- 'icone_nds_para_png', '_ler_icon_bin', 'ler_metadados_3ds', '_morton', '_desembaralha_rgb565', '_png_rgb', 'icone_rom_para_png', 'importar_lista', 'importar_com_min_score']
+__all__ = ['SHOPS_CONHECIDAS', 'pontuar', 'hydra_db_candidates', 'find_hydra_db', 'TITLE_RE', 'EXEC_RE', 'SHOP_RE', 'OBJID_RE', 'PLAYTIME_RE', '_unescape', 'scan_hydra_db', 'SKIP_DIRS', 'SKIP_EXE_RE', 'RIOT_EXE', 'ACF_NAME_RE', 'ACF_DIR_RE', 'default_scan_roots', '_titulo_de_exe', 'scan_discos', 'preview_scan', 'JUNK_PROG_RE', '_detector_hydra', '_steamapps_dirs', '_item_steam_manifest', '_detector_steam', '_detector_epic', '_detector_gog', '_detector_riot', '_detector_windows', 'ler_do_disco', 'default_roms_roots', 'ROM_TAGS_LIXO_RE', '_titulo_de_rom', '_item_rom', 'scan_roms', 'preview_roms', 'EXE_IMPORTAVEIS', 'analisar_arquivo', 'preview_pasta', '_norm_titulo', '_norm_caminho', '_dobrar_fundido', '_compativel', 'fundir_duplicados', 'SMDH_IDIOMAS', 'SMDH_REGIOES', '_u32', '_parse_smdh', 'NDS_REGIOES', '_rgb555', '_ler_banner_nds', 'ler_metadados_nds', 'icone_nds_para_png', '_ler_icon_bin', 'ler_metadados_3ds', '_morton', '_desembaralha_rgb565', '_png_rgb', 'icone_rom_para_png', 'importar_lista']
 __all__ += ['resumo_importacao']

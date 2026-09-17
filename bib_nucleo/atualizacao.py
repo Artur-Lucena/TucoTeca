@@ -176,7 +176,6 @@ def instalar(info: dict, dest: Path, progresso=None, plataforma=None,
                                 or any(":" in p or p.casefold() == "user" for p in partes)):
                             raise ValueError("pacote contém caminho inválido ou dados de usuário")
                     z.extractall(stage)
-                import fnmatch
                 candidatas = [stage, *(p for p in stage.iterdir() if p.is_dir())]
                 achado = None
                 for cand in candidatas:

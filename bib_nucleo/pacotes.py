@@ -291,10 +291,4 @@ def fazer_backup(db_path: Path, manter: int = 10) -> dict:
 
 
 
-def listar_backups() -> list[dict]:
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    arqs = sorted(BACKUP_DIR.glob("biblioteca-*.json"),
-                  key=lambda p: p.name, reverse=True)
-    return [{"arquivo": str(p), "nome": p.name, "bytes": p.stat().st_size} for p in arqs]
-
-__all__ = ['PACOTE_ESQUEMA', 'PACOTE_INFO', 'PACOTE_JSON', 'PACOTE_MANIFESTO', '_dados_exportacao', '_saves_para_pacote', 'exportar_pacote', '_membro_pacote_ok', 'importar_pacote', 'fazer_backup', 'listar_backups']
+__all__ = ['PACOTE_ESQUEMA', 'PACOTE_INFO', 'PACOTE_JSON', 'PACOTE_MANIFESTO', '_dados_exportacao', '_saves_para_pacote', 'exportar_pacote', '_membro_pacote_ok', 'importar_pacote', 'fazer_backup']

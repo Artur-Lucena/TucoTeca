@@ -145,7 +145,6 @@ def azahar_release_info(timeout: int = 25) -> dict:
 
 
 
-AZAHAR_EXE_MINIMO = 10_000_000  # sanidade: menor que isso não é o Azahar
 
 
 
@@ -378,13 +377,6 @@ def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "
             return {"ok": False, "requer_elevacao": True,
                     "erro": f"{type(e).__name__}: {e} — o executável exige administrador."}, None
         return {"ok": False, "erro": f"{type(e).__name__}: {e}"}, None
-
-
-
-def executar_jogo(executable_path: str, wine_prefix: str = "", launch_options: str = "",
-                  elevar: bool = False) -> dict:
-    res, _proc = _lancar(executable_path, wine_prefix, launch_options, elevar)
-    return res
 
 
 
@@ -837,26 +829,6 @@ def aplicar_preset(nome: str, chave: str = "azahar") -> dict:
     return {"ok": True, "preset": alvo.stem, "config": str(cfg)}
 
 
-def restaurar_config_emu(chave: str) -> dict:
-    """Volta o ini ao estado pré-preset (.bak)."""
-    cfg = config_atual_emu(chave)
-    if cfg is None:
-        return {"ok": False, "erro": "config do emulador não encontrada."}
-    bak = cfg.with_name(cfg.name + ".bak")
-    if not bak.is_file():
-        return {"ok": False, "erro": "sem backup pré-preset (.bak ausente)."}
-    try:
-        shutil.copy2(str(bak), str(cfg))
-    except OSError as e:
-        return {"ok": False, "erro": f"falha ao restaurar: {e}"}
-    return {"ok": True, "config": str(cfg)}
-
-
-def restaurar_config_azahar() -> dict:
-    """Volta o qt-config.ini ao estado pré-preset (.bak)."""
-    return restaurar_config_emu("azahar")
-
-
 def preparar_lancamento(jogo: dict) -> dict:
     """Aplica o preset do provider do jogo. Nunca bloqueia o play."""
     origem = (jogo.get("origem") or "")
@@ -906,4 +878,4 @@ def azahar_tem_chaves() -> bool:
     ud = azahar_user_dir()
     return bool(ud) and (Path(ud) / "sysdata" / "aes_keys.txt").is_file()
 
-__all__ = ['azahar_dir_override', 'default_emu_3ds', 'desmume_dir_override', 'desmume_dir', 'default_emu_nds', 'desmume_user_dir', 'desmume_versao_local', 'desmume_release_info', 'desmume_instalar', 'desmume_config_atual', 'desmume_flags', '_prov_desmume', 'config_atual_emu', 'presets_prov_dir', 'restaurar_config_emu',  'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', '_emu_dir', 'azahar_versao_local', 'azahar_release_info', 'AZAHAR_EXE_MINIMO', 'azahar_instalar', '_eh_elevacao_necessaria', 'executar_elevado', '_lancar', 'executar_jogo', '_lancar_jogo_dict', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', '_vigiar_processo', 'executar_monitorado', '_prov_azahar', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'presets_prov_dir', 'listar_presets', 'azahar_config_atual', 'config_atual_emu', 'salvar_preset_de_atual', 'aplicar_preset', 'restaurar_config_emu', 'restaurar_config_azahar', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves']
+__all__ = ['azahar_dir_override', 'default_emu_3ds', 'desmume_dir_override', 'desmume_dir', 'default_emu_nds', 'desmume_user_dir', 'desmume_versao_local', 'desmume_release_info', 'desmume_instalar', 'desmume_config_atual', 'desmume_flags', '_prov_desmume', 'config_atual_emu', 'presets_prov_dir', 'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', '_emu_dir', 'azahar_versao_local', 'azahar_release_info', 'azahar_instalar', '_eh_elevacao_necessaria', 'executar_elevado', '_lancar', '_lancar_jogo_dict', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', '_vigiar_processo', 'executar_monitorado', '_prov_azahar', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'presets_prov_dir', 'listar_presets', 'azahar_config_atual', 'config_atual_emu', 'salvar_preset_de_atual', 'aplicar_preset', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves']
