@@ -40,15 +40,24 @@ def teste_update_mostra_erro_rede():
         return
     try:
         visto = []
-        orig_info, orig_err = core.azahar_release_info, messagebox.showerror
-        core.azahar_release_info = lambda *a, **k: {"erro": "rede-x"}
+        from bib_nucleo import emuladores as EMU  # patch onde a spec lê
+        orig_info, orig_err = EMU.azahar_release_info, messagebox.showerror
+        EMU.azahar_release_info = lambda *a, **k: {"erro": "rede-x"}
         messagebox.showerror = lambda t, m: visto.append((t, m))
         try:
             app.atualizar_azahar()
-            root.after(5000, root.quit)  # mainloop de verdade: after() de thread vale
+            # mainloop de verdade (after() de thread vale); sai ao ver o erro ou no teto
+            fim = time.time() + 8
+
+            def _espera():
+                if visto or time.time() > fim:
+                    root.quit()
+                else:
+                    root.after(100, _espera)
+            root.after(100, _espera)
             root.mainloop()
         finally:
-            core.azahar_release_info = orig_info
+            EMU.azahar_release_info = orig_info
             messagebox.showerror = orig_err
         afirmar(visto and visto[0][1] == "rede-x", visto)
     finally:
@@ -122,7 +131,14 @@ def teste_pacote_exporta_em_thread():
         messagebox.showerror = lambda *a, **k: mudou.append("erro")
         try:
             app.exportar_pacote()
-            root.after(10000, root.quit)
+            fim = time.time() + 15
+
+            def _espera():
+                if (tmp / "p.zip").is_file() or time.time() > fim:
+                    root.quit()
+                else:
+                    root.after(100, _espera)
+            root.after(100, _espera)
             root.mainloop()
         finally:
             filedialog.asksaveasfilename = orig_ask
@@ -158,7 +174,14 @@ def teste_pacote_importa_em_thread():
         messagebox.showerror = lambda *a, **k: avisos.append(("erro", a))
         try:
             app.importar_pacote()
-            root.after(10000, root.quit)
+            fim = time.time() + 15
+
+            def _espera():
+                if avisos or time.time() > fim:
+                    root.quit()
+                else:
+                    root.after(100, _espera)
+            root.after(100, _espera)
             root.mainloop()
         finally:
             filedialog.askopenfilename = orig_ask

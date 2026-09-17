@@ -171,6 +171,7 @@ class App:
         for rotulo, cmd in (("💾 Backup agora", self.backup),
                             ("💾 Saves 3DS", self.backup_saves),
                             ("⬇ Atualizar Azahar", self.atualizar_azahar),
+                            ("⬇ Atualizar DeSmuME", self.atualizar_desmume),
                             ("💾 Exportar JSON…", self.exportar_json),
                             ("📦 Pacote…", self.exportar_pacote)):
             ttk.Button(side, text=rotulo, style="Side.TButton",
@@ -648,34 +649,77 @@ class App:
             row=0, column=3, sticky="w", pady=4)
         campos["nota"], campos["horas"] = var_nota, var_horas
 
-        # -- 3ds
-        fr_3ds = secao("Nintendo 3DS")
-        ttk.Label(fr_3ds, text="Preset", style="Sec.TLabel").grid(
+        # -- emulador (provider detectado pelo jogo; pode trocar)
+        fr_emu = secao("Emulador")
+        rotulos_prov = {"": "—"}
+        chaves_prov = {"—": ""}
+        for _ch, _pv in core.provedores().items():
+            _rot = f"{_pv['nome']} · {'/'.join(_pv['sistemas'])}"
+            rotulos_prov[_ch] = _rot
+            chaves_prov[_rot] = _ch
+
+        def _prov_do_jogo(jogo):
+            if jogo:
+                _pv = core.provedor_por_origem(jogo.get("origem") or "")
+                if _pv is not None:
+                    return _pv["chave"]
+                _pv = core.provedor_por_extensao(
+                    Path(jogo.get("launch_options") or "").suffix)
+                if _pv is not None:
+                    return _pv["chave"]
+            return ""
+
+        var_prov = tk.StringVar(value=rotulos_prov[_prov_do_jogo(j)])
+        ttk.Label(fr_emu, text="Sistema", style="Sec.TLabel").grid(
             row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        cmb_prov = ttk.Combobox(fr_emu, textvariable=var_prov,
+                                values=list(chaves_prov),
+                                state="readonly", font=("Segoe UI", 10))
+        cmb_prov.grid(row=0, column=1, columnspan=2, sticky="ew", pady=4)
+        fr_emu.grid_columnconfigure(1, weight=1)
+        ttk.Label(fr_emu, text="Preset", style="Sec.TLabel").grid(
+            row=1, column=0, sticky="w", padx=(0, 8), pady=4)
         var_preset = tk.StringVar(
             value=(j.get("azahar_preset") if j else "") or "")
-        cmb_preset = ttk.Combobox(fr_3ds, textvariable=var_preset,
-                                  values=core.listar_presets(),
+        cmb_preset = ttk.Combobox(fr_emu, textvariable=var_preset,
                                   font=("Segoe UI", 10))
-        cmb_preset.grid(row=0, column=1, sticky="ew", pady=4)
+        cmb_preset.grid(row=1, column=1, sticky="ew", pady=4)
         campos["azahar_preset"] = var_preset
 
+        def _chave_sel():
+            return chaves_prov.get(var_prov.get(), "")
+
+        def _recarrega_presets():
+            chave = _chave_sel()
+            vals = core.listar_presets(chave) if chave else []
+            cmb_preset.configure(values=vals)
+
+        def _troca_prov(_e=None):
+            _recarrega_presets()
+
+        cmb_prov.bind("<<ComboboxSelected>>", _troca_prov)
+        _recarrega_presets()
+
         def foto_preset():
+            chave = _chave_sel()
+            if not chave:
+                messagebox.showwarning("Preset", "Escolha o sistema primeiro.")
+                return
             nome = simpledialog.askstring(
-                "Preset Azahar",
-                "Nome do preset (fotografa a config atual do Azahar):",
+                "Preset",
+                f"Nome do preset (fotografa a config atual):",
                 parent=dlg)
             if not nome:
                 return
-            r = core.salvar_preset_de_atual(nome)
+            r = core.salvar_preset_de_atual(nome, chave)
             if r.get("ok"):
-                cmb_preset.configure(values=core.listar_presets())
+                cmb_preset.configure(values=core.listar_presets(chave))
                 var_preset.set(r["preset"])
             else:
-                messagebox.showwarning("Preset Azahar", r.get("erro", "falha"))
+                messagebox.showwarning("Preset", r.get("erro", "falha"))
 
-        ttk.Button(fr_3ds, text="📸", width=3, command=foto_preset).grid(
-            row=0, column=2, padx=(6, 0))
+        ttk.Button(fr_emu, text="📸", width=3, command=foto_preset).grid(
+            row=1, column=2, padx=(6, 0))
 
         # -- notas
         fr_obs = secao("Observações")
@@ -996,8 +1040,16 @@ class App:
             pass  # janela fechada
 
     def atualizar_azahar(self):
+        self.atualizar_emu("azahar")
+
+    def atualizar_desmume(self):
+        self.atualizar_emu("desmume")
+
+    def atualizar_emu(self, chave: str):
+        prov = core.provedores()[chave]
+        nome = prov["nome"]
         prog = tk.Toplevel(self.root)
-        prog.title("Azahar")
+        prog.title(nome)
         prog.transient(self.root)
         lbl = ttk.Label(prog, text="Consultando releases...")
         lbl.pack(padx=24, pady=(20, 8))
@@ -1010,7 +1062,7 @@ class App:
             return
 
         def trabalho():
-            info = core.azahar_release_info()
+            info = prov["release_info"]()
             if info.get("erro"):
                 msg_erro = info["erro"]  # captura já-string (padrão Fase A)
 
@@ -1019,11 +1071,10 @@ class App:
                         prog.destroy()
                     except tk.TclError:
                         pass
-                    messagebox.showerror("Azahar", msg)
+                    messagebox.showerror(nome, msg)
 
                 return self._depois(mostra_erro)
-            local = core.azahar_versao_local()
-            local = core.azahar_versao_local()
+            local = prov["versao_local"]()
             tag = info.get("tag") or "?"
 
             def decidir():
@@ -1032,23 +1083,28 @@ class App:
                 except tk.TclError:
                     return
                 if local and local == tag:
-                    messagebox.showinfo("Azahar", f"Já está na {tag} ✓")
+                    messagebox.showinfo(nome, f"Já está na {tag} ✓")
                     return
                 mb = round((info.get("size") or 0) / 1048576)
                 if not messagebox.askyesno(
-                        "Azahar",
+                        nome,
                         f"Instalada: {local or '?'} → remota: {tag} (~{mb} MB).\n"
                         "Baixar e instalar agora? (demora alguns minutos)"):
                     return
-                self._baixar_azahar(info)
+                self._baixar_emu(chave, info)
 
             self._depois(decidir)
 
         threading.Thread(target=trabalho, daemon=True).start()
 
     def _baixar_azahar(self, info):
+        self._baixar_emu("azahar", info)
+
+    def _baixar_emu(self, chave: str, info):
+        prov = core.provedores()[chave]
+        nome = prov["nome"]
         prog = tk.Toplevel(self.root)
-        prog.title("Azahar")
+        prog.title(nome)
         prog.transient(self.root)
         lbl = ttk.Label(prog, text="Baixando...")
         lbl.pack(padx=24, pady=20)
@@ -1071,7 +1127,7 @@ class App:
 
                 self._depois(aplica)
 
-            res = core.azahar_instalar(info, progresso=andamento)
+            res = prov["instalar"](info, progresso=andamento)
 
             def fim():
                 try:
@@ -1079,9 +1135,9 @@ class App:
                 except tk.TclError:
                     return
                 if res.get("ok"):
-                    messagebox.showinfo("Azahar", f"{res.get('tag')} instalado ✓")
+                    messagebox.showinfo(nome, f"{res.get('tag')} instalado ✓")
                 else:
-                    messagebox.showerror("Azahar", res.get("erro", "falha"))
+                    messagebox.showerror(nome, res.get("erro", "falha"))
                 self.recarregar()
 
             self._depois(fim)

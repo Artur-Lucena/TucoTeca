@@ -17,7 +17,9 @@ from bib_nucleo.banco import STATUS_VALIDOS, salvar_capa_bytes
 from bib_nucleo.base import (LINUX_ROOT, ROM_EXTS_3DS, WIN_ROOT, agora_iso,
                              existe_aqui_ou_traduzido, slugify, traduzir_para_atual,
                              win_para_linux)
-from bib_nucleo.emuladores import default_emu_3ds, provedor_por_extensao
+from bib_nucleo.emuladores import (default_emu_3ds, default_emu_nds,
+                                     provedores, provedor_por_extensao,
+                                     provedor_por_origem)
 
 
 
@@ -722,20 +724,22 @@ def _titulo_de_rom(p: Path) -> str:
 
 
 
-def _item_rom(full: str, emu_exe: str = "") -> dict:
+def _item_rom(full: str, emu_exe: str = "", prov=None) -> dict:
     """Um achado de ROM (título/código/região lidos de dentro do arquivo)."""
+    if prov is None:
+        prov = provedor_por_extensao(Path(full).suffix) or provedores()["azahar"]
     item = {
         "titulo": _titulo_de_rom(Path(full)),
         "executable_path": emu_exe,
         "launch_options": full,
         "shop": "", "object_id": "",
-        "horas": 0.0, "origem": "rom-3ds",
+        "horas": 0.0, "origem": prov["origem"],
         "rom_path": full,
         "game_code": "", "regiao": "",
         "tem_metadados": False,
     }
     try:
-        m = ler_metadados_3ds(full)
+        m = prov["ler_metadados"](full)
     except Exception:
         m = {}
     if m.get("titulo"):
@@ -750,8 +754,11 @@ def _item_rom(full: str, emu_exe: str = "") -> dict:
 
 
 def scan_roms(roots: list[str], emu_exe: str = "", prof_max: int = 4,
-              retornar_info: bool = False) -> list[dict] | tuple[list[dict], dict]:
-    """Procura ROMs 3DS. Leitura apenas. Itens já vêm com o emu em executable_path."""
+              retornar_info: bool = False, prov_chave: str = "azahar"
+              ) -> list[dict] | tuple[list[dict], dict]:
+    """Procura ROMs do provider. Leitura apenas. Itens já vêm com o emu em executable_path."""
+    prov = provedores()[prov_chave]
+    exts = prov["rom_exts"]
     achados: dict[str, dict] = {}
     vistos = 0
     truncado = False
@@ -781,24 +788,47 @@ def scan_roms(roots: list[str], emu_exe: str = "", prof_max: int = 4,
                 if vistos >= 60_000:
                     truncado = True
                     return _final()
-                if Path(fn).suffix.lower() not in ROM_EXTS_3DS:
+                if Path(fn).suffix.lower() not in exts:
                     continue
                 vistos += 1
                 full = str(Path(dirpath) / fn)
                 chave = full.lower()
                 if chave not in achados:
-                    achados[chave] = _item_rom(full, emu_exe)
+                    achados[chave] = _item_rom(full, emu_exe, prov)
     return _final()
 
 
 
+def default_roms_nds_roots() -> list[str]:
+    env = os.environ.get("BIBLIOTECA_ROMS_NDS_ROOTS")
+    if env:
+        return [r for r in re.split(r"[;\n]+", env) if r.strip()]
+    if os.name == "nt":
+        base = WIN_ROOT.rstrip("\\")
+        return [f"{base}\\Games\\Roms", f"{base}\\Games\\Roms\\NDS"]
+    base = LINUX_ROOT.rstrip("/")
+    return [f"{base}/Games/Roms", f"{base}/Games/Roms/NDS"]
+
+
 def preview_roms(roots: list[str] | None = None,
-                 emu_exe: str | None = None) -> tuple[list[str], list[dict], dict, str]:
+                 emu_exe: str | None = None, prov_chave: str = "azahar"
+                 ) -> tuple[list[str], list[dict], dict, str]:
     """(raízes, itens pontuados, info, emu_usado)."""
-    roots = roots or default_roms_roots()
-    emu = emu_exe if emu_exe is not None else default_emu_3ds()
-    achados, info = scan_roms(roots, emu_exe=emu, retornar_info=True)
+    if roots is None:
+        roots = default_roms_roots() if prov_chave == "azahar" else default_roms_nds_roots()
+    if emu_exe is None:
+        emu = default_emu_3ds() if prov_chave == "azahar" else default_emu_nds()
+    else:
+        emu = emu_exe
+    achados, info = scan_roms(roots, emu_exe=emu, retornar_info=True,
+                              prov_chave=prov_chave)
     return roots, [pontuar(j) for j in achados], info, emu
+
+
+def preview_roms_nds(roots: list[str] | None = None,
+                     emu_exe: str | None = None):
+    """Atalho: preview de ROMs NDS (DeSmuME)."""
+    return preview_roms(roots, emu_exe, "desmume")
 
 
 
@@ -830,7 +860,7 @@ def analisar_arquivo(caminho: str) -> dict:
     prov = provedor_por_extensao(ext)
     if prov is not None:
         emu = prov["exe"]() or ""
-        item = pontuar(_item_rom(str(p), emu))
+        item = pontuar(_item_rom(str(p), emu, prov))
         aviso = None
         if not emu:
             aviso = (f"{prov['nome']} não instalado — a ROM importa mesmo assim; "
@@ -852,7 +882,7 @@ def analisar_arquivo(caminho: str) -> dict:
                 "detalhe": f"jogo de PC (roda direto, sem emulador) · '{item['titulo']}'",
                 "aviso": aviso}
     return {**vazio, "detalhe": (f"extensão '{ext or '?'}' não suportada "
-                                 "(exe, ROM 3DS, .json, .zip ou pasta).")}
+                                 "(exe, ROM, .json, .zip ou pasta).")}
 
 
 
@@ -865,17 +895,18 @@ def preview_pasta(roots: list[str] | None = None) -> tuple[list[str], list[dict]
     """
     if not roots:
         vistas: list[str] = []
-        for r in default_scan_roots() + default_roms_roots():
+        for r in default_scan_roots() + default_roms_roots() + default_roms_nds_roots():
             if r not in vistas:
                 vistas.append(r)
         roots = vistas
     roots_u, itens_disco, info_d = preview_scan(roots)
     _r, itens_rom, info_r, emu = preview_roms(roots, None)
-    itens = sorted(fundir_duplicados(itens_disco + itens_rom),
+    _r, itens_nds, info_n, emu_nds = preview_roms(roots, None, "desmume")
+    itens = sorted(fundir_duplicados(itens_disco + itens_rom + itens_nds),
                    key=lambda j: j["titulo"].lower())
-    info = {"vistos": info_d["vistos"] + info_r["vistos"],
-            "truncado": info_d["truncado"] or info_r["truncado"],
-            "raizes": info_d["raizes"], "emu": emu}
+    info = {"vistos": info_d["vistos"] + info_r["vistos"] + info_n["vistos"],
+            "truncado": info_d["truncado"] or info_r["truncado"] or info_n["truncado"],
+            "raizes": info_d["raizes"], "emu": emu, "emu_nds": emu_nds}
     return roots_u, itens, info
 
 
@@ -927,7 +958,7 @@ def _dobrar_fundido(atual: dict, novo: dict) -> None:
 
 def _compativel(atual: dict, novo: dict) -> bool:
     """Podem ser o mesmo jogo? ROMs: mesma rom. PC: exe igual ou ausente."""
-    if (atual.get("origem") or "") == "rom-3ds":
+    if (atual.get("origem") or "").startswith("rom-"):
         return _norm_caminho(atual.get("rom_path")) == _norm_caminho(novo.get("rom_path"))
     ea, en = _norm_caminho(atual.get("executable_path")), _norm_caminho(novo.get("executable_path"))
     return (not ea) or (not en) or (ea == en)
@@ -946,7 +977,7 @@ def fundir_duplicados(itens: list[dict]) -> list[dict]:
     ordem: list[tuple] = []
     for it in itens:
         t = _norm_titulo(it.get("titulo"))
-        kind = "rom" if (it.get("origem") or "") == "rom-3ds" else "pc"
+        kind = "rom" if (it.get("origem") or "").startswith("rom-") else "pc"
         chave = (kind, t) if t else ("unico", id(it))
         if chave not in grupos:
             grupos[chave] = []
@@ -1111,6 +1142,117 @@ def ler_metadados_3ds(caminho: str) -> dict:
     except (OSError, ValueError, OverflowError):
         return {}
 
+
+
+NDS_REGIOES = {"E": "América do Norte", "P": "Europa", "J": "Japão",
+               "K": "Coreia", "D": "Alemanha", "F": "França", "I": "Itália",
+               "S": "Espanha", "U": "Austrália"}
+NDS_IDIOMAS = ("Japonês", "Inglês", "Francês", "Alemão", "Italiano", "Espanhol")
+
+
+def _rgb555(v: int) -> bytes:
+    return bytes((((v & 31) * 255 // 31), (((v >> 5) & 31) * 255 // 31),
+                  (((v >> 10) & 31) * 255 // 31)))
+
+
+def _ler_banner_nds(caminho: str) -> bytes:
+    """Devolve o banner NDS (ícone + títulos) ou b''."""
+    try:
+        with Path(caminho).open("rb") as f:
+            head = f.read(0x200)
+            if len(head) < 0x200:
+                return b""
+            off = _u32(head, 0x68)
+            if not off or off > 64 * 1024 * 1024:
+                return b""
+            f.seek(off)
+            return f.read(0x2000)
+    except (OSError, ValueError, OverflowError):
+        return b""
+
+
+def ler_metadados_nds(caminho: str) -> dict:
+    """Lê título/código/região do header + banner NDS. {} se não der."""
+    try:
+        p = Path(caminho)
+        if not p.is_file():
+            return {}
+        meta: dict = {}
+        with p.open("rb") as f:
+            head = f.read(0x200)
+        if len(head) < 0x200:
+            return {}
+        titulo = head[:12].split(b"\x00")[0].decode("ascii", "ignore").strip()
+        code = head[0x0C:0x10].split(b"\x00")[0].decode("ascii", "ignore").strip()
+        if code:
+            meta["game_code"] = code
+            reg = NDS_REGIOES.get(code[-1:])
+            if reg:
+                meta["regiao"] = reg
+        banner = _ler_banner_nds(caminho)
+        if len(banner) >= 0x340:
+            nomes = []
+            for i in range(6):
+                raw = banner[0x240 + i * 0x100:0x240 + i * 0x100 + 0x100]
+                try:
+                    nomes.append(raw.decode("utf-16-le").split("\x00")[0].strip())
+                except Exception:
+                    nomes.append("")
+            for i in (1, 0):
+                if i < len(nomes) and nomes[i]:
+                    meta["titulo"] = nomes[i]
+                    meta["tem_metadados"] = True
+                    break
+            else:
+                for t in nomes:
+                    if t:
+                        meta["titulo"] = t
+                        meta["tem_metadados"] = True
+                        break
+        if titulo and "titulo" not in meta:
+            meta["titulo"] = titulo
+        return meta
+    except (OSError, ValueError, OverflowError):
+        return {}
+
+
+def icone_nds_para_png(caminho: str, alvo_px: int = 96) -> bytes | None:
+    """Decodifica o ícone 32x32 do banner NDS e devolve PNG (None se não der)."""
+    try:
+        banner = _ler_banner_nds(caminho)
+        if len(banner) < 0x240:
+            return None
+        pal = [_rgb555(banner[0x220 + i * 2] | (banner[0x221 + i * 2] << 8))
+               for i in range(16)]
+        dados = banner[0x20:0x220]
+        if len(dados) < 0x200:
+            return None
+        lado = 32
+        rgb = bytearray(lado * lado * 3)
+        for ty in range(4):
+            for tx in range(4):
+                base_t = (ty * 4 + tx) * 32  # tile 8x8 4bpp = 32 bytes
+                for y in range(8):
+                    for x in range(8):
+                        b = dados[base_t + (y * 8 + x) // 2]
+                        v = (b & 0x0F) if x % 2 == 0 else (b >> 4)
+                        dst = ((ty * 8 + y) * lado + (tx * 8 + x)) * 3
+                        rgb[dst:dst + 3] = pal[v]
+        rgb = bytes(rgb)
+        fator = max(1, alvo_px // lado)
+        if fator > 1:
+            amp = bytearray(lado * fator * lado * fator * 3)
+            W = lado * fator
+            for y in range(lado):
+                for x in range(lado):
+                    px = rgb[(y * lado + x) * 3:(y * lado + x) * 3 + 3]
+                    for dy in range(fator):
+                        base = ((y * fator + dy) * W + x * fator) * 3
+                        amp[base:base + fator * 3] = px * fator
+            rgb, lado = bytes(amp), W
+        return _png_rgb(lado, lado, rgb)
+    except Exception:
+        return None
 
 
 def _morton(x: int, y: int) -> int:
@@ -1285,10 +1427,11 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
             novos += cur.rowcount
             if not cur.rowcount:
                 ignorados += 1
-            if cur.rowcount and (j.get("origem") or "") == "rom-3ds":
+            prov_rom = provedor_por_origem(j.get("origem") or "")
+            if cur.rowcount and prov_rom is not None:
                 try:  # capa automática: ícone de dentro da própria ROM
                     rom = (j.get("rom_path") or "").strip()
-                    png = icone_rom_para_png(rom) if rom else None
+                    png = prov_rom["icone"](rom) if rom else None
                     if png:
                         salvar_capa_bytes(con, cur.lastrowid,
                                           slugify(titulo) + ".png", png)
@@ -1317,5 +1460,7 @@ def resumo_importacao(res: dict) -> str:
         texto += "\n" + "\n".join(res["avisos"][:5])
     return texto
 
-__all__ = ['SHOPS_CONHECIDAS', 'pontuar', 'selecionar_prev', 'hydra_db_candidates', 'find_hydra_db', 'TITLE_RE', 'EXEC_RE', 'SHOP_RE', 'OBJID_RE', 'PLAYTIME_RE', '_unescape', 'scan_hydra_db', 'preview_hydra', 'SKIP_DIRS', 'SKIP_EXE_RE', 'RIOT_EXE', 'ACF_NAME_RE', 'ACF_DIR_RE', 'default_scan_roots', '_titulo_de_exe', 'scan_discos', 'preview_scan', 'JUNK_PROG_RE', '_detector_hydra', '_steamapps_dirs', '_item_steam_manifest', '_detector_steam', '_detector_epic', '_detector_gog', '_detector_riot', '_detector_windows', 'ler_do_disco', 'default_roms_roots', 'ROM_TAGS_LIXO_RE', '_titulo_de_rom', '_item_rom', 'scan_roms', 'preview_roms', 'EXE_IMPORTAVEIS', 'analisar_arquivo', 'preview_pasta', '_norm_titulo', '_norm_caminho', '_dobrar_fundido', '_compativel', 'fundir_duplicados', 'SMDH_IDIOMAS', 'SMDH_REGIOES', '_u32', '_parse_smdh', '_ler_icon_bin', 'ler_metadados_3ds', '_morton', '_desembaralha_rgb565', '_png_rgb', 'icone_rom_para_png', 'importar_lista', 'importar_com_min_score']
+__all__ = ['SHOPS_CONHECIDAS', 'pontuar', 'selecionar_prev', 'hydra_db_candidates', 'find_hydra_db', 'TITLE_RE', 'EXEC_RE', 'SHOP_RE', 'OBJID_RE', 'PLAYTIME_RE', '_unescape', 'scan_hydra_db', 'preview_hydra', 'SKIP_DIRS', 'SKIP_EXE_RE', 'RIOT_EXE', 'ACF_NAME_RE', 'ACF_DIR_RE', 'default_scan_roots', '_titulo_de_exe', 'scan_discos', 'preview_scan', 'JUNK_PROG_RE', '_detector_hydra', '_steamapps_dirs', '_item_steam_manifest', '_detector_steam', '_detector_epic', '_detector_gog', '_detector_riot', '_detector_windows', 'ler_do_disco', 'default_roms_roots', 'ROM_TAGS_LIXO_RE', '_titulo_de_rom', '_item_rom', 'scan_roms', 'preview_roms', 'EXE_IMPORTAVEIS', 'analisar_arquivo', 'preview_pasta', '_norm_titulo', '_norm_caminho', '_dobrar_fundido', '_compativel',  'fundir_duplicados', 'SMDH_IDIOMAS', 'SMDH_REGIOES', '_u32', '_parse_smdh',
+ 'NDS_REGIOES', 'NDS_IDIOMAS', '_rgb555', '_ler_banner_nds', 'ler_metadados_nds',
+ 'icone_nds_para_png', '_ler_icon_bin', 'ler_metadados_3ds', '_morton', '_desembaralha_rgb565', '_png_rgb', 'icone_rom_para_png', 'importar_lista', 'importar_com_min_score']
 __all__ += ['resumo_importacao']

@@ -11,7 +11,7 @@ Teclas (lista): ↑/↓ ou j/k navegar · PgUp/PgDn · / buscar · f status ·
   * favoritos · Enter jogar · a adicionar · e editar · d excluir ·
   I importar (arquivo, pasta ou disco — ROM liga no emu sozinha) ·
   b backup · U saves 3DS · E exportar JSON · P pacote portátil ·
-  A atualizar Azahar · r recarregar · q sair
+  A atualizar Azahar · G atualizar DeSmuME · r recarregar · q sair
 Preview: Espaço marca/desmarca · i importa marcados · q volta
 
 Horas automáticas: ao jogar, o tempo do processo é somado sozinho
@@ -97,11 +97,12 @@ class Tui:
         s = self.stdscr
         s.erase()
         rows, cols = s.getmaxyx()
-        titulo = "🎮 Biblioteca  │  / busca · f status · * fav · Enter joga · a/e/d · I importa · b/U/E/P/A · q sai"
+        titulo = "🎮 Biblioteca  │  / busca · f status · * fav · Enter joga · a/e/d · I importa · b/U/E/P/A/G · q sai"
         s.addnstr(0, 0, titulo, cols - 1, self.cor["mut"])
         az = core.azahar_status()
         azg = "🎮✓" if az["instalado"] and az["chaves"] else ("🎮!" if az["instalado"] else "🎮✗")
-        filtro = f"busca='{self.q}' status={self.statuses[self.si] or 'todos'} fav={'sim' if self.fav else 'não'} {azg}"
+        ndsg = "NDS✓" if core.default_emu_nds() else "NDS✗"
+        filtro = f"busca='{self.q}' status={self.statuses[self.si] or 'todos'} fav={'sim' if self.fav else 'não'} {azg} {ndsg}"
         s.addnstr(1, 0, f"{filtro} — {len(self.jogos)} jogo(s)", cols - 1, self.cor["mut"])
         area = rows - 4
         if self.cur < self.top:
@@ -581,23 +582,31 @@ class Tui:
         self.recarregar()
 
     def atualizar_azahar(self):
+        self.atualizar_emu("azahar")
+
+    def atualizar_desmume(self):
+        self.atualizar_emu("desmume")
+
+    def atualizar_emu(self, chave: str):
+        prov = core.provedores()[chave]
+        nome = prov["nome"]
         self.msg = "Consultando releases..."
         self.desenhar()
-        info = core.azahar_release_info()
+        info = prov["release_info"]()
         if info.get("erro"):
-            self.msg = f"Azahar: {info['erro']}"
+            self.msg = f"{nome}: {info['erro']}"
             return
-        local, tag = core.azahar_versao_local(), info.get("tag") or "?"
+        local, tag = prov["versao_local"](), info.get("tag") or "?"
         if local and local == tag:
-            self.msg = f"Azahar já está na {tag} ✓"
+            self.msg = f"{nome} já está na {tag} ✓"
             return
         mb = round((info.get("size") or 0) / 1048576)
-        if not self.confirmar(f"Azahar {local or '?'} -> {tag} (~{mb} MB). Baixar?"):
+        if not self.confirmar(f"{nome} {local or '?'} -> {tag} (~{mb} MB). Baixar?"):
             return
         self.msg = "Baixando e instalando (aguarde)..."
         self.desenhar()
         try:
-            res = core.azahar_instalar(info, progresso=self._prog_azahar)
+            res = prov["instalar"](info, progresso=self._prog_azahar)
         except Exception as e:
             self.msg = f"Falha: {e}"
             return
@@ -670,6 +679,8 @@ class Tui:
                 self.exportar_pacote()
             elif ch == ord("A"):
                 self.atualizar_azahar()
+            elif ch == ord("G"):
+                self.atualizar_desmume()
             elif ch == ord("r"):
                 self.recarregar()
                 self.msg = "Recarregado."

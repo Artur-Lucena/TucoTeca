@@ -5,7 +5,7 @@ Monta o HUB portátil Windows: Python embutido + tkinter + app, tudo num .zip.
 
     python ferramentas/montar_portatil.py [--sem-azahar]
 
-Modelo: o .zip LEVA o Azahar instalado junto, 100% das vezes
+Modelo: o .zip LEVA os emuladores instalados junto, 100% das vezes
 (emuladores/Azahar/, com licença GPL (COPYING.txt), nota de fonte
 (FONTE.txt) e user/ essencial: config + saves + mods LayeredFS — NUNCA
 nand, sysdata com chaves, log ou shaders). Só com --sem-azahar o pacote
@@ -45,6 +45,7 @@ BAT_GUI = """@echo off
 setlocal
 set BIBLIOTECA_HOME=%~dp0dados
 set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
+set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
 set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
 start "BibliotecaHub" "%~dp0python\\pythonw.exe" "%~dp0app\\app_win.py"
@@ -54,6 +55,7 @@ BAT_DEBUG = """@echo off
 setlocal
 set BIBLIOTECA_HOME=%~dp0dados
 set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
+set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
 set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
 "%~dp0python\\python.exe" "%~dp0app\\app_win.py" %*
@@ -82,7 +84,8 @@ ONDE FICA O QUÊ
 - dados/ ........... sua casa: banco, backups, capas, presets
 - app/ ............. código do launcher (pode atualizar por cima)
 - python/ .......... Python embutido (não usa o do sistema)
-- emuladores/ ...... Azahar incluído (pacote magro não tem; use ⬇)
+- emuladores/ ...... Azahar + DeSmuME incluídos (pacote magro não tem; use ⬇)
+  (DeSmuME: NDS; saves .dsv ficam ao lado das ROMs)
 - Criar-Atalho.bat .. atalho na Área de Trabalho (duplo-clique, sem console)
 - Debug-Console.bat  abre com janela de texto (para ver erros)
 
@@ -238,6 +241,61 @@ def garantir_gpl() -> Path:
     return dest
 
 
+DESMUME_URL = "https://github.com/TASEmulators/desmume"
+
+
+def desmume_instalado_dir() -> Path:
+    """De onde copiar o DeSmuME (instalação real; nunca o bundle)."""
+    env = (os.environ.get("BIBLIOTECA_EMULADOR_NDS") or "").strip()
+    if env and Path(env).is_file():
+        return Path(env).parent
+    for cand in (Path("D:/Games/Emuladores/DeSmuME"),
+                 Path("/run/media/tuco/Games/Games/Emuladores/DeSmuME")):
+        if (cand / "desmume.exe").is_file() or list(cand.glob("desmume*.AppImage")):
+            return cand
+    raise SystemExit("DeSmuME instalado não achado (instale com o botão ⬇ primeiro).")
+
+
+def incluir_desmume(dest_base: Path) -> str:
+    """Copia o DeSmuME instalado p/ emuladores/DeSmuME. Retorna a versão."""
+    src = desmume_instalado_dir()
+    dst = dest_base / "emuladores" / "DeSmuME"
+    if dst.exists():
+        shutil.rmtree(dst)
+    dst.mkdir(parents=True)
+    for item in sorted(src.iterdir()):
+        if item.name == "user" or item.suffix.lower() in (".bak", ".log"):
+            continue  # DeSmuME não tem user/; config vai ao lado do exe
+        if item.is_dir():
+            shutil.copytree(item, dst / item.name)
+        else:
+            shutil.copy2(item, dst / item.name)
+    for cfg in ("desmume.ini",):
+        s = src / cfg
+        if s.is_file():
+            shutil.copy2(s, dst / cfg)
+    ver = ""
+    varq = src / "desmume-versao.txt"
+    if varq.is_file():
+        try:
+            ver = varq.read_text(encoding="utf-8", errors="ignore").strip()
+        except OSError:
+            pass
+    (dst / "FONTE.txt").write_text(
+        "DeSmuME \u2014 emulador de Nintendo DS (terceiros, sem modifica\u00e7\u00e3o).\n"
+        f"Vers\u00e3o empacotada: {ver or 'desconhecida'}\n"
+        f"Fonte: {DESMUME_URL} (c\u00f3digo-fonte e releases oficiais)\n"
+        "Licen\u00e7a: GPL-2.0 (texto em COPYING.txt).\n"
+        "\n"
+        "Agrega\u00e7\u00e3o como no Azahar: o launcher apenas EXECUTA o\n"
+        "emulador como processo filho. Saves .dsv ficam ao lado das ROMs.\n",
+        encoding="utf-8")
+    shutil.copy2(garantir_gpl(), dst / "COPYING.txt")
+    mb = sum(f.stat().st_size for f in dst.rglob("*") if f.is_file()) / 1048576
+    print(f"[ok] DeSmuME {ver or '?'} embutido ({mb:.0f} MB)")
+    return ver
+
+
 def incluir_azahar(dest_base: Path) -> str:
     """Copia o Azahar instalado p/ emuladores/Azahar. Retorna a versão."""
     src = azahar_instalado_dir()
@@ -339,15 +397,17 @@ def montar(sem_azahar: bool = False) -> Path:
     (BUILD / "README-PORTATIL.txt").write_text(LEIAME_PORTATIL, encoding="utf-8")
     for sub in ("dados", "dados/backups", "dados/capas", "dados/presets"):
         (BUILD / sub).mkdir(parents=True, exist_ok=True)
-    azahar_ver = ""
+    azahar_ver = desmume_ver = ""
     if not sem_azahar:
         azahar_ver = incluir_azahar(BUILD)
+        desmume_ver = incluir_desmume(BUILD)
     else:
         print("[aviso] pacote magro, sem emulador (--sem-azahar)")
     (BUILD / "VERSAO.txt").write_text(
         f"Biblioteca Hub — build {datetime.date.today():%Y-%m-%d}\n"
         f"Python embutido: {versao}\n"
-        f"Azahar: {azahar_ver or 'ausente (--sem-azahar)'}\n",
+        f"Azahar: {azahar_ver or 'ausente (--sem-azahar)'}\n"
+        f"DeSmuME: {desmume_ver or 'ausente (--sem-azahar)'}\n",
         encoding="utf-8")
 
     # prova real: o python embutido importa tkinter e monta a UI oculta
@@ -384,6 +444,12 @@ def montar(sem_azahar: bool = False) -> Path:
         if (BUILD / "emuladores" / "Azahar" / "user" / "nand").exists():
             raise SystemExit("nand vazou para o bundle!")
         print("[ok] bundle com Azahar + COPYING + FONTE, sem nand")
+        dm = BUILD / "emuladores" / "DeSmuME"
+        if not (dm / "desmume.exe").is_file() \
+                or not (dm / "COPYING.txt").is_file() \
+                or not (dm / "FONTE.txt").is_file():
+            raise SystemExit("bundle incompleto: DeSmuME (exe/COPYING/FONTE).")
+        print("[ok] bundle com DeSmuME + COPYING + FONTE")
         env2 = dict(env)
         env2.pop("BIBLIOTECA_EMULADOR_3DS", None)  # override perde p/ exe explícito
         env2["BIBLIOTECA_AZAHAR_DIR"] = str(BUILD / "emuladores" / "Azahar")
@@ -396,6 +462,17 @@ def montar(sem_azahar: bool = False) -> Path:
         if r.returncode != 0 or alvo not in (r.stdout or ""):
             raise SystemExit(f"override não resolve o embutido:\n{r.stdout[-800:]}\n{r.stderr[-800:]}")
         print("[ok] BIBLIOTECA_AZAHAR_DIR resolve o embutido")
+        env2["BIBLIOTECA_DESMUME_DIR"] = str(BUILD / "emuladores" / "DeSmuME")
+        env2.pop("BIBLIOTECA_EMULADOR_NDS", None)
+        r = subprocess.run(
+            [str(py), "-c",
+             f"import sys; sys.path.insert(0, {str(app_dir)!r}); "
+              "import bib_core as c; print(c.default_emu_nds())"],
+            capture_output=True, text=True, timeout=60, env=env2)
+        alvo_dm = str(BUILD / "emuladores" / "DeSmuME" / "desmume.exe")
+        if r.returncode != 0 or alvo_dm not in (r.stdout or ""):
+            raise SystemExit(f"override NDS não resolve:\n{r.stdout[-800:]}\n{r.stderr[-800:]}")
+        print("[ok] BIBLIOTECA_DESMUME_DIR resolve o embutido")
 
     DIST.mkdir(parents=True, exist_ok=True)
     hoje = datetime.date.today().strftime("%Y%m%d")

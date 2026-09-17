@@ -27,6 +27,47 @@ def _dlg(app, root, jogo=None):
     return dlgs[-1]
 
 
+def _combos(dlg):
+    out = []
+
+    def walk(w):
+        for ch in w.winfo_children():
+            if ch.winfo_class() == "TCombobox":
+                out.append(ch)
+            walk(ch)
+    walk(dlg)
+    return out
+
+
+def teste_dialogo_emulador_autodetect():
+    import tkinter as tk
+    root, app = _app_oculto("d3.db")
+    if root is None:
+        print("(sem display: skip)")
+        return
+    try:
+        jogo = {"titulo": "Z", "executable_path": "", "exe_win": "", "exe_linux": "",
+                "status": "backlog", "nota": None, "horas": 0, "favorito": False,
+                "launch_options": "D:\\roms\\jogo.nds", "origem": "rom-nds",
+                "azahar_preset": "", "observacoes": "", "capa": ""}
+        dlg = _dlg(app, root, jogo)
+        combos = _combos(dlg)
+        textos = [c.get() for c in combos]
+        afirmar(any("DeSmuME" in t for t in textos), textos)
+        dlg.destroy()
+        jogo3 = dict(jogo, origem="rom-3ds", launch_options="D:\\roms\\jogo.3ds")
+        dlg = _dlg(app, root, jogo3)
+        textos = [c.get() for c in _combos(dlg)]
+        afirmar(any("Azahar" in t for t in textos), textos)
+        dlg.destroy()
+        dlg = _dlg(app, root, None)
+        textos = [c.get() for c in _combos(dlg)]
+        afirmar(any(t == "—" for t in textos), textos)
+        dlg.destroy()
+    finally:
+        root.destroy()
+
+
 def teste_dialogo_secoes_escuras():
     import tkinter as tk
     root, app = _app_oculto()

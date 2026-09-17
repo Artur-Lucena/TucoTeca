@@ -138,7 +138,10 @@ def _aplicar(stage: Path, dest: Path, tag: str) -> dict:
                 "erro": f"Atualização falhou: {e}; {detalhe}"}
 
 
-def instalar(info: dict, dest: Path, progresso=None, plataforma=None) -> dict:
+def instalar(info: dict, dest: Path, progresso=None, plataforma=None,
+               exe_nomes=("azahar.exe",), deps=("Qt6Core.dll", "Qt6Gui.dll",
+               "plugins/platforms/qwindows.dll"), renomear_exe=None,
+               versao_nome=VERSAO) -> dict:
     plataforma = plataforma or os.name
     url, tag = info.get("url"), str(info.get("tag") or "").strip()
     if not url or not tag:
@@ -173,15 +176,28 @@ def instalar(info: dict, dest: Path, progresso=None, plataforma=None) -> dict:
                                 or any(":" in p or p.casefold() == "user" for p in partes)):
                             raise ValueError("pacote contém caminho inválido ou dados de usuário")
                     z.extractall(stage)
+                import fnmatch
                 candidatas = [stage, *(p for p in stage.iterdir() if p.is_dir())]
-                raiz = next((p for p in candidatas if (p / "azahar.exe").is_file()), None)
-                if raiz is None:
-                    raise ValueError("azahar.exe não encontrado no pacote")
+                achado = None
+                for cand in candidatas:
+                    for pat in exe_nomes:
+                        alvos = sorted(cand.glob(pat)) if any(c in pat for c in "*?[") else ([cand / pat] if (cand / pat).is_file() else [])
+                        if alvos:
+                            achado = (cand, alvos[0])
+                            break
+                    if achado:
+                        break
+                if achado is None:
+                    raise ValueError(f"executável não encontrado no pacote ({'/'.join(exe_nomes)})")
+                raiz, exe_baixado = achado
                 stage = raiz
-                nome_exe, assinatura = "azahar.exe", b"MZ"
-                for dep in ("Qt6Core.dll", "Qt6Gui.dll", "plugins/platforms/qwindows.dll"):
+                nome_exe, assinatura = exe_baixado.name, b"MZ"
+                for dep in deps:
                     if not (stage / dep).is_file() or not (stage / dep).stat().st_size:
                         raise ValueError(f"dependência ausente: {dep}")
+                if renomear_exe and exe_baixado.name != renomear_exe:
+                    exe_baixado.rename(stage / renomear_exe)
+                    nome_exe = renomear_exe
             else:
                 nome_exe, assinatura = "azahar.AppImage", b"\x7fELF"
                 shutil.copy2(pacote, stage / nome_exe)
@@ -190,7 +206,7 @@ def instalar(info: dict, dest: Path, progresso=None, plataforma=None) -> dict:
             with exe.open("rb") as f:
                 if f.read(len(assinatura)) != assinatura or exe.stat().st_size < 10_000_000:
                     raise ValueError("executável inválido no pacote")
-            (stage / VERSAO).write_text(tag, encoding="utf-8")
+            (stage / versao_nome).write_text(tag, encoding="utf-8")
             r = _aplicar(stage, dest, tag)
             if r["ok"]:
                 r.update(tag=tag, exe=str(dest / nome_exe), exe_existe=True)

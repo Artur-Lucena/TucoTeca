@@ -156,6 +156,141 @@ def azahar_instalar(info: dict, progresso=None) -> dict:
 
 
 
+
+
+# --------------------------------------------------------------------------
+# DeSmuME (Nintendo DS): provider nº 2, mesma integração do Azahar
+# --------------------------------------------------------------------------
+
+DESMUME_API_LATEST = "https://api.github.com/repos/TASEmulators/desmume/releases/latest"
+DESMUME_VERSAO_ARQ = "desmume-versao.txt"
+
+
+def desmume_dir_override() -> Path | None:
+    env = (os.environ.get("BIBLIOTECA_DESMUME_DIR") or "").strip()
+    if env and Path(env).is_dir():
+        return Path(env)
+    return None
+
+
+def desmume_dir() -> Path:
+    ov = desmume_dir_override()
+    if ov is not None:
+        return ov
+    if os.name == "nt":
+        return Path(WIN_ROOT) / "Games/Emuladores/DeSmuME"
+    return Path(LINUX_ROOT) / "Games/Emuladores/DeSmuME"
+
+
+def default_emu_nds() -> str:
+    """Caminho do DeSmuME (BIBLIOTECA_EMULADOR_NDS > DIR > padrão)."""
+    env = os.environ.get("BIBLIOTECA_EMULADOR_NDS")
+    if env:
+        return env
+    ov = desmume_dir_override()
+    if ov is not None:
+        if os.name == "nt":
+            cand = ov / "desmume.exe"
+            return str(cand) if cand.is_file() else ""
+        imgs = sorted(ov.glob("desmume*.AppImage"))
+        return str(imgs[-1]) if imgs else ""
+    if os.name == "nt":
+        cand = Path(WIN_ROOT) / "Games/Emuladores/DeSmuME/desmume.exe"
+        return str(cand) if cand.is_file() else ""
+    pasta = Path(LINUX_ROOT) / "Games/Emuladores/DeSmuME"
+    if pasta.is_dir():
+        imgs = sorted(pasta.glob("desmume*.AppImage"))
+        if imgs:
+            return str(imgs[-1])
+    return ""
+
+
+def desmume_user_dir(exe: str = "") -> str:
+    """DeSmuME é portátil por natureza: config (desmume.ini) mora ao lado do exe."""
+    exe = exe or default_emu_nds()
+    if exe:
+        base = Path(exe).parent
+        if base.is_dir():
+            return str(base)
+    return ""
+
+
+def desmume_versao_local() -> str:
+    arq = desmume_dir() / DESMUME_VERSAO_ARQ
+    try:
+        if arq.is_file():
+            return arq.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    return ""
+
+
+def desmume_release_info(timeout: int = 25) -> dict:
+    """{'tag','nome','size','sha256','url'} do win64.zip, ou {'erro':...}."""
+    try:
+        with urllib.request.urlopen(DESMUME_API_LATEST, timeout=timeout) as r:
+            rel = json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        return {"erro": f"falha de rede: {type(e).__name__}: {e}"}
+    tag = (rel.get("tag_name") or "").strip()
+    for a in rel.get("assets", []):
+        nome = a.get("name") or ""
+        if "-win64.zip" in nome:
+            digest = a.get("digest") or ""
+            sha = digest.split(":", 1)[1].strip() if ":" in digest else ""
+            return {"tag": tag, "nome": nome, "size": a.get("size") or 0,
+                    "sha256": sha, "url": a.get("browser_download_url") or ""}
+    return {"erro": "asset Windows não encontrado no release"}
+
+
+def desmume_instalar(info: dict, progresso=None) -> dict:
+    """Baixa o win64.zip e instala como desmume.exe (transacional, como Azahar)."""
+    from bib_nucleo.atualizacao import instalar
+    return instalar(info, desmume_dir(), progresso, exe_nomes=("DeSmuME*.exe",),
+                    deps=(), renomear_exe="desmume.exe",
+                    versao_nome=DESMUME_VERSAO_ARQ)
+
+
+def desmume_config_atual() -> Path | None:
+    ud = desmume_user_dir()
+    if ud:
+        cfg = Path(ud) / "desmume.ini"
+        if cfg.is_file():
+            return cfg
+    return None
+
+
+def desmume_flags() -> list[str]:
+    """Flags extras ao bootar ROM NDS (padrão tela cheia em janela)."""
+    import shlex
+    return shlex.split(os.environ.get("BIBLIOTECA_DESMUME_FLAGS", "--windowed-fullscreen"),
+                       posix=(os.name != "nt"))
+
+
+def _prov_desmume() -> dict:
+    from bib_nucleo.scans import icone_nds_para_png, ler_metadados_nds
+    return {
+        "chave": "desmume",
+        "nome": "DeSmuME",
+        "sistemas": ("Nintendo DS",),
+        "origens": ("rom-nds",),
+        "origem": "rom-nds",
+        "exe": default_emu_nds,           # () -> str
+        "user_dir": desmume_user_dir,     # (exe="") -> str
+        "saves_subs": (),                 # .dsv mora ao lado da ROM
+        "pacote_subs": (),
+        "rom_exts": {".nds", ".dsi"},
+        "flags": desmume_flags,           # () -> list[str]
+        "aplicar_preset": lambda nome: aplicar_preset(nome, "desmume"),
+        "release_info": desmume_release_info,
+        "versao_local": desmume_versao_local,
+        "instalar": desmume_instalar,
+        "ler_metadados": ler_metadados_nds,
+        "icone": icone_nds_para_png,
+        "dica_instalacao": ("DeSmuME não encontrado — instale em "
+                            "Games/Emuladores/DeSmuME ou defina BIBLIOTECA_EMULADOR_NDS."),
+    }
+
 # --------------------------------------------------------------------------
 # Execução de jogos (Windows + Linux)
 # --------------------------------------------------------------------------
@@ -331,14 +466,14 @@ def procurar_rom(nome_arquivo: str, roots: list[str] | None = None,
 
     Só leitura, com teto. Compara case-insensitive pelo nome do arquivo.
     """
-    from bib_nucleo.scans import (SKIP_DIRS, default_roms_roots,
-                                   default_scan_roots)
+    from bib_nucleo.scans import (SKIP_DIRS, default_roms_nds_roots,
+                                   default_roms_roots, default_scan_roots)
     alvo = (nome_arquivo or "").strip().lower()
     if not alvo:
         return []
     if roots is None:
         vistas: list[str] = []
-        for r in default_roms_roots() + default_scan_roots():
+        for r in default_roms_roots() + default_roms_nds_roots() + default_scan_roots():
             if r not in vistas:
                 vistas.append(r)
         roots = vistas
@@ -434,11 +569,13 @@ def executar_monitorado(jogo: dict, ao_fim=None,
 # --------------------------------------------------------------------------
 
 def _prov_azahar() -> dict:
+    from bib_nucleo.scans import icone_rom_para_png, ler_metadados_3ds
     return {
         "chave": "azahar",
         "nome": "Azahar",
         "sistemas": ("Nintendo 3DS",),
         "origens": ("rom-3ds",),
+        "origem": "rom-3ds",
         "exe": default_emu_3ds,          # () -> str
         "user_dir": azahar_user_dir,     # (exe="") -> str
         "saves_subs": ("sdmc", "states"),
@@ -446,6 +583,11 @@ def _prov_azahar() -> dict:
         "rom_exts": ROM_EXTS_3DS,
         "flags": azahar_flags,           # () -> list[str]
         "aplicar_preset": aplicar_preset,  # (nome) -> dict
+        "ler_metadados": ler_metadados_3ds,
+        "icone": icone_rom_para_png,
+        "release_info": azahar_release_info,
+        "versao_local": azahar_versao_local,
+        "instalar": azahar_instalar,
         "dica_instalacao": ("Azahar não encontrado — instale em "
                             "Games/Emuladores/Azahar ou defina BIBLIOTECA_EMULADOR_3DS."),
     }
@@ -454,7 +596,7 @@ def _prov_azahar() -> dict:
 
 def provedores() -> dict:
     """chave -> spec. Construído sob demanda (as funções existem no import)."""
-    return {"azahar": _prov_azahar()}
+    return {"azahar": _prov_azahar(), "desmume": _prov_desmume()}
 
 
 
@@ -582,10 +724,24 @@ def presets_dir() -> Path:
     return PRESETS_DIR
 
 
+def presets_prov_dir(chave: str) -> Path:
+    d = presets_dir() / chave
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
-def listar_presets() -> list[str]:
+
+def presets_dir() -> Path:
+    PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+    return PRESETS_DIR
+
+
+
+def listar_presets(chave: str = "azahar") -> list[str]:
     try:
-        return sorted(p.stem for p in presets_dir().glob("*.ini") if p.is_file())
+        nomes = [p.stem for p in presets_prov_dir(chave).glob("*.ini") if p.is_file()]
+        if chave == "azahar":  # legado: presets/*.ini na raiz valem p/ Azahar
+            nomes += [p.stem for p in presets_dir().glob("*.ini") if p.is_file()]
+        return sorted(set(nomes))
     except OSError:
         return []
 
@@ -608,16 +764,16 @@ def azahar_config_atual() -> Path | None:
 
 
 
-def salvar_preset_de_atual(nome: str) -> dict:
-    """Fotografa o qt-config.ini atual como presets/<nome>.ini."""
-    cfg = azahar_config_atual()
+def salvar_preset_de_atual(nome: str, chave: str = "azahar") -> dict:
+    """Fotografa o ini atual como presets/<provider>/<nome>.ini."""
+    cfg = config_atual_emu(chave)
     if cfg is None:
         return {"ok": False,
-                "erro": "config do Azahar não encontrada (abra o Azahar uma vez)."}
+                "erro": f"config não encontrada (abra o {chave} uma vez)."}
     slug = slugify(nome or "")
     if not slug:
         return {"ok": False, "erro": "nome de preset vazio."}
-    dest = presets_dir() / f"{slug}.ini"
+    dest = presets_prov_dir(chave) / f"{slug}.ini"
     try:
         shutil.copy2(str(cfg), str(dest))
     except OSError as e:
@@ -625,39 +781,55 @@ def salvar_preset_de_atual(nome: str) -> dict:
     return {"ok": True, "preset": slug, "arquivo": str(dest)}
 
 
+def config_atual_emu(chave: str) -> Path | None:
+    if chave == "desmume":
+        return desmume_config_atual()
+    return azahar_config_atual()
 
-def aplicar_preset(nome: str) -> dict:
-    """Mescla presets/<nome>.ini sobre o qt-config.ini (backup .bak uma vez)."""
-    nome = (nome or "").strip()
-    if not nome:
-        return {"ok": False, "erro": "sem preset"}
-    base = presets_dir()
+
+def _alvo_preset(nome: str, chave: str):
+    base = presets_prov_dir(chave)
     alvo = base / Path(nome).name
     if not alvo.suffix:
-        alvo = alvo.with_name(alvo.name + ".ini")  # aceita stem ("up-2x") ou "up-2x.ini"
+        alvo = alvo.with_name(alvo.name + ".ini")  # aceita stem ou "x.ini"
+    if chave == "azahar" and not alvo.is_file():
+        leg = presets_dir() / alvo.name  # legado na raiz
+        if leg.suffix.lower() == ".ini" and leg.is_file():
+            alvo, base = leg, presets_dir()
     try:
         dentro = alvo.resolve().parent == base.resolve()
     except OSError:
         dentro = False
     if not dentro or alvo.suffix.lower() != ".ini" or not alvo.is_file():
-        return {"ok": False, "erro": f"preset '{nome}' não existe em presets/."}
-    cfg = azahar_config_atual()
+        return None
+    return alvo
+
+
+def aplicar_preset(nome: str, chave: str = "azahar") -> dict:
+    """Mescla presets/<provider>/<nome>.ini sobre o ini atual (backup .bak uma vez)."""
+    nome = (nome or "").strip()
+    if not nome:
+        return {"ok": False, "erro": "sem preset"}
+    alvo = _alvo_preset(nome, chave)
+    if alvo is None:
+        return {"ok": False, "erro": f"preset '{nome}' não existe."}
+    cfg = config_atual_emu(chave)
     if cfg is None:
-        return {"ok": False, "erro": "config do Azahar não encontrada."}
+        return {"ok": False, "erro": "config do emulador não encontrada."}
     try:
         bak = cfg.with_name(cfg.name + ".bak")
         if not bak.is_file():
             shutil.copy2(str(cfg), str(bak))  # estado pré-preset, uma única vez
         atual, novo = configparser.ConfigParser(), configparser.ConfigParser()
-        atual.optionxform = str  # type: ignore[assignment]  # Qt usa camelCase
+        atual.optionxform = str  # type: ignore[assignment]  # preserva maiúsculas
         novo.optionxform = str  # type: ignore[assignment]
         atual.read(cfg, encoding="utf-8")
         novo.read(alvo, encoding="utf-8")
         for sec in novo.sections():
             if not atual.has_section(sec):
                 atual.add_section(sec)
-            for chave, valor in novo.items(sec):
-                atual.set(sec, chave, valor)
+            for k, valor in novo.items(sec):
+                atual.set(sec, k, valor)
         with cfg.open("w", encoding="utf-8") as fh:
             atual.write(fh)
     except (OSError, configparser.Error) as e:
@@ -665,12 +837,11 @@ def aplicar_preset(nome: str) -> dict:
     return {"ok": True, "preset": alvo.stem, "config": str(cfg)}
 
 
-
-def restaurar_config_azahar() -> dict:
-    """Volta o qt-config.ini ao estado pré-preset (.bak)."""
-    cfg = azahar_config_atual()
+def restaurar_config_emu(chave: str) -> dict:
+    """Volta o ini ao estado pré-preset (.bak)."""
+    cfg = config_atual_emu(chave)
     if cfg is None:
-        return {"ok": False, "erro": "config do Azahar não encontrada."}
+        return {"ok": False, "erro": "config do emulador não encontrada."}
     bak = cfg.with_name(cfg.name + ".bak")
     if not bak.is_file():
         return {"ok": False, "erro": "sem backup pré-preset (.bak ausente)."}
@@ -680,6 +851,10 @@ def restaurar_config_azahar() -> dict:
         return {"ok": False, "erro": f"falha ao restaurar: {e}"}
     return {"ok": True, "config": str(cfg)}
 
+
+def restaurar_config_azahar() -> dict:
+    """Volta o qt-config.ini ao estado pré-preset (.bak)."""
+    return restaurar_config_emu("azahar")
 
 
 def preparar_lancamento(jogo: dict) -> dict:
@@ -698,7 +873,8 @@ def preparar_lancamento(jogo: dict) -> dict:
         else:
             avisos.append(f"Preset '{nome}' falhou ({r['erro']}); abrindo com config atual.")
     launch = (jogo.get("launch_options") or "").strip()
-    if launch and provedor_por_extensao(Path(launch).suffix) is not None:
+    if (launch and prov.get("chave") == "azahar"
+            and provedor_por_extensao(Path(launch).suffix) is not None):
         if rom_parece_criptografada(launch) and not azahar_tem_chaves():
             avisos.append("ROM parece criptografada e o Azahar está sem aes_keys.txt "
                           "— o jogo não vai abrir. Faça o dump das chaves do seu 3DS "
@@ -730,4 +906,4 @@ def azahar_tem_chaves() -> bool:
     ud = azahar_user_dir()
     return bool(ud) and (Path(ud) / "sysdata" / "aes_keys.txt").is_file()
 
-__all__ = ['azahar_dir_override', 'default_emu_3ds', 'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', '_emu_dir', 'azahar_versao_local', 'azahar_release_info', 'AZAHAR_EXE_MINIMO', 'azahar_instalar', '_eh_elevacao_necessaria', 'executar_elevado', '_lancar', 'executar_jogo', '_lancar_jogo_dict', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', '_vigiar_processo', 'executar_monitorado', '_prov_azahar', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'listar_presets', 'azahar_config_atual', 'salvar_preset_de_atual', 'aplicar_preset', 'restaurar_config_azahar', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves']
+__all__ = ['azahar_dir_override', 'default_emu_3ds', 'desmume_dir_override', 'desmume_dir', 'default_emu_nds', 'desmume_user_dir', 'desmume_versao_local', 'desmume_release_info', 'desmume_instalar', 'desmume_config_atual', 'desmume_flags', '_prov_desmume', 'config_atual_emu', 'presets_prov_dir', 'restaurar_config_emu',  'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', '_emu_dir', 'azahar_versao_local', 'azahar_release_info', 'AZAHAR_EXE_MINIMO', 'azahar_instalar', '_eh_elevacao_necessaria', 'executar_elevado', '_lancar', 'executar_jogo', '_lancar_jogo_dict', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', '_vigiar_processo', 'executar_monitorado', '_prov_azahar', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'presets_prov_dir', 'listar_presets', 'azahar_config_atual', 'config_atual_emu', 'salvar_preset_de_atual', 'aplicar_preset', 'restaurar_config_emu', 'restaurar_config_azahar', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves']
