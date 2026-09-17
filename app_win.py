@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import sys
 import threading
 import tkinter as tk
@@ -488,28 +489,33 @@ class App:
                 return None
             if r:
                 j = core.atualizar_jogo(con, j["id"],
-                                        {"executable_path": "", "exe_win": "",
-                                         "exe_linux": ""})
+                                        {"executable_path": "",
+                                         "exe_win" if os.name == "nt" else "exe_linux": ""})
             else:
                 j = {**j, "executable_path": "", "exe_win": "", "exe_linux": ""}
         drom = core.diagnosticar_rom(j)
         if drom["estado"] == "rom-ausente":
             launch = (j.get("launch_options") or "").strip()
             cands = drom["candidatos"]
+            escolhido = None
             if cands:
-                extra = f" (+{len(cands) - 1} outra(s))" if len(cands) > 1 else ""
-                r = messagebox.askyesnocancel(
-                    "Jogar",
-                    f"ROM não encontrada:\n{launch}\n\nAchei:\n{cands[0]}{extra}\n\n"
-                    "Sim = religar e jogar · Não = jogar assim mesmo · Cancelar = voltar")
-                if r is None:
+                if len(cands) == 1:
+                    if messagebox.askyesno("Localizar ROM", f"Religar esta entrada para:\n{cands[0]}?"):
+                        escolhido = cands[0]
+                else:
+                    lista = "\n".join(f"{i + 1}. {p}" for i, p in enumerate(cands))
+                    idx = simpledialog.askinteger("Localizar ROM", lista + "\nNúmero da ROM:",
+                                                  minvalue=1, maxvalue=len(cands), parent=self.root)
+                    if idx:
+                        escolhido = cands[idx - 1]
+            if escolhido is None:
+                escolhido = filedialog.askopenfilename(title="Localizar ROM movida", parent=self.root,
+                    filetypes=[("ROMs 3DS", "*.cci *.cxi *.3ds *.3dsx *.app *.elf *.axf"), ("Todos", "*.*")])
+                if escolhido and not messagebox.askyesno("Localizar ROM", f"Gravar este novo caminho?\n{escolhido}"):
                     return None
-                if r:
-                    j = core.atualizar_jogo(con, j["id"], {"launch_options": cands[0]})
-            else:
-                messagebox.showwarning(
-                    "Jogar", f"ROM não encontrada:\n{launch}\n\nConfira o caminho.")
+            if not escolhido:
                 return None
+            j = core.atualizar_jogo(con, j["id"], {"launch_options": escolhido})
         return j
 
     def _sessao_fim(self, gid: int, sessao: float, rastreado: bool) -> None:
@@ -565,16 +571,41 @@ class App:
         dlg.configure(bg=BG)
         dlg.transient(self.root)
         dlg.grab_set()
+        dlg.minsize(540, 0)
         campos: dict[str, tk.Variable | tk.Text] = {}
 
-        def linha(rotulo, chave, valor="", largura=60):
-            ttk.Label(dlg, text=rotulo).pack(anchor="w", padx=10, pady=(6, 0))
-            v = tk.StringVar(value=valor)
-            ttk.Entry(dlg, textvariable=v, width=largura).pack(fill="x", padx=10)
-            campos[chave] = v
+        def secao(titulo):
+            fr = ttk.LabelFrame(dlg, text=f" {titulo} ", padding=(10, 6))
+            fr.pack(fill="x", padx=10, pady=(8, 0))
+            return fr
 
-        linha("Título *", "titulo", j["titulo"] if j else "")
-        linha("Executável", "executable_path", j["executable_path"] if j else "")
+        def linha(pai, rotulo, chave, valor="", largura=40):
+            ttk.Label(pai, text=rotulo, width=16, anchor="w").grid(
+                row=linha.n, column=0, sticky="w", pady=2)
+            v = tk.StringVar(value=valor)
+            ttk.Entry(pai, textvariable=v, width=largura).grid(
+                row=linha.n, column=1, sticky="ew", pady=2)
+            pai.grid_columnconfigure(1, weight=1)
+            campos[chave] = v
+            linha.n += 1
+            return v
+        linha.n = 0
+
+        # -- jogo
+        fr_jogo = secao("Jogo")
+        linha.n = 0
+        linha(fr_jogo, "Título *", "titulo", j["titulo"] if j else "")
+        ttk.Label(fr_jogo, text="Status", width=16, anchor="w").grid(
+            row=1, column=0, sticky="w", pady=2)
+        var_st = tk.StringVar(value=j["status"] if j else "backlog")
+        ttk.Combobox(fr_jogo, textvariable=var_st, values=list(core.STATUS_VALIDOS),
+                     state="readonly", width=18).grid(row=1, column=1, sticky="w", pady=2)
+        campos["status"] = var_st
+
+        # -- execução
+        fr_exe = secao("Execução")
+        linha.n = 0
+        linha(fr_exe, "Executável", "executable_path", j["executable_path"] if j else "")
 
         def procurar_exe():
             arq = filedialog.askopenfilename(
@@ -583,35 +614,37 @@ class App:
             if arq:
                 campos["executable_path"].set(arq)
 
-        ttk.Button(dlg, text="Procurar...", command=procurar_exe).pack(anchor="e", padx=10)
-        linha("Executável Windows (vazio = usa o de cima)", "exe_win",
-              j["exe_win"] if j else "")
-        linha("Executável Linux (vazio = usa o de cima)", "exe_linux",
-              j["exe_linux"] if j else "")
-        ttk.Label(dlg, text="Status").pack(anchor="w", padx=10, pady=(6, 0))
-        var_st = tk.StringVar(value=j["status"] if j else "backlog")
-        ttk.Combobox(dlg, textvariable=var_st, values=list(core.STATUS_VALIDOS),
-                     state="readonly").pack(anchor="w", padx=10)
-        campos["status"] = var_st
-        frow = ttk.Frame(dlg)
-        frow.pack(fill="x", padx=10, pady=6)
+        ttk.Button(fr_exe, text="Procurar...", command=procurar_exe).grid(
+            row=1, column=1, sticky="e", pady=2)
+        linha.n = 2
+        linha(fr_exe, "Exe Windows", "exe_win", j["exe_win"] if j else "")
+        linha(fr_exe, "Exe Linux", "exe_linux", j["exe_linux"] if j else "")
+        linha(fr_exe, "Lançamento", "launch_options", j["launch_options"] if j else "")
+        ttk.Label(fr_exe, text="Vazio = usa o executável de cima",
+                  style="Mut.TLabel").grid(row=5, column=1, sticky="w")
+
+        # -- avaliação
+        fr_av = secao("Avaliação")
         var_nota = tk.StringVar(value="" if not j or j["nota"] is None else str(j["nota"]))
         var_horas = tk.StringVar(value="0" if not j else str(j["horas"] or 0))
         var_fav = tk.BooleanVar(value=bool(j and j["favorito"]))
-        ttk.Label(frow, text="Nota 0–10").pack(side="left")
-        ttk.Entry(frow, textvariable=var_nota, width=6).pack(side="left", padx=(2, 10))
-        ttk.Label(frow, text="Horas").pack(side="left")
-        ttk.Entry(frow, textvariable=var_horas, width=8).pack(side="left", padx=(2, 10))
-        ttk.Checkbutton(frow, text="★ favorito", variable=var_fav).pack(side="left")
+        ttk.Label(fr_av, text="Nota 0–10").pack(side="left")
+        ttk.Entry(fr_av, textvariable=var_nota, width=6).pack(side="left", padx=(2, 14))
+        ttk.Label(fr_av, text="Horas").pack(side="left")
+        ttk.Entry(fr_av, textvariable=var_horas, width=8).pack(side="left", padx=(2, 14))
+        ttk.Checkbutton(fr_av, text="★ favorito", variable=var_fav).pack(side="left")
         campos["nota"], campos["horas"], campos["favorito"] = var_nota, var_horas, var_fav
-        linha("Opções de lançamento", "launch_options", j["launch_options"] if j else "")
-        ttk.Label(dlg, text="Preset Azahar (só ROMs 3DS; vazio = nenhum)").pack(
-            anchor="w", padx=10, pady=(6, 0))
+
+        # -- 3ds
+        fr_3ds = secao("Nintendo 3DS")
+        ttk.Label(fr_3ds, text="Preset", width=16, anchor="w").grid(
+            row=0, column=0, sticky="w", pady=2)
         var_preset = tk.StringVar(
             value=(j.get("azahar_preset") if j else "") or "")
-        cmb_preset = ttk.Combobox(dlg, textvariable=var_preset,
-                                  values=core.listar_presets())
-        cmb_preset.pack(fill="x", padx=10)
+        cmb_preset = ttk.Combobox(fr_3ds, textvariable=var_preset,
+                                  values=core.listar_presets(), width=36)
+        cmb_preset.grid(row=0, column=1, sticky="ew", pady=2)
+        fr_3ds.grid_columnconfigure(1, weight=1)
         campos["azahar_preset"] = var_preset
 
         def foto_preset():
@@ -628,25 +661,31 @@ class App:
             else:
                 messagebox.showwarning("Preset Azahar", r.get("erro", "falha"))
 
-        ttk.Button(dlg, text="📸 Fotografar config atual como preset...",
-                   command=foto_preset).pack(anchor="e", padx=10)
-        ttk.Label(dlg, text="Observações").pack(anchor="w", padx=10, pady=(6, 0))
-        txt = tk.Text(dlg, height=3, bg="#0b0d12", fg=TXT, insertbackground=TXT)
-        txt.pack(fill="x", padx=10)
+        ttk.Button(fr_3ds, text="📸 Fotografar config atual...",
+                   command=foto_preset).grid(row=1, column=1, sticky="e", pady=2)
+
+        # -- notas
+        fr_obs = secao("Observações")
+        txt = tk.Text(fr_obs, height=3, bg="#0b0d12", fg=TXT, insertbackground=TXT)
+        txt.pack(fill="x")
         if j and j["observacoes"]:
             txt.insert("1.0", j["observacoes"])
         campos["observacoes"] = txt
 
+        # -- capa
+        fr_capa = secao("Capa")
         var_capa = tk.StringVar(value="")
-        lbl_capa = ttk.Label(dlg, text=f"Capa atual: {j['capa']}" if j and j.get("capa") else "")
-        lbl_capa.pack(anchor="w", padx=10)
+        lbl_capa = ttk.Label(fr_capa, text=f"Atual: {j['capa']}" if j and j.get("capa") else "Sem capa")
+        lbl_capa.pack(anchor="w")
         self._img_capa = None
         if j and j.get("capa"):
             alvo = core.caminho_capa(j["capa"])
             if alvo is not None and alvo.suffix.lower() in (".png", ".gif"):
                 try:
-                    self._img_capa = tk.PhotoImage(file=str(alvo))
-                    ttk.Label(dlg, image=self._img_capa).pack(anchor="w", padx=10)
+                    img = tk.PhotoImage(file=str(alvo))
+                    f = max(1, img.height() // 160)
+                    self._img_capa = img.subsample(f, f) if f > 1 else img
+                    ttk.Label(fr_capa, image=self._img_capa).pack(anchor="w", pady=4)
                 except tk.TclError:
                     pass  # mantém só o nome do arquivo
 
@@ -658,7 +697,7 @@ class App:
                 var_capa.set(arq)
                 lbl_capa.configure(text=f"Nova capa: {Path(arq).name}")
 
-        ttk.Button(dlg, text="Escolher capa...", command=trocar_capa).pack(anchor="e", padx=10)
+        ttk.Button(fr_capa, text="Escolher capa...", command=trocar_capa).pack(anchor="e")
 
         def salvar():
             try:
@@ -672,8 +711,6 @@ class App:
                     "nota": None if nota_txt == "" else int(nota_txt),
                     "horas": float(var_horas.get().strip() or 0),
                     "favorito": var_fav.get(),
-                    # sem campo na GUI: preserva o gravado (era "" fixo e apagava o do Linux)
-                    "wine_prefix": (j["wine_prefix"] if j else ""),
                     "launch_options": campos["launch_options"].get().strip(),
                     "azahar_preset": campos["azahar_preset"].get().strip(),
                     "observacoes": txt.get("1.0", "end").strip(),
@@ -869,8 +906,7 @@ class App:
             dlg.destroy()
             self.sel = None
             self.recarregar()
-            messagebox.showinfo(titulo, f"Importados {res['novos']} "
-                                        f"(total {res['total_no_banco']})")
+            messagebox.showinfo(titulo, core.resumo_importacao(res))
 
         ttk.Button(dlg, text="Importar selecionados", command=importar,
                    style="Accent.TButton").pack(pady=8)
@@ -1069,8 +1105,7 @@ class App:
             con.close()
         self.sel = None
         self.recarregar()
-        messagebox.showinfo("Importar", f"Novos: {res['novos']} "
-                                        f"(total {res['total_no_banco']}).")
+        messagebox.showinfo("Importar", core.resumo_importacao(res))
 
     def exportar_pacote(self):
         dest = filedialog.asksaveasfilename(
@@ -1113,7 +1148,7 @@ class App:
         self.sel = None
         self.recarregar()
         messagebox.showinfo("Pacote",
-                            f"Novos: {res['novos']} (total {res['total_no_banco']}) · "
+                            core.resumo_importacao(res) + "\n" +
                             f"capas {res['capas']} · presets {res['presets']} · "
                             f"saves {res['saves']}")
 

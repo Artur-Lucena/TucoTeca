@@ -58,11 +58,11 @@ Onde o Hydra guarda os dados:
 
 ## HUB de emulação (provedores)
 
-O núcleo tem um **registro de emuladores** (`provedores()` em `bib_core.py`): cada provider diz que origens atende, onde está o exe, onde ficam config/saves, como montar o launch e como aplicar preset. Lançamento, horas automáticas, pacote e backup de saves falam com o registro — **o Azahar é só o provider nº 1**. O próximo sistema (NDS, GBA…) entra como provider novo sem tocar em lançamento ou frontends. Na GUI, provedores ficam numa seção própria (recurso de fundo, com nº de jogos e ✓ de instalado) — clicar filtra os jogos que ele roda; o emulador não entra na lista de jogos.
+O núcleo tem um **registro de emuladores** (`provedores()` em `bib_nucleo/emuladores.py`): cada provider diz que origens atende, onde está o exe, onde ficam config/saves, como montar o launch e como aplicar preset. Lançamento, horas automáticas, pacote e backup de saves falam com o registro — **o Azahar é só o provider nº 1**. O próximo sistema (NDS, GBA…) entra como provider novo sem tocar em lançamento ou frontends. Na GUI, provedores ficam numa seção própria (recurso de fundo, com nº de jogos e ✓ de instalado) — clicar filtra os jogos que ele roda; o emulador não entra na lista de jogos.
 
 ## Portátil Windows
 
-`python ferramentas/montar_portatil.py` gera `dist/BibliotecaHub-portatil-AAAAmmdd.zip`: Python embutido + tkinter transplantado + scripts Tcl/Tk do fonte oficial + app + launchers. É só extrair e abrir `BibliotecaHub.bat` (a casa vai em `dados/` dentro do pacote).
+Extraia `dist/BibliotecaHub-portatil-AAAAmmdd.zip`, duplo-clique em `BibliotecaHub.bat` (ou rode `Criar-Atalho.bat` uma vez e use o atalho da Área de Trabalho) — sem VS Code, sem console, sem Python instalado. A casa vai em `dados/` dentro do pacote.
 
 O Azahar instalado vai junto, 100% das vezes (`emuladores/Azahar/`, com `COPYING.txt` + `FONTE.txt` da GPL e só `user/` essencial: config + saves + mods — nunca nand, chaves, log ou shaders). Os `.bat` apontam `BIBLIOTECA_AZAHAR_DIR` pro embutido (override honesto: pasta ausente = ignora e usa o padrão), e o botão ⬇ atualiza o emulador dentro do pacote. Com `--sem-azahar`, o pacote sai magro (net-install: na primeira execução, use ⬇ Atualizar Azahar — ele baixa o build oficial e instala sozinho). O repo git nunca recebe binários (`dist/` ignorado).
 
@@ -75,7 +75,8 @@ O Azahar instalado vai junto, 100% das vezes (`emuladores/Azahar/`, com `COPYING
 
 ## Estrutura
 
-- `bib_core.py` — regras (banco, tradução, scans, backup, execução).
+- `bib_core.py` — compat: reexporta `bib_nucleo/` (não edite; o código mora nos módulos).
+- `bib_nucleo/` — `base` (caminhos), `banco` (SQLite), `scans` (achados/importação), `emuladores` (providers/Azahar/execução), `pacotes` (backup/zip), `atualizacao` (update transacional).
 - `app_win.py` / `app_tui.py` — frontends GUI (Windows) / terminal (Linux).
 - `biblioteca.db` — criado no primeiro run (SQLite, journal `DELETE`, sem sidecars).
 - `backups/` — backups versionados. `capas/` — capas locais. `presets/` — presets do Azahar (`*.ini`).

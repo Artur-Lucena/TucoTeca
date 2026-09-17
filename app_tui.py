@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+from queue import SimpleQueue, Empty
 import sys
 from pathlib import Path
 
@@ -47,7 +49,7 @@ class Tui:
         self.fav = False
         self.msg = ""
         self.msg_final = ""
-        self.sessoes_pendentes: list = []  # (gid, sessao_h, rastreado) da vigia
+        self.sessoes_pendentes = SimpleQueue()  # fila entre vigia e UI
         self._cores()
         self.recarregar()
 
@@ -168,7 +170,7 @@ class Tui:
             aviso = f" [{prep['aviso']}]" if prep.get("aviso") else ""
             res = core.executar_monitorado(
                 j, ao_fim=lambda sessao, rastreado, _gid=j["id"]:
-                    self.sessoes_pendentes.append((_gid, sessao, rastreado)))
+                    self.sessoes_pendentes.put((_gid, sessao, rastreado)))
             if res.get("requer_elevacao") and self.confirmar("Exige administrador. Elevar?"):
                 res = core.executar_jogo_dict(j, elevar=True)
                 if res.get("ok"):
@@ -197,7 +199,7 @@ class Tui:
             op = r.strip().lower()
             if op in ("g", "gravar"):
                 j = core.atualizar_jogo(con, j["id"], {"executable_path": "",
-                                                       "exe_win": "", "exe_linux": ""})
+                    "exe_win" if os.name == "nt" else "exe_linux": ""})
             elif op in ("v", "vez"):
                 j = {**j, "executable_path": "", "exe_win": "", "exe_linux": ""}
             else:
@@ -206,28 +208,39 @@ class Tui:
         if drom["estado"] == "rom-ausente":
             launch = (j.get("launch_options") or "").strip()
             cands = drom["candidatos"]
+            escolhido = None
             if cands:
-                extra = f" (+{len(cands) - 1})" if len(cands) > 1 else ""
-                r = self.perguntar(
-                    f"ROM sumiu. Religar p/ {cands[0]}{extra} e [J]ogar, "
-                    "jogar [A]ssim mesmo ou [C]ancelar? ")
+                for i, p in enumerate(cands):
+                    self.msg = f"{i + 1}: {p}"
+                    self.desenhar()
+                    self.perguntar("Enter para continuar: ")
+                r = self.perguntar("Número da ROM (J=primeira, vazio=informar caminho): ")
                 if r is None:
                     return None
-                op = r.strip().lower()
-                if op in ("j", "jogar"):
-                    j = core.atualizar_jogo(con, j["id"], {"launch_options": cands[0]})
-                elif op not in ("a", "assim"):
-                    return None
-            else:
-                self.msg = f"ROM não encontrada: {launch} (sem candidatas)"
+                if r.lower() in ("j", "jogar"):
+                    escolhido = cands[0]
+                elif r.isdigit() and 1 <= int(r) <= len(cands):
+                    escolhido = cands[int(r) - 1]
+            if not escolhido:
+                escolhido = self.perguntar("Novo caminho da ROM (vazio=cancela): ")
+            if not escolhido or not Path(escolhido).is_file():
+                self.msg = "Religação cancelada ou arquivo inexistente."
                 return None
+            if not self.confirmar(f"Religar para {escolhido}?"):
+                return None
+            j = core.atualizar_jogo(con, j["id"], {"launch_options": escolhido})
         return j
 
     def _aplicar_sessoes(self):
-        """Soma as sessões que a vigia encerrou (thread-safe: só append/limpa)."""
-        if not self.sessoes_pendentes:
+        """Drena a fila de sessões sem trocar sua referência na thread vigia."""
+        pend = []
+        while True:
+            try:
+                pend.append(self.sessoes_pendentes.get_nowait())
+            except Empty:
+                break
+        if not pend:
             return
-        pend, self.sessoes_pendentes = self.sessoes_pendentes, []
         con = self._con()
         try:
             msgs = []
@@ -392,7 +405,7 @@ class Tui:
                     res = core.importar_lista(con, sel)
                 finally:
                     con.close()
-                self.msg = f"Importados {res['novos']} (total {res['total_no_banco']})"
+                self.msg = core.resumo_importacao(res).replace("\n", " · ")
                 self.recarregar()
                 return
 
@@ -530,7 +543,7 @@ class Tui:
             res = core.importar_lista(con, lista)
         finally:
             con.close()
-        self.msg = f"Novos: {res['novos']} (total {res['total_no_banco']})."
+        self.msg = core.resumo_importacao(res).replace("\n", " · ")
         self.recarregar()
 
     def exportar_pacote(self):
@@ -562,7 +575,7 @@ class Tui:
         if not res.get("ok"):
             self.msg = f"Pacote: {res.get('erro')}"
             return
-        self.msg = (f"Pacote: novos {res['novos']} (total {res['total_no_banco']}) · "
+        self.msg = (core.resumo_importacao(res).replace("\n", " · ") + " · " +
                     f"capas {res['capas']} · presets {res['presets']} · "
                     f"saves {res['saves']}")
         self.recarregar()

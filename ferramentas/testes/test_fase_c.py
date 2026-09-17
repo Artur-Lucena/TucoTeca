@@ -5,6 +5,7 @@ import zipfile
 from pathlib import Path
 
 import bib_core as core
+from bib_nucleo import emuladores
 from executar import afirmar
 
 
@@ -208,20 +209,21 @@ def teste_tui_relink():
         con.close()
     t.recarregar()
     t.cur = 0
-    orig_proc, orig_lancar = core.procurar_rom, core._lancar_jogo_dict
+    orig_proc, orig_lancar = emuladores.procurar_rom, emuladores._lancar_jogo_dict
 
     class FP:
         def wait(self):
             return 0
 
-    core.procurar_rom = lambda base, roots=None, max_resultados=20: [str(cand)]
-    core._lancar_jogo_dict = lambda j, e=False: ({"ok": True, "modo": "fake"}, FP())
+    emuladores.procurar_rom = lambda base, roots=None, max_resultados=20: [str(cand)]
+    emuladores._lancar_jogo_dict = lambda j, e=False: ({"ok": True, "modo": "fake"}, FP())
     t.perguntar = lambda *a, **k: "j"
+    t.confirmar = lambda *a, **k: True
     try:
         t.jogar()
         afirmar("Executando" in t.msg, t.msg)
     finally:
-        core.procurar_rom, core._lancar_jogo_dict = orig_proc, orig_lancar
+        emuladores.procurar_rom, emuladores._lancar_jogo_dict = orig_proc, orig_lancar
     con = core.get_db(db)
     try:
         launch = con.execute("SELECT launch_options FROM jogos WHERE id=?", (gid,)).fetchone()["launch_options"]

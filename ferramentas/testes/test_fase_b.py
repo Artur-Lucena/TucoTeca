@@ -1,129 +1,136 @@
-"""Fase B: update com stage + backup + rollback (file:// fake, dest fake)."""
+"""Update com arquivos temporários: falhas, interrupção e rollback verificável."""
 import hashlib
 import tempfile
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
-import bib_core as core
+from bib_nucleo import atualizacao as upd, emuladores
 from executar import afirmar
 
 
-def _release(tmp, tag, corpo=b"X", extra=None):
-    src = tmp / f"rel-{tag}"
-    src.mkdir()
-    (src / "azahar.exe").write_bytes(corpo * (12_000_000 // len(corpo) + 1))
-    (src / "nota.txt").write_text("oi", encoding="utf-8")
-    if extra:
-        for nome, dados in extra.items():
-            (src / nome).write_bytes(dados)
-    zp = tmp / f"{tag}.zip"
-    with zipfile.ZipFile(zp, "w", zipfile.ZIP_DEFLATED) as z:
-        for arq in src.rglob("*"):
-            if arq.is_file():
-                z.write(arq, arq.relative_to(src))
-    raw = zp.read_bytes()
-    return {"url": zp.as_uri(), "tag": tag, "size": len(raw),
-            "sha256": hashlib.sha256(raw).hexdigest()}
+def _release(tmp, tag, corpo=b"X", plataforma="nt"):
+    payload = (b"MZ" if plataforma == "nt" else b"\x7fELF") + corpo * 10_000_001
+    if plataforma == "nt":
+        arq = tmp / (tag + ".zip")
+        with zipfile.ZipFile(arq, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("azahar.exe", payload)
+            for dep in ("Qt6Core.dll", "Qt6Gui.dll", "plugins/platforms/qwindows.dll"):
+                z.writestr(dep, corpo * 100)
+    else:
+        arq = tmp / (tag + ".AppImage")
+        arq.write_bytes(payload)
+    return {"url": arq.as_uri(), "tag": tag, "size": arq.stat().st_size,
+            "sha256": upd._sha(arq)}
 
 
-def _com_dest(tmp):
+def _ambiente():
+    tmp = Path(tempfile.mkdtemp())
     dest = tmp / "emu"
-    dest.mkdir()
-    (dest / "user").mkdir()
-    (dest / "user" / "save.txt").write_text("meu save", encoding="utf-8")
-    velho = core._emu_dir
-    core._emu_dir = lambda: dest
-    return dest, velho
+    (dest / "user/load/mods").mkdir(parents=True)
+    (dest / "user/save.txt").write_text("save intacto")
+    (dest / "user/load/mods/code.ips").write_bytes(b"PATCH")
+    return tmp, dest
 
 
-def teste_instala_limpo():
-    tmp = Path(tempfile.mkdtemp(prefix="suite-b1-"))
-    info = _release(tmp, "v1")
-    dest, velho = _com_dest(tmp)
-    try:
-        res = core.azahar_instalar(info)
-        afirmar(res.get("ok"), res)
-        afirmar((dest / "azahar.exe").is_file(), res)
-        afirmar((dest / "versao-azahar.txt").read_text(encoding="utf-8") == "v1")
-        afirmar((dest / "user" / "save.txt").read_text(encoding="utf-8") == "meu save")
-        afirmar(res.get("anterior") is None, res)  # limpa: nada a preservar
-    finally:
-        core._emu_dir = velho
-
-
-def teste_upgrade_guarda_anterior():
-    tmp = Path(tempfile.mkdtemp(prefix="suite-b2-"))
-    dest, velho = _com_dest(tmp)
-    try:
-        r1 = core.azahar_instalar(_release(tmp, "v1", corpo=b"1"))
-        afirmar(r1.get("ok"), r1)
-        r2 = core.azahar_instalar(_release(tmp, "v2", corpo=b"2"))
-        afirmar(r2.get("ok"), r2)
-        ant = Path(r2["anterior"])
-        afirmar(ant.is_dir(), r2)
-        velho_exe = (ant / "azahar.exe").read_bytes()[:8]
-        novo_exe = (dest / "azahar.exe").read_bytes()[:8]
-        afirmar(velho_exe == b"11111111" and novo_exe == b"22222222",
-                (velho_exe, novo_exe))
-        afirmar((dest / "user" / "save.txt").is_file(), "user sumiu")
-    finally:
-        core._emu_dir = velho
+def teste_instala_e_upgrade():
+    tmp, dest = _ambiente()
+    with patch.object(emuladores, "_emu_dir", return_value=dest):
+        r = emuladores.azahar_instalar(_release(tmp, "v1", b"1"))
+    afirmar(r["ok"] and r["exe"] == str(dest / "azahar.exe"), r)
+    antes = upd._manifesto(dest)
+    r = upd.instalar(_release(tmp, "v2", b"2"), dest, plataforma="nt")
+    afirmar(r["ok"], r)
+    afirmar(upd._manifesto(Path(r["anterior"]) / "runtime") == antes)
+    afirmar((dest / upd.VERSAO).read_text() == "v2")
+    afirmar((dest / "user/save.txt").read_text() == "save intacto")
 
 
 def teste_falha_no_meio_restaura():
-    tmp = Path(tempfile.mkdtemp(prefix="suite-b3-"))
-    dest, velho = _com_dest(tmp)
-    afirmar(core.azahar_instalar(_release(tmp, "v1", corpo=b"1")).get("ok"))
-    orig_fundir = core._fundir
-    core._fundir = lambda o, d: (_ for _ in ()).throw(OSError("disco cheio"))
+    tmp, dest = _ambiente()
+    afirmar(upd.instalar(_release(tmp, "v1", b"1"), dest, plataforma="nt")["ok"])
+    antes = upd._manifesto(dest)
+    copiar = upd._copiar
+    def falhar(orig, alvo):
+        if alvo == dest / "Qt6Core.dll" and ".azahar-stage-" in str(orig):
+            raise OSError("disco cheio")
+        copiar(orig, alvo)
+    with patch.object(upd, "_copiar", side_effect=falhar):
+        r = upd.instalar(_release(tmp, "v2", b"2"), dest, plataforma="nt")
+    afirmar(not r["ok"] and r["restaurado"], r)
+    afirmar(upd._manifesto(dest) == antes)
+
+
+def teste_interrupcao_e_recuperacao():
+    tmp, dest = _ambiente()
+    afirmar(upd.instalar(_release(tmp, "v1"), dest, plataforma="nt")["ok"])
+    antes = upd._manifesto(dest)
+    copiar = upd._copiar
+    def interromper(orig, alvo):
+        copiar(orig, alvo)
+        if alvo == dest / "azahar.exe" and ".azahar-stage-" in str(orig):
+            raise KeyboardInterrupt("simula encerramento abrupto")
     try:
-        res = core.azahar_instalar(_release(tmp, "v2", corpo=b"2"))
-    finally:
-        core._fundir = orig_fundir
-        core._emu_dir = velho
-    afirmar(res.get("ok") is False and "restaurada" in res.get("erro", ""), res)
-    afirmar((dest / "azahar.exe").read_bytes()[:8] == b"11111111", "exe trocou!")
-    afirmar((dest / "user" / "save.txt").is_file(), "user sumiu")
+        with patch.object(upd, "_copiar", side_effect=interromper):
+            upd.instalar(_release(tmp, "v2", b"2"), dest, plataforma="nt")
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("interrupção não ocorreu")
+    r = upd.recuperar(dest)
+    afirmar(r["ok"] and r["recuperado"], r)
+    afirmar(upd._manifesto(dest) == antes)
+    afirmar((dest / "user/load/mods/code.ips").read_bytes() == b"PATCH")
 
 
-def teste_pacote_sem_exe():
-    tmp = Path(tempfile.mkdtemp(prefix="suite-b4-"))
-    zp = tmp / "ruim.zip"
-    with zipfile.ZipFile(zp, "w") as z:
-        z.writestr("leia.txt", "nada")
-    raw = zp.read_bytes()
-    info = {"url": zp.as_uri(), "tag": "vx", "size": len(raw),
-            "sha256": hashlib.sha256(raw).hexdigest()}
-    dest, velho = _com_dest(tmp)
-    try:
-        res = core.azahar_instalar(info)
-    finally:
-        core._emu_dir = velho
-    afirmar(res.get("ok") is False and "não encontrado" in res.get("erro", ""), res)
-    afirmar(not (dest / "azahar.exe").exists(), "criou exe do nada")
+def teste_rollback_falho_nao_anuncia_sucesso():
+    tmp, dest = _ambiente()
+    afirmar(upd.instalar(_release(tmp, "v1"), dest, plataforma="nt")["ok"])
+    copiar = upd._copiar
+    def falhar(orig, alvo):
+        if alvo.parent == dest:
+            raise PermissionError("arquivo bloqueado")
+        copiar(orig, alvo)
+    with patch.object(upd, "_copiar", side_effect=falhar):
+        r = upd.instalar(_release(tmp, "v2"), dest, plataforma="nt")
+    afirmar(not r["ok"] and not r["restaurado"], r)
+    afirmar((Path(r["anterior"]) / "runtime/azahar.exe").is_file())
+    afirmar(upd.recuperar(dest)["ok"])
 
 
-def teste_sha_divergente():
-    tmp = Path(tempfile.mkdtemp(prefix="suite-b5-"))
+def teste_sha_e_dependencias():
+    tmp, dest = _ambiente()
     info = _release(tmp, "v1")
     info["sha256"] = "0" * 64
-    dest, velho = _com_dest(tmp)
-    try:
-        res = core.azahar_instalar(info)
-    finally:
-        core._emu_dir = velho
-    afirmar(res.get("ok") is False and "sha256" in res.get("erro", ""), res)
+    r = upd.instalar(info, dest, plataforma="nt")
+    afirmar(not r["ok"] and "sha256" in r["erro"], r)
+    arq = tmp / "incompleto.zip"
+    with zipfile.ZipFile(arq, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("azahar.exe", b"MZ" + b"0" * 10_000_001)
+    r = upd.instalar({"tag": "v2", "url": arq.as_uri()}, dest, plataforma="nt")
+    afirmar(not r["ok"] and "dependência" in r["erro"], r)
+    afirmar(not (dest / "azahar.exe").exists())
 
 
-def teste_fundir_conta_falhas():
-    tmp = Path(tempfile.mkdtemp(prefix="suite-b6-"))
-    orig = tmp / "o"
-    dst = tmp / "d"
-    orig.mkdir()
-    dst.mkdir()
-    (orig / "a.txt").write_text("a", encoding="utf-8")
-    (orig / "conflito").write_text("novo", encoding="utf-8")
-    (dst / "conflito").mkdir()  # dir no caminho: unlink+move falham
-    n = core._fundir(orig, dst)
-    afirmar(n >= 1, n)
-    afirmar((dst / "a.txt").read_text(encoding="utf-8") == "a", "ok não copiou")
+def teste_payload_nao_altera_user():
+    tmp, dest = _ambiente()
+    arq = tmp / "ruim.zip"
+    with zipfile.ZipFile(arq, "w") as z:
+        z.writestr("user/save.txt", "não pode")
+    r = upd.instalar({"tag": "v2", "url": arq.as_uri()}, dest, plataforma="nt")
+    afirmar(not r["ok"] and (dest / "user/save.txt").read_text() == "save intacto")
+
+
+def teste_appimage_mesma_transacao():
+    tmp, dest = _ambiente()
+    r = upd.instalar(_release(tmp, "v1", plataforma="posix"), dest, plataforma="posix")
+    afirmar(r["ok"] and (dest / "azahar.AppImage").is_file(), r)
+    antes = upd._manifesto(dest)
+    copiar = upd._copiar
+    def falhar(orig, alvo):
+        if alvo == dest / upd.VERSAO and ".azahar-stage-" in str(orig):
+            raise OSError("falha ao escrever versão")
+        copiar(orig, alvo)
+    with patch.object(upd, "_copiar", side_effect=falhar):
+        r = upd.instalar(_release(tmp, "v2", b"2", "posix"), dest, plataforma="posix")
+    afirmar(not r["ok"] and r["restaurado"] and upd._manifesto(dest) == antes, r)

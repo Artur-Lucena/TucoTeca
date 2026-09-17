@@ -66,7 +66,7 @@ def teste_quit_aplica_sessoes():
             # a vigia encerra DURANTE o getch: sem o fix do quit, perdia
             if not FakeScr.injetado:
                 FakeScr.injetado = True
-                t.sessoes_pendentes = [(gid, 1.5, True)]
+                t.sessoes_pendentes.put((gid, 1.5, True))
             return ord("q")
 
     class FakeCurses:
@@ -99,24 +99,15 @@ def teste_quit_aplica_sessoes():
 
 
 def teste_log_erro_anexa():
+    from unittest.mock import patch
+    from bib_nucleo import base
     tmp = Path(tempfile.mkdtemp(prefix="suite-al-"))
-    velho = os.environ.get("BIBLIOTECA_HOME")
-    os.environ["BIBLIOTECA_HOME"] = str(tmp)
-    try:
-        import importlib
-        importlib.reload(core)
+    with patch.object(base, "HOME_DIR", tmp):
         core.log_erro("ctx-teste", "detalhe-x")
         core.log_erro("ctx-teste", "detalhe-y")
         txt = (tmp / "erros.log").read_text(encoding="utf-8")
         afirmar("ctx-teste" in txt and "detalhe-x" in txt and "detalhe-y" in txt, txt)
         afirmar(len(txt.strip().splitlines()) == 2, txt)
-    finally:
-        if velho is None:
-            del os.environ["BIBLIOTECA_HOME"]
-        else:
-            os.environ["BIBLIOTECA_HOME"] = velho
-        import importlib
-        importlib.reload(core)
 
 
 def teste_sem_lambda_e_morta():

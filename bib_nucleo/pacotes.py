@@ -1,0 +1,300 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Backup versionado e pacote portátil (.zip) com restore."""
+from __future__ import annotations
+
+import datetime
+import json
+import sqlite3
+import zipfile
+from pathlib import Path
+
+from bib_nucleo.banco import (CAPA_EXTS, get_db, row_to_dict,
+                               salvar_capa_bytes)
+from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, DEFAULT_DB, agora_iso,
+                               garantir_dirs)
+from bib_nucleo.emuladores import azahar_versao_local, provedores, presets_dir
+from bib_nucleo.scans import importar_lista
+
+
+
+# --------------------------------------------------------------------------
+# Pacote portátil (.zip): banco + capas + presets + saves 3DS
+# --------------------------------------------------------------------------
+
+PACOTE_ESQUEMA = 2  # v2: manifesto {arquivo: uuid} (v1 title: aceito em leitura)
+
+PACOTE_INFO = "pacote-info.json"
+
+PACOTE_JSON = "biblioteca.json"
+
+PACOTE_MANIFESTO = "capas-manifesto.json"
+
+
+
+def _dados_exportacao(con: sqlite3.Connection) -> dict:
+    rows = con.execute("SELECT * FROM jogos ORDER BY id").fetchall()
+    return {"exportado_em": agora_iso(), "jogos": [row_to_dict(r) for r in rows]}
+
+
+
+def _saves_para_pacote() -> list[tuple[str, Path]]:
+    """[(membro_no_zip, caminho)] dos saves de todos os providers instalados.
+
+    Nomes estáveis por provider: 'azahar-user/sdmc/...' (compat com pacotes
+    já exportados).
+    """
+    pares: list[tuple[str, Path]] = []
+    for prov in provedores().values():
+        try:
+            ud = prov["user_dir"]() or ""
+        except Exception:
+            continue
+        if not ud:
+            continue
+        for sub in prov["pacote_subs"]:
+            base = Path(ud) / sub
+            if not base.is_dir():
+                continue
+            try:
+                arquivos = sorted(p for p in base.rglob("*") if p.is_file())
+            except OSError:
+                continue
+            for arq in arquivos:
+                try:
+                    rel = arq.relative_to(base).as_posix()
+                except ValueError:
+                    continue
+                pares.append((f"{prov['chave']}-user/{sub}/{rel}", arq))
+    return pares
+
+
+
+def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
+    """Empacota tudo para levar a outra máquina (ou guardar)."""
+    destino = Path(destino)
+    if destino.suffix.lower() != ".zip":
+        destino = destino.with_suffix(".zip")
+    if str(destino.parent):
+        destino.parent.mkdir(parents=True, exist_ok=True)
+    garantir_dirs()
+    con = get_db(Path(db_path) if db_path else DEFAULT_DB)
+    try:
+        dados = _dados_exportacao(con)
+    finally:
+        con.close()
+    pares_saves = _saves_para_pacote() if incluir_saves else []
+    com_saves = bool(pares_saves)
+    info = {"app": "biblioteca-jogos", "esquema": PACOTE_ESQUEMA,
+            "exportado_em": dados["exportado_em"], "jogos": len(dados["jogos"]),
+            "inclui_saves": com_saves, "azahar_versao": azahar_versao_local(),
+            "provedores": sorted(provedores())}
+    manifesto = {}
+    for j in dados["jogos"]:
+        if j.get("capa") and j.get("uuid"):
+            manifesto[Path(j["capa"]).name] = j["uuid"]
+    n = 0
+    try:
+        with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr(PACOTE_INFO, json.dumps(info, ensure_ascii=False, indent=2))
+            z.writestr(PACOTE_JSON, json.dumps(dados, ensure_ascii=False, indent=2))
+            z.writestr(PACOTE_MANIFESTO,
+                       json.dumps(manifesto, ensure_ascii=False, indent=2))
+            n += 3
+            for arq in sorted(CAPAS_DIR.glob("*")):
+                if arq.is_file() and arq.suffix.lower() in CAPA_EXTS:
+                    z.write(arq, f"capas/{arq.name}")
+                    n += 1
+            for arq in sorted(presets_dir().glob("*.ini")):
+                if arq.is_file():
+                    z.write(arq, f"presets/{arq.name}")
+                    n += 1
+            if com_saves:
+                for membro, arq in pares_saves:
+                    z.write(arq, membro)
+                    n += 1
+    except OSError as e:
+        return {"ok": False, "erro": f"falha ao gravar pacote: {e}"}
+    return {"ok": True, "destino": str(destino), "arquivos": n,
+            "bytes": destino.stat().st_size, "jogos": len(dados["jogos"]),
+            "inclui_saves": com_saves}
+
+
+
+def _membro_pacote_ok(nome: str) -> str | None:
+    """Categoria do membro ('json','info','manifesto','capa','preset','save')
+    ou None se proibido (traversal, absoluto, fora da allowlist)."""
+    if not nome:
+        return None
+    n = nome.replace("\\", "/")
+    if (".." in n.split("/") or n.startswith("/") or ":" in n
+            or "\\" in nome or any(p in ("", ".") for p in n.split("/"))):
+        return None
+    if n == PACOTE_JSON:
+        return "json"
+    if n == PACOTE_INFO:
+        return "info"
+    if n == PACOTE_MANIFESTO:
+        return "manifesto"
+    if n.startswith("capas/") and "/" not in n[6:] \
+            and Path(n).suffix.lower() in CAPA_EXTS:
+        return "capa"
+    if n.startswith("presets/") and "/" not in n[8:] and n.lower().endswith(".ini"):
+        return "preset"
+    partes = n.split("/")
+    if len(partes) >= 3 and partes[0].endswith("-user") and not n.endswith("/"):
+        prov = provedores().get(partes[0][:-5])
+        if prov is not None and partes[1] in prov["pacote_subs"]:
+            return "save"
+    return None
+
+
+
+def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict:
+    """Restaura um pacote: valida TODOS os nomes antes de aplicar qualquer
+    coisa (nada parcial em pacote hostil). Capas voltam exatas via manifesto
+    {arquivo: uuid} (pacotes v1 com {arquivo: titulo} ainda entram)."""
+    origem = Path(origem)
+    try:
+        zf = zipfile.ZipFile(origem)
+    except (OSError, zipfile.BadZipFile) as e:
+        return {"ok": False, "erro": f"pacote inválido: {e}"}
+    with zf:
+        nomes = [i.filename for i in zf.infolist() if not i.is_dir()]
+        if len(nomes) != len(set(nomes)):
+            return {"ok": False, "erro": "pacote contém nomes duplicados"}
+        cats: dict[str, str] = {}
+        for nm in nomes:
+            cat = _membro_pacote_ok(nm)
+            if cat is None:
+                return {"ok": False,
+                        "erro": f"membro proibido no pacote: {nm!r} (nada foi aplicado)"}
+            cats[nm] = cat
+        if PACOTE_JSON not in cats:
+            return {"ok": False, "erro": "pacote sem biblioteca.json"}
+        try:
+            esquema = 1
+            if PACOTE_INFO in cats:
+                info = json.loads(zf.read(PACOTE_INFO).decode("utf-8"))
+                esquema = info.get("esquema", 1)
+            if esquema not in (1, 2):
+                return {"ok": False, "erro": "versão do pacote não suportada"}
+            if zf.testzip() is not None:
+                return {"ok": False, "erro": "pacote corrompido (CRC)"}
+            dados = json.loads(zf.read(PACOTE_JSON).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError, AttributeError, zipfile.BadZipFile) as e:
+            return {"ok": False, "erro": f"biblioteca.json inválida: {e}"}
+        lista = dados if isinstance(dados, list) else dados.get("jogos") if isinstance(dados, dict) else None
+        if not isinstance(lista, list):
+            return {"ok": False, "erro": "biblioteca.json deve ser lista ou {jogos:[...]}"}
+        try:
+            manifesto = json.loads(zf.read(PACOTE_MANIFESTO).decode("utf-8")) \
+                if PACOTE_MANIFESTO in cats else {}
+        except (ValueError, UnicodeDecodeError):
+            manifesto = {}
+        if not isinstance(manifesto, dict):
+            manifesto = {}
+        db = Path(db_path) if db_path else DEFAULT_DB
+        backup = fazer_backup(db) if db.is_file() else None
+        con = get_db(db)
+        try:
+            res = importar_lista(con, lista)
+            avisos = []
+            capas = 0
+            for arq, ident in manifesto.items():
+                cat = cats.get(f"capas/{Path(arq).name}")
+                if cat != "capa" or not isinstance(ident, str) or not ident.strip():
+                    continue
+                try:
+                    raw = zf.read(f"capas/{Path(arq).name}")
+                except KeyError:
+                    continue
+                if esquema == 2:
+                    alvo = con.execute("SELECT id FROM jogos WHERE uuid=?", (ident.strip(),)).fetchone()
+                else:
+                    candidatos = con.execute("SELECT id FROM jogos WHERE titulo=?", (ident.strip(),)).fetchall()
+                    alvo = candidatos[0] if len(candidatos) == 1 else None
+                if alvo is None:
+                    avisos.append(f"Capa {arq}: identidade ausente ou ambígua; não aplicada")
+                    continue
+                r = salvar_capa_bytes(con, alvo["id"], Path(arq).name, raw)
+                if r.get("ok"):
+                    capas += 1
+                else:
+                    res["erros"].append(f"Capa {arq}: {r['erro']}")
+            presets = 0
+            garantir_dirs()
+            for nm, cat in cats.items():
+                if cat != "preset":
+                    continue
+                try:
+                    (presets_dir() / Path(nm).name).write_bytes(zf.read(nm))
+                    presets += 1
+                except OSError as e:
+                    res["erros"].append(f"Preset {nm}: {e}")
+            saves, saves_ignorados = 0, 0
+            tem_saves = any(c == "save" for c in cats.values())
+            if tem_saves and restaurar_saves:
+                for nm, cat in cats.items():
+                    if cat != "save":
+                        continue
+                    partes = nm.split("/")
+                    prov = provedores().get(partes[0][:-5])
+                    ud = (prov["user_dir"]() or "") if prov is not None else ""
+                    if not ud:
+                        saves_ignorados += 1
+                        continue
+                    try:
+                        dest = Path(ud) / partes[1] / Path(*partes[2:])
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        dest.write_bytes(zf.read(nm))
+                        saves += 1
+                    except (OSError, ValueError):
+                        saves_ignorados += 1
+        finally:
+            con.close()
+    return {"ok": True, "novos": res["novos"], "atualizados": res["atualizados"],
+            "ignorados": res["ignorados"], "erros": res["erros"],
+            "avisos": avisos, "backup": backup,
+            "total_no_banco": res["total_no_banco"],
+            "capas": capas, "presets": presets, "saves": saves,
+            "saves_ignorados": saves_ignorados}
+
+
+
+def fazer_backup(db_path: Path, manter: int = 10) -> dict:
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    dest_db = BACKUP_DIR / f"biblioteca-{ts}.db"
+    dest_json = BACKUP_DIR / f"biblioteca-{ts}.json"
+    con = get_db(db_path)
+    try:
+        dados = _dados_exportacao(con)
+        dst = sqlite3.connect(str(dest_db))
+        try:
+            con.backup(dst)
+        finally:
+            dst.close()
+    finally:
+        con.close()
+    dest_json.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
+    # poda: mantém os `manter` mais recentes de cada tipo
+    for padrao in ("biblioteca-*.db", "biblioteca-*.json"):
+        arqs = sorted(BACKUP_DIR.glob(padrao), key=lambda p: p.name, reverse=True)
+        for velho in arqs[manter:]:
+            try:
+                velho.unlink()
+            except OSError:
+                pass
+    return {"db": str(dest_db), "json": str(dest_json),
+            "jogos": len(dados["jogos"]), "mantidos": manter}
+
+
+
+def listar_backups() -> list[dict]:
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    arqs = sorted(BACKUP_DIR.glob("biblioteca-*.json"),
+                  key=lambda p: p.name, reverse=True)
+    return [{"arquivo": str(p), "nome": p.name, "bytes": p.stat().st_size} for p in arqs]
+
+__all__ = ['PACOTE_ESQUEMA', 'PACOTE_INFO', 'PACOTE_JSON', 'PACOTE_MANIFESTO', '_dados_exportacao', '_saves_para_pacote', 'exportar_pacote', '_membro_pacote_ok', 'importar_pacote', 'fazer_backup', 'listar_backups']

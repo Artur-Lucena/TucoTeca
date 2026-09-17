@@ -3,7 +3,7 @@
 """
 Monta o HUB portátil Windows: Python embutido + tkinter + app, tudo num .zip.
 
-    python ferramentas/montar_portatil.py [--só-verificar]
+    python ferramentas/montar_portatil.py [--sem-azahar]
 
 Modelo: o .zip LEVA o Azahar instalado junto, 100% das vezes
 (emuladores/Azahar/, com licença GPL (COPYING.txt), nota de fonte
@@ -59,11 +59,21 @@ set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
 if errorlevel 1 pause
 """
 
+BAT_ATALHO = """@echo off
+setlocal
+set HUB=%~dp0
+set HUB=%HUB:~0,-1%
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$w = New-Object -ComObject WScript.Shell; $a = $w.CreateShortcut($env:USERPROFILE + '\\Desktop\\Biblioteca Hub.lnk'); $a.TargetPath = '%HUB%\\BibliotecaHub.bat'; $a.WorkingDirectory = '%HUB%'; $a.WindowStyle = 7; $a.Description = 'Biblioteca Hub (portatil)'; $a.Save()"
+echo Atalho criado na Area de Trabalho.
+pause
+"""
+
 LEIAME_PORTATIL = """BIBLIOTECA HUB (portátil Windows) — sem instalar nada.
 
 COMO USAR
 1. Extraia esta pasta onde quiser (inclusive pendrive).
-2. Duplo-clique em BibliotecaHub.bat.
+2. Duplo-clique em BibliotecaHub.bat (sem janela preta) ou rode
+   Criar-Atalho.bat uma vez para ganhar um atalho na Área de Trabalho.
 3. O Azahar já vem junto (emuladores/Azahar/, com seus mods e saves).
    Pacote magro (--sem-azahar)? Sidebar BANCO > "Atualizar Azahar".
 
@@ -71,7 +81,8 @@ ONDE FICA O QUÊ
 - dados/ ........... sua casa: banco, backups, capas, presets
 - app/ ............. código do launcher (pode atualizar por cima)
 - python/ .......... Python embutido (não usa o do sistema)
-- emuladores/ ...... Azahar incluído, se o pacote veio --com-azahar
+- emuladores/ ...... Azahar incluído (pacote magro não tem; use ⬇)
+- Criar-Atalho.bat .. atalho na Área de Trabalho (duplo-clique, sem console)
 - Debug-Console.bat  abre com janela de texto (para ver erros)
 
 O botão "Atualizar Azahar" atualiza o emulador DENTRO do pacote.
@@ -310,15 +321,28 @@ def montar(sem_azahar: bool = False) -> Path:
         if not src.is_file():
             raise SystemExit(f"arquivo do app ausente no repo: {nome}")
         shutil.copy2(src, app_dir / nome)
+    nucleo_src = REPO / "bib_nucleo"
+    if not (nucleo_src / "__init__.py").is_file():
+        raise SystemExit("pacote bib_nucleo ausente no repo.")
+    shutil.copytree(nucleo_src, app_dir / "bib_nucleo",
+                    ignore=shutil.ignore_patterns("__pycache__"),
+                    dirs_exist_ok=True)
     (BUILD / "BibliotecaHub.bat").write_text(BAT_GUI.format(serie=serie), encoding="utf-8")
     (BUILD / "Debug-Console.bat").write_text(BAT_DEBUG.format(serie=serie), encoding="utf-8")
+    (BUILD / "Criar-Atalho.bat").write_text(BAT_ATALHO, encoding="utf-8")
     (BUILD / "README-PORTATIL.txt").write_text(LEIAME_PORTATIL, encoding="utf-8")
     for sub in ("dados", "dados/backups", "dados/capas", "dados/presets"):
         (BUILD / sub).mkdir(parents=True, exist_ok=True)
+    azahar_ver = ""
     if not sem_azahar:
-        incluir_azahar(BUILD)
+        azahar_ver = incluir_azahar(BUILD)
     else:
         print("[aviso] pacote magro, sem emulador (--sem-azahar)")
+    (BUILD / "VERSAO.txt").write_text(
+        f"Biblioteca Hub — build {datetime.date.today():%Y-%m-%d}\n"
+        f"Python embutido: {versao}\n"
+        f"Azahar: {azahar_ver or 'ausente (--sem-azahar)'}\n",
+        encoding="utf-8")
 
     # prova real: o python embutido importa tkinter e monta a UI oculta
     py = py_dir / "python.exe"
@@ -340,6 +364,9 @@ def montar(sem_azahar: bool = False) -> Path:
     if r.returncode != 0 or "[ok] selftest" not in r.stdout:
         raise SystemExit(f"selftest falhou no portátil:\n{r.stdout[-1500:]}\n{r.stderr[-1500:]}")
     print(f"[ok] {r.stdout.strip()} (casa de prova: {prova_home.name}/)")
+    if not (app_dir / "bib_nucleo" / "__init__.py").is_file():
+        raise SystemExit("app/ sem bib_nucleo (shim bib_core.py não resolve).")
+    print("[ok] app/ com bib_nucleo + shim bib_core.py")
     if not sem_azahar:
         az = BUILD / "emuladores" / "Azahar" / (
             "azahar.exe" if os.name == "nt" else "azahar.AppImage")
