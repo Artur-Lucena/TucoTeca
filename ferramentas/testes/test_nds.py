@@ -77,3 +77,31 @@ def teste_icone_nds_cores():
 def teste_rom_invalida():
     afirmar(scans.ler_metadados_nds("/nao/existe.nds") == {})
     afirmar(scans.icone_nds_para_png("/nao/existe.nds") is None)
+
+
+def teste_titulo_multilinha_limpo():
+    tmp = Path(tempfile.mkdtemp(prefix="suite-ndsm-"))
+    head = bytearray(0x200)
+    head[:12] = b"MULTI"
+    head[0x0C:0x10] = b"AMCE"
+    head[0x68:0x6C] = (0x4000).to_bytes(4, "little")
+    banner = bytearray(0x1000)
+    nome = "Pokémon\nBlack Version\nNintendo".encode("utf-16-le")
+    banner[0x340:0x340 + len(nome)] = nome
+    p = tmp / "m.nds"
+    p.write_bytes(bytes(head).ljust(0x4000, b"\x00") + bytes(banner))
+    m = scans.ler_metadados_nds(str(p))
+    afirmar(m.get("titulo") == "Pokémon Black Version", m)
+
+
+def teste_tags_nds_limpas():
+    from bib_nucleo.scans import _titulo_de_rom
+    afirmar(_titulo_de_rom(Path("Pokemon - Black Version (USA, Europe) (NDSi Enhanced).nds"))
+            == "Pokemon Black Version")
+    afirmar(_titulo_de_rom(Path("Pokemon - Pearl Version (USA) (Rev 5).nds"))
+            == "Pokemon Pearl Version")
+
+
+def teste_roots_nds_reais():
+    roots = scans.default_roms_nds_roots()
+    afirmar(any("Roms NDs" in r for r in roots), roots)

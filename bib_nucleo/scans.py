@@ -713,7 +713,8 @@ def default_roms_roots() -> list[str]:
 
 ROM_TAGS_LIXO_RE = re.compile(
     r"\s*\((USA|EUR|JPN|JAP|KOR|CHN|TWN|AUS|BRA|World|"
-    r"En(?:,[A-Za-z]{2})+|Rev\s*\d+|v\d+[\.\d]*|Decrypted|Trimmed)\)", re.IGNORECASE)
+    r"En(?:,[A-Za-z]{2})+|Rev\s*\d+|v\d+[\.\d]*|Decrypted|Trimmed|NDSi Enhanced"
+    r"|(?:USA|EUR|JPN)(?:,\s*[A-Za-z]+)+)\)", re.IGNORECASE)
 
 
 
@@ -805,9 +806,10 @@ def default_roms_nds_roots() -> list[str]:
         return [r for r in re.split(r"[;\n]+", env) if r.strip()]
     if os.name == "nt":
         base = WIN_ROOT.rstrip("\\")
-        return [f"{base}\\Games\\Roms", f"{base}\\Games\\Roms\\NDS"]
+        return [f"{base}\\Games\\Roms", f"{base}\\Games\\Roms\\NDS",
+                f"{base}\\Games\\Roms NDs"]
     base = LINUX_ROOT.rstrip("/")
-    return [f"{base}/Games/Roms", f"{base}/Games/Roms/NDS"]
+    return [f"{base}/Games/Roms", f"{base}/Games/Roms/NDS", f"{base}/Games/Roms NDs"]
 
 
 def preview_roms(roots: list[str] | None = None,
@@ -1195,18 +1197,24 @@ def ler_metadados_nds(caminho: str) -> dict:
             for i in range(6):
                 raw = banner[0x240 + i * 0x100:0x240 + i * 0x100 + 0x100]
                 try:
-                    nomes.append(raw.decode("utf-16-le").split("\x00")[0].strip())
+                    txt = raw.decode("utf-16-le").split("\x00")[0]
+                    txt = re.sub(r"\s+", " ", txt.replace("\u2028", " ")).strip()
+                    nomes.append(txt)
                 except Exception:
                     nomes.append("")
+            def _limpa_nome_nds(s):
+                s = re.sub(r"\s+Nintendo$", "", s).strip()  # última linha é a publisher
+                return s
+
             for i in (1, 0):
                 if i < len(nomes) and nomes[i]:
-                    meta["titulo"] = nomes[i]
+                    meta["titulo"] = _limpa_nome_nds(nomes[i])
                     meta["tem_metadados"] = True
                     break
             else:
                 for t in nomes:
                     if t:
-                        meta["titulo"] = t
+                        meta["titulo"] = _limpa_nome_nds(t)
                         meta["tem_metadados"] = True
                         break
         if titulo and "titulo" not in meta:

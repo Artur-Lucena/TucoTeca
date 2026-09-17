@@ -106,5 +106,39 @@ def teste_preview_pasta_inclui_nds():
     afirmar("emu_nds" in info, info)
 
 
+def teste_tui_mostra_nds():
+    import app_tui as tui
+
+    class FakeScr:
+        def getmaxyx(self):
+            return (24, 80)
+
+        def addnstr(self, *a):
+            pass
+
+        def erase(self):
+            pass
+
+        def refresh(self):
+            pass
+
+        def getch(self):
+            return ord("q")
+
+    class FakeCurses:
+        COLOR_CYAN = COLOR_BLACK = COLOR_GREEN = COLOR_RED = 1
+
+        def curs_set(self, *a):
+            pass
+
+        def has_colors(self):
+            return False
+
+    tui.curses = FakeCurses()
+    tmp = Path(tempfile.mkdtemp(prefix="suite-dt-"))
+    t = tui.Tui(FakeScr(), tmp / "u.db")
+    t.desenhar()  # não pode levantar (status NDS incluso)
+
+
 def achados_str(itens):
     return [(i.get("titulo"), i.get("origem")) for i in itens]
