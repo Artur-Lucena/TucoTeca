@@ -43,7 +43,7 @@ Opções comuns: `--db outro.db` (padrão: `biblioteca.db` na casa), `--selftest
 - O scan **lê título, código e região de dentro da ROM** e **cola o ícone da ROM como capa** automaticamente.
 - Boot direto em tela cheia (`-f`; desligue com `BIBLIOTECA_AZAHAR_FLAGS=` vazio). Status do Azahar (instalado/user/chaves) na barra da GUI e do TUI.
 - **Backup de saves 3DS** (`sdmc/` + `states/`) em botão próprio, separado do backup do banco.
-- 🎛️ **Preset por jogo**: cada ROM pode ter um preset (foto da config atual do Azahar em `presets/*.ini`); o launcher mescla no `qt-config.ini` antes de abrir e avisa se falhar (nunca bloqueia o play). Backup pré-preset em `qt-config.ini.bak`.
+- 🎛️ **Preset por jogo**: cada ROM pode ter um preset (foto da config atual em `presets/<emulador>/*.ini`); o launcher mescla no `qt-config.ini` antes de abrir e avisa se falhar (nunca bloqueia o play). Backup pré-preset em `qt-config.ini.bak`.
 - No Linux, prefira o AppImage; `sdmc/` (saves) pode ser linkado pra partilha, `config/` fica local.
 - Chaves AES + arquivos de sistema: dumpe do seu próprio 3DS (ver wiki do Azahar).
 - 🔁 **Tradução determinística**: `D:\…` ↔ `/run/media/tuco/Games/…`. Overrides: `BIBLIOTECA_WIN_ROOT`, `BIBLIOTECA_LINUX_ROOT`, `BIBLIOTECA_HOME`.
@@ -60,7 +60,7 @@ Onde o Hydra guarda os dados:
 
 ## HUB de emulação (provedores)
 
-O núcleo tem um **registro de emuladores** (`provedores()` em `bib_nucleo/emuladores.py`): cada provider diz que origens atende, onde está o exe, onde ficam config/saves, como montar o launch e como aplicar preset. Lançamento, horas automáticas, pacote e backup de saves falam com o registro — **o Azahar é só o provider nº 1**. O próximo sistema (NDS, GBA…) entra como provider novo sem tocar em lançamento ou frontends. Na GUI, provedores ficam numa seção própria (recurso de fundo, com nº de jogos e ✓ de instalado) — clicar filtra os jogos que ele roda; o emulador não entra na lista de jogos.
+O núcleo tem um **registro de emuladores** (`provedores()` em `codigo/bib_nucleo/emuladores.py`): cada provider diz que origens atende, onde está o exe, onde ficam config/saves, como montar o launch e como aplicar preset. Lançamento, horas automáticas, pacote e backup de saves falam com o registro — **o Azahar é só o provider nº 1**. O próximo sistema (NDS, GBA…) entra como provider novo sem tocar em lançamento ou frontends. Na GUI, provedores ficam numa seção própria (recurso de fundo, com nº de jogos e ✓ de instalado) — clicar filtra os jogos que ele roda; o emulador não entra na lista de jogos.
 
 ## Emulação NDS (DeSmuME)
 

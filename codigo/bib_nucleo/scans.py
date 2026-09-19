@@ -1313,6 +1313,7 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
     agora = agora_iso()
     novos = atualizados = ignorados = 0
     erros: list[str] = []
+    avisos: list[str] = []
 
     def _ignorar(motivo: str):
         nonlocal ignorados
@@ -1403,15 +1404,19 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                     if png:
                         salvar_capa_bytes(con, cur.lastrowid,
                                           slugify(titulo) + ".png", png)
-                except Exception:
-                    pass
+                    elif len(avisos) < 20:
+                        avisos.append(f"'{titulo}': sem ícone extraível na ROM")
+                except Exception as e:
+                    if len(avisos) < 20:
+                        avisos.append(f"'{titulo}': capa falhou ({type(e).__name__})")
         except Exception as e:
             _ignorar(f"'{titulo}': {type(e).__name__}: {e}")
             continue
     con.commit()
     depois = con.execute("SELECT COUNT(*) AS n FROM jogos").fetchone()["n"]
     return {"novos": novos, "atualizados": atualizados, "ignorados": ignorados,
-            "erros": erros, "total_no_banco": depois, "antes": antes}
+            "erros": erros, "avisos": avisos,
+            "total_no_banco": depois, "antes": antes}
 
 
 

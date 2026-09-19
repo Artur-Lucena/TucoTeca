@@ -78,7 +78,6 @@ def teste_rom_invalida():
     afirmar(scans.ler_metadados_nds("/nao/existe.nds") == {})
     afirmar(scans.icone_nds_para_png("/nao/existe.nds") is None)
 
-
 def teste_titulo_multilinha_limpo():
     tmp = Path(tempfile.mkdtemp(prefix="suite-ndsm-"))
     head = bytearray(0x200)
@@ -105,3 +104,19 @@ def teste_tags_nds_limpas():
 def teste_roots_nds_reais():
     roots = scans.default_roms_nds_roots()
     afirmar(any("Roms NDs" in r for r in roots), roots)
+
+
+def teste_capa_falha_vira_aviso():
+    import bib_core as core
+    tmp = Path(tempfile.mkdtemp(prefix="suite-nc-"))
+    (tmp / "vazia.nds").write_bytes(b"0")
+    con = core.get_db(tmp / "t.db")
+    try:
+        res = core.importar_lista(con, [{"titulo": "Sem Icone", "executable_path": "",
+                                         "status": "backlog", "origem": "rom-nds",
+                                         "rom_path": str(tmp / "vazia.nds")}])
+        afirmar(res["novos"] == 1, res)
+        afirmar(any("Sem Icone" in a for a in res["avisos"]), res)
+        afirmar("Sem Icone" in core.resumo_importacao(res), res)
+    finally:
+        con.close()

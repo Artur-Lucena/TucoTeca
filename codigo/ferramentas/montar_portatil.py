@@ -3,7 +3,7 @@
 """
 Monta o HUB portátil Windows: Python embutido + tkinter + app, tudo num .zip.
 
-    python ferramentas/montar_portatil.py [--sem-azahar]
+    python codigo/ferramentas/montar_portatil.py [--sem-azahar]
 
 Modelo: o .zip LEVA os emuladores instalados junto, 100% das vezes
 (emuladores/Azahar/, com licença GPL (COPYING.txt), nota de fonte
