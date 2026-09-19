@@ -6,8 +6,8 @@ Visual estilo Hydra: sidebar, grade de cards com capas e painel de detalhes.
 Mesmo banco e mesmas regras do terminal Linux; nada de navegador.
 
 Uso:
-    python frontends/app_win.py [--db caminho\\biblioteca.db]
-    python frontends/app_win.py --selftest   # monta a UI oculta e sai (verificação)
+    python codigo/frontends/app_win.py [--db caminho\\biblioteca.db]
+    python codigo/frontends/app_win.py --selftest   # monta a UI oculta e sai (verificação)
 Ou duplo-clique em BibliotecaHub.bat na raiz do projeto.
 """
 from __future__ import annotations

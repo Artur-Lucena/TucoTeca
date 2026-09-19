@@ -34,12 +34,13 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 CACHE = Path(__file__).resolve().parent / ".cache"
 BUILD = Path(__file__).resolve().parent / ".build" / "hub"
 DIST = REPO / "dist"
-APP_ARQS = ("bib_core.py", "README.md")
-FRONT_ARQS = ("frontends/app_win.py", "frontends/app_tui.py")
+APP_ARQS = (("bib_core.py", "bib_core.py"), ("README.md", "README.md"),
+            ("frontends/app_win.py", "app_win.py"),
+            ("frontends/app_tui.py", "app_tui.py"))
 
 BAT_GUI = """@echo off
 setlocal
@@ -375,17 +376,12 @@ def montar(sem_azahar: bool = False) -> Path:
         f"python{nodot}.zip\n.\nLib\n../app\n", encoding="utf-8")
 
     app_dir.mkdir(parents=True)
-    for nome in APP_ARQS:
-        src = REPO / nome
+    for origem, destino in APP_ARQS:
+        src = REPO / "codigo" / origem
         if not src.is_file():
-            raise SystemExit(f"arquivo do app ausente no repo: {nome}")
-        shutil.copy2(src, app_dir / nome)
-    for nome in FRONT_ARQS:
-        src = REPO / nome
-        if not src.is_file():
-            raise SystemExit(f"arquivo do app ausente no repo: {nome}")
-        shutil.copy2(src, app_dir / Path(nome).name)
-    nucleo_src = REPO / "bib_nucleo"
+            raise SystemExit(f"arquivo do app ausente no repo: {origem}")
+        shutil.copy2(src, app_dir / destino)
+    nucleo_src = REPO / "codigo" / "bib_nucleo"
     if not (nucleo_src / "__init__.py").is_file():
         raise SystemExit("pacote bib_nucleo ausente no repo.")
     shutil.copytree(nucleo_src, app_dir / "bib_nucleo",

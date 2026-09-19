@@ -7,4 +7,4 @@ set PYW=
 for /f "delims=" %%P in ('where pythonw 2^>nul') do if not defined PYW set PYW=%%P
 if not defined PYW for /f "delims=" %%P in ('where python 2^>nul') do if not defined PYW if exist "%%~dpPpythonw.exe" set PYW=%%~dpPpythonw.exe
 if not defined PYW set PYW=python
-start "Biblioteca Hub" "%PYW%" "%~dp0frontends\app_win.py"
+start "Biblioteca Hub" "%PYW%" "%~dp0codigo\frontends\app_win.py"

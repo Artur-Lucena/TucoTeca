@@ -9,7 +9,7 @@ import re
 import unicodedata
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 # --------------------------------------------------------------------------
@@ -42,18 +42,21 @@ def resolve_home() -> Path:
 
 HOME_DIR = resolve_home()
 
-DEFAULT_DB = HOME_DIR / "biblioteca.db"
+DADOS_DIR = HOME_DIR / "dados"
 
-BACKUP_DIR = HOME_DIR / "backups"
+DEFAULT_DB = DADOS_DIR / "biblioteca.db"
 
-CAPAS_DIR = HOME_DIR / "capas"
+BACKUP_DIR = DADOS_DIR / "backups"
 
-PRESETS_DIR = HOME_DIR / "presets"
+CAPAS_DIR = DADOS_DIR / "capas"
+
+PRESETS_DIR = DADOS_DIR / "presets"
 
 
 
 def garantir_dirs() -> None:
     HOME_DIR.mkdir(parents=True, exist_ok=True)
+    DADOS_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     CAPAS_DIR.mkdir(parents=True, exist_ok=True)
     PRESETS_DIR.mkdir(parents=True, exist_ok=True)
@@ -126,10 +129,10 @@ def agora_iso() -> str:
 
 
 def log_erro(contexto: str, detalhe: str) -> None:
-    """Anexa uma linha em erros.log (casa). Nunca levanta; diagnóstico local."""
+    """Anexa uma linha em dados/erros.log. Nunca levanta; diagnóstico local."""
     try:
-        HOME_DIR.mkdir(parents=True, exist_ok=True)
-        with open(HOME_DIR / "erros.log", "a", encoding="utf-8") as fh:
+        DADOS_DIR.mkdir(parents=True, exist_ok=True)
+        with open(DADOS_DIR / "erros.log", "a", encoding="utf-8") as fh:
             fh.write(f"{agora_iso()} [{contexto}] {detalhe}\n")
     except OSError:
         pass
@@ -161,5 +164,5 @@ def slugify(s: str) -> str:
 # Extensões de ROM por provider (aqui p/ scans e emuladores usarem sem ciclo).
 ROM_EXTS_3DS = {".cci", ".cxi", ".3ds", ".3dsx", ".elf", ".app", ".axf"}
 
-__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'garantir_dirs', '_com_barra', 'win_para_linux', 'linux_para_win', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', '_txt', '_desaspas', 'slugify',
+__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'garantir_dirs', '_com_barra', 'win_para_linux', 'linux_para_win', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', '_txt', '_desaspas', 'slugify',
  'ROM_EXTS_3DS']

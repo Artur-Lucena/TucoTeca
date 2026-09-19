@@ -1,10 +1,7 @@
 # Banco e dados do usuário — nunca versionar (ficam na máquina)
-biblioteca.db
-backups/
-capas/
-erros.log
+dados/
 # Histórico local de arquivo único (arquivo, não entrega)
-historico/
+codigo/historico/
 # Caches e temporários
 __pycache__/
 *.py[cod]
@@ -14,5 +11,5 @@ Thumbs.db
 .vscode/
 # Saída do portátil (ferramentas/montar_portatil.py) — artefato, não fonte
 dist/
-ferramentas/.cache/
-ferramentas/.build/
+codigo/ferramentas/.cache/
+codigo/ferramentas/.build/

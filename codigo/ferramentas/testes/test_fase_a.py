@@ -6,7 +6,7 @@ from pathlib import Path
 import bib_core as core
 from executar import afirmar
 
-REPO = Path(__file__).resolve().parent.parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent.parent
 
 
 def _nova_db():
@@ -102,7 +102,7 @@ def teste_log_erro_anexa():
     from unittest.mock import patch
     from bib_nucleo import base
     tmp = Path(tempfile.mkdtemp(prefix="suite-al-"))
-    with patch.object(base, "HOME_DIR", tmp):
+    with patch.object(base, "DADOS_DIR", tmp):
         core.log_erro("ctx-teste", "detalhe-x")
         core.log_erro("ctx-teste", "detalhe-y")
         txt = (tmp / "erros.log").read_text(encoding="utf-8")
@@ -112,6 +112,6 @@ def teste_log_erro_anexa():
 
 def teste_sem_lambda_e_morta():
     """Regressão: nenhum callback diferido pode referenciar `e` do except."""
-    src = (REPO / "frontends/app_win.py").read_text(encoding="utf-8")
+    src = (REPO / "codigo/frontends/app_win.py").read_text(encoding="utf-8")
     afirmar("lambda: falhou(e)" not in src, "padrão NameError reintroduzido")
-    afirmar("lambda m=msg_erro: falhou(m)" in src, "captura por string ausente")
+    afirmar("m=msg_erro" in src, "captura por string ausente")

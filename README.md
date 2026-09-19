@@ -17,11 +17,11 @@ Duplo-clique em **`Biblioteca Hub.vbs`** (raiz do projeto) — abre só o app, s
 
 | Frontend | Onde | Roda como |
 |---|---|---|
-| `frontends/app_win.py` | Windows | aplicativo local (tkinter): `python frontends/app_win.py` |
-| `frontends/app_tui.py` | Linux | aplicativo de terminal (curses): `python frontends/app_tui.py` |
+| `codigo/frontends/app_win.py` | Windows | aplicativo local (tkinter): `python codigo/frontends/app_win.py` |
+| `codigo/frontends/app_tui.py` | Linux | aplicativo de terminal (curses): `python codigo/frontends/app_tui.py` |
 
-Núcleo compartilhado: `bib_core.py` (caminhos, banco, scans, backup, execução).
-Versão web antiga removida (histórico em `historico/`).
+Núcleo compartilhado: `codigo/bib_core.py` (compat; código em `codigo/bib_nucleo/`).
+Versão web antiga removida (histórico em `codigo/historico/`).
 
 Opções comuns: `--db outro.db` (padrão: `biblioteca.db` na casa), `--selftest` (só GUI: monta oculta e sai).
 
@@ -85,11 +85,10 @@ O Azahar instalado vai junto, 100% das vezes (`emuladores/Azahar/`, com `COPYING
 
 ## Estrutura
 
-- `BibliotecaHub.bat` — **o executável**: duplo-clique abre a GUI (produção/dev).
-- `bib_core.py` — compat: reexporta `bib_nucleo/` (não edite; o código mora nos módulos).
-- `bib_nucleo/` — `base` (caminhos), `banco` (SQLite), `scans` (achados/importação), `emuladores` (providers/Azahar/execução), `pacotes` (backup/zip), `atualizacao` (update transacional).
-- `frontends/` — `app_win.py` (GUI Windows) / `app_tui.py` (terminal Linux).
-- `ferramentas/` — `montar_portatil.py` (gera o portátil), `testes/` (suíte).
-- `fontes-capas/` — imagens-fonte das capas (já aplicadas; reserva).
-- `biblioteca.db` — criado no primeiro run (SQLite, journal `DELETE`, sem sidecars).
-- `backups/` — backups versionados. `capas/` — capas locais. `presets/` — presets do Azahar (`*.ini`).
+Pastas principais (raiz só tem launchers, este README e git):
+
+- `Biblioteca Hub.vbs` / `BibliotecaHub.bat` — **o executável**: duplo-clique abre a GUI (produção/dev).
+- `codigo/` — tudo que é programa: `bib_core.py` (compat), `bib_nucleo/` (`base`, `banco`, `scans`, `emuladores`, `pacotes`, `atualizacao`), `frontends/` (GUI Windows / terminal Linux), `ferramentas/` (portátil, testes), `historico/` (arquivo).
+- `dados/` — tudo que é seu: `biblioteca.db`, `backups/`, `capas/`, `presets/`, `erros.log` (nunca vai pro git).
+- `midia/fontes-capas/` — imagens-fonte das capas (já aplicadas; reserva).
+- `dist/` — portáteis gerados (ignorado no git).

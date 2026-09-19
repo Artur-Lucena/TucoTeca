@@ -5,7 +5,7 @@ Minha Biblioteca de Jogos — aplicativo de terminal (curses, stdlib).
 Alvo principal: Linux. Mesmo banco e mesmas regras da GUI Windows.
 
 Uso:
-    python frontends/app_tui.py [--db ~/.../biblioteca.db]
+    python codigo/frontends/app_tui.py [--db ~/.../biblioteca.db]
 
 Teclas (lista): ↑/↓ ou j/k navegar · PgUp/PgDn · / buscar · f status ·
   * favoritos · Enter jogar · a adicionar · e editar · d excluir ·

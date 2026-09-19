@@ -6,4 +6,4 @@ Set sh = CreateObject("Wscript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 hub = fso.GetParentFolderName(WScript.ScriptFullName)
 sh.Environment("PROCESS")("BIBLIOTECA_HOME") = hub & "\"
-sh.Run "python """ & hub & "\frontends\app_win.py""", 0, False
+sh.Run "python """ & hub & "\codigo\frontends\app_win.py""", 0, False
