@@ -38,9 +38,10 @@ REPO = Path(__file__).resolve().parent.parent.parent
 CACHE = Path(__file__).resolve().parent / ".cache"
 BUILD = Path(__file__).resolve().parent / ".build" / "hub"
 DIST = REPO / "dist"
-APP_ARQS = (("bib_core.py", "bib_core.py"), ("README.md", "README.md"),
-            ("frontends/app_win.py", "app_win.py"),
-            ("frontends/app_tui.py", "app_tui.py"))
+APP_ARQS = (("README.md", "README.md"),
+            ("codigo/bib_core.py", "bib_core.py"),
+            ("codigo/frontends/app_win.py", "app_win.py"),
+            ("codigo/frontends/app_tui.py", "app_tui.py"))
 
 BAT_GUI = """@echo off
 setlocal
@@ -377,7 +378,7 @@ def montar(sem_azahar: bool = False) -> Path:
 
     app_dir.mkdir(parents=True)
     for origem, destino in APP_ARQS:
-        src = REPO / "codigo" / origem
+        src = REPO / origem
         if not src.is_file():
             raise SystemExit(f"arquivo do app ausente no repo: {origem}")
         shutil.copy2(src, app_dir / destino)
