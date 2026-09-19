@@ -106,6 +106,19 @@ def teste_preview_pasta_inclui_nds():
     afirmar("emu_nds" in info, info)
 
 
+def teste_score_rom_nds_igual_3ds():
+    tmp = Path(tempfile.mkdtemp(prefix="suite-dw-"))
+    rom = _rom_nds(tmp, "s.nds", nome_en="Score")
+    a = core.pontuar({"titulo": "S", "executable_path": "e", "shop": "",
+                      "object_id": "", "horas": 0.0, "origem": "rom-nds",
+                      "rom_path": str(rom), "tem_metadados": True})
+    b = core.pontuar({"titulo": "S", "executable_path": "e", "shop": "",
+                      "object_id": "", "horas": 0.0, "origem": "rom-3ds",
+                      "rom_path": str(rom), "tem_metadados": True})
+    afirmar(a["score"] == b["score"] == 0.6, (a["score"], b["score"]))
+    afirmar("ROM existe neste SO" in a["motivos"], a["motivos"])
+
+
 def teste_tui_mostra_nds():
     import app_tui as tui
 

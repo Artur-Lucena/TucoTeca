@@ -462,7 +462,7 @@ class App:
                 return
             prep = core.preparar_lancamento(j)
             if prep.get("aviso"):
-                messagebox.showwarning("Preset Azahar", prep["aviso"])
+                messagebox.showwarning("Preset", prep["aviso"])
             res = core.executar_monitorado(
                 j, ao_fim=lambda sessao, rastreado, _gid=j["id"]:
                     self._depois(lambda: self._sessao_fim(_gid, sessao, rastreado)))
@@ -519,7 +519,8 @@ class App:
                         escolhido = cands[idx - 1]
             if escolhido is None:
                 escolhido = filedialog.askopenfilename(title="Localizar ROM movida", parent=self.root,
-                    filetypes=[("ROMs 3DS", "*.cci *.cxi *.3ds *.3dsx *.app *.elf *.axf"), ("Todos", "*.*")])
+                    filetypes=[("ROMs 3DS", "*.cci *.cxi *.3ds *.3dsx *.app *.elf *.axf"),
+                               ("ROMs NDS", "*.nds *.dsi"), ("Todos", "*.*")])
                 if escolhido and not messagebox.askyesno("Localizar ROM", f"Gravar este novo caminho?\n{escolhido}"):
                     return None
             if not escolhido:
@@ -842,9 +843,10 @@ class App:
                 title="Arquivo para importar", parent=dlg,
                 filetypes=[("Suportados",
                             "*.exe *.lnk *.bat *.cmd *.3ds *.3dsx *.cci *.cxi "
-                            "*.elf *.app *.axf *.json *.zip"),
+                            "*.elf *.app *.axf *.nds *.dsi *.json *.zip"),
                            ("Executáveis", "*.exe *.lnk *.bat *.cmd"),
                            ("ROMs 3DS", "*.3ds *.3dsx *.cci *.cxi *.elf *.app *.axf"),
+                           ("ROMs NDS", "*.nds *.dsi"),
                            ("JSON", "*.json"), ("Pacote", "*.zip"),
                            ("Todos", "*.*")])
             if not arq:

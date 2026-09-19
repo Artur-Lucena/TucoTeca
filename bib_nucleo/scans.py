@@ -68,7 +68,7 @@ def pontuar(item: dict) -> dict:
     if (item.get("origem") or "") in ("steam-manifest", "epic", "gog", "riot"):
         score += 0.1
         motivos.append("manifesto da loja")
-    if (item.get("origem") or "") == "rom-3ds" and (item.get("rom_path") or "").strip():
+    if (item.get("origem") or "").startswith("rom-") and (item.get("rom_path") or "").strip():
         rp = item["rom_path"].strip()
         if Path(rp).exists():
             score += 0.5
