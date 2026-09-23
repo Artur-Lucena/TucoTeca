@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""SQLite: schema, migrações, validação, CRUD, capas e horas."""
+"""SQLite: schema, migrações, validação, CRUD, capas, horas e etiquetas."""
 from __future__ import annotations
 
 import base64
 import datetime
 import math
+import re
 import shutil
 import sqlite3
 import uuid as uuid_mod
@@ -13,7 +14,6 @@ from pathlib import Path
 
 from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, _desaspas, _txt,
                                 agora_iso, resolver_exe, slugify)
-
 
 
 # --------------------------------------------------------------------------
@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS jogos (
     regiao TEXT DEFAULT '',
     azahar_preset TEXT DEFAULT '',
     uuid TEXT DEFAULT '',
+    etiquetas TEXT DEFAULT '',
     criado_em TEXT,
     atualizado_em TEXT,
     UNIQUE(titulo, executable_path, launch_options)
@@ -55,7 +56,8 @@ CREATE TABLE IF NOT EXISTS jogos (
 
 
 # Migração de bancos antigos: v1 (sem capa/confianca), v2 (sem exe por SO),
-# v3 (sem game_code/regiao), v4 (sem azahar_preset), v5 (sem uuid).
+# v3 (sem game_code/regiao), v4 (sem azahar_preset), v5 (sem uuid),
+# v6 (sem etiquetas).
 MIGRACOES = (
     "ALTER TABLE jogos ADD COLUMN capa TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN confianca REAL DEFAULT 0",
@@ -65,14 +67,95 @@ MIGRACOES = (
     "ALTER TABLE jogos ADD COLUMN regiao TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN azahar_preset TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN uuid TEXT DEFAULT ''",
+    "ALTER TABLE jogos ADD COLUMN etiquetas TEXT DEFAULT ''",
 )
 
 
 CAMPOS_EDITAVEIS = ("titulo", "executable_path", "exe_win", "exe_linux",
                     "wine_prefix", "launch_options", "status", "nota", "favorito",
                     "horas", "observacoes", "shop", "object_id", "origem",
-                    "game_code", "regiao", "azahar_preset")
+                    "game_code", "regiao", "azahar_preset", "etiquetas")
 
+
+# --------------------------------------------------------------------------
+# Etiquetas (tags livres) + plataforma derivada (PC/3DS/NDS)
+# --------------------------------------------------------------------------
+
+ETIQUETA_MAX = 30
+ETIQUETAS_MAX = 20
+
+
+def normalizar_etiquetas(v) -> str:
+    """Normaliza etiquetas livres para ", ".join ordenado e dedupado.
+
+    Aceita str (separada por vírgula/ponto-vírgula) ou lista. Remove vazias,
+    limita a ETIQUETAS_MAX tags de até ETIQUETA_MAX chars. Tag não pode conter
+    vírgula, ponto-vírgula ou NUL (são separadores). Retorna "" se vazio.
+    """
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        partes = re.split(r"[;,]+", v)
+    elif isinstance(v, (list, tuple)):
+        partes = []
+        for item in v:
+            if isinstance(item, str):
+                partes.extend(re.split(r"[;,]+", item))
+            elif item is not None:
+                partes.extend(re.split(r"[;,]+", str(item)))
+    else:
+        partes = re.split(r"[;,]+", str(v))
+    vistas: dict[str, str] = {}
+    for p in partes:
+        t = (p or "").replace("\x00", "").strip()
+        if not t:
+            continue
+        t = re.sub(r"\s+", " ", t)[:ETIQUETA_MAX].strip()
+        if not t:
+            continue
+        chave = t.casefold()
+        if chave not in vistas:
+            vistas[chave] = t
+        if len(vistas) >= ETIQUETAS_MAX:
+            break
+    return ", ".join(sorted(vistas.values(), key=str.casefold))
+
+
+def etiquetas_de(j: dict | None) -> list[str]:
+    """Lista de etiquetas do jogo (a partir do campo gravado)."""
+    if not j:
+        return []
+    norm = normalizar_etiquetas(j.get("etiquetas") or "")
+    return norm.split(", ") if norm else []
+
+
+def plataforma_de_origem(origem: str) -> str:
+    """PC/3DS/NDS a partir da origem (sem consultar o registro)."""
+    o = (origem or "").strip().lower()
+    if o == "rom-3ds":
+        return "3DS"
+    if o == "rom-nds":
+        return "NDS"
+    return "PC"
+
+
+def plataforma_jogo(j: dict | None) -> str:
+    """Plataforma de exibição do jogo (provider quando conhecido)."""
+    if not j:
+        return "PC"
+    origem = (j.get("origem") or "")
+    try:
+        from bib_nucleo.emuladores import provedor_por_origem
+        prov = provedor_por_origem(origem)
+        if prov is not None:
+            sist = " ".join(prov.get("sistemas") or ())
+            if "3DS" in sist:
+                return "3DS"
+            if re.search(r"\bNDS\b|Nintendo DS", sist):
+                return "NDS"
+    except Exception:
+        pass
+    return plataforma_de_origem(origem)
 
 
 def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
@@ -101,7 +184,7 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
     cols = ["id", "titulo", "executable_path", "exe_win", "exe_linux", "wine_prefix",
             "launch_options", "status", "nota", "favorito", "horas", "ultima_execucao",
             "observacoes", "origem", "shop", "object_id", "game_code", "regiao",
-            "azahar_preset", "uuid", "capa", "confianca", "criado_em", "atualizado_em"]
+            "azahar_preset", "uuid", "etiquetas", "capa", "confianca", "criado_em", "atualizado_em"]
     todos = ", ".join(cols)
     con.executescript(f"""
         CREATE TABLE jogos_nova (
@@ -125,6 +208,7 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
             regiao TEXT DEFAULT '',
             azahar_preset TEXT DEFAULT '',
             uuid TEXT DEFAULT '',
+            etiquetas TEXT DEFAULT '',
             capa TEXT DEFAULT '',
             confianca REAL DEFAULT 0,
             criado_em TEXT,
@@ -136,7 +220,6 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
         ALTER TABLE jogos_nova RENAME TO jogos;
     """)
     con.commit()
-
 
 
 def _garantir_uuid(con: sqlite3.Connection) -> None:
@@ -160,7 +243,6 @@ def _garantir_uuid(con: sqlite3.Connection) -> None:
     con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_jogos_uuid ON jogos(uuid)")
     if vazios:
         con.commit()
-
 
 
 def get_db(db_path: Path) -> sqlite3.Connection:
@@ -190,10 +272,12 @@ def get_db(db_path: Path) -> sqlite3.Connection:
     return con
 
 
-
 def row_to_dict(r: sqlite3.Row) -> dict:
     d = dict(r)
     d["favorito"] = bool(d.get("favorito"))
+    d["etiquetas"] = normalizar_etiquetas(d.get("etiquetas") or "")
+    d["etiquetas_lista"] = etiquetas_de(d)
+    d["plataforma"] = plataforma_jogo(d)
     exe, _origem = resolver_exe(d)
     if not exe:
         from bib_nucleo.emuladores import provedor_por_origem
@@ -207,7 +291,6 @@ def row_to_dict(r: sqlite3.Row) -> dict:
     d["exe_existe"] = existe
     d["exe_traduzido"] = exe
     return d
-
 
 
 def validar_dados(dados: dict, parcial: bool = False) -> dict:
@@ -256,17 +339,29 @@ def validar_dados(dados: dict, parcial: bool = False) -> dict:
         limpo["horas"] = horas
     if "origem" in dados or not parcial:
         limpo["origem"] = _txt(dados.get("origem")) or "manual"
+    if "etiquetas" in dados or not parcial:
+        limpo["etiquetas"] = normalizar_etiquetas(dados.get("etiquetas") or "")
     return limpo
-
 
 
 def _like_esc(s: str) -> str:
     return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+def chave_dedup(titulo: str, exe: str, launch: str) -> tuple:
+    """Chave anti-duplicata: barra e caixa normalizadas.
+
+    Sem isso, o mesmo exe gravado como D:/... e D:\\... vira duas linhas
+    a cada re-scan (UNIQUE do banco é literal e não pega).
+    """
+    def _n(c):
+        return (c or "").strip().replace("/", "\\").casefold()
+    return (_n(titulo), _n(exe), _n(launch))
+
 
 def listar_jogos(con: sqlite3.Connection, q: str = "", status: str = "",
-                 favorito: bool = False) -> list[dict]:
+                 favorito: bool = False, etiquetas: list[str] | None = None,
+                 plataformas: list[str] | None = None) -> list[dict]:
     sql = "SELECT * FROM jogos WHERE 1=1"
     params: list = []
     if q:
@@ -279,33 +374,60 @@ def listar_jogos(con: sqlite3.Connection, q: str = "", status: str = "",
     if favorito:
         sql += " AND favorito = 1"
     sql += " ORDER BY favorito DESC, titulo COLLATE NOCASE"
-    return [row_to_dict(r) for r in con.execute(sql, params).fetchall()]
+    jogos = [row_to_dict(r) for r in con.execute(sql, params).fetchall()]
+    if etiquetas:
+        alvos = [e.casefold() for e in etiquetas if (e or "").strip()]
+        if alvos:
+            jogos = [j for j in jogos
+                     if all(a in {t.casefold() for t in j.get("etiquetas_lista") or []}
+                            for a in alvos)]
+    if plataformas:
+        plats = {(p or "").strip().upper() for p in plataformas if (p or "").strip()}
+        if plats:
+            jogos = [j for j in jogos if (j.get("plataforma") or "PC").upper() in plats]
+    return jogos
 
+
+def listar_etiquetas(con: sqlite3.Connection) -> list[dict]:
+    """[{nome, n}] de etiquetas livres usadas, ordenadas por uso e nome."""
+    cont: dict[str, dict] = {}
+    for r in con.execute("SELECT etiquetas FROM jogos").fetchall():
+        for t in etiquetas_de({"etiquetas": r["etiquetas"] or ""}):
+            chave = t.casefold()
+            if chave not in cont:
+                cont[chave] = {"nome": t, "n": 0}
+            cont[chave]["n"] += 1
+    return sorted(cont.values(), key=lambda d: (-d["n"], d["nome"].casefold()))
 
 
 def criar_jogo(con: sqlite3.Connection, dados: dict) -> dict:
     limpo = validar_dados(dados)
     limpo["uuid"] = _txt(dados.get("uuid")) or uuid_mod.uuid4().hex
     agora = agora_iso()
+    chave = chave_dedup(limpo["titulo"], limpo["executable_path"],
+                        limpo["launch_options"])
+    for r in con.execute(
+            "SELECT titulo, executable_path, launch_options FROM jogos").fetchall():
+        if chave_dedup(r["titulo"], r["executable_path"], r["launch_options"]) == chave:
+            raise ValueError("jogo já cadastrado (mesmo título + executável)")
     try:
         cur = con.execute(
             """INSERT INTO jogos (titulo, executable_path, exe_win, exe_linux, wine_prefix,
                launch_options, status, nota, favorito, horas, observacoes, origem, shop,
-               object_id, game_code, regiao, azahar_preset, uuid, criado_em, atualizado_em)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               object_id, game_code, regiao, azahar_preset, uuid, etiquetas, criado_em, atualizado_em)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
              (limpo["titulo"], limpo["executable_path"], limpo["exe_win"],
-             limpo["exe_linux"], limpo["wine_prefix"],
-             limpo["launch_options"], limpo["status"], limpo["nota"],
-             limpo["favorito"], limpo["horas"], limpo["observacoes"],
-             limpo["origem"], limpo["shop"], limpo["object_id"],
-             limpo["game_code"], limpo["regiao"], limpo["azahar_preset"],
-             limpo["uuid"], agora, agora),
+              limpo["exe_linux"], limpo["wine_prefix"],
+              limpo["launch_options"], limpo["status"], limpo["nota"],
+              limpo["favorito"], limpo["horas"], limpo["observacoes"],
+              limpo["origem"], limpo["shop"], limpo["object_id"],
+              limpo["game_code"], limpo["regiao"], limpo["azahar_preset"],
+              limpo["uuid"], limpo["etiquetas"], agora, agora),
         )
         con.commit()
     except sqlite3.IntegrityError:
         raise ValueError("jogo já cadastrado (mesmo título + executável)")
     return row_to_dict(con.execute("SELECT * FROM jogos WHERE id=?", (cur.lastrowid,)).fetchone())
-
 
 
 def atualizar_jogo(con: sqlite3.Connection, gid: int, dados: dict) -> dict:
@@ -318,17 +440,16 @@ def atualizar_jogo(con: sqlite3.Connection, gid: int, dados: dict) -> dict:
         """UPDATE jogos SET titulo=?, executable_path=?, exe_win=?, exe_linux=?,
            wine_prefix=?, launch_options=?, status=?, nota=?, favorito=?, horas=?,
            observacoes=?, shop=?, object_id=?, origem=?, game_code=?, regiao=?,
-           azahar_preset=?, atualizado_em=? WHERE id=?""",
+           azahar_preset=?, etiquetas=?, atualizado_em=? WHERE id=?""",
         (limpo["titulo"], limpo["executable_path"], limpo["exe_win"],
          limpo["exe_linux"], limpo["wine_prefix"], limpo["launch_options"],
          limpo["status"], limpo["nota"], limpo["favorito"],
          limpo["horas"], limpo["observacoes"], limpo["shop"], limpo["object_id"],
          limpo["origem"], limpo["game_code"], limpo["regiao"],
-         limpo["azahar_preset"], agora_iso(), gid),
+         limpo["azahar_preset"], limpo["etiquetas"], agora_iso(), gid),
     )
     con.commit()
     return row_to_dict(con.execute("SELECT * FROM jogos WHERE id=?", (gid,)).fetchone())
-
 
 
 def excluir_jogo(con: sqlite3.Connection, gid: int) -> None:
@@ -344,10 +465,8 @@ def excluir_jogo(con: sqlite3.Connection, gid: int) -> None:
             pass
 
 
-
 CAPA_EXTS = {".png": "image/png", ".jpg": "image/jpeg",
              ".jpeg": "image/jpeg", ".webp": "image/webp"}
-
 
 
 def salvar_capa(con: sqlite3.Connection, gid: int, filename: str, data_b64: str) -> dict:
@@ -361,18 +480,81 @@ def salvar_capa(con: sqlite3.Connection, gid: int, filename: str, data_b64: str)
     return salvar_capa_bytes(con, gid, filename, raw)
 
 
+CAPA_LARG, CAPA_ALT = 600, 800  # retrato padrão de todas as capas
+
+CAPA_ICON_MAX = 200  # até aqui é ícone extraído de ROM: preserva intacto
+
+
+def _enquadrar_capa(img):
+    """Arte em retrato 600x800: contém a arte + fundo blur da própria arte.
+
+    Ícones pequenos (≤200px nos dois lados) voltam intactos.
+    """
+    from PIL import Image, ImageFilter
+    if img.width <= CAPA_ICON_MAX and img.height <= CAPA_ICON_MAX:
+        return img
+    base = img.convert("RGB")
+    fundo = base.resize((CAPA_LARG, CAPA_ALT))
+    fundo = fundo.filter(ImageFilter.GaussianBlur(24))
+    fator = min(CAPA_LARG / base.width, CAPA_ALT / base.height)
+    arte = base.resize((max(1, round(base.width * fator)),
+                        max(1, round(base.height * fator))))
+    tela = fundo.copy()
+    tela.paste(arte, ((CAPA_LARG - arte.width) // 2,
+                       (CAPA_ALT - arte.height) // 2))
+    return tela
+
+
+def _normalizar_capa(raw: bytes, ext: str) -> tuple[bytes, str]:
+    """Se Pillow existir: jpg/webp/gif → PNG 600x800 padronizado.
+
+    Sem Pillow, devolve bytes/ext originais (GUI mostra tile p/ não-png/gif).
+    Nunca levanta: falha de conversão = original.
+    """
+    try:
+        from io import BytesIO
+        from PIL import Image  # opcional, não é dependência
+        img = Image.open(BytesIO(raw))
+        img.load()
+        if img.mode in ("RGBA", "LA"):
+            fundo = Image.new("RGB", img.size, (16, 18, 24))
+            fundo.paste(img, mask=img.split()[-1])
+            img = fundo
+        else:
+            img = img.convert("RGB")
+        if ext == ".gif":
+            buf = BytesIO()
+            img.save(buf, format="PNG")
+            out = buf.getvalue()
+            return (out, ".png") if len(out) <= 2_000_000 else (raw, ext)
+        img = _enquadrar_capa(img)
+        for _tent in (1, 2):
+            buf = BytesIO()
+            img.save(buf, format="PNG", optimize=True)
+            out = buf.getvalue()
+            if len(out) <= 2_000_000:
+                return out, ".png"
+            img = img.resize((img.width // 2, img.height // 2))
+    except Exception:
+        pass
+    return raw, ext
+
 
 def salvar_capa_bytes(con: sqlite3.Connection, gid: int, filename: str, raw: bytes) -> dict:
     ext = Path(filename or "").suffix.lower()
     if ext not in CAPA_EXTS:
         return {"ok": False, "erro": f"extensão inválida. Use: {sorted(CAPA_EXTS)}"}
-    if len(raw) > 2_000_000:
-        return {"ok": False, "erro": "capa maior que 2 MB"}
     row = con.execute("SELECT * FROM jogos WHERE id=?", (gid,)).fetchone()
     if not row:
         return {"ok": False, "erro": "jogo não encontrado"}
+    raw, ext = _normalizar_capa(raw, ext)  # encolhe/padroniza antes do teto
+    if len(raw) > 2_000_000:
+        return {"ok": False, "erro": "capa maior que 2 MB"}
     CAPAS_DIR.mkdir(parents=True, exist_ok=True)
-    nome = f"{gid}-{slugify(Path(filename).stem)}{ext}"
+    stem = Path(filename).stem
+    while stem.startswith(f"{gid}-"):  # re-salvar não empilha o id
+        stem = stem[len(str(gid)) + 1:] or "capa"
+    nome = f"{gid}-{slugify(stem)}{ext}"
     (CAPAS_DIR / nome).write_bytes(raw)
     antiga = row["capa"] or ""
     if antiga and antiga != nome:
@@ -384,7 +566,6 @@ def salvar_capa_bytes(con: sqlite3.Connection, gid: int, filename: str, raw: byt
                 (nome, agora_iso(), gid))
     con.commit()
     return {"ok": True, "capa": nome}
-
 
 
 def caminho_capa(nome: str) -> Path | None:
@@ -399,13 +580,11 @@ def caminho_capa(nome: str) -> Path | None:
     return alvo
 
 
-
 def marcar_execucao(con: sqlite3.Connection, gid: int) -> None:
     agora = agora_iso()
     con.execute("UPDATE jogos SET ultima_execucao=?, atualizado_em=? WHERE id=?",
                 (agora, agora, gid))
     con.commit()
-
 
 
 def adicionar_horas(con: sqlite3.Connection, gid: int, delta_h: float) -> dict:
@@ -419,16 +598,28 @@ def adicionar_horas(con: sqlite3.Connection, gid: int, delta_h: float) -> dict:
     cur = con.execute("SELECT horas FROM jogos WHERE id=?", (gid,)).fetchone()
     if cur is None:
         return {"ok": False, "erro": "jogo inexistente"}
-    con.execute("UPDATE jogos SET horas=COALESCE(horas, 0)+?, atualizado_em=? WHERE id=?",
+    con.execute("UPDATE jogos SET horas=ROUND(COALESCE(horas, 0)+?, 2), atualizado_em=? WHERE id=?",
                 (delta, agora_iso(), gid))
     con.commit()
     total = con.execute("SELECT horas FROM jogos WHERE id=?", (gid,)).fetchone()["horas"]
+    try:
+        total = round(float(total or 0), 2)
+    except (TypeError, ValueError):
+        pass
     return {"ok": True, "somado": round(delta, 2), "total": total}
-
 
 
 def contar_por_origem(con: sqlite3.Connection) -> dict:
     rows = con.execute("SELECT origem, COUNT(*) AS n FROM jogos GROUP BY origem").fetchall()
     return {(r["origem"] or ""): r["n"] for r in rows}
 
-__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', '_garantir_unique_triplo', '_garantir_uuid', 'get_db', 'row_to_dict', 'validar_dados', '_like_esc', 'listar_jogos', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'CAPA_EXTS', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem']
+
+def selo_confianca(j: dict) -> str:
+    """' · ◎0.85' se o jogo tem confiança de importação, senão ''."""
+    try:
+        conf = float((j or {}).get("confianca") or 0)
+    except (TypeError, ValueError):
+        return ""
+    return f" · ◎{conf:.2f}" if conf > 0 else ""
+
+__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']

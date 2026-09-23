@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Minha Biblioteca de Jogos — aplicativo local Windows (tkinter, stdlib).
+TucoTeca — aplicativo local Windows (tkinter, stdlib).
 Visual estilo Hydra: sidebar, grade de cards com capas e painel de detalhes.
 Mesmo banco e mesmas regras do terminal Linux; nada de navegador.
 
@@ -13,7 +13,6 @@ Ou duplo-clique em BibliotecaHub.bat na raiz do projeto.
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import os
 import sys
@@ -28,6 +27,7 @@ import bib_core as core
 BG = "#0f1116"
 PANEL = "#16181f"
 CARD = "#1c1f27"
+CARD_HOVER = "#242834"
 LINE = "#2a2e39"
 TXT = "#e8eaf0"
 MUT = "#9aa0b2"
@@ -36,7 +36,7 @@ OK_C = "#2ecc71"
 WARN_C = "#f39c12"
 BAD_C = "#e74c3c"
 
-CARD_W, CARD_H = 132, 186
+CARD_W, CARD_H = 140, 196
 STATUS_CORES = {"backlog": MUT, "jogando": "#7aa2ff", "zerado": OK_C,
                 "pausado": WARN_C, "abandonado": BAD_C}
 
@@ -46,35 +46,99 @@ NAV = [("📚 Biblioteca", "", False),
        ("✓ Zerados", "zerado", False),
        ("★ Favoritos", "", True)]
 
+_MINI_CACHE: dict = {}
+
 
 def carregar_miniatura(caminho: Path, largura: int = CARD_W,
                        altura: int = CARD_H) -> tk.PhotoImage | None:
-    """PhotoImage reduzido da capa, ou None (só png/gif; resto vira tile)."""
+    """PhotoImage reduzido da capa, ou None (vira tile).
+
+    Tenta Pillow (jpg/webp/png/gif) quando instalado; senão, PhotoImage
+    nativo (só png/gif). Cacheado por (caminho, mtime, tamanho) p/ não
+    recarregar a cada recarregar().
+    """
+    try:
+        st = Path(caminho).stat()
+        chave = (str(caminho), st.st_mtime_ns, st.st_size, largura, altura)
+    except OSError:
+        return None
+    if chave in _MINI_CACHE:
+        return _MINI_CACHE[chave]
+    img = None
+    # 1) Pillow (opcional): cobre jpg/webp e reduz com qualidade
+    try:
+        from PIL import Image, ImageTk  # type: ignore
+        pil = Image.open(caminho)
+        pil.load()
+        pil.thumbnail((largura, altura), Image.LANCZOS)
+        img = ImageTk.PhotoImage(pil)
+        _MINI_CACHE[chave] = img
+        if len(_MINI_CACHE) > 300:
+            _MINI_CACHE.pop(next(iter(_MINI_CACHE)))
+        return img
+    except Exception:
+        pass
+    # 2) Nativo Tk (zero deps): png/gif apenas. Teto na divisão para a
+    # imagem NUNCA estourar o alvo (piso deixava 141–279px intactos e a
+    # grade transbordava a viewport).
     if Path(caminho).suffix.lower() not in (".png", ".gif"):
         return None
     try:
-        img = tk.PhotoImage(file=str(caminho))
+        base = tk.PhotoImage(file=str(caminho))
     except tk.TclError:
         return None
     try:
-        f = max(max(1, img.width() // largura), max(1, img.height() // altura))
-        return img.subsample(f, f) if f > 1 else img
+        f = max(1, -(-base.width() // largura), -(-base.height() // altura))
+        img = base.subsample(f, f) if f > 1 else base
     except tk.TclError:
         return None
+    _MINI_CACHE[chave] = img
+    if len(_MINI_CACHE) > 300:
+        _MINI_CACHE.pop(next(iter(_MINI_CACHE)))
+    return img
+
+
+def _titulo_escuro(janela) -> None:
+    """Barra de título escura no Windows 10/11 via DWM (só stdlib).
+
+    Sem efeito em outros SOs ou Windows antigos; nunca levanta.
+    """
+    try:
+        if os.name != "nt":
+            return
+        import ctypes
+        valor = ctypes.c_int(1)
+        hwnd = ctypes.c_void_p(janela.winfo_id())
+        for attr in (20, 19):  # 20 = Win11/20H1+; 19 = builds antigas
+            try:
+                if ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                        hwnd, attr, ctypes.byref(valor),
+                        ctypes.sizeof(valor)) == 0:
+                    return
+            except Exception:
+                continue
+    except Exception:
+        pass
 
 
 def desenhar_tile(cv: tk.Canvas, titulo: str, w: int, h: int,
-                  selecionado: bool = False, grande: bool = False):
+                   selecionado: bool = False, grande: bool = False,
+                   subtitulo: str = ""):
     """Tile estilo Hydra quando não há capa: inicial do título em destaque."""
     cv.delete("all")
-    cv.create_rectangle(1, 1, w - 1, h - 1, fill=CARD,
-                        outline=ACC if selecionado else LINE,
-                        width=3 if selecionado else 1)
+    borda = ACC if selecionado else LINE
+    cv.create_rectangle(2, 2, w - 2, h - 2, fill=CARD,
+                        outline=borda, width=3 if selecionado else 1)
+    cv.create_rectangle(2, 2, w - 2, 7, fill=borda, outline="")
     inicial = (titulo.strip()[:1] or "?").upper()
-    cv.create_text(w // 2, h // 2 - (14 if grande else 8), text=inicial,
-                   fill=ACC if selecionado else MUT,
-                   font=("Segoe UI", 64 if grande else 44, "bold"))
-    cv.create_text(w // 2, h - (26 if grande else 18), text="sem capa",
+    cv.create_text(w // 2, h // 2 - (16 if grande else 10), text=inicial,
+                   fill=ACC if selecionado else TXT,
+                   font=("Segoe UI", 68 if grande else 48, "bold"))
+    base_y = h - (30 if grande else 22)
+    if subtitulo:
+        cv.create_text(w // 2, base_y - (16 if grande else 13), text=subtitulo,
+                       fill=ACC, font=("Segoe UI", 10 if grande else 9, "bold"))
+    cv.create_text(w // 2, base_y, text="sem capa",
                    fill=MUT, font=("Segoe UI", 9 if grande else 8))
 
 
@@ -87,13 +151,15 @@ class App:
         self.nav_idx = 0
         self.filtro_prov: str | None = None  # chave do provider (fundo, não jogo)
         self.prov_btns: dict[str, ttk.Button] = {}
+        self.filtro_plat: str | None = None  # PC/3DS/NDS (derivado da origem)
+        self.plat_btns: dict[str, ttk.Button] = {}
         self._deb = None
         self.cards: list[dict] = []  # {frame, jogo}
         self._imgs_cards: list = []  # retém miniaturas da grade
         self._img_det = None  # retém a capa do painel de detalhes
-        root.title("🎮 Minha Biblioteca")
-        root.geometry("1120x680")
-        root.minsize(900, 540)
+        root.title("🎮 TucoTeca")
+        root.geometry("1200x720")
+        root.minsize(960, 600)
         root.configure(bg=BG)
         self._estilo()
         self._montar()
@@ -113,7 +179,9 @@ class App:
         st.configure("Panel.TLabel", background=PANEL, foreground=TXT)
         st.configure("Mut.TLabel", background=BG, foreground=MUT)
         st.configure("Title.TLabel", background=BG, foreground=TXT,
-                     font=("Segoe UI", 13, "bold"))
+                      font=("Segoe UI", 14, "bold"))
+        st.configure("Panel.Title.TLabel", background=PANEL, foreground=TXT,
+                      font=("Segoe UI", 14, "bold"))
         st.configure("Side.TButton", background=PANEL, foreground=MUT,
                      borderwidth=0, padding=8, anchor="w",
                      font=("Segoe UI", 11))
@@ -123,28 +191,36 @@ class App:
                      borderwidth=0, padding=8, anchor="w",
                      font=("Segoe UI", 11, "bold"))
         st.configure("TButton", background=CARD, foreground=TXT,
-                     borderwidth=1, padding=6)
+                      borderwidth=1, padding=10, font=("Segoe UI", 11))
         st.map("TButton", background=[("active", ACC)])
         st.configure("Accent.TButton", background=ACC, foreground="white",
-                     borderwidth=0, padding=8, font=("Segoe UI", 11, "bold"))
+                      borderwidth=0, padding=10, font=("Segoe UI", 13, "bold"))
         st.configure("TEntry", fieldbackground="#0b0d12", foreground=TXT,
                       borderwidth=1)
         st.configure("Sec.TLabelframe", background=CARD, borderwidth=0, padding=12)
         st.configure("Sec.TLabelframe.Label", background=CARD, foreground=ACC,
-                     font=("Segoe UI", 11, "bold"))
+                      font=("Segoe UI", 13, "bold"))
         st.configure("Sec.TLabel", background=CARD, foreground=MUT,
-                     font=("Segoe UI", 10))
+                      font=("Segoe UI", 12))
         st.configure("Big.Accent.TButton", background=ACC, foreground="white",
-                     borderwidth=0, padding=12, font=("Segoe UI", 12, "bold"))
-        st.configure("Vertical.TScrollbar", background=CARD)
+                      borderwidth=0, padding=16, font=("Segoe UI", 14, "bold"))
+        st.configure("Vertical.TScrollbar", background=CARD, troughcolor=BG,
+                      borderwidth=0, arrowsize=13)
+        st.map("Vertical.TScrollbar", background=[("active", ACC)])
+        st.configure("Chip.TButton", background=CARD, foreground=MUT,
+                      borderwidth=1, padding=6, font=("Segoe UI", 10, "bold"))
+        st.map("Chip.TButton", background=[("active", CARD_HOVER)],
+               foreground=[("active", TXT)])
+        st.configure("ChipAct.TButton", background=ACC, foreground="white",
+                      borderwidth=0, padding=6, font=("Segoe UI", 10, "bold"))
 
     def _montar(self):
         # sidebar
         side = ttk.Frame(self.root, style="Panel.TFrame", width=200)
         side.pack(side="left", fill="y")
         side.pack_propagate(False)
-        ttk.Label(side, text="🎮 BIBLIOTECA", style="Panel.TLabel",
-                  font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=12, pady=(14, 8))
+        ttk.Label(side, text="🎮 TUCOTECA", style="Panel.TLabel",
+                  font=("Segoe UI", 13, "bold")).pack(anchor="w", padx=12, pady=(14, 8))
         self.nav_btns: list[ttk.Button] = []
         for i, (rotulo, _st, _fv) in enumerate(NAV):
             b = ttk.Button(side, text=rotulo, style="Side.TButton",
@@ -153,7 +229,7 @@ class App:
             self.nav_btns.append(b)
         ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
         ttk.Label(side, text="PROVEDORES", style="Panel.TLabel",
-                  font=("Segoe UI", 9, "bold"), foreground=MUT).pack(anchor="w", padx=12)
+                  font=("Segoe UI", 10, "bold"), foreground=MUT).pack(anchor="w", padx=12)
         for chave in core.provedores():
             b = ttk.Button(side, text=chave, style="Side.TButton",
                            command=lambda c=chave: self._ir_prov(c))
@@ -161,21 +237,13 @@ class App:
             self.prov_btns[chave] = b
         ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
         ttk.Label(side, text="IMPORTAR", style="Panel.TLabel",
-                  font=("Segoe UI", 9, "bold"), foreground=MUT).pack(anchor="w", padx=12)
+                  font=("Segoe UI", 10, "bold"), foreground=MUT).pack(anchor="w", padx=12)
         for rotulo, cmd in (("📥 Importar…", self.importar_unificado),):
             ttk.Button(side, text=rotulo, style="Side.TButton",
                        command=cmd).pack(fill="x", padx=8, pady=1)
         ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
-        ttk.Label(side, text="BANCO", style="Panel.TLabel",
-                  font=("Segoe UI", 9, "bold"), foreground=MUT).pack(anchor="w", padx=12)
-        for rotulo, cmd in (("💾 Backup agora", self.backup),
-                            ("💾 Saves 3DS", self.backup_saves),
-                            ("⬇ Atualizar Azahar", self.atualizar_azahar),
-                            ("⬇ Atualizar DeSmuME", self.atualizar_desmume),
-                            ("💾 Exportar JSON…", self.exportar_json),
-                            ("📦 Pacote…", self.exportar_pacote)):
-            ttk.Button(side, text=rotulo, style="Side.TButton",
-                       command=cmd).pack(fill="x", padx=8, pady=1)
+        ttk.Button(side, text="⚙ Configurações", style="Side.TButton",
+                   command=self.abrir_configuracoes).pack(fill="x", padx=8, pady=1)
         self._pintar_nav()
 
         # coluna central
@@ -188,6 +256,26 @@ class App:
         self.ent_busca.pack(side="left")
         self.ent_busca.bind("<KeyRelease>", self._ao_digitar)
         ttk.Label(topo, text="  🔎 buscar", style="Mut.TLabel").pack(side="left")
+        self.btn_usuario = ttk.Button(topo, text="👤 —", style="Chip.TButton",
+                                      command=self.dlg_usuario)
+        self.btn_usuario.pack(side="right")
+        # linha de filtros: plataforma (PC/3DS/NDS) + etiqueta livre
+        ffilt = ttk.Frame(centro)
+        ffilt.pack(fill="x", padx=12, pady=(0, 2))
+        for plat in ("PC", "3DS", "NDS"):
+            b = ttk.Button(ffilt, text=plat, width=5, style="Chip.TButton",
+                           command=lambda p=plat: self._ir_plat(p))
+            b.pack(side="left", padx=(0, 4))
+            self.plat_btns[plat] = b
+        ttk.Label(ffilt, text="🏷", style="Mut.TLabel").pack(side="left", padx=(8, 2))
+        self.var_tagfiltro = tk.StringVar(value="")
+        self.cmb_tagfiltro = ttk.Combobox(ffilt, textvariable=self.var_tagfiltro,
+                                          values=[], width=22, font=("Segoe UI", 10))
+        self.cmb_tagfiltro.pack(side="left")
+        self.cmb_tagfiltro.bind("<<ComboboxSelected>>", lambda _e: self.recarregar())
+        self.cmb_tagfiltro.bind("<Return>", lambda _e: self.recarregar())
+        ttk.Button(ffilt, text="✕", width=3,
+                   command=self._limpar_filtros).pack(side="left", padx=(4, 0))
         self.lbl_cont = ttk.Label(centro, text="", style="Mut.TLabel")
         self.lbl_cont.pack(anchor="w", padx=14)
         self.canvas = tk.Canvas(centro, bg=BG, highlightthickness=0)
@@ -207,8 +295,8 @@ class App:
         det = ttk.Frame(self.root, style="Panel.TFrame", width=272)
         det.pack(side="right", fill="y")
         det.pack_propagate(False)
-        self.det_capa = tk.Canvas(det, width=200, height=260, bg=PANEL,
-                                  highlightthickness=0)
+        self.det_capa = tk.Canvas(det, width=216, height=280, bg=PANEL,
+                                  highlightthickness=2, highlightbackground=LINE)
         self.det_capa.pack(padx=16, pady=(16, 8))
         self.det_titulo = ttk.Label(det, text="", style="Title.TLabel",
                                     wraplength=240)
@@ -242,6 +330,11 @@ class App:
             b.configure(style="SideAct.TButton" if i == self.nav_idx else "Side.TButton")
         for chave, b in self.prov_btns.items():
             b.configure(style="SideAct.TButton" if chave == self.filtro_prov else "Side.TButton")
+        for plat, b in self.plat_btns.items():
+            try:
+                b.configure(style="ChipAct.TButton" if plat == self.filtro_plat else "Chip.TButton")
+            except tk.TclError:
+                pass
 
     def _ir_nav(self, i: int):
         self.nav_idx = i
@@ -250,6 +343,21 @@ class App:
 
     def _ir_prov(self, chave: str):
         self.filtro_prov = None if self.filtro_prov == chave else chave
+        self._pintar_nav()
+        self.recarregar()
+
+    def _ir_plat(self, plat: str):
+        self.filtro_plat = None if self.filtro_plat == plat else plat
+        self._pintar_nav()
+        self.recarregar()
+
+    def _limpar_filtros(self):
+        self.filtro_plat = None
+        self.filtro_prov = None
+        try:
+            self.var_tagfiltro.set("")
+        except (tk.TclError, AttributeError):
+            pass
         self._pintar_nav()
         self.recarregar()
 
@@ -266,7 +374,16 @@ class App:
 
     def _ao_redimensionar(self, e):
         self.canvas.itemconfig(self._win_grade, width=e.width)
-        self._reorganizar()
+        # coalesce: resize dispara Configure em rajada; reorganiza 1x por ciclo
+        try:
+            if getattr(self, "_reorg_pend", None):
+                self.root.after_cancel(self._reorg_pend)
+        except (tk.TclError, AttributeError):
+            pass
+        try:
+            self._reorg_pend = self.root.after_idle(self._reorganizar)
+        except tk.TclError:
+            pass
 
     def _rodar(self, e):
         try:
@@ -281,22 +398,261 @@ class App:
         except tk.TclError:
             pass
 
+    def _largura_coluna(self) -> int:
+        """Passo real de uma coluna (card medido + respiro do grid).
+
+        Mede o card MAIS LARGO (capas têm tamanhos distintos) em vez de
+        chutar: a conta fixa estourava a viewport e a última coluna sumia
+        atrás da borda do painel.
+        """
+        passo = CARD_W + 28
+        if self.cards:
+            try:
+                self.grade.update_idletasks()
+                mais_largo = max(c["frame"].winfo_reqwidth() for c in self.cards)
+                passo = max(passo, mais_largo + 28)
+            except (tk.TclError, ValueError):
+                pass
+        return max(1, passo)
+
     def _reorganizar(self):
-        larg = max(200, self.canvas.winfo_width())
-        cols = max(1, larg // (CARD_W + 24))
+        self._reorg_pend = None
+        try:
+            vp = max(200, self.canvas.winfo_width())
+        except tk.TclError:
+            return
+        cols = max(1, vp // self._largura_coluna())
         for i, c in enumerate(self.cards):
-            c["frame"].grid(row=i // cols, column=i % cols, padx=12, pady=10)
+            c["frame"].grid(row=i // cols, column=i % cols, padx=14, pady=12)
+        # trava de segurança: a grade nunca estoura a viewport (cards têm
+        # larguras distintas; a estimativa pode errar para mais)
+        try:
+            for _ in range(10):
+                self.grade.update_idletasks()
+                if self.grade.winfo_reqwidth() <= vp or cols <= 1:
+                    break
+                cols -= 1
+                for i, c in enumerate(self.cards):
+                    c["frame"].grid(row=i // cols, column=i % cols,
+                                    padx=14, pady=12)
+        except tk.TclError:
+            pass
 
     # -- dados
     def _con(self):
         return core.get_db(self.db_path)
 
+    def _thread_segura(self, trabalho, prog, contexto: str):
+        """Envolve trabalho de thread: nunca deixa modal órfão nem exceção muda."""
+        def alvo():
+            try:
+                trabalho()
+            except Exception as e:
+                msg = f"{type(e).__name__}: {e}"
+                try:
+                    core.log_erro(contexto, msg)
+                except Exception:
+                    pass
+
+                def fim(msg=msg):
+                    try:
+                        prog.destroy()
+                    except Exception:
+                        pass
+                    try:
+                        messagebox.showerror(contexto, f"falha inesperada: {msg}")
+                    except Exception:
+                        pass
+                try:
+                    self._depois(fim)
+                except Exception:
+                    pass
+        return alvo
+
+    # -- usuário jogador (perfis de D:\Games\trocar-nome-jogador.py)
+    def _mod_jogador(self):
+        """Importa o motor de nomes de jogador (ou None se ausente)."""
+        try:
+            import importlib.util
+            p = Path(core.WIN_ROOT) / "Games" / "trocar-nome-jogador.py"
+            if not p.is_file():
+                return None
+            spec = importlib.util.spec_from_file_location(
+                "trocar_nome_jogador", str(p))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+        except Exception:
+            return None
+
+    def _estado_jogador(self) -> dict:
+        mod = self._mod_jogador()
+        if mod is None:
+            return {"usuarios": [], "atual": "", "jogos": {}}
+        try:
+            from pathlib import Path as _P
+            return mod.carregar_estado(
+                _P(str(Path(core.WIN_ROOT) / "Games" / "trocar-nome-jogador.json")))
+        except Exception:
+            return {"usuarios": [], "atual": "", "jogos": {}}
+
+    def _atualizar_chip_usuario(self):
+        try:
+            atual = (self._estado_jogador().get("atual") or "").strip()
+        except Exception:
+            atual = ""
+        try:
+            self.btn_usuario.configure(text=f"👤 {atual}" if atual else "👤 —")
+        except (tk.TclError, AttributeError):
+            pass
+
+    def dlg_usuario(self):
+        """Mostra quem é o jogador atual e troca entre os salvos."""
+        mod = self._mod_jogador()
+        if mod is None:
+            messagebox.showinfo(
+                "Usuário jogador",
+                "Perfis indisponíveis: D:\\Games\\trocar-nome-jogador.py não encontrado.")
+            return
+        est = self._estado_jogador()
+        dlg = tk.Toplevel(self.root)
+        _titulo_escuro(dlg)
+        dlg.title("👤 Usuário jogador")
+        dlg.configure(bg=BG)
+        dlg.transient(self.root)
+        dlg.grab_set()
+        dlg.minsize(380, 0)
+        ttk.Label(dlg, wraplength=360, justify="left",
+                  text=("Nome gravado nos saves dos repacks (UserName=…). "
+                        "Trocar aqui reaplica o nome em todos os jogos.")).pack(
+                            anchor="w", padx=14, pady=(12, 6))
+        lb = tk.Listbox(dlg, bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                        font=("Segoe UI", 12), height=4)
+        lb.pack(fill="x", padx=14)
+        usuarios = list(est.get("usuarios") or [])
+        atual = (est.get("atual") or "").strip()
+        for u in usuarios:
+            lb.insert("end", f"● {u}" if u == atual else f"○ {u}")
+        if usuarios:
+            lb.selection_set(usuarios.index(atual) if atual in usuarios else 0)
+
+        def usar():
+            idx = lb.curselection()
+            if not idx and usuarios:
+                messagebox.showinfo("Usuário", "Selecione um usuário na lista.")
+                return
+            nome = usuarios[idx[0]] if idx else None
+            if nome is None:
+                return
+            dlg.destroy()
+            self._aplicar_usuario(nome)
+
+        def novo():
+            nome = simpledialog.askstring("Usuário jogador",
+                                          "Nome novo (máx 3 salvos):",
+                                          parent=dlg)
+            if not nome:
+                return
+            dlg.destroy()
+            self._aplicar_usuario(nome.strip())
+
+        lin = ttk.Frame(dlg)
+        lin.pack(fill="x", padx=14, pady=12)
+        ttk.Button(lin, text="Usar selecionado", style="Accent.TButton",
+                   command=usar).pack(side="left", expand=True, fill="x",
+                                      padx=(0, 3))
+        ttk.Button(lin, text="Novo…", command=novo).pack(
+            side="left", expand=True, fill="x", padx=(3, 0))
+
+    def sincronizar_nomes_boot(self):
+        """1,5s após abrir: aplica o usuário atual aos jogos novos (só nomes).
+
+        Roda em thread, silencioso; só avisa se algo mudou. Saves não
+        são tocados aqui (vão na troca manual de usuário).
+        """
+        def trabalho():
+            try:
+                mod = self._mod_jogador()
+                if mod is None or not hasattr(mod, "sincronizar_nomes"):
+                    return
+                res = mod.sincronizar_nomes()
+            except Exception as e:
+                try:
+                    core.log_erro("auto-nomes", f"{type(e).__name__}: {e}")
+                except Exception:
+                    pass
+                return
+            try:
+                aplicadas = int(res.get("aplicadas") or 0)
+            except Exception:
+                aplicadas = 0
+            if aplicadas > 0:
+                nome = res.get("nome") or ""
+
+                def fim():
+                    try:
+                        self._atualizar_chip_usuario()
+                        messagebox.showinfo(
+                            "Usuário jogador",
+                            f"'{nome}' aplicado a {aplicadas} jogo(s) novo(s) ✓")
+                    except Exception:
+                        pass
+
+                self._depois(fim)
+
+        import threading
+        threading.Thread(target=trabalho, daemon=True).start()
+
+    def _aplicar_usuario(self, nome: str):
+        mod = self._mod_jogador()
+        if mod is None:
+            return
+        prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
+        prog.title("Usuário jogador")
+        prog.transient(self.root)
+        ttk.Label(prog, text=f"Aplicando '{nome}' aos jogos...").pack(
+            padx=24, pady=24)
+        try:
+            prog.update()
+        except tk.TclError:
+            return
+
+        def trabalho():
+            rc = mod.main([nome, "--aplicar"])
+
+            def fim(rc=rc):
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    return
+                self._atualizar_chip_usuario()
+                if rc == 0:
+                    messagebox.showinfo("Usuário jogador",
+                                        f"'{nome}' aplicado aos jogos ✓")
+                else:
+                    messagebox.showerror("Usuário jogador",
+                                         "Falhou em algum jogo (backups .bak intactos).")
+
+            self._depois(fim)
+
+        import threading
+        threading.Thread(target=self._thread_segura(
+            trabalho, prog, "Usuário jogador"), daemon=True).start()
+
     def recarregar(self):
         _rot, status, fav = NAV[self.nav_idx]
+        try:
+            tag_txt = self.var_tagfiltro.get().strip()
+        except (tk.TclError, AttributeError):
+            tag_txt = ""
+        tags = [t.strip() for t in tag_txt.replace(";", ",").split(",") if t.strip()]
         con = self._con()
         try:
             self.jogos = core.listar_jogos(
-                con, q=self.var_q.get().strip(), status=status, favorito=fav)
+                con, q=self.var_q.get().strip(), status=status, favorito=fav,
+                etiquetas=tags or None,
+                plataformas=[self.filtro_plat] if self.filtro_plat else None)
             if self.filtro_prov:
                 self.jogos = core.jogos_do_provedor(self.jogos, self.filtro_prov)
             for r in core.provedores_resumo(con):
@@ -304,13 +660,23 @@ class App:
                 if b is not None:
                     marca = "✓" if r["instalado"] else "!"
                     b.configure(text=f"🎮{marca} {r['nome']} · {r['n']}")
+            try:
+                nomes_tags = [e["nome"] for e in core.listar_etiquetas(con)]
+                self.cmb_tagfiltro.configure(values=nomes_tags)
+            except (tk.TclError, AttributeError):
+                pass
         finally:
             con.close()
         for w in self.grade.winfo_children():
             w.destroy()
         self.cards = []
         self._imgs_cards = []
-        for j in self.jogos:
+        # virtualização simples: grade completa trava com 100s de capas;
+        # renderiza os 150 primeiros e orienta refinar a busca.
+        LIMITE_GRADE = 150
+        visiveis = self.jogos[:LIMITE_GRADE]
+        ocultos = len(self.jogos) - len(visiveis)
+        for j in visiveis:
             self.cards.append(self._criar_card(j))
         self._reorganizar()
         if self.sel is None or self.sel >= len(self.jogos):
@@ -321,9 +687,33 @@ class App:
         az = core.azahar_status()
         az_txt = "🎮 Azahar ✓" if az["instalado"] and az["chaves"] else (
             "🎮 Azahar !" if az["instalado"] else "🎮 Azahar ✗")
-        self.lbl_cont.configure(text=f"{n} jogo(s) · {az_txt}")
+        extra = f" · mostrando {len(visiveis)} (+{ocultos} ocultos — refine a busca)" if ocultos else ""
+        # avisos não-modais na barra (modais aqui travariam testes/sandbox)
+        try:
+            pend = core.listar_sessoes_pendentes()
+            if pend:
+                extra += f" · ⏱ {len(pend)} sessão(ões) pendente(s)"
+        except Exception:
+            pass
+        try:
+            idade = core.idade_ultimo_backup_dias()
+            if idade is None:
+                extra += " · sem backup"
+            elif idade > 7:
+                extra += f" · backup há {int(idade)}d"
+        except Exception:
+            pass
+        self.lbl_cont.configure(text=f"{n} jogo(s) · {az_txt}{extra}")
+        try:
+            self._atualizar_chip_usuario()
+        except Exception:
+            pass
         if n == 0:
-            self.lbl_vazio.configure(text="Nada aqui — use 📥 Importar…")
+            if (self.filtro_plat or self.filtro_prov or tag_txt
+                    or self.var_q.get().strip()):
+                self.lbl_vazio.configure(text="Nada aqui — ajuste busca/filtros ou ✕ limpa tudo")
+            else:
+                self.lbl_vazio.configure(text="Nada aqui — use 📥 Importar…")
             self.lbl_vazio.pack(anchor="w", padx=14)
         else:
             self.lbl_vazio.pack_forget()
@@ -337,39 +727,92 @@ class App:
                 img = carregar_miniatura(alvo)
         if img is not None:
             self._imgs_cards.append(img)
-            lb = tk.Label(fr, image=img, bg=CARD, cursor="hand2")
+            lb = tk.Label(fr, image=img, bg=CARD, cursor="hand2",
+                          highlightthickness=2, highlightbackground=CARD,
+                          borderwidth=0)
             lb.pack(padx=6, pady=(6, 2))
             fr._imgw = lb  # type: ignore[attr-defined]
         else:
             cv = tk.Canvas(fr, width=CARD_W, height=CARD_H, bg=CARD,
-                           highlightthickness=0, cursor="hand2")
+                           highlightthickness=2, highlightbackground=CARD,
+                           cursor="hand2")
             cv.pack(padx=6, pady=(6, 2))
-            desenhar_tile(cv, j["titulo"], CARD_W, CARD_H)
+            try:
+                plat_cv = j.get("plataforma") or core.plataforma_jogo(j)
+            except Exception:
+                plat_cv = ""
+            desenhar_tile(cv, j["titulo"], CARD_W, CARD_H, subtitulo=plat_cv)
             fr._tile = cv  # type: ignore[attr-defined]
             fr._imgw = cv  # type: ignore[attr-defined]
+        # etiqueta de plataforma no canto (roxo, como no print) + tags livres
+        try:
+            plat = j.get("plataforma") or core.plataforma_jogo(j)
+        except Exception:
+            plat = "PC"
+        tags = list(j.get("etiquetas_lista") or [])
+        badge_plat = tk.Label(fr, text=plat, bg=ACC, fg="white",
+                              font=("Segoe UI", 9, "bold"), padx=6, pady=2,
+                              cursor="hand2")
+        badge_plat.place(x=6, y=6)
+        fr._badge_plat = badge_plat  # type: ignore[attr-defined]
+        if tags:
+            txt_tags = ", ".join(tags[:2]) + (f" +{len(tags) - 2}" if len(tags) > 2 else "")
+            badge_tags = tk.Label(fr, text=f"🏷 {txt_tags}", bg="#0b0d12", fg=TXT,
+                                  font=("Segoe UI", 8), padx=5, pady=2, cursor="hand2")
+            badge_tags.place(x=6, y=30)
+            fr._badge_tags = badge_tags  # type: ignore[attr-defined]
         t = tk.Label(fr, text=f"{'★ ' if j['favorito'] else ''}{j['titulo']}",
                      bg=CARD, fg=TXT, wraplength=CARD_W + 8,
-                     font=("Segoe UI", 10, "bold"), cursor="hand2")
+                     font=("Segoe UI", 11, "bold"), cursor="hand2")
         t.pack()
         cor = STATUS_CORES.get(j["status"], MUT)
-        horas = f" · {j['horas']}h" if j["horas"] else ""
-        m = tk.Label(fr, text=f"{j['status']}{horas}", bg=CARD, fg=cor,
-                     font=("Segoe UI", 9), cursor="hand2")
-        m.pack(pady=(0, 6))
-        for w in (fr, t, m, getattr(fr, "_imgw", None)):
+        try:
+            horas_n = round(float(j["horas"] or 0), 2)
+        except (TypeError, ValueError):
+            horas_n = 0
+        horas = f" · {horas_n:g}h" if horas_n else ""
+        m = tk.Label(fr, text=f"{j['status']}{horas}{core.selo_confianca(j)}", bg=CARD, fg=cor,
+                     font=("Segoe UI", 9), wraplength=CARD_W + 8, justify="center", cursor="hand2")
+        m.pack(pady=(0, 8))
+        fr._titulo = t  # type: ignore[attr-defined]
+        fr._meta = m  # type: ignore[attr-defined]
+        for w in (fr, t, m, getattr(fr, "_imgw", None),
+                    getattr(fr, "_badge_plat", None), getattr(fr, "_badge_tags", None)):
             if w is None:
                 continue
+            try:
+                w._card = fr  # type: ignore[attr-defined]
+            except Exception:
+                pass
             w.bind("<Button-1>", lambda e: self._clicar(e))
             w.bind("<Double-Button-1>", lambda _e: self.jogar())
             w.bind("<Button-3>", lambda e: self._menu_ctx(e))
-            w.bind("<Enter>", lambda _e, t=t: t.configure(foreground=ACC))
-            w.bind("<Leave>", lambda _e, t=t: t.configure(foreground=TXT))
+            w.bind("<Enter>", lambda e: self._hover_card(e, True))
+            w.bind("<Leave>", lambda e: self._hover_card(e, False))
         return {"frame": fr, "jogo": j}
+
+    def _hover_card(self, e, on: bool):
+        """Acende o card inteiro no hover (fundo + título)."""
+        try:
+            fr = getattr(e.widget, "_card", None) or e.widget
+            t = getattr(fr, "_titulo", None)
+            m = getattr(fr, "_meta", None)
+            imgw = getattr(fr, "_imgw", None)
+            bg = CARD_HOVER if on else CARD
+            if t is not None:
+                t.configure(bg=bg, foreground=ACC if on else TXT)
+            if m is not None:
+                m.configure(bg=bg)
+            if isinstance(imgw, tk.Label):
+                imgw.configure(bg=bg)
+        except tk.TclError:
+            pass
 
     def _indice_do_widget(self, w) -> int | None:
         while w is not None:
+            card = getattr(w, "_card", None) or w
             for i, c in enumerate(self.cards):
-                if c["frame"] == w or getattr(w, "_card", None) == c["frame"]:
+                if c["frame"] is card or c["frame"] == w:
                     return i
             w = getattr(w, "master", None)
         return None
@@ -407,10 +850,21 @@ class App:
             fr = c["frame"]
             sel = (i == self.sel)
             fr.configure(style="Card.TFrame")
+            imgw = getattr(fr, "_imgw", None)
+            if isinstance(imgw, tk.Label):
+                try:
+                    imgw.configure(highlightbackground=ACC if sel else CARD)
+                except tk.TclError:
+                    pass
             for w in fr.winfo_children():
                 if isinstance(w, tk.Canvas) and w not in (self.det_capa,):
+                    try:
+                        w.configure(highlightbackground=ACC if sel else CARD)
+                    except tk.TclError:
+                        pass
                     desenhar_tile(w, c["jogo"]["titulo"], CARD_W, CARD_H,
-                                  selecionado=sel)
+                                  selecionado=sel,
+                                  subtitulo=(c["jogo"].get("plataforma") or ""))
 
     # -- detalhe / seleção
     def selecionado(self) -> dict | None:
@@ -424,16 +878,26 @@ class App:
             self.det_titulo.configure(text="Nenhum jogo")
             self.det_meta.configure(text="")
             self.det_exe.configure(text="")
-            desenhar_tile(self.det_capa, "?", 200, 260, grande=True)
+            desenhar_tile(self.det_capa, "?", 216, 280, grande=True)
             return
         j = self.jogos[self.sel]
         self.det_titulo.configure(
             text=f"{'★ ' if j['favorito'] else ''}{j['titulo']}")
         nota = f" · nota {j['nota']}" if j.get("nota") is not None else ""
-        horas = f" · {j['horas']}h" if j["horas"] else ""
+        try:
+            horas_n = round(float(j["horas"] or 0), 2)
+        except (TypeError, ValueError):
+            horas_n = 0
+        horas = f" · {horas_n:g}h" if horas_n else ""
+        try:
+            plat = j.get("plataforma") or core.plataforma_jogo(j)
+        except Exception:
+            plat = "PC"
+        tags = list(j.get("etiquetas_lista") or [])
         fichas = [x for x in (j.get("game_code"), j.get("regiao")) if x]
         self.det_meta.configure(
-            text=f"{j['status']}{nota}{horas} · {core.provedor_nome(j)}"
+            text=f"{j['status']}{nota}{horas}{core.selo_confianca(j)} · {core.provedor_nome(j)}"
+            + f"\n🏷 {plat}" + (f" · {', '.join(tags)}" if tags else "")
             + (f"\n🔖 {' · '.join(fichas)}" if fichas else "")
             + (f"\n🎛 preset {j['azahar_preset']}" if j.get("azahar_preset") else "")
             + (f"\n▶ {j['ultima_execucao']}" if j.get("ultima_execucao") else "")
@@ -442,13 +906,19 @@ class App:
         marca = "●" if j["exe_existe"] else ("○" if j["executable_path"] else "–")
         self.det_exe.configure(text=f"{marca} {exe}")
         self.det_capa.delete("all")
+        try:
+            self.det_capa.configure(highlightthickness=2,
+                                    highlightbackground=LINE)
+        except tk.TclError:
+            pass
         alvo = core.caminho_capa(j["capa"]) if j.get("capa") else None
-        img = carregar_miniatura(alvo, 200, 260) if alvo else None
+        img = carregar_miniatura(alvo, 216, 280) if alvo else None
         self._img_det = img
         if img is not None:
-            self.det_capa.create_image(100, 130, image=img)
+            self.det_capa.create_image(108, 140, image=img)
         else:
-            desenhar_tile(self.det_capa, j["titulo"], 200, 260, grande=True)
+            desenhar_tile(self.det_capa, j["titulo"], 216, 280, grande=True,
+                          subtitulo=plat)
 
     # -- ações
     def jogar(self):
@@ -471,18 +941,65 @@ class App:
                 res = core.executar_jogo_dict(j, elevar=True)
                 if res.get("ok"):
                     core.marcar_execucao(con, j["id"])
-                    messagebox.showinfo("Jogar", "Executando ✓ (UAC — horas manuais)")
+                    try:
+                        core.iniciar_sessao_manual(j["id"], j.get("titulo") or "")
+                    except Exception:
+                        pass
+                    messagebox.showinfo("Jogar", "Executando ✓ (UAC — sessão manual aberta; ao terminar use ⏱ Registrar sessão)")
                 else:
                     messagebox.showerror("Jogar", res.get("erro", "falha"))
             elif res.get("ok"):
                 core.marcar_execucao(con, j["id"])
-                extra = " ⏱ tempo será registrado" if res.get("rastreado") else ""
+                if res.get("rastreado"):
+                    extra = " ⏱ tempo será registrado"
+                else:
+                    extra = " ⏱ sem rastreio (startfile/UAC) — sessão manual aberta; ao terminar use ⏱ Registrar sessão"
                 messagebox.showinfo("Jogar", f"Executando ✓ ({res.get('modo')}){extra}")
             else:
                 messagebox.showerror("Jogar", res.get("erro", "falha"))
         finally:
             con.close()
         self.recarregar()
+
+    def registrar_sessao_manual(self):
+        """Fecha sessão manual: pergunta horas e soma (fallback UAC/startfile)."""
+        try:
+            pend = core.listar_sessoes_pendentes()
+        except Exception as e:
+            messagebox.showerror("Sessão", f"falha ao listar: {e}")
+            return
+        if not pend:
+            messagebox.showinfo("Sessão", "Nenhuma sessão manual pendente.")
+            return
+        if len(pend) == 1:
+            alvo = pend[0]
+        else:
+            lista = "\n".join(f"{i+1}. {p.get('titulo') or p.get('gid')} · {p.get('inicio')}" for i, p in enumerate(pend))
+            idx = simpledialog.askinteger("Sessão manual", lista + "\nNúmero:", minvalue=1, maxvalue=len(pend), parent=self.root)
+            if not idx:
+                return
+            alvo = pend[idx - 1]
+        horas = simpledialog.askfloat("Sessão manual", f"Horas jogadas em '{alvo.get('titulo') or alvo.get('gid')}'?", minvalue=0.0, parent=self.root)
+        if horas is None:
+            return
+        try:
+            res = core.encerrar_sessao_manual(alvo["_arquivo"], float(horas))
+        except Exception as e:
+            messagebox.showerror("Sessão", f"falha: {e}")
+            return
+        if res.get("ok"):
+            self.recarregar()
+            messagebox.showinfo("Sessão", f"+{horas}h registradas ✓" if horas else "Sessão encerrada (sem horas).")
+        else:
+            messagebox.showerror("Sessão", res.get("erro", "falha"))
+
+    def _verificar_sessoes_pendentes(self):
+        """Compat: avisos agora vão na barra de status (ver recarregar)."""
+        return 0
+
+    def _verificar_backup_antigo(self, dias: int = 7):
+        """Compat: avisos agora vão na barra de status (ver recarregar)."""
+        return None
 
     def _resolver_antes_de_jogar(self, con, j):
         """Perguntar-antes: emulador trocado? ROM sumida? Devolve jogo (talvez
@@ -504,7 +1021,6 @@ class App:
                 j = {**j, "executable_path": "", "exe_win": "", "exe_linux": ""}
         drom = core.diagnosticar_rom(j)
         if drom["estado"] == "rom-ausente":
-            launch = (j.get("launch_options") or "").strip()
             cands = drom["candidatos"]
             escolhido = None
             if cands:
@@ -577,11 +1093,12 @@ class App:
 
     def _dlg_jogo(self, j: dict | None):
         dlg = tk.Toplevel(self.root)
+        _titulo_escuro(dlg)
         dlg.title("Editar jogo" if j else "Adicionar jogo")
         dlg.configure(bg=BG)
         dlg.transient(self.root)
         dlg.grab_set()
-        dlg.minsize(560, 0)
+        dlg.minsize(640, 0)
         campos: dict[str, tk.Variable | tk.Text] = {}
 
         def secao(titulo):
@@ -592,32 +1109,25 @@ class App:
 
         def campo(pai, linha_n, rotulo, chave, valor=""):
             ttk.Label(pai, text=rotulo, style="Sec.TLabel").grid(
-                row=linha_n, column=0, sticky="w", padx=(0, 8), pady=4)
+                row=linha_n, column=0, sticky="w", padx=(0, 8), pady=6)
             v = tk.StringVar(value=valor)
-            e = ttk.Entry(pai, textvariable=v, font=("Segoe UI", 10))
-            e.grid(row=linha_n, column=1, sticky="ew", pady=4)
+            e = ttk.Entry(pai, textvariable=v, font=("Segoe UI", 12))
+            e.grid(row=linha_n, column=1, sticky="ew", pady=6)
             campos[chave] = v
             return e
 
-        # -- jogo
+        # -- jogo (só o essencial; status/nota/favorito preservados)
         fr_jogo = secao("Jogo")
-        campo(fr_jogo, 0, "Título *", "titulo", j["titulo"] if j else "")
-        ttk.Label(fr_jogo, text="Status", style="Sec.TLabel").grid(
-            row=1, column=0, sticky="w", padx=(0, 8), pady=4)
-        var_st = tk.StringVar(value=j["status"] if j else "backlog")
-        ttk.Combobox(fr_jogo, textvariable=var_st, values=list(core.STATUS_VALIDOS),
-                     state="readonly", width=16, font=("Segoe UI", 10)).grid(
-                         row=1, column=1, sticky="w", pady=4)
-        campos["status"] = var_st
-        var_fav = tk.BooleanVar(value=bool(j and j["favorito"]))
-        ttk.Checkbutton(fr_jogo, text="★ Favorito", variable=var_fav).grid(
-            row=2, column=1, sticky="w", pady=2)
-        campos["favorito"] = var_fav
+        campo(fr_jogo, 0, "Título *", "titulo", (j.get("titulo") if j else "") or "")
+        campo(fr_jogo, 1, "Etiquetas", "etiquetas", (j.get("etiquetas") if j else "") or "")
+        ttk.Label(fr_jogo, text="Livres, separadas por vírgula (ex.: rpg, souls-like)",
+                  style="Sec.TLabel", font=("Segoe UI", 11, "italic")).grid(
+                      row=2, column=1, sticky="w")
 
-        # -- execução
+        # -- execução (só o executável; resto preservado)
         fr_exe = secao("Execução")
-        ent_exe = campo(fr_exe, 0, "Executável", "executable_path",
-                        j["executable_path"] if j else "")
+        campo(fr_exe, 0, "Executável", "executable_path",
+              (j.get("executable_path") if j else "") or "")
 
         def procurar_exe():
             arq = filedialog.askopenfilename(
@@ -626,29 +1136,18 @@ class App:
             if arq:
                 campos["executable_path"].set(arq)
 
-        ttk.Button(fr_exe, text="🔍", width=3, command=procurar_exe).grid(
+        ttk.Button(fr_exe, text="🔍", width=4, command=procurar_exe).grid(
             row=0, column=2, padx=(6, 0))
-        campo(fr_exe, 1, "Exe Windows", "exe_win", j["exe_win"] if j else "")
-        campo(fr_exe, 2, "Exe Linux", "exe_linux", j["exe_linux"] if j else "")
-        campo(fr_exe, 3, "Lançamento", "launch_options", j["launch_options"] if j else "")
-        ttk.Label(fr_exe, text="Vazio = usa o executável de cima",
-                  style="Sec.TLabel", font=("Segoe UI", 9, "italic")).grid(
-                      row=4, column=1, sticky="w")
 
-        # -- avaliação
+        # -- avaliação (só horas; nota preservada)
         fr_av = secao("Avaliação")
         fr_av.grid_columnconfigure(1, weight=0)
-        var_nota = tk.StringVar(value="" if not j or j["nota"] is None else str(j["nota"]))
-        var_horas = tk.StringVar(value="0" if not j else str(j["horas"] or 0))
-        ttk.Label(fr_av, text="Nota 0–10", style="Sec.TLabel").grid(
-            row=0, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(fr_av, textvariable=var_nota, width=8, font=("Segoe UI", 10)).grid(
-            row=0, column=1, sticky="w", pady=4)
+        var_horas = tk.StringVar(value="0" if not j else str((j.get("horas") or 0)))
         ttk.Label(fr_av, text="Horas", style="Sec.TLabel").grid(
-            row=0, column=2, sticky="w", padx=(16, 8), pady=4)
-        ttk.Entry(fr_av, textvariable=var_horas, width=8, font=("Segoe UI", 10)).grid(
-            row=0, column=3, sticky="w", pady=4)
-        campos["nota"], campos["horas"] = var_nota, var_horas
+            row=0, column=0, sticky="w", padx=(0, 8), pady=6)
+        ttk.Entry(fr_av, textvariable=var_horas, width=10, font=("Segoe UI", 12)).grid(
+            row=0, column=1, sticky="w", pady=6)
+        campos["horas"] = var_horas
 
         # -- emulador (provider detectado pelo jogo; pode trocar)
         fr_emu = secao("Emulador")
@@ -672,19 +1171,19 @@ class App:
 
         var_prov = tk.StringVar(value=rotulos_prov[_prov_do_jogo(j)])
         ttk.Label(fr_emu, text="Sistema", style="Sec.TLabel").grid(
-            row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+            row=0, column=0, sticky="w", padx=(0, 8), pady=6)
         cmb_prov = ttk.Combobox(fr_emu, textvariable=var_prov,
                                 values=list(chaves_prov),
-                                state="readonly", font=("Segoe UI", 10))
-        cmb_prov.grid(row=0, column=1, columnspan=2, sticky="ew", pady=4)
+                                state="readonly", font=("Segoe UI", 12))
+        cmb_prov.grid(row=0, column=1, columnspan=2, sticky="ew", pady=6)
         fr_emu.grid_columnconfigure(1, weight=1)
         ttk.Label(fr_emu, text="Preset", style="Sec.TLabel").grid(
-            row=1, column=0, sticky="w", padx=(0, 8), pady=4)
+            row=1, column=0, sticky="w", padx=(0, 8), pady=6)
         var_preset = tk.StringVar(
             value=(j.get("azahar_preset") if j else "") or "")
         cmb_preset = ttk.Combobox(fr_emu, textvariable=var_preset,
-                                  font=("Segoe UI", 10))
-        cmb_preset.grid(row=1, column=1, sticky="ew", pady=4)
+                                  font=("Segoe UI", 12))
+        cmb_preset.grid(row=1, column=1, sticky="ew", pady=6)
         campos["azahar_preset"] = var_preset
 
         def _chave_sel():
@@ -719,16 +1218,16 @@ class App:
             else:
                 messagebox.showwarning("Preset", r.get("erro", "falha"))
 
-        ttk.Button(fr_emu, text="📸", width=3, command=foto_preset).grid(
+        ttk.Button(fr_emu, text="📸", width=4, command=foto_preset).grid(
             row=1, column=2, padx=(6, 0))
 
         # -- notas
         fr_obs = secao("Observações")
-        txt = tk.Text(fr_obs, height=3, bg="#0b0d12", fg=TXT, insertbackground=TXT,
-                      font=("Segoe UI", 10))
+        txt = tk.Text(fr_obs, height=4, bg="#0b0d12", fg=TXT, insertbackground=TXT,
+                      font=("Segoe UI", 12))
         txt.pack(fill="x")
-        if j and j["observacoes"]:
-            txt.insert("1.0", j["observacoes"])
+        if j and j.get("observacoes"):
+            txt.insert("1.0", j.get("observacoes") or "")
         campos["observacoes"] = txt
 
         # -- capa
@@ -738,48 +1237,58 @@ class App:
         prev = None
         if j and j.get("capa"):
             alvo = core.caminho_capa(j["capa"])
-            if alvo is not None and alvo.suffix.lower() in (".png", ".gif"):
+            if alvo is not None:
                 try:
-                    img = tk.PhotoImage(file=str(alvo))
-                    f = max(1, img.height() // 140)
-                    self._img_capa = img.subsample(f, f) if f > 1 else img
-                    prev = ttk.Label(fr_capa, image=self._img_capa, background=CARD)
-                    prev.grid(row=0, column=0, rowspan=2, padx=(0, 12))
-                except tk.TclError:
+                    img = carregar_miniatura(alvo, 200, 140)
+                    if img is not None:
+                        self._img_capa = img
+                        prev = ttk.Label(fr_capa, image=self._img_capa, background=CARD)
+                        prev.grid(row=0, column=0, rowspan=2, padx=(0, 12))
+                except Exception:
                     pass  # segue sem preview
+        try:
+            from PIL import Image  # noqa: F401
+            dica_pillow = ""
+        except Exception:
+            dica_pillow = " (jpg/webp exigem Pillow p/ preview; png sempre funciona)"
         lbl_capa = ttk.Label(fr_capa, style="Sec.TLabel",
-                             text=f"{j['capa']}" if j and j.get("capa") else "Sem capa")
+                             text=f"{j['capa']}" if j and j.get("capa") else "Sem capa" + dica_pillow)
         lbl_capa.grid(row=0, column=1, sticky="w")
 
         def trocar_capa():
             arq = filedialog.askopenfilename(
                 title="Capa (png/jpg/webp até 2 MB)",
-                filetypes=[("Imagens", "*.png *.jpg *.jpeg *.webp")])
+                filetypes=[("Imagens", "*.png *.jpg *.jpeg *.webp *.gif")])
             if arq:
                 var_capa.set(arq)
                 lbl_capa.configure(text=Path(arq).name)
 
         ttk.Button(fr_capa, text="Escolher capa…", command=trocar_capa).grid(
-            row=1, column=1, sticky="w", pady=(4, 0))
+            row=1, column=1, sticky="w", pady=(6, 0))
+
+        btn_salvar = ttk.Button(dlg, text="  Salvar  ", style="Big.Accent.TButton")
+        btn_salvar.pack(pady=18)
 
         def salvar():
             try:
-                nota_txt = var_nota.get().strip()
                 dados = {
                     "titulo": campos["titulo"].get().strip(),
                     "executable_path": campos["executable_path"].get().strip(),
-                    "exe_win": campos["exe_win"].get().strip(),
-                    "exe_linux": campos["exe_linux"].get().strip(),
-                    "status": var_st.get(),
-                    "nota": None if nota_txt == "" else int(nota_txt),
+                    # removidos da tela: preserva o gravado (ou padrão ao criar)
+                    "exe_win": ((j.get("exe_win") or "") if j else ""),
+                    "exe_linux": ((j.get("exe_linux") or "") if j else ""),
+                    "wine_prefix": ((j.get("wine_prefix") or "") if j else ""),
+                    "status": ((j.get("status") or "backlog") if j else "backlog"),
+                    "nota": ((j.get("nota")) if j else None),
                     "horas": float(var_horas.get().strip() or 0),
-                    "favorito": var_fav.get(),
-                    "launch_options": campos["launch_options"].get().strip(),
+                    "favorito": (bool(j.get("favorito")) if j else False),
+                    "launch_options": ((j.get("launch_options") or "") if j else ""),
                     "azahar_preset": campos["azahar_preset"].get().strip(),
+                    "etiquetas": campos["etiquetas"].get().strip(),
                     "observacoes": txt.get("1.0", "end").strip(),
                 }
             except ValueError:
-                messagebox.showerror("Salvar", "Nota deve ser inteiro 0–10; horas, número.")
+                messagebox.showerror("Salvar", "Horas deve ser número.")
                 return
             con = self._con()
             try:
@@ -789,37 +1298,71 @@ class App:
                 except (ValueError, LookupError) as e:
                     messagebox.showerror("Salvar", str(e))
                     return
-                if var_capa.get():
-                    p = Path(var_capa.get())
-                    if p.suffix.lower() not in core.CAPA_EXTS:
-                        messagebox.showerror("Capa", "Use png/jpg/webp.")
-                        return
-                    try:
-                        raw = p.read_bytes()
-                    except OSError as e:
-                        messagebox.showerror("Capa", f"não consegui ler o arquivo: {e}")
-                        return
-                    if len(raw) > 2_000_000:
-                        messagebox.showerror("Capa", "Arquivo maior que 2 MB.")
-                        return
-                    res = core.salvar_capa(con, novo["id"], p.name,
-                                           base64.b64encode(raw).decode())
-                    if not res.get("ok"):
-                        messagebox.showerror("Capa", res.get("erro", "falha"))
-                        return
+                capa_orig = var_capa.get().strip()
+                gid = novo["id"]
             finally:
                 con.close()
-            dlg.destroy()
-            self.sel = None
-            self.recarregar()
-            messagebox.showinfo("Biblioteca", "Salvo ✓")
+            if not capa_orig:
+                dlg.destroy()
+                self.sel = None
+                self.recarregar()
+                messagebox.showinfo("Biblioteca", "Salvo ✓")
+                return
+            # capa em thread: não trava a UI com arquivos de 2MB
+            p = Path(capa_orig)
+            if p.suffix.lower() not in core.CAPA_EXTS:
+                messagebox.showerror("Capa", "Use png/jpg/webp.")
+                return
+            try:
+                btn_salvar.configure(state="disabled", text="Salvando capa…")
+            except tk.TclError:
+                pass
 
-        ttk.Button(dlg, text="  Salvar  ", command=salvar,
-                   style="Big.Accent.TButton").pack(pady=14)
+            def trabalho_capa(caminho=p, gid_capa=gid):
+                try:
+                    raw = caminho.read_bytes()
+                except OSError as e:
+                    msg = f"não consegui ler o arquivo: {e}"
+                    return self._depois(lambda m=msg: _falha_capa(m))
+                if len(raw) > 2_000_000:
+                    return self._depois(lambda: _falha_capa("Arquivo maior que 2 MB."))
+                con2 = self._con()
+                try:
+                    res = core.salvar_capa_bytes(con2, gid_capa, caminho.name, raw)
+                except Exception as e:
+                    core.log_erro("salvar-capa", f"{type(e).__name__}: {e}")
+                    res = {"ok": False, "erro": f"{type(e).__name__}: {e}"}
+                finally:
+                    con2.close()
+
+                def fim(res=res):
+                    try:
+                        dlg.destroy()
+                    except tk.TclError:
+                        pass
+                    self.sel = None
+                    self.recarregar()
+                    if not res.get("ok"):
+                        messagebox.showerror("Capa", res.get("erro", "falha"))
+                    else:
+                        messagebox.showinfo("Biblioteca", "Salvo ✓")
+                self._depois(fim)
+
+            def _falha_capa(msg):
+                try:
+                    btn_salvar.configure(state="normal", text="  Salvar  ")
+                except tk.TclError:
+                    pass
+                messagebox.showerror("Capa", msg)
+
+            threading.Thread(target=trabalho_capa, daemon=True).start()
+
+        btn_salvar.configure(command=salvar)
 
     # -- importação unificada (pasta ou arquivo; emulador detectado sozinho)
     def importar_unificado(self):
         dlg = tk.Toplevel(self.root)
+        _titulo_escuro(dlg)
         dlg.title("Importar")
         dlg.configure(bg=BG)
         dlg.transient(self.root)
@@ -866,6 +1409,7 @@ class App:
 
     def _importar_pasta(self, pasta: str):
         prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
         prog.title("Importar pasta")
         prog.transient(self.root)
         ttk.Label(prog, text="Varrendo pasta (só leitura)...").pack(padx=24, pady=24)
@@ -900,15 +1444,23 @@ class App:
                     return
                 sub = f"{len(itens)} achado(s)."
                 if info.get("truncado"):
-                    sub += " LISTA PARCIAL (teto de varredura)."
+                    sub += " LISTA PARCIAL (teto de varredura — refine a pasta)."
                 if not info.get("emu"):
                     sub += (" ROMs importam sem executável (Azahar ausente) — "
                             "instale com 'Atualizar Azahar'.")
                 self._dlg_prev("Preview — Pasta",
                                sub + " Pré-marcados: score ≥ 0.3.", itens)
+                if info.get("truncado"):
+                    try:
+                        messagebox.showwarning(
+                            "Importar pasta",
+                            f"Lista parcial: {info.get('vistos', 0)} arquivos vistos, "
+                            "teto estourou. Refine a pasta ou defina BIBLIOTECA_SCAN_ROOTS.")
+                    except Exception:
+                        pass
             na_ui(pronto)
 
-        threading.Thread(target=trabalho, daemon=True).start()
+        threading.Thread(target=self._thread_segura(trabalho, prog, "Importar pasta"), daemon=True).start()
 
     def _importar_arquivo(self, arq: str):
         ana = core.analisar_arquivo(arq)
@@ -922,6 +1474,7 @@ class App:
         elif tipo in ("rom", "jogo"):
             if ana.get("aviso") and not messagebox.askyesno("Importar", f"{ana['aviso']}\n\nImportar mesmo assim?"):
                 return
+            self._backup_pre_import()
             con = self._con()
             try:
                 res = core.importar_lista(con, [ana["item"]])
@@ -939,6 +1492,7 @@ class App:
     # -- preview / importação
     def _dlg_prev(self, titulo: str, sub: str, itens: list[dict]):
         dlg = tk.Toplevel(self.root)
+        _titulo_escuro(dlg)
         dlg.title(titulo)
         dlg.configure(bg=BG)
         dlg.geometry("700x480")
@@ -962,6 +1516,7 @@ class App:
                 messagebox.showinfo(titulo, "Nada selecionado.")
                 return
             sel = [itens[i] for i in idx]
+            self._backup_pre_import()
             con = self._con()
             try:
                 res = core.importar_lista(con, sel)
@@ -975,8 +1530,13 @@ class App:
         ttk.Button(dlg, text="Importar selecionados", command=importar,
                    style="Accent.TButton").pack(pady=8)
 
+    def _backup_pre_import(self):
+        """Backup silencioso antes de importar (nunca bloqueia o import)."""
+        core.backup_pre_import(self.db_path)
+
     def _ler_do_disco(self):
         prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
         prog.title("Ler do disco")
         prog.transient(self.root)
         ttk.Label(prog, text="Lendo Hydra, lojas e programas (só leitura)...").pack(
@@ -1021,7 +1581,7 @@ class App:
                                sub + " Pré-marcados: score ≥ 0.3.", itens)
             na_ui(pronto)
 
-        threading.Thread(target=trabalho, daemon=True).start()
+        threading.Thread(target=self._thread_segura(trabalho, prog, "Ler do disco"), daemon=True).start()
 
     def backup_saves(self):
         try:
@@ -1034,6 +1594,40 @@ class App:
                                 f"{res['arquivos']} arquivo(s)\n{res['arquivo']}")
         else:
             messagebox.showwarning("Saves 3DS", res.get("erro", "falha"))
+
+    def abrir_configuracoes(self):
+        """Técnico fora da tela inicial: backup, sessão, emuladores, JSON."""
+        dlg = tk.Toplevel(self.root)
+        _titulo_escuro(dlg)
+        dlg.title("⚙ Configurações")
+        dlg.configure(bg=BG)
+        dlg.transient(self.root)
+        dlg.grab_set()
+        dlg.minsize(420, 0)
+        ttk.Label(dlg, text="Coisas técnicas — a biblioteca mora na tela inicial.",
+                  style="Sec.TLabel",
+                  font=("Segoe UI", 11, "italic")).pack(anchor="w", padx=14, pady=(12, 2))
+
+        def secao(titulo):
+            fr = ttk.LabelFrame(dlg, text=f"  {titulo}  ", style="Sec.TLabelframe")
+            fr.pack(fill="x", padx=12, pady=(10, 0))
+            fr.columnconfigure(0, weight=1)
+            return fr
+
+        fr_banco = secao("Banco")
+        for rotulo, cmd in (("💾 Backup agora", self.backup),
+                            ("💾 Saves 3DS", self.backup_saves),
+                            ("⏱ Registrar sessão", self.registrar_sessao_manual),
+                            ("💾 Exportar JSON…", self.exportar_json),
+                            ("📦 Pacote…", self.exportar_pacote)):
+            ttk.Button(fr_banco, text=rotulo, command=cmd).pack(
+                fill="x", padx=4, pady=3)
+        fr_emu = secao("Emuladores")
+        for rotulo, cmd in (("⬇ Atualizar Azahar", self.atualizar_azahar),
+                            ("⬇ Atualizar DeSmuME", self.atualizar_desmume)):
+            ttk.Button(fr_emu, text=rotulo, command=cmd).pack(
+                fill="x", padx=4, pady=3)
+        ttk.Button(dlg, text="Fechar", command=dlg.destroy).pack(pady=14)
 
     def _depois(self, fn):
         try:
@@ -1051,6 +1645,7 @@ class App:
         prov = core.provedores()[chave]
         nome = prov["nome"]
         prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
         prog.title(nome)
         prog.transient(self.root)
         lbl = ttk.Label(prog, text="Consultando releases...")
@@ -1097,15 +1692,13 @@ class App:
 
             self._depois(decidir)
 
-        threading.Thread(target=trabalho, daemon=True).start()
-
-    def _baixar_azahar(self, info):
-        self._baixar_emu("azahar", info)
+        threading.Thread(target=self._thread_segura(trabalho, prog, "Atualizar emulador"), daemon=True).start()
 
     def _baixar_emu(self, chave: str, info):
         prov = core.provedores()[chave]
         nome = prov["nome"]
         prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
         prog.title(nome)
         prog.transient(self.root)
         lbl = ttk.Label(prog, text="Baixando...")
@@ -1144,7 +1737,7 @@ class App:
 
             self._depois(fim)
 
-        threading.Thread(target=trabalho, daemon=True).start()
+        threading.Thread(target=self._thread_segura(trabalho, prog, "Baixar emulador"), daemon=True).start()
 
     def backup(self):
         try:
@@ -1161,19 +1754,16 @@ class App:
             initialfile="biblioteca.json")
         if not dest:
             return
-        con = self._con()
         try:
-            jogos = core.listar_jogos(con)
-            dados = {"exportado_em": core.agora_iso(), "jogos": jogos}
-        finally:
-            con.close()
-        try:
-            Path(dest).write_text(json.dumps(dados, ensure_ascii=False, indent=2),
-                                   encoding="utf-8")
-        except OSError as e:
+            res = core.exportar_json(dest, db_path=self.db_path)
+        except Exception as e:
             messagebox.showerror("Exportar", f"falha ao gravar: {e}")
+            core.log_erro("exportar-json", str(e))
             return
-        messagebox.showinfo("Exportar", f"Exportados {len(jogos)} jogo(s).")
+        if not res.get("ok"):
+            messagebox.showerror("Exportar", res.get("erro", "falha"))
+            return
+        messagebox.showinfo("Exportar", f"Exportados {res['jogos']} jogo(s).")
 
     def importar_json(self, arq: str | None = None):
         if not arq:
@@ -1190,6 +1780,7 @@ class App:
         if not isinstance(lista, list):
             messagebox.showerror("Importar", "JSON deve ser lista ou {jogos:[...]}.")
             return
+        self._backup_pre_import()
         con = self._con()
         try:
             res = core.importar_lista(con, lista)
@@ -1207,6 +1798,7 @@ class App:
         if not dest:
             return
         prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
         prog.title("Pacote")
         prog.transient(self.root)
         ttk.Label(prog, text="Empacotando (só leitura)...").pack(padx=24, pady=24)
@@ -1248,7 +1840,7 @@ class App:
 
             na_ui(pronto)
 
-        threading.Thread(target=trabalho, daemon=True).start()
+        threading.Thread(target=self._thread_segura(trabalho, prog, "Pacote"), daemon=True).start()
 
     def importar_pacote(self, arq: str | None = None):
         if not arq:
@@ -1258,6 +1850,7 @@ class App:
                 return
         quer_saves = messagebox.askyesno("Pacote", "Restaurar os saves 3DS do pacote?")
         prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
         prog.title("Pacote")
         prog.transient(self.root)
         ttk.Label(prog, text="Restaurando pacote...").pack(padx=24, pady=24)
@@ -1301,18 +1894,33 @@ class App:
 
             na_ui(pronto)
 
-        threading.Thread(target=trabalho, daemon=True).start()
+        threading.Thread(target=self._thread_segura(trabalho, prog, "Pacote"), daemon=True).start()
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Minha Biblioteca de Jogos — app Windows (tkinter)")
+    ap = argparse.ArgumentParser(description="TucoTeca — app Windows (tkinter)")
     ap.add_argument("--db", default=str(core.DEFAULT_DB))
     ap.add_argument("--selftest", action="store_true",
                     help="monta a UI oculta, recarrega e sai")
+    ap.add_argument("--ignorar-lock", action="store_true",
+                    help="abre mesmo com lock de outra instância (após crash)")
     args = ap.parse_args(argv)
     core.garantir_dirs()
+    lk = core.adquirir_lock(ignorar=args.ignorar_lock)
+    if not lk.get("ok"):
+        try:
+            r = tk.Tk()
+            r.withdraw()
+            messagebox.showerror("Biblioteca", lk.get("erro", "já aberta"))
+            r.destroy()
+        except Exception:
+            print(f"[erro] {lk.get('erro')}")
+        return 2
+    import atexit
+    atexit.register(core.liberar_lock)
     core.get_db(Path(args.db)).close()
     root = tk.Tk()
+    _titulo_escuro(root)
     app = App(root, Path(args.db))
     if args.selftest:
         root.withdraw()
@@ -1320,9 +1928,14 @@ def main(argv: list[str] | None = None) -> int:
         n = len(app.jogos)
         ncards = len(app.cards)
         root.destroy()
+        core.liberar_lock()
         print(f"[ok] selftest: UI montada, {n} jogo(s), {ncards} card(s)")
         return 0
-    root.mainloop()
+    try:
+        root.after(1500, app.sincronizar_nomes_boot)
+        root.mainloop()
+    finally:
+        core.liberar_lock()
     return 0
 
 

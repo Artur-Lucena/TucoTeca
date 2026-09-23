@@ -13,3 +13,6 @@ Thumbs.db
 dist/
 codigo/ferramentas/.cache/
 codigo/ferramentas/.build/
+# Trava de instância e atalho locais — máquina, não repo
+.biblioteca.lock
+*.lnk

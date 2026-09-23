@@ -23,14 +23,12 @@ from bib_nucleo.base import (BACKUP_DIR, LINUX_ROOT, PRESETS_DIR, ROM_EXTS_3DS,
 from bib_nucleo.banco import contar_por_origem
 
 
-
 def azahar_dir_override() -> Path | None:
     """Destino explícito do portátil, inclusive antes da primeira instalação."""
     env = (os.environ.get("BIBLIOTECA_AZAHAR_DIR") or "").strip()
     if env:
         return Path(env)
     return None
-
 
 
 def default_emu_3ds() -> str:
@@ -58,7 +56,6 @@ def default_emu_3ds() -> str:
     return ""
 
 
-
 def azahar_user_dir(exe: str = "") -> str:
     """Pasta user do Azahar (portátil ao lado do exe vence os padrões do SO)."""
     exe = exe or default_emu_3ds()
@@ -71,7 +68,6 @@ def azahar_user_dir(exe: str = "") -> str:
     else:
         base = Path.home() / ".local/share/azahar-emu"
     return str(base) if base.is_dir() else ""
-
 
 
 def azahar_status() -> dict:
@@ -90,7 +86,6 @@ def azahar_status() -> dict:
     return st
 
 
-
 # --------------------------------------------------------------------------
 # Gerenciador do Azahar: verifica, baixa, confere sha256 e instala sozinho
 # --------------------------------------------------------------------------
@@ -98,7 +93,6 @@ def azahar_status() -> dict:
 AZAHAR_API_LATEST = "https://api.github.com/repos/azahar-emu/azahar/releases/latest"
 
 AZAHAR_VERSAO_ARQ = "versao-azahar.txt"
-
 
 
 def _emu_dir() -> Path:
@@ -110,7 +104,6 @@ def _emu_dir() -> Path:
     return Path(LINUX_ROOT) / "Games/Emuladores/Azahar"
 
 
-
 def azahar_versao_local() -> str:
     arq = _emu_dir() / AZAHAR_VERSAO_ARQ
     try:
@@ -119,7 +112,6 @@ def azahar_versao_local() -> str:
     except OSError:
         pass
     return ""
-
 
 
 def azahar_release_info(timeout: int = 25) -> dict:
@@ -144,17 +136,10 @@ def azahar_release_info(timeout: int = 25) -> dict:
     return {"erro": "asset deste SO não encontrado no release"}
 
 
-
-
-
-
 def azahar_instalar(info: dict, progresso=None) -> dict:
     """Atualiza o runtime atual com backup, diário e verificação SHA-256."""
     from bib_nucleo.atualizacao import instalar
     return instalar(info, _emu_dir(), progresso)
-
-
-
 
 
 # --------------------------------------------------------------------------
@@ -201,6 +186,14 @@ def default_emu_nds() -> str:
         imgs = sorted(pasta.glob("desmume*.AppImage"))
         if imgs:
             return str(imgs[-1])
+    # sem AppImage: aceita DeSmuME do sistema (pacote/flatpak/snap)
+    import shutil
+    for cand in (shutil.which("desmume"),
+                 str(Path.home() / ".local/share/flatpak/exports/bin/org.desmume.DeSmuME"),
+                 "/var/lib/flatpak/exports/bin/org.desmume.DeSmuME",
+                 "/snap/bin/desmume"):
+        if cand and Path(cand).is_file():
+            return cand
     return ""
 
 
@@ -225,7 +218,14 @@ def desmume_versao_local() -> str:
 
 
 def desmume_release_info(timeout: int = 25) -> dict:
-    """{'tag','nome','size','sha256','url'} do win64.zip, ou {'erro':...}."""
+    """{'tag','nome','size','sha256','url'} do win64.zip, ou {'erro':...}.
+
+    Linux: release oficial só tem zip Windows; AppImage manual.
+    """
+    if os.name != "nt":
+        return {"erro": ("Atualização automática do DeSmuME só no Windows. "
+                         "No Linux, baixe o AppImage manual para Games/Emuladores/DeSmuME "
+                         "ou defina BIBLIOTECA_EMULADOR_NDS.")}
     try:
         with urllib.request.urlopen(DESMUME_API_LATEST, timeout=timeout) as r:
             rel = json.loads(r.read().decode("utf-8"))
@@ -244,6 +244,9 @@ def desmume_release_info(timeout: int = 25) -> dict:
 
 def desmume_instalar(info: dict, progresso=None) -> dict:
     """Baixa o win64.zip e instala como desmume.exe (transacional, como Azahar)."""
+    if os.name != "nt":
+        return {"ok": False, "erro": ("Instalação automática do DeSmuME só no Windows. "
+                                      "No Linux use AppImage manual.")}
     from bib_nucleo.atualizacao import instalar
     return instalar(info, desmume_dir(), progresso, exe_nomes=("DeSmuME*.exe",),
                     deps=(), renomear_exe="desmume.exe",
@@ -261,7 +264,6 @@ def desmume_config_atual() -> Path | None:
 
 def desmume_flags() -> list[str]:
     """Flags extras ao bootar ROM NDS (padrão tela cheia em janela)."""
-    import shlex
     return shlex.split(os.environ.get("BIBLIOTECA_DESMUME_FLAGS", "--windowed-fullscreen"),
                        posix=(os.name != "nt"))
 
@@ -287,7 +289,8 @@ def _prov_desmume() -> dict:
         "ler_metadados": ler_metadados_nds,
         "icone": icone_nds_para_png,
         "dica_instalacao": ("DeSmuME não encontrado — instale em "
-                            "Games/Emuladores/DeSmuME ou defina BIBLIOTECA_EMULADOR_NDS."),
+                            "Games/Emuladores/DeSmuME (Win: desmume.exe, "
+                            "Linux: desmume*.AppImage) ou defina BIBLIOTECA_EMULADOR_NDS."),
     }
 
 # --------------------------------------------------------------------------
@@ -296,7 +299,6 @@ def _prov_desmume() -> dict:
 
 def _eh_elevacao_necessaria(e: Exception) -> bool:
     return isinstance(e, OSError) and getattr(e, "winerror", None) == 740
-
 
 
 def executar_elevado(executable_path: str, launch_options: str = "") -> dict:
@@ -319,7 +321,6 @@ def executar_elevado(executable_path: str, launch_options: str = "") -> dict:
         except Exception as e:
             return {"ok": False, "erro": f"{type(e).__name__}: {e}"}
     return {"ok": False, "erro": "elevação só existe no Windows"}
-
 
 
 def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "",
@@ -379,7 +380,6 @@ def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "
         return {"ok": False, "erro": f"{type(e).__name__}: {e}"}, None
 
 
-
 def _lancar_jogo_dict(jogo: dict, elevar: bool = False) -> tuple[dict, object | None]:
     """Resolve o exe do SO atual (exe_win/exe_linux vencem) e lança.
 
@@ -390,9 +390,14 @@ def _lancar_jogo_dict(jogo: dict, elevar: bool = False) -> tuple[dict, object | 
     exe, _origem = resolver_exe(jogo)
     if prov is not None:
         from bib_nucleo.atualizacao import recuperar
-        recuperacao = recuperar(_emu_dir())
-        if not recuperacao["ok"]:
-            return {"ok": False, "erro": recuperacao["erro"]}, None
+        exe_prov = prov["exe"]() or ""
+        # diário do provider atual (não do Azahar fixo): update interrompido
+        # de qualquer emulador bloqueia o play com erro claro
+        alvo_rec = Path(exe_prov).parent if exe_prov else None
+        if alvo_rec is not None:
+            recuperacao = recuperar(alvo_rec)
+            if not recuperacao["ok"]:
+                return {"ok": False, "erro": recuperacao["erro"]}, None
     if not exe and prov is not None:
         exe = prov["exe"]() or ""  # linha sem emu (ou apagado): o instalado vale
     if not exe and prov is not None:
@@ -403,12 +408,10 @@ def _lancar_jogo_dict(jogo: dict, elevar: bool = False) -> tuple[dict, object | 
     return _lancar(exe, (jogo.get("wine_prefix") or ""), launch, elevar=elevar)
 
 
-
 def executar_jogo_dict(jogo: dict, elevar: bool = False) -> dict:
     """Resolve o exe do SO atual (exe_win/exe_linux vencem) e executa."""
     res, _proc = _lancar_jogo_dict(jogo, elevar)
     return res
-
 
 
 def diagnosticar_exe(jogo: dict) -> dict:
@@ -435,7 +438,6 @@ def diagnosticar_exe(jogo: dict) -> dict:
     return {"estado": "ausente", "gravado": exe, "atual": ""}
 
 
-
 def diagnosticar_rom(jogo: dict) -> dict:
     """A ROM (launch_options) existe? Se não, procura candidatas pelo nome."""
     launch = (jogo.get("launch_options") or "").strip().strip('"')
@@ -449,7 +451,6 @@ def diagnosticar_rom(jogo: dict) -> dict:
         return {"estado": "ok", "candidatos": []}
     base = launch.replace("\\", "/").rsplit("/", 1)[-1]
     return {"estado": "rom-ausente", "candidatos": procurar_rom(base) if base else []}
-
 
 
 def procurar_rom(nome_arquivo: str, roots: list[str] | None = None,
@@ -497,12 +498,10 @@ def procurar_rom(nome_arquivo: str, roots: list[str] | None = None,
     return sorted(achados)
 
 
-
 def azahar_flags() -> list[str]:
     """Flags extras ao bootar ROM (padrão -f fullscreen; vazio desliga)."""
     return shlex.split(os.environ.get("BIBLIOTECA_AZAHAR_FLAGS", "-f"),
                        posix=(os.name != "nt"))
-
 
 
 # --------------------------------------------------------------------------
@@ -510,7 +509,6 @@ def azahar_flags() -> list[str]:
 # --------------------------------------------------------------------------
 
 LIMIAR_SESSAO_S = 30  # sessões mais curtas não contam (clique de teste)
-
 
 
 def _vigiar_processo(proc, limiar_s: float, ao_fim) -> None:
@@ -527,28 +525,109 @@ def _vigiar_processo(proc, limiar_s: float, ao_fim) -> None:
         pass
 
 
-
 def executar_monitorado(jogo: dict, ao_fim=None,
                         limiar_s: float = LIMIAR_SESSAO_S) -> dict:
     """Lança e, havendo handle (Popen), vigia o fim em thread daemon.
 
     ao_fim(sessao_horas, rastreado) roda na thread vigia — o frontend deve
     despachar para a thread de UI. Sem handle (startfile/UAC) e com ok:
-    chama ao_fim(0.0, False) direto. Limite honesto: fechar o launcher
-    antes do jogo mata a vigia e perde a sessão.
+    abre sessão manual (arquivo em dados/sessoes/) e chama ao_fim(0.0, False).
+    Se o launcher fechar, a sessão manual sobrevive e pode ser reconciliada.
     """
+    from bib_nucleo.base import SESSOES_DIR
     res, proc = _lancar_jogo_dict(jogo)
     rastreavel = bool(res.get("ok")) and proc is not None
     res["rastreado"] = rastreavel
     if ao_fim is None:
+        if bool(res.get("ok")) and not rastreavel:
+            try:
+                iniciar_sessao_manual(int(jogo.get("id") or 0),
+                                      str(jogo.get("titulo") or ""))
+            except Exception:
+                pass
         return res
     if rastreavel:
         threading.Thread(target=_vigiar_processo, args=(proc, limiar_s, ao_fim),
                          daemon=True).start()
     elif res.get("ok"):
+        try:
+            iniciar_sessao_manual(int(jogo.get("id") or 0),
+                                  str(jogo.get("titulo") or ""))
+        except Exception:
+            pass
         ao_fim(0.0, False)
     return res
 
+
+def iniciar_sessao_manual(gid: int, titulo: str = "") -> dict:
+    """Abre marcador de sessão não-rastreada (UAC/startfile). Sobrevive a restart."""
+    from bib_nucleo.base import SESSOES_DIR, agora_iso
+    try:
+        SESSOES_DIR.mkdir(parents=True, exist_ok=True)
+        ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        arq = SESSOES_DIR / f"sessao-{int(gid)}-{ts}.json"
+        arq.write_text(json.dumps({"gid": int(gid), "titulo": titulo,
+                                   "inicio": agora_iso(), "modo": "manual"},
+                                  ensure_ascii=False, indent=2), encoding="utf-8")
+        return {"ok": True, "arquivo": str(arq)}
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}
+
+
+def listar_sessoes_pendentes() -> list[dict]:
+    """Sessões manuais ainda não reconciliadas (p/ prompt no próximo abrir)."""
+    from bib_nucleo.base import SESSOES_DIR
+    out: list[dict] = []
+    try:
+        if not SESSOES_DIR.is_dir():
+            return out
+        for arq in sorted(SESSOES_DIR.glob("sessao-*.json")):
+            try:
+                d = json.loads(arq.read_text(encoding="utf-8"))
+                d["_arquivo"] = str(arq)
+                out.append(d)
+            except (OSError, ValueError):
+                continue
+    except OSError:
+        pass
+    return out
+
+
+def encerrar_sessao_manual(arquivo: str, horas: float = 0.0) -> dict:
+    """Fecha marcador: soma horas (se >0) e apaga arquivo. Sempre remove."""
+    from bib_nucleo.base import SESSOES_DIR
+    from bib_nucleo.banco import adicionar_horas, get_db
+    from bib_nucleo.base import DEFAULT_DB
+    p = Path(arquivo)
+    gid = 0
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+        gid = int(d.get("gid") or 0)
+    except (OSError, ValueError, TypeError):
+        try:
+            p.unlink()
+        except OSError:
+            pass
+        return {"ok": False, "erro": "marcador inválido (removido)"}
+    res = {"ok": True, "somado": 0.0}
+    if horas and horas > 0 and gid:
+        try:
+            con = get_db(DEFAULT_DB)
+            try:
+                r = adicionar_horas(con, gid, float(horas))
+            finally:
+                con.close()
+            if r.get("ok"):
+                res["somado"] = r["somado"]
+            else:
+                res = {"ok": False, "erro": r.get("erro", "falha")}
+        except Exception as e:
+            return {"ok": False, "erro": f"{type(e).__name__}: {e}"}
+    try:
+        p.unlink()
+    except OSError:
+        pass
+    return res
 
 
 # --------------------------------------------------------------------------
@@ -585,11 +664,9 @@ def _prov_azahar() -> dict:
     }
 
 
-
 def provedores() -> dict:
     """chave -> spec. Construído sob demanda (as funções existem no import)."""
     return {"azahar": _prov_azahar(), "desmume": _prov_desmume()}
-
 
 
 def provedor_por_origem(origem: str) -> dict | None:
@@ -597,7 +674,6 @@ def provedor_por_origem(origem: str) -> dict | None:
         if (origem or "") in prov["origens"]:
             return prov
     return None
-
 
 
 def provedor_por_extensao(ext: str) -> dict | None:
@@ -611,7 +687,6 @@ def provedor_por_extensao(ext: str) -> dict | None:
     return None
 
 
-
 def provedor_nome(jogo_ou_origem) -> str:
     """'Azahar · Nintendo 3DS' p/ ROMs; origem crua p/ jogos de PC."""
     origem = jogo_ou_origem.get("origem") if isinstance(jogo_ou_origem, dict) \
@@ -622,12 +697,10 @@ def provedor_nome(jogo_ou_origem) -> str:
     return f"{prov['nome']} · {'/'.join(prov['sistemas'])}"
 
 
-
 def jogos_do_provedor(jogos: list[dict], chave: str) -> list[dict]:
     """Só os jogos que o provider consegue rodar (p/ filtro da UI)."""
     return [j for j in (jogos or [])
             if (provedor_por_origem(j.get("origem") or "") or {}).get("chave") == chave]
-
 
 
 def provedores_resumo(con: sqlite3.Connection) -> list[dict]:
@@ -646,7 +719,6 @@ def provedores_resumo(con: sqlite3.Connection) -> list[dict]:
     return out
 
 
-
 def montar_launch_rom(prov: dict, rom_path: str) -> str:
     """flags do provider + ROM entre aspas quando tem espaço."""
     rom = (rom_path or "").strip()
@@ -654,7 +726,6 @@ def montar_launch_rom(prov: dict, rom_path: str) -> str:
         rom = f'"{rom}"'
     flags = " ".join(prov["flags"]())
     return (flags + " " if flags else "") + rom
-
 
 
 def backup_saves_emu(chave: str, manter: int = 10) -> dict:
@@ -700,11 +771,9 @@ def backup_saves_emu(chave: str, manter: int = 10) -> dict:
     return {"ok": True, "arquivo": str(dest), "arquivos": n}
 
 
-
 def backup_saves_azahar(manter: int = 10) -> dict:
     """Zipa sdmc/ + states/ do Azahar em backups/. Retorna dict (sempre)."""
     return backup_saves_emu("azahar", manter)
-
 
 
 # --------------------------------------------------------------------------
@@ -722,12 +791,6 @@ def presets_prov_dir(chave: str) -> Path:
     return d
 
 
-def presets_dir() -> Path:
-    PRESETS_DIR.mkdir(parents=True, exist_ok=True)
-    return PRESETS_DIR
-
-
-
 def listar_presets(chave: str = "azahar") -> list[str]:
     try:
         nomes = [p.stem for p in presets_prov_dir(chave).glob("*.ini") if p.is_file()]
@@ -736,7 +799,6 @@ def listar_presets(chave: str = "azahar") -> list[str]:
         return sorted(set(nomes))
     except OSError:
         return []
-
 
 
 def azahar_config_atual() -> Path | None:
@@ -753,7 +815,6 @@ def azahar_config_atual() -> Path | None:
         if alts:
             return alts[0]
     return None
-
 
 
 def salvar_preset_de_atual(nome: str, chave: str = "azahar") -> dict:
@@ -854,14 +915,12 @@ def preparar_lancamento(jogo: dict) -> dict:
     return {"preset_aplicado": aplicado, "aviso": " ".join(avisos) or None}
 
 
-
 def rom_parece_criptografada(rom_path: str) -> bool:
     """ExeFS sem ícone extraível = quase sempre ROM criptografada."""
     rom = (rom_path or "").strip()
     if not rom or not Path(rom).is_file():
         return False  # ausente é outro erro (o play já reporta)
     try:
-        from bib_nucleo.scans import _ler_icon_bin
         with Path(rom).open("rb") as f:
             head = f.read(0x200)
             if head[0x100:0x104] == b"NCSD":
@@ -873,9 +932,8 @@ def rom_parece_criptografada(rom_path: str) -> bool:
         return False
 
 
-
 def azahar_tem_chaves() -> bool:
     ud = azahar_user_dir()
     return bool(ud) and (Path(ud) / "sysdata" / "aes_keys.txt").is_file()
 
-__all__ = ['azahar_dir_override', 'default_emu_3ds', 'desmume_dir_override', 'desmume_dir', 'default_emu_nds', 'desmume_user_dir', 'desmume_versao_local', 'desmume_release_info', 'desmume_instalar', 'desmume_config_atual', 'desmume_flags', '_prov_desmume', 'config_atual_emu', 'presets_prov_dir', 'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', '_emu_dir', 'azahar_versao_local', 'azahar_release_info', 'azahar_instalar', '_eh_elevacao_necessaria', 'executar_elevado', '_lancar', '_lancar_jogo_dict', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', '_vigiar_processo', 'executar_monitorado', '_prov_azahar', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'presets_prov_dir', 'listar_presets', 'azahar_config_atual', 'config_atual_emu', 'salvar_preset_de_atual', 'aplicar_preset', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves']
+__all__ = ['azahar_dir_override', 'default_emu_3ds', 'desmume_dir_override', 'desmume_dir', 'default_emu_nds', 'desmume_user_dir', 'desmume_versao_local', 'desmume_release_info', 'desmume_instalar', 'desmume_config_atual', 'desmume_flags', 'config_atual_emu', 'presets_prov_dir', 'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', 'azahar_versao_local', 'azahar_release_info', 'azahar_instalar', 'executar_elevado', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', 'executar_monitorado', 'iniciar_sessao_manual', 'listar_sessoes_pendentes', 'encerrar_sessao_manual', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'presets_prov_dir', 'listar_presets', 'azahar_config_atual', 'config_atual_emu', 'salvar_preset_de_atual', 'aplicar_preset', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves']

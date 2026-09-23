@@ -8,19 +8,18 @@ import math
 import os
 import re
 import sqlite3
-import uuid as uuid_mod
 import struct
+import uuid as uuid_mod
 import zlib
 from pathlib import Path
 
-from bib_nucleo.banco import STATUS_VALIDOS, salvar_capa_bytes
-from bib_nucleo.base import (LINUX_ROOT, ROM_EXTS_3DS, WIN_ROOT, agora_iso,
+from bib_nucleo.banco import STATUS_VALIDOS, chave_dedup, normalizar_etiquetas, salvar_capa_bytes
+from bib_nucleo.base import (LINUX_ROOT, WIN_ROOT, agora_iso,
                              existe_aqui_ou_traduzido, slugify, traduzir_para_atual,
                              win_para_linux)
 from bib_nucleo.emuladores import (default_emu_3ds, default_emu_nds,
                                      provedores, provedor_por_extensao,
                                      provedor_por_origem)
-
 
 
 # --------------------------------------------------------------------------
@@ -31,7 +30,6 @@ SHOPS_CONHECIDAS = {
     "steam", "gog", "epic", "fitgirl", "steamrip",
     "dodi", "online-fix", "onlinefix", "xbox", "riot",
 }
-
 
 
 def pontuar(item: dict) -> dict:
@@ -89,7 +87,6 @@ def pontuar(item: dict) -> dict:
     return out
 
 
-
 def hydra_db_candidates() -> list[Path]:
     cands: list[Path] = []
     appdata = os.environ.get("APPDATA")
@@ -112,7 +109,6 @@ def hydra_db_candidates() -> list[Path]:
     return cands
 
 
-
 def find_hydra_db() -> Path | None:
     for p in hydra_db_candidates():
         try:
@@ -121,7 +117,6 @@ def find_hydra_db() -> Path | None:
         except OSError:
             continue
     return None
-
 
 
 TITLE_RE = re.compile(r'"title"\s*:\s*"((?:[^"\\]|\\.)+)"')
@@ -135,13 +130,11 @@ OBJID_RE = re.compile(r'"objectId"\s*:\s*"((?:[^"\\]|\\.)+)"')
 PLAYTIME_RE = re.compile(r'"playTimeInMilliseconds"\s*:\s*(\d+)')
 
 
-
 def _unescape(s: str) -> str:
     try:
         return json.loads(f'"{s}"')
     except Exception:
         return s
-
 
 
 def scan_hydra_db(db_dir: Path, limite_bytes_por_arquivo: int = 20_000_000) -> list[dict]:
@@ -192,20 +185,22 @@ def scan_hydra_db(db_dir: Path, limite_bytes_por_arquivo: int = 20_000_000) -> l
     return sorted(achados.values(), key=lambda j: j["titulo"].lower())
 
 
-
 # Scanner de disco (D:\\Games, SteamLibrary, Riot...) + manifests Steam
 # --------------------------------------------------------------------------
 
 SKIP_DIRS = {
     "windowsapps", "system volume information", "$recycle.bin",
     ".pnpm-store", "msdownld.tmp", "found.000", "wpsystem",
-    "backups", "capas",
+    "backups", "capas", "presets", "sessoes",
+    ".git", ".build", ".cache", "__pycache__", "dist",
+    "node_modules", ".venv", "venv", ".mypy_cache", ".pytest_cache",
 }
 
 SKIP_EXE_RE = re.compile(
     r"(?i)^(unins|uninstall|setup|dotnet|dxweb|quicksfv|visualcpp|"
     r"vc_?redist|dxsetup|oalinst|crash|crashhandler|bugreport|"
-    r"unitycrashhandler|qt|python|hydra|redist|vcredist|eac|easyanticheat)"
+    r"unitycrashhandler|qt|python|hydra|redist|vcredist|eac|easyanticheat|"
+    r"stockfish|cgef|f10\.)"
 )
 
 RIOT_EXE = {
@@ -217,7 +212,6 @@ RIOT_EXE = {
 ACF_NAME_RE = re.compile(r'"name"\s+"([^"]+)"')
 
 ACF_DIR_RE = re.compile(r'"installdir"\s+"([^"]+)"')
-
 
 
 def default_scan_roots() -> list[str]:
@@ -237,15 +231,17 @@ def default_scan_roots() -> list[str]:
     return roots
 
 
-
 def _titulo_de_exe(p: Path) -> str:
     baixo = p.name.lower()
     if baixo in RIOT_EXE:
         return RIOT_EXE[baixo]
     stem = p.stem
     stem = re.sub(r"(?i)[-_ ]?(win64|win32|x64|shipping|game)$", "", stem)
-    return stem.replace("_", " ").replace(".", " ").strip() or p.stem
-
+    stem = stem.replace("_", " ").replace(".", " ").strip()
+    # separa colados do exe ("HowManyDudes" -> "How Many Dudes", "Hades2" -> "Hades 2")
+    stem = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", stem)
+    stem = re.sub(r"(?<=[A-Za-z])(?=[0-9])", " ", stem)
+    return re.sub(r"\s+", " ", stem).strip() or p.stem
 
 
 def scan_discos(roots: list[str], max_arquivos: int = 60_000, prof_max: int = 5,
@@ -297,7 +293,7 @@ def scan_discos(roots: list[str], max_arquivos: int = 60_000, prof_max: int = 5,
                         txt = Path(full).read_text(encoding="utf-8", errors="ignore")
                     except OSError:
                         continue
-                    it = _item_steam_manifest(txt, dirpath)
+                    it = _item_steam_manifest(txt, dirpath, _appid_de_manifest(fn))
                     if it is not None:
                         registrar(it)
                 elif baixo.endswith(".exe"):
@@ -313,13 +309,11 @@ def scan_discos(roots: list[str], max_arquivos: int = 60_000, prof_max: int = 5,
     return _final()
 
 
-
 def preview_scan(roots: list[str] | None = None) -> tuple[list[str], list[dict], dict]:
     """(raízes_usadas, itens pontuados, info{vistos, truncado, raizes})."""
     roots = roots or default_scan_roots()
     achados, info = scan_discos(roots, retornar_info=True)
     return roots, [pontuar(j) for j in achados], info
-
 
 
 # --------------------------------------------------------------------------
@@ -333,7 +327,6 @@ JUNK_PROG_RE = re.compile(
 )
 
 
-
 def _detector_hydra() -> tuple[str, list[dict], str]:
     db = find_hydra_db()
     if db is None:
@@ -345,7 +338,6 @@ def _detector_hydra() -> tuple[str, list[dict], str]:
     for it in itens:
         it["fonte"] = "Hydra"
     return "Hydra", itens, f"{len(itens)} em {db}"
-
 
 
 def _steamapps_dirs() -> list[Path]:
@@ -386,8 +378,12 @@ def _steamapps_dirs() -> list[Path]:
     return vistas + extras
 
 
+def _appid_de_manifest(nome_arq: str) -> str:
+    m = re.search(r"appmanifest_(\d+)\.acf$", (nome_arq or "").lower())
+    return m.group(1) if m else ""
 
-def _item_steam_manifest(txt: str, dirpath: str) -> dict | None:
+
+def _item_steam_manifest(txt: str, dirpath: str, appid: str = "") -> dict | None:
     mn = ACF_NAME_RE.search(txt)
     md = ACF_DIR_RE.search(txt)
     nome = mn.group(1).strip() if mn else None
@@ -410,9 +406,8 @@ def _item_steam_manifest(txt: str, dirpath: str) -> dict | None:
             except OSError:
                 pass
     return {"titulo": nome, "executable_path": exe, "shop": "steam",
-            "object_id": "", "horas": 0.0, "origem": "steam-manifest",
+            "object_id": appid, "horas": 0.0, "origem": "steam-manifest",
             "fonte": "Steam"}
-
 
 
 def _detector_steam(steamapps: list[Path] | None = None) -> tuple[str, list[dict], str]:
@@ -436,12 +431,11 @@ def _detector_steam(steamapps: list[Path] | None = None) -> tuple[str, list[dict
                 txt = arq.read_text(encoding="utf-8", errors="ignore")
             except OSError:
                 continue
-            it = _item_steam_manifest(txt, str(c))
+            it = _item_steam_manifest(txt, str(c), _appid_de_manifest(arq.name))
             if it:
                 achados.setdefault(f"{it['titulo'].lower()}\x00{it['executable_path'].lower()}", it)
     det = f"{len(achados)} em {olhadas} biblioteca(s)" if olhadas else "Steam ausente"
     return "Steam", list(achados.values()), det
-
 
 
 def _detector_epic(manifests: Path | None = None) -> tuple[str, list[dict], str]:
@@ -480,7 +474,6 @@ def _detector_epic(manifests: Path | None = None) -> tuple[str, list[dict], str]
             "horas": 0.0, "origem": "epic", "fonte": "Epic",
         })
     return "Epic", list(achados.values()), f"{len(achados)} manifesto(s)"
-
 
 
 def _detector_gog(roots: list[str] | None = None) -> tuple[str, list[dict], str]:
@@ -531,7 +524,6 @@ def _detector_gog(roots: list[str] | None = None) -> tuple[str, list[dict], str]
     return "GOG", list(achados.values()), det
 
 
-
 def _detector_riot(arqs: list[Path] | None = None) -> tuple[str, list[dict], str]:
     if arqs is None:
         arqs = []
@@ -570,7 +562,6 @@ def _detector_riot(arqs: list[Path] | None = None) -> tuple[str, list[dict], str
             })
     det = f"{len(achados)} instalação(ões)" if achou_arq else "Riot ausente"
     return "Riot", list(achados.values()), det
-
 
 
 def _detector_windows() -> tuple[str, list[dict], str]:
@@ -636,7 +627,6 @@ def _detector_windows() -> tuple[str, list[dict], str]:
     return "Windows", list(achados.values()), f"{len(achados)} programa(s)"
 
 
-
 def ler_do_disco() -> tuple[list[dict], dict]:
     """Todas as fontes de jogos instalados, de uma vez (só leitura).
 
@@ -662,7 +652,6 @@ def ler_do_disco() -> tuple[list[dict], dict]:
     return pont, {"fontes": fontes, "total": len(pont)}
 
 
-
 # --------------------------------------------------------------------------
 # ROMs (ex.: 3DS no Azahar) — scanner + raízes + emulador padrão
 # --------------------------------------------------------------------------
@@ -678,19 +667,16 @@ def default_roms_roots() -> list[str]:
     return [f"{base}/Games/Roms", f"{base}/Games/Roms/3DS"]
 
 
-
 ROM_TAGS_LIXO_RE = re.compile(
     r"\s*\((USA|EUR|JPN|JAP|KOR|CHN|TWN|AUS|BRA|World|"
     r"En(?:,[A-Za-z]{2})+|Rev\s*\d+|v\d+[\.\d]*|Decrypted|Trimmed|NDSi Enhanced"
     r"|(?:USA|EUR|JPN)(?:,\s*[A-Za-z]+)+)\)", re.IGNORECASE)
 
 
-
 def _titulo_de_rom(p: Path) -> str:
     nome = p.stem.replace("_", " ").replace(".", " ").replace("-", " ").strip()
     nome = ROM_TAGS_LIXO_RE.sub("", nome)  # "Pokemon X (USA) (En,Ja…)" -> "Pokemon X"
     return re.sub(r"\s+", " ", nome).strip() or p.stem
-
 
 
 def _item_rom(full: str, emu_exe: str = "", prov=None) -> dict:
@@ -719,7 +705,6 @@ def _item_rom(full: str, emu_exe: str = "", prov=None) -> dict:
     if m.get("regiao"):
         item["regiao"] = m["regiao"]
     return item
-
 
 
 def scan_roms(roots: list[str], emu_exe: str = "", prof_max: int = 4,
@@ -767,7 +752,6 @@ def scan_roms(roots: list[str], emu_exe: str = "", prof_max: int = 4,
     return _final()
 
 
-
 def default_roms_nds_roots() -> list[str]:
     env = os.environ.get("BIBLIOTECA_ROMS_NDS_ROOTS")
     if env:
@@ -796,7 +780,6 @@ def preview_roms(roots: list[str] | None = None,
 
 
 EXE_IMPORTAVEIS = {".exe", ".lnk", ".bat", ".cmd", ".sh", ".AppImage"}
-
 
 
 def analisar_arquivo(caminho: str) -> dict:
@@ -848,7 +831,6 @@ def analisar_arquivo(caminho: str) -> dict:
                                  "(exe, ROM, .json, .zip ou pasta).")}
 
 
-
 def preview_pasta(roots: list[str] | None = None) -> tuple[list[str], list[dict], dict]:
     """Uma varredura só: jogos de PC + ROMs nas mesmas raízes.
 
@@ -873,10 +855,8 @@ def preview_pasta(roots: list[str] | None = None) -> tuple[list[str], list[dict]
     return roots_u, itens, info
 
 
-
 def _norm_titulo(t) -> str:
     return " ".join((t or "").casefold().split())
-
 
 
 def _norm_caminho(c) -> str:
@@ -885,7 +865,6 @@ def _norm_caminho(c) -> str:
     if not c:
         return ""
     return win_para_linux(c).lower()
-
 
 
 def _dobrar_fundido(atual: dict, novo: dict) -> None:
@@ -918,14 +897,12 @@ def _dobrar_fundido(atual: dict, novo: dict) -> None:
     atual["fonte"] = "+".join(atual["fontes"])
 
 
-
 def _compativel(atual: dict, novo: dict) -> bool:
     """Podem ser o mesmo jogo? ROMs: mesma rom. PC: exe igual ou ausente."""
     if (atual.get("origem") or "").startswith("rom-"):
         return _norm_caminho(atual.get("rom_path")) == _norm_caminho(novo.get("rom_path"))
     ea, en = _norm_caminho(atual.get("executable_path")), _norm_caminho(novo.get("executable_path"))
     return (not ea) or (not en) or (ea == en)
-
 
 
 def fundir_duplicados(itens: list[dict]) -> list[dict]:
@@ -967,7 +944,6 @@ def fundir_duplicados(itens: list[dict]) -> list[dict]:
     return saidas
 
 
-
 # --------------------------------------------------------------------------
 # Metadados internos de ROMs 3DS (NCSD/CCI, NCCH/CXI, 3DSX + SMDH)
 # --------------------------------------------------------------------------
@@ -980,10 +956,8 @@ SMDH_REGIOES = ("Japão", "América do Norte", "Europa", "Austrália", "China",
                 "Coreia", "Taiwan")
 
 
-
 def _u32(buf: bytes, off: int) -> int:
     return int.from_bytes(buf[off:off + 4], "little")
-
 
 
 def _parse_smdh(smdh: bytes) -> dict:
@@ -1016,7 +990,6 @@ def _parse_smdh(smdh: bytes) -> dict:
     if regs:
         out["regiao"] = "Livre" if len(regs) == 7 else ", ".join(regs)
     return out
-
 
 
 def _ler_icon_bin(caminho: str) -> bytes:
@@ -1066,7 +1039,6 @@ def _ler_icon_bin(caminho: str) -> bytes:
     return b""
 
 
-
 def ler_metadados_3ds(caminho: str) -> dict:
     """Lê título/código/região de dentro da ROM. {} se não der (usa nome do arquivo)."""
     try:
@@ -1104,7 +1076,6 @@ def ler_metadados_3ds(caminho: str) -> dict:
         return meta
     except (OSError, ValueError, OverflowError):
         return {}
-
 
 
 NDS_REGIOES = {"E": "América do Norte", "P": "Europa", "J": "Japão",
@@ -1231,7 +1202,6 @@ def _morton(x: int, y: int) -> int:
     return z
 
 
-
 def _desembaralha_rgb565(dados: bytes, lado: int) -> bytes:
     """SMDH guarda o ícone em tiles 8x8 (ordem Morton). Devolve RGB888 linear."""
     n = lado * lado
@@ -1254,11 +1224,7 @@ def _desembaralha_rgb565(dados: bytes, lado: int) -> bytes:
     return bytes(rgb)
 
 
-
 def _png_rgb(larg: int, alt: int, rgb: bytes) -> bytes:
-    import struct
-    import zlib
-
     def bloco(tipo: bytes, dado: bytes) -> bytes:
         c = tipo + dado
         return struct.pack(">I", len(dado)) + c + struct.pack(
@@ -1269,7 +1235,6 @@ def _png_rgb(larg: int, alt: int, rgb: bytes) -> bytes:
                      for y in range(alt))
     return (b"\x89PNG\r\n\x1a\n" + bloco(b"IHDR", cab)
             + bloco(b"IDAT", zlib.compress(corpo)) + bloco(b"IEND", b""))
-
 
 
 def icone_rom_para_png(caminho: str, alvo_px: int = 144) -> bytes | None:
@@ -1301,10 +1266,28 @@ def icone_rom_para_png(caminho: str, alvo_px: int = 144) -> bytes | None:
         return None
 
 
-
 # --------------------------------------------------------------------------
 # Importação / backup / capas
 # --------------------------------------------------------------------------
+
+def _capa_steam(appid: str, timeout: int = 15) -> bytes | None:
+    """Baixa o header oficial da Steam (só leitura). None se offline/sem arte."""
+    import urllib.request
+    api = f"https://store.steampowered.com/api/appdetails?appids={appid}"
+    req = urllib.request.Request(api, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        data = json.loads(r.read().decode("utf-8"))
+    info = data.get(str(appid)) or {}
+    if not info.get("success"):
+        return None
+    url = ((info.get("data") or {}).get("header_image") or "").split("?")[0]
+    if not url.startswith("http"):
+        return None
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        raw = r.read(2_500_000)
+    return raw if len(raw) >= 1024 else None
+
 
 def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
     """Importa jogos. Itens com uuid existente ATUALIZAM progresso (restore);
@@ -1314,6 +1297,12 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
     novos = atualizados = ignorados = 0
     erros: list[str] = []
     avisos: list[str] = []
+    vistos = {chave_dedup(r["titulo"], r["executable_path"], r["launch_options"])
+              for r in con.execute(
+                  "SELECT titulo, executable_path, launch_options FROM jogos").fetchall()}
+    # mesmo exe+lançamento com título diferente também é duplicata
+    # (título de scan muda: "Hades2" virou "Hades 2" no exe do "Hades II")
+    vistos_exe = {(t[1], t[2]) for t in vistos}
 
     def _ignorar(motivo: str):
         nonlocal ignorados
@@ -1358,29 +1347,37 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
             else:
                 alvo = None
             if alvo is not None:
-                # restore: progresso volta; identidade/caminhos ficam locais
+                # restore: progresso volta; identidade/caminhos ficam locais.
+                # etiquetas voltam se o pacote as trouxe (scans não mandam).
                 ultima = j.get("ultima_execucao", alvo["ultima_execucao"])
+                etiq_alvo = alvo["etiquetas"] if "etiquetas" in alvo.keys() else ""
                 con.execute(
                     """UPDATE jogos SET horas=?, ultima_execucao=?, status=?, nota=?,
-                       favorito=?, observacoes=?, azahar_preset=?, atualizado_em=? WHERE id=?""",
+                       favorito=?, observacoes=?, azahar_preset=?, etiquetas=?, atualizado_em=? WHERE id=?""",
                     (horas if "horas" in j else alvo["horas"], ultima,
                      j.get("status") if j.get("status") in STATUS_VALIDOS else alvo["status"],
                      nota if "nota" in j else alvo["nota"],
                      int(bool(j.get("favorito"))) if "favorito" in j else alvo["favorito"],
                      j.get("observacoes", alvo["observacoes"]),
                      j.get("azahar_preset", alvo["azahar_preset"]),
+                     normalizar_etiquetas(j["etiquetas"]) if "etiquetas" in j else etiq_alvo,
                      j.get("atualizado_em") or agora, alvo["id"]),
                 )
                 atualizados += 1
                 continue
             if uid is None:
                 uid = uuid_mod.uuid4().hex
+            chave = chave_dedup(titulo, (j.get("executable_path") or ""),
+                                (j.get("launch_options") or ""))
+            if chave in vistos or (chave[1] and (chave[1], chave[2]) in vistos_exe):
+                ignorados += 1
+                continue
             cur = con.execute(
                 """INSERT OR IGNORE INTO jogos
                    (titulo, executable_path, exe_win, exe_linux, wine_prefix, launch_options,
                     status, nota, favorito, horas, ultima_execucao, observacoes, origem, shop, object_id,
-                    game_code, regiao, azahar_preset, uuid, confianca, criado_em, atualizado_em)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    game_code, regiao, azahar_preset, uuid, etiquetas, confianca, criado_em, atualizado_em)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (titulo, (j.get("executable_path") or "").strip(),
                  (j.get("exe_win") or "").strip(), (j.get("exe_linux") or "").strip(),
                  (j.get("wine_prefix") or ""), (j.get("launch_options") or ""),
@@ -1391,11 +1388,15 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                  j.get("origem") or "manual", (j.get("shop") or ""),
                  (j.get("object_id") or ""), (j.get("game_code") or "").strip(),
                  (j.get("regiao") or "").strip(), (j.get("azahar_preset") or "").strip(),
-                 uid, confianca, j.get("criado_em") or agora, j.get("atualizado_em") or agora),
+                 uid, normalizar_etiquetas(j.get("etiquetas") or ""),
+                 confianca, j.get("criado_em") or agora, j.get("atualizado_em") or agora),
             )
             novos += cur.rowcount
             if not cur.rowcount:
                 ignorados += 1
+            else:
+                vistos.add(chave)
+                vistos_exe.add((chave[1], chave[2]))
             prov_rom = provedor_por_origem(j.get("origem") or "")
             if cur.rowcount and prov_rom is not None:
                 try:  # capa automática: ícone de dentro da própria ROM
@@ -1409,6 +1410,18 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                 except Exception as e:
                     if len(avisos) < 20:
                         avisos.append(f"'{titulo}': capa falhou ({type(e).__name__})")
+            if cur.rowcount and prov_rom is None:
+                appid = ((j.get("object_id") or "").strip()
+                         if (j.get("shop") or "").strip().lower() == "steam" else "")
+                if appid and appid.isdigit():
+                    try:  # capa automática: header oficial da Steam
+                        raw = _capa_steam(appid)
+                        if raw:
+                            salvar_capa_bytes(con, cur.lastrowid,
+                                              slugify(titulo) + ".jpg", raw)
+                    except Exception as e:
+                        if len(avisos) < 20:
+                            avisos.append(f"'{titulo}': capa Steam falhou ({type(e).__name__})")
         except Exception as e:
             _ignorar(f"'{titulo}': {type(e).__name__}: {e}")
             continue
@@ -1417,7 +1430,6 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
     return {"novos": novos, "atualizados": atualizados, "ignorados": ignorados,
             "erros": erros, "avisos": avisos,
             "total_no_banco": depois, "antes": antes}
-
 
 
 def resumo_importacao(res: dict) -> str:
@@ -1429,5 +1441,5 @@ def resumo_importacao(res: dict) -> str:
         texto += "\n" + "\n".join(res["avisos"][:5])
     return texto
 
-__all__ = ['SHOPS_CONHECIDAS', 'pontuar', 'hydra_db_candidates', 'find_hydra_db', 'TITLE_RE', 'EXEC_RE', 'SHOP_RE', 'OBJID_RE', 'PLAYTIME_RE', '_unescape', 'scan_hydra_db', 'SKIP_DIRS', 'SKIP_EXE_RE', 'RIOT_EXE', 'ACF_NAME_RE', 'ACF_DIR_RE', 'default_scan_roots', '_titulo_de_exe', 'scan_discos', 'preview_scan', 'JUNK_PROG_RE', '_detector_hydra', '_steamapps_dirs', '_item_steam_manifest', '_detector_steam', '_detector_epic', '_detector_gog', '_detector_riot', '_detector_windows', 'ler_do_disco', 'default_roms_roots', 'ROM_TAGS_LIXO_RE', '_titulo_de_rom', '_item_rom', 'scan_roms', 'preview_roms', 'EXE_IMPORTAVEIS', 'analisar_arquivo', 'preview_pasta', '_norm_titulo', '_norm_caminho', '_dobrar_fundido', '_compativel', 'fundir_duplicados', 'SMDH_IDIOMAS', 'SMDH_REGIOES', '_u32', '_parse_smdh', 'NDS_REGIOES', '_rgb555', '_ler_banner_nds', 'ler_metadados_nds', 'icone_nds_para_png', '_ler_icon_bin', 'ler_metadados_3ds', '_morton', '_desembaralha_rgb565', '_png_rgb', 'icone_rom_para_png', 'importar_lista']
+__all__ = ['SHOPS_CONHECIDAS', 'pontuar', 'hydra_db_candidates', 'find_hydra_db', 'TITLE_RE', 'EXEC_RE', 'SHOP_RE', 'OBJID_RE', 'PLAYTIME_RE', 'scan_hydra_db', 'SKIP_DIRS', 'SKIP_EXE_RE', 'RIOT_EXE', 'ACF_NAME_RE', 'ACF_DIR_RE', 'default_scan_roots', 'scan_discos', 'preview_scan', 'JUNK_PROG_RE', 'ler_do_disco', 'default_roms_roots', 'ROM_TAGS_LIXO_RE', 'scan_roms', 'preview_roms', 'EXE_IMPORTAVEIS', 'analisar_arquivo', 'preview_pasta', 'fundir_duplicados', 'SMDH_IDIOMAS', 'SMDH_REGIOES', 'NDS_REGIOES', 'ler_metadados_nds', 'icone_nds_para_png', 'ler_metadados_3ds', 'icone_rom_para_png', 'importar_lista']
 __all__ += ['resumo_importacao']

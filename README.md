@@ -1,4 +1,4 @@
-# 🎮 Minha Biblioteca de Jogos
+# 🎮 TucoTeca
 
 Biblioteca pessoal para não depender do Hydra. **Zero dependências** (só Python 3.10+), mesmo banco e mesmas regras em dois frontends nativos (sem navegador, sem rede).
 
@@ -9,31 +9,32 @@ Banco, código, backups e capas moram na mesma pasta física NTFS, visível nos 
 - Windows: `D:\Tuco-Compartilhado\Jogos\biblioteca\`
 - Linux: `/run/media/tuco/Games/Tuco-Compartilhado/Jogos/biblioteca/`
 
-Nunca abra nos dois sistemas ao mesmo tempo; encerre/desmonte antes de trocar de SO.
+Nunca abra nos dois sistemas ao mesmo tempo; encerre/desmonte antes de trocar de SO. O app grava `.biblioteca.lock` na casa e recusa segunda instância (`--ignorar-lock` só após crash; lock com +24h é considerado obsoleto).
 
 ## Entradas
 
-Duplo-clique em **`Biblioteca Hub.vbs`** (raiz do projeto) — abre só o app, sem janela preta (`BibliotecaHub.bat` faz o mesmo com console, pra debug).
+No terminal, digite **`tucoteca`** (abre a GUI). Ou duplo-clique em **`TucoTeca.lnk`** (raiz do projeto) — abre só o app, sem janela preta (`BibliotecaHub.bat` faz o mesmo com console, pra debug).
 
 | Frontend | Onde | Roda como |
 |---|---|---|
 | `codigo/frontends/app_win.py` | Windows | aplicativo local (tkinter): `python codigo/frontends/app_win.py` |
-| `codigo/frontends/app_tui.py` | Linux | aplicativo de terminal (curses): `python codigo/frontends/app_tui.py` |
+| `codigo/frontends/app_tui.py` | Linux | aplicativo de terminal (curses): `./BibliotecaHub.sh` ou `python3 codigo/frontends/app_tui.py` |
 
 Núcleo compartilhado: `codigo/bib_core.py` (compat; código em `codigo/bib_nucleo/`).
 Versão web antiga removida (histórico em `codigo/historico/`).
 
-Opções comuns: `--db outro.db` (padrão: `biblioteca.db` na casa), `--selftest` (só GUI: monta oculta e sai).
+Opções comuns: `--db outro.db` (padrão: `biblioteca.db` na casa), `--ignorar-lock` (após crash), `--selftest` (só GUI: monta oculta e sai). TUI: `V` provider, `Y` plataforma, `T` etiquetas, `S` sessão manual, preview com `PgUp/PgDn`.
 
 ## O que faz (nos dois)
 
-- ➕ Cadastrar / editar / excluir: **título + executável** + status (`backlog`, `jogando`, `zerado`, `pausado`, `abandonado`), nota 0–10, favorito, horas, wine prefix, opções, observações, **capa local** (png/jpg/webp até 2 MB).
-- 🔎 Buscar + filtrar por status / favoritos; selo **● exe ok / ○ exe?**.
+- ➕ Cadastrar / editar / excluir: **título + executável** + horas, etiquetas livres, preset do emulador, observações, **capa local** (png/jpg/webp até 2 MB). O diálogo de edição é sintetizado (status, nota, favorito e caminhos por SO ficam preservados). Filtros cobrem status (`backlog`, `jogando`, `zerado`, `pausado`, `abandonado`), nota 0–10 e favorito gravados.
+- 🔎 Buscar + filtrar por status / favoritos / provider (GUI: clique; TUI: `V`) / plataforma / etiquetas; selo **● exe ok / ○ exe?** + **◎confiança** do import.
+- 🏷️ **Etiquetas livres**: qualquer jogo aceita tags separadas por vírgula (ex.: `rpg, souls-like`) — aparecem no canto do card (roxo p/ plataforma `PC`/`3DS`/`NDS` derivada da origem + `🏷 tags`) e no detalhe. Filtros: GUI chips `PC`/`3DS`/`NDS` + combo de tags (✕ limpa tudo); TUI `Y` plataforma, `T` tags. Viajam no JSON/pacote e sobrevivem ao restore.
 - ▶️ **Executar**: traduz o caminho para o SO atual antes de abrir. Se o jogo exigir administrador (WinError 740), oferece relançar com elevação (UAC). Se o emulador gravado sumiu mas há outro instalado, pergunta (usar+gravar, só desta vez, cancelar); se a ROM sumiu, procura pelo nome nas raízes e oferece religar.
-- ⏱️ **Horas automáticas**: ao jogar, o tempo do processo é somado sozinho (sessões ≥ 30 s). Limite honesto: fechar o launcher antes do jogo perde a sessão; com UAC/startfile as horas seguem manuais.
+- ⏱️ **Horas automáticas**: ao jogar, o tempo do processo é somado sozinho (sessões ≥ 30 s). UAC/startfile abrem sessão manual em `dados/sessoes/` — reconcilie com ⏱ Registrar sessão (`S` no TUI); ela sobrevive a fechar o launcher.
 - 🖥️ **Executável por SO**: `exe_win` / `exe_linux` vencem o caminho único (útil p/ emulador `.exe` no Win e `.AppImage` no Linux).
 - 🎮 **Scan de ROMs 3DS** (`.cci/.cxi/.3ds/.3dsx/.elf/.app/.axf`): já liga cada ROM no emulador via opções de lançamento, com preview + confiança.
-- 📥 **Importar unificado**: um botão só — pasta (varre jogos de PC + ROMs juntos), arquivo (exe, ROM, JSON ou pacote `.zip`) ou **ler do disco** (Hydra + Steam + Epic + GOG + Riot + programas instalados, cada achado marcado com a fonte). A ROM é ligada no emulador sozinha; sem emulador, importa mesmo assim e o play orienta.
+- 📥 **Importar unificado**: um botão só — pasta (varre jogos de PC + ROMs juntos), arquivo (exe, ROM, JSON ou pacote `.zip`) ou **ler do disco** (Hydra + Steam + Epic + GOG + Riot + programas instalados, cada achado marcado com a fonte). Re-scan não duplica (dedup por exe, ignora barra invertida e renomeios). Jogos Steam ganham a capa oficial sozinhos; a ROM é ligada no emulador sozinha; sem emulador, importa mesmo assim e o play orienta.
 
 ## Emulação 3DS (Azahar)
 
@@ -66,29 +67,39 @@ O núcleo tem um **registro de emuladores** (`provedores()` em `codigo/bib_nucle
 
 - Emulador: `D:\Games\Emuladores\DeSmuME\desmume.exe` (release oficial 0.9.13, renomeado p/ nome estável; `desmume.ini` portátil ao lado do exe).
 - ROMs: `D:\Games\Roms\NDS\` (`.nds/.dsi`). O scan lê título/código/região do header + banner e cola o ícone como capa, igual ao 3DS.
-- O app **baixa e atualiza o DeSmuME sozinho** (⬇ na GUI, `G` no TUI — mesmo instalador transacional do Azahar).
+- O app **baixa e atualiza o DeSmuME sozinho no Windows** (⬇ na GUI, `G` no TUI — mesmo instalador transacional do Azahar). No Linux, use AppImage manual (update automático só Win) ou o DeSmuME do sistema (`desmume` no PATH, flatpak ou snap — detectado sozinho, ou `BIBLIOTECA_EMULADOR_NDS`).
+
+## Primeiro boot no Linux
+
+1. `python3 --version` (precisa 3.10+ com `curses`, que vem junto).
+2. `./BibliotecaHub.sh` na raiz (se disser permissão negada: `chmod +x BibliotecaHub.sh`).
+3. `chmod +x /run/media/tuco/Games/Games/Emuladores/Azahar/azahar.AppImage` (NTFS não guarda o bit executável).
+4. DeSmuME: AppImage na mesma pasta, ou pacote do sistema.
+5. O resto (banco, capas, presets, saves, lock) é a mesma partilha do Windows.
 - Boot em tela cheia em janela (`--windowed-fullscreen`; `BIBLIOTECA_DESMUME_FLAGS=` desliga). Saves `.dsv` ficam ao lado da ROM (viajam com ela).
 - Override: `BIBLIOTECA_EMULADOR_NDS` (exe) ou `BIBLIOTECA_DESMUME_DIR` (pasta, ex.: dentro do portátil).
 
 ## Portátil Windows
 
-Extraia `dist/BibliotecaHub-portatil-AAAAmmdd.zip`, duplo-clique em `BibliotecaHub.bat` (ou rode `Criar-Atalho.bat` uma vez e use o atalho da Área de Trabalho) — sem VS Code, sem console, sem Python instalado. A casa vai em `dados/` dentro do pacote.
+Extraia `dist/tucoteca-portatil-AAAAmmdd.zip`, duplo-clique em `BibliotecaHub.bat` (ou rode `Criar-Atalho.bat` uma vez e use o atalho da Área de Trabalho) — sem VS Code, sem console, sem Python instalado. A casa vai em `dados/` dentro do pacote.
 
 O Azahar instalado vai junto, 100% das vezes (`emuladores/Azahar/`, com `COPYING.txt` + `FONTE.txt` da GPL e só `user/` essencial: config + saves + mods — nunca nand, chaves, log ou shaders). O DeSmuME vai junto no mesmo esquema (`emuladores/DeSmuME/`). Os `.bat` apontam `BIBLIOTECA_AZAHAR_DIR` pro embutido (override honesto: pasta ausente = ignora e usa o padrão), e o botão ⬇ atualiza o emulador dentro do pacote. Com `--sem-azahar`, o pacote sai magro (net-install: na primeira execução, use ⬇ Atualizar Azahar — ele baixa o build oficial e instala sozinho). O repo git nunca recebe binários (`dist/` ignorado).
 
 ## Backup
 
 1. **💾 Backup** na interface (vai para `backups/` na casa canônica), ou
-2. **📦 Pacote portátil** (banco + capas + presets + saves — o jeito de levar pra outra máquina), ou
-3. **Exportar JSON** (GUI ou TUI), ou
+2. **📦 Pacote portátil** (banco + capas + presets `presets/<prov>/` + saves — o jeito de levar pra outra máquina), ou
+3. **Exportar JSON** (GUI ou TUI, limpo sem derivados), ou
 4. Copie `biblioteca.db` com tudo fechado.
+
+Auto-proteções: backup silencioso antes de todo import (preview/JSON/arquivo), aviso se backup tem +7 dias, lock `.biblioteca.lock` impede abrir nos 2 SOs juntos (`--ignorar-lock` após crash), sessões manuais `dados/sessoes/` reconciliam UAC/startfile via ⏱ Registrar sessão (S no TUI).
 
 ## Estrutura
 
 Pastas principais (raiz só tem launchers, este README e git):
 
-- `Biblioteca Hub.vbs` / `BibliotecaHub.bat` — **o executável**: duplo-clique abre a GUI (produção/dev).
+- `TucoTeca.lnk` (atalho p/ GUI) / `BibliotecaHub.bat` — **o executável**: duplo-clique abre a GUI (produção/dev).
 - `codigo/` — tudo que é programa: `bib_core.py` (compat), `bib_nucleo/` (`base`, `banco`, `scans`, `emuladores`, `pacotes`, `atualizacao`), `frontends/` (GUI Windows / terminal Linux), `ferramentas/` (portátil, testes), `historico/` (arquivo).
-- `dados/` — tudo que é seu: `biblioteca.db`, `backups/`, `capas/`, `presets/`, `erros.log` (nunca vai pro git).
+- `dados/` — tudo que é seu: `biblioteca.db`, `backups/`, `capas/`, `presets/`, `sessoes/`, `erros.log` (nunca vai pro git).
 - `midia/fontes-capas/` — imagens-fonte das capas (já aplicadas; reserva).
 - `dist/` — portáteis gerados (ignorado no git).

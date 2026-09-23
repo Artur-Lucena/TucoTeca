@@ -23,7 +23,6 @@ LINUX_ROOT = os.environ.get("BIBLIOTECA_LINUX_ROOT", "/run/media/tuco/Games")
 REL_HOME = Path("Tuco-Compartilhado") / "Jogos" / "biblioteca"
 
 
-
 def resolve_home() -> Path:
     env = os.environ.get("BIBLIOTECA_HOME")
     if env:
@@ -39,7 +38,6 @@ def resolve_home() -> Path:
     return BASE_DIR
 
 
-
 HOME_DIR = resolve_home()
 
 DADOS_DIR = HOME_DIR / "dados"
@@ -52,6 +50,7 @@ CAPAS_DIR = DADOS_DIR / "capas"
 
 PRESETS_DIR = DADOS_DIR / "presets"
 
+SESSOES_DIR = DADOS_DIR / "sessoes"
 
 
 def garantir_dirs() -> None:
@@ -60,12 +59,11 @@ def garantir_dirs() -> None:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     CAPAS_DIR.mkdir(parents=True, exist_ok=True)
     PRESETS_DIR.mkdir(parents=True, exist_ok=True)
-
+    SESSOES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _com_barra(p: str) -> str:
     return p.replace("\\", "/")
-
 
 
 def win_para_linux(p: str) -> str:
@@ -77,7 +75,6 @@ def win_para_linux(p: str) -> str:
     return p
 
 
-
 def linux_para_win(p: str) -> str:
     n = _com_barra(p)
     lx = LINUX_ROOT.rstrip("/") + "/"
@@ -87,13 +84,11 @@ def linux_para_win(p: str) -> str:
     return p
 
 
-
 def traduzir_para_atual(p: str) -> str:
     """Converte um caminho gravado para o equivalente neste SO (ou igual)."""
     if not p:
         return p
     return linux_para_win(p) if os.name == "nt" else win_para_linux(p)
-
 
 
 def existe_aqui_ou_traduzido(p: str) -> tuple[bool, str]:
@@ -106,7 +101,6 @@ def existe_aqui_ou_traduzido(p: str) -> tuple[bool, str]:
     if t != p and Path(t).exists():
         return True, t
     return False, t
-
 
 
 def resolver_exe(d: dict) -> tuple[str, str]:
@@ -122,14 +116,17 @@ def resolver_exe(d: dict) -> tuple[str, str]:
     return traduzir_para_atual((d.get("executable_path") or "").strip()), "executavel"
 
 
-
 def agora_iso() -> str:
     return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-
 def log_erro(contexto: str, detalhe: str) -> None:
-    """Anexa uma linha em dados/erros.log. Nunca levanta; diagnóstico local."""
+    """Anexa uma linha em dados/erros.log. Nunca levanta; diagnóstico local.
+
+    Usa DADOS_DIR (patchável em testes). Em produção é HOME/dados;
+    na suíte, isolar() fixa BIBLIOTECA_HOME antes do import, então
+    DADOS_DIR já aponta p/ sandbox e nada vaza p/ instalação real.
+    """
     try:
         DADOS_DIR.mkdir(parents=True, exist_ok=True)
         with open(DADOS_DIR / "erros.log", "a", encoding="utf-8") as fh:
@@ -137,6 +134,69 @@ def log_erro(contexto: str, detalhe: str) -> None:
     except OSError:
         pass
 
+
+def lock_path() -> Path:
+    return HOME_DIR / ".biblioteca.lock"
+
+
+def adquirir_lock(ignorar: bool = False) -> dict:
+    """Impede 2 instâncias (Win+Linux juntos corrompem o SQLite).
+
+    Retorna {"ok": True} ou {"ok": False, "erro": ...}. Com ignorar=True,
+    sobrescreve lock existente (uso: --ignorar-lock após crash).
+    Lock stale (>24h) é sobrescrito sozinho.
+    """
+    import json as _json
+    import socket as _socket
+    lp = lock_path()
+    try:
+        lp.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    info_atual = {"pid": os.getpid(),
+                  "host": _socket.gethostname(),
+                  "so": os.name,
+                  "inicio": agora_iso()}
+    try:
+        if lp.is_file() and not ignorar:
+            try:
+                antigo = _json.loads(lp.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                antigo = {}
+            try:
+                idade_h = (datetime.datetime.now().astimezone() -
+                           datetime.datetime.fromisoformat(str(antigo.get("inicio") or ""))).total_seconds() / 3600.0
+            except (ValueError, TypeError):
+                idade_h = 999.0
+            if idade_h < 24:
+                return {"ok": False, "lock": antigo,
+                        "erro": (f"Biblioteca já aberta em {antigo.get('host', '?')} "
+                                 f"(pid {antigo.get('pid', '?')}, desde {antigo.get('inicio', '?')}). "
+                                 "Feche lá primeiro ou use --ignorar-lock (após crash).")}
+        lp.write_text(_json.dumps(info_atual, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {"ok": True, "lock": info_atual}
+    except OSError as e:
+        return {"ok": False, "erro": f"não consegui gravar lock: {e}"}
+
+
+def liberar_lock() -> None:
+    """Remove lock da instância atual (não remove lock de outro pid)."""
+    import json as _json
+    lp = lock_path()
+    try:
+        if not lp.is_file():
+            return
+        try:
+            dono = _json.loads(lp.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if int(dono.get("pid") or -1) == os.getpid():
+            try:
+                lp.unlink()
+            except OSError:
+                pass
+    except (OSError, ValueError, TypeError):
+        pass
 
 
 def _txt(v) -> str:
@@ -146,13 +206,11 @@ def _txt(v) -> str:
     return (v if isinstance(v, str) else str(v)).replace("\x00", "").strip()
 
 
-
 def _desaspas(s: str) -> str:
     """Remove um par de aspas duplas coladas (colo de 'copiar como caminho')."""
     if len(s) >= 2 and s.startswith('"') and s.endswith('"'):
         return s[1:-1]
     return s
-
 
 
 def slugify(s: str) -> str:
@@ -164,5 +222,5 @@ def slugify(s: str) -> str:
 # Extensões de ROM por provider (aqui p/ scans e emuladores usarem sem ciclo).
 ROM_EXTS_3DS = {".cci", ".cxi", ".3ds", ".3dsx", ".elf", ".app", ".axf"}
 
-__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'garantir_dirs', '_com_barra', 'win_para_linux', 'linux_para_win', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', '_txt', '_desaspas', 'slugify',
+__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
  'ROM_EXTS_3DS']

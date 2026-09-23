@@ -18,7 +18,7 @@ Layout do portátil:
     README-PORTATIL.txt
     app/                   bib_core.py, app_win.py, app_tui.py, README.md
     python/                Python embutido + tkinter transplantado
-    dados/                 casa (db, backups, capas, presets) via BIBLIOTECA_HOME
+    dados/                 casa (db, backups, capas, presets, sessoes) via BIBLIOTECA_HOME
 
 Só roda no Windows (o tkinter vem da instalação local).
 """
@@ -68,7 +68,7 @@ BAT_ATALHO = """@echo off
 setlocal
 set HUB=%~dp0
 set HUB=%HUB:~0,-1%
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$w = New-Object -ComObject WScript.Shell; $a = $w.CreateShortcut($env:USERPROFILE + '\\Desktop\\Biblioteca Hub.lnk'); $a.TargetPath = '%HUB%\\BibliotecaHub.bat'; $a.WorkingDirectory = '%HUB%'; $a.WindowStyle = 7; $a.Description = 'Biblioteca Hub (portatil)'; $a.Save()"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$w = New-Object -ComObject WScript.Shell; $a = $w.CreateShortcut($env:USERPROFILE + '\\Desktop\\TucoTeca.lnk'); $a.TargetPath = '%HUB%\\BibliotecaHub.bat'; $a.WorkingDirectory = '%HUB%'; $a.WindowStyle = 7; $a.Description = 'TucoTeca (portatil)'; $a.Save()"
 echo Atalho criado na Area de Trabalho.
 pause
 """
@@ -83,7 +83,7 @@ COMO USAR
    Pacote magro (--sem-azahar)? Sidebar BANCO > "Atualizar Azahar".
 
 ONDE FICA O QUÊ
-- dados/ ........... sua casa: banco, backups, capas, presets
+- dados/ ........... sua casa: banco, backups, capas, presets, sessoes
 - app/ ............. código do launcher (pode atualizar por cima)
 - python/ .......... Python embutido (não usa o do sistema)
 - emuladores/ ...... Azahar + DeSmuME incluídos (pacote magro não tem; use ⬇)
@@ -317,6 +317,8 @@ def incluir_azahar(dest_base: Path) -> str:
             for sub in ("sdmc", "states", "cheats"):
                 (u_dst / sub).mkdir(parents=True, exist_ok=True)
             continue
+        if item.suffix.lower() == ".appimage":
+            continue  # AppImage é do Linux; portátil é só Windows
         if item.is_dir():
             shutil.copytree(item, dst / item.name)
         else:
@@ -392,7 +394,7 @@ def montar(sem_azahar: bool = False) -> Path:
     (BUILD / "Debug-Console.bat").write_text(BAT_DEBUG.format(serie=serie), encoding="utf-8")
     (BUILD / "Criar-Atalho.bat").write_text(BAT_ATALHO, encoding="utf-8")
     (BUILD / "README-PORTATIL.txt").write_text(LEIAME_PORTATIL, encoding="utf-8")
-    for sub in ("dados", "dados/backups", "dados/capas", "dados/presets"):
+    for sub in ("dados", "dados/backups", "dados/capas", "dados/presets", "dados/sessoes"):
         (BUILD / sub).mkdir(parents=True, exist_ok=True)
     azahar_ver = desmume_ver = ""
     if not sem_azahar:
@@ -401,7 +403,7 @@ def montar(sem_azahar: bool = False) -> Path:
     else:
         print("[aviso] pacote magro, sem emulador (--sem-azahar)")
     (BUILD / "VERSAO.txt").write_text(
-        f"Biblioteca Hub — build {datetime.date.today():%Y-%m-%d}\n"
+        f"TucoTeca — build {datetime.date.today():%Y-%m-%d}\n"
         f"Python embutido: {versao}\n"
         f"Azahar: {azahar_ver or 'ausente (--sem-azahar)'}\n"
         f"DeSmuME: {desmume_ver or 'ausente (--sem-azahar)'}\n",
@@ -474,7 +476,7 @@ def montar(sem_azahar: bool = False) -> Path:
     DIST.mkdir(parents=True, exist_ok=True)
     hoje = datetime.date.today().strftime("%Y%m%d")
     sufixo = "-slim" if sem_azahar else ""
-    saida = DIST / f"BibliotecaHub-portatil-{hoje}{sufixo}.zip"
+    saida = DIST / f"tucoteca-portatil-{hoje}{sufixo}.zip"
     with zipfile.ZipFile(saida, "w", zipfile.ZIP_DEFLATED) as z:
         for arq in sorted(BUILD.rglob("*")):
             z.write(arq, arq.relative_to(BUILD))

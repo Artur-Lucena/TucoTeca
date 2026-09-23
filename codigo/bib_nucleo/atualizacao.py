@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """Atualização transacional do runtime; user/ nunca faz parte da troca.
 
 A cópia anterior e um diário persistente permitem recuperar uma interrupção.

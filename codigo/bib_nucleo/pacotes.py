@@ -17,12 +17,11 @@ from bib_nucleo.emuladores import azahar_versao_local, provedores, presets_dir
 from bib_nucleo.scans import importar_lista
 
 
-
 # --------------------------------------------------------------------------
 # Pacote portátil (.zip): banco + capas + presets + saves 3DS
 # --------------------------------------------------------------------------
 
-PACOTE_ESQUEMA = 2  # v2: manifesto {arquivo: uuid} (v1 title: aceito em leitura)
+PACOTE_ESQUEMA = 3  # v3: presets/<prov>/*.ini (v2 manifesto uuid, v1 title)
 
 PACOTE_INFO = "pacote-info.json"
 
@@ -31,11 +30,39 @@ PACOTE_JSON = "biblioteca.json"
 PACOTE_MANIFESTO = "capas-manifesto.json"
 
 
+def _jogo_limpo(j: dict) -> dict:
+    """Remove campos derivados da UI (exe_existe/traduzido etc) do export."""
+    j = dict(j)
+    for k in ("exe_existe", "exe_traduzido", "etiquetas_lista", "plataforma",
+              "score", "motivos", "fontes", "fonte", "tem_metadados", "rom_path"):
+        j.pop(k, None)
+    return j
+
 
 def _dados_exportacao(con: sqlite3.Connection) -> dict:
     rows = con.execute("SELECT * FROM jogos ORDER BY id").fetchall()
-    return {"exportado_em": agora_iso(), "jogos": [row_to_dict(r) for r in rows]}
+    return {"exportado_em": agora_iso(),
+            "jogos": [_jogo_limpo(row_to_dict(r)) for r in rows]}
 
+
+def exportar_json(destino, db_path=None) -> dict:
+    """Exporta biblioteca limpa (sem derivados) para .json."""
+    destino = Path(destino)
+    if destino.suffix.lower() != ".json":
+        destino = destino.with_suffix(".json")
+    if str(destino.parent):
+        destino.parent.mkdir(parents=True, exist_ok=True)
+    con = get_db(Path(db_path) if db_path else DEFAULT_DB)
+    try:
+        dados = _dados_exportacao(con)
+    finally:
+        con.close()
+    try:
+        destino.write_text(json.dumps(dados, ensure_ascii=False, indent=2),
+                           encoding="utf-8")
+    except OSError as e:
+        return {"ok": False, "erro": f"falha ao gravar: {e}"}
+    return {"ok": True, "destino": str(destino), "jogos": len(dados["jogos"])}
 
 
 def _saves_para_pacote() -> list[tuple[str, Path]]:
@@ -67,7 +94,6 @@ def _saves_para_pacote() -> list[tuple[str, Path]]:
                     continue
                 pares.append((f"{prov['chave']}-user/{sub}/{rel}", arq))
     return pares
-
 
 
 def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
@@ -105,10 +131,30 @@ def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
                 if arq.is_file() and arq.suffix.lower() in CAPA_EXTS:
                     z.write(arq, f"capas/{arq.name}")
                     n += 1
-            for arq in sorted(presets_dir().glob("*.ini")):
+            base_pre = presets_dir()
+            # legado raiz + por provider (presets/<prov>/*.ini)
+            vistos_pre: set[str] = set()
+            for arq in sorted(base_pre.glob("*.ini")):
                 if arq.is_file():
-                    z.write(arq, f"presets/{arq.name}")
-                    n += 1
+                    membro = f"presets/{arq.name}"
+                    if membro not in vistos_pre:
+                        z.write(arq, membro)
+                        vistos_pre.add(membro)
+                        n += 1
+            for prov_chave in sorted(provedores()):
+                sub = base_pre / prov_chave
+                if not sub.is_dir():
+                    continue
+                try:
+                    arquivos = sorted(p for p in sub.glob("*.ini") if p.is_file())
+                except OSError:
+                    continue
+                for arq in arquivos:
+                    membro = f"presets/{prov_chave}/{arq.name}"
+                    if membro not in vistos_pre:
+                        z.write(arq, membro)
+                        vistos_pre.add(membro)
+                        n += 1
             if com_saves:
                 for membro, arq in pares_saves:
                     z.write(arq, membro)
@@ -118,7 +164,6 @@ def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
     return {"ok": True, "destino": str(destino), "arquivos": n,
             "bytes": destino.stat().st_size, "jogos": len(dados["jogos"]),
             "inclui_saves": com_saves}
-
 
 
 def _membro_pacote_ok(nome: str) -> str | None:
@@ -139,15 +184,22 @@ def _membro_pacote_ok(nome: str) -> str | None:
     if n.startswith("capas/") and "/" not in n[6:] \
             and Path(n).suffix.lower() in CAPA_EXTS:
         return "capa"
-    if n.startswith("presets/") and "/" not in n[8:] and n.lower().endswith(".ini"):
-        return "preset"
+    if n.startswith("presets/") and n.lower().endswith(".ini"):
+        partes_pre = n.split("/")
+        if len(partes_pre) == 2 and partes_pre[1]:
+            # legado: presets/<nome>.ini (vale p/ Azahar)
+            return "preset"
+        if len(partes_pre) == 3 and partes_pre[1] and partes_pre[2]:
+            # novo: presets/<prov>/<nome>.ini (prov precisa existir)
+            if partes_pre[1] in provedores():
+                return "preset"
+            return None
     partes = n.split("/")
     if len(partes) >= 3 and partes[0].endswith("-user") and not n.endswith("/"):
         prov = provedores().get(partes[0][:-5])
         if prov is not None and partes[1] in prov["pacote_subs"]:
             return "save"
     return None
-
 
 
 def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict:
@@ -177,7 +229,7 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
             if PACOTE_INFO in cats:
                 info = json.loads(zf.read(PACOTE_INFO).decode("utf-8"))
                 esquema = info.get("esquema", 1)
-            if esquema not in (1, 2):
+            if esquema not in (1, 2, 3):
                 return {"ok": False, "erro": "versão do pacote não suportada"}
             if zf.testzip() is not None:
                 return {"ok": False, "erro": "pacote corrompido (CRC)"}
@@ -209,7 +261,7 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                     raw = zf.read(f"capas/{Path(arq).name}")
                 except KeyError:
                     continue
-                if esquema == 2:
+                if esquema in (2, 3):
                     alvo = con.execute("SELECT id FROM jogos WHERE uuid=?", (ident.strip(),)).fetchone()
                 else:
                     candidatos = con.execute("SELECT id FROM jogos WHERE titulo=?", (ident.strip(),)).fetchall()
@@ -224,11 +276,27 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                     res["erros"].append(f"Capa {arq}: {r['erro']}")
             presets = 0
             garantir_dirs()
+            from bib_nucleo.emuladores import presets_prov_dir as _prov_dir
             for nm, cat in cats.items():
                 if cat != "preset":
                     continue
                 try:
-                    (presets_dir() / Path(nm).name).write_bytes(zf.read(nm))
+                    partes = nm.split("/")
+                    if len(partes) == 3:
+                        dest = _prov_dir(partes[1]) / Path(partes[2]).name
+                    else:
+                        dest = presets_dir() / Path(nm).name
+                    # anti traversal: destino precisa ficar dentro de presets_dir
+                    try:
+                        dentro = dest.resolve().parent == dest.parent.resolve() or \
+                            presets_dir().resolve() in dest.resolve().parents
+                    except OSError:
+                        dentro = False
+                    if not dentro:
+                        res["erros"].append(f"Preset {nm}: fora de presets/")
+                        continue
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_bytes(zf.read(nm))
                     presets += 1
                 except OSError as e:
                     res["erros"].append(f"Preset {nm}: {e}")
@@ -261,7 +329,6 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
             "saves_ignorados": saves_ignorados}
 
 
-
 def fazer_backup(db_path: Path, manter: int = 10) -> dict:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -290,5 +357,30 @@ def fazer_backup(db_path: Path, manter: int = 10) -> dict:
             "jogos": len(dados["jogos"]), "mantidos": manter}
 
 
+def backup_pre_import(db_path=None) -> dict | None:
+    """Backup silencioso antes de importar. Nunca levanta; None se falhou."""
+    from bib_nucleo.base import log_erro
+    try:
+        return fazer_backup(Path(db_path) if db_path else DEFAULT_DB)
+    except Exception as e:
+        try:
+            log_erro("backup-pre-import", f"{type(e).__name__}: {e}")
+        except Exception:
+            pass
+        return None
 
-__all__ = ['PACOTE_ESQUEMA', 'PACOTE_INFO', 'PACOTE_JSON', 'PACOTE_MANIFESTO', '_dados_exportacao', '_saves_para_pacote', 'exportar_pacote', '_membro_pacote_ok', 'importar_pacote', 'fazer_backup']
+
+def idade_ultimo_backup_dias() -> float | None:
+    """Idade do backup .db mais recente em dias. None se nunca houve."""
+    try:
+        arqs = sorted(BACKUP_DIR.glob("biblioteca-*.db"))
+        if not arqs:
+            return None
+        mais_recente = max(a.stat().st_mtime for a in arqs)
+        import time as _time
+        return (_time.time() - mais_recente) / 86400.0
+    except OSError:
+        return None
+
+
+__all__ = ['PACOTE_ESQUEMA', 'PACOTE_INFO', 'PACOTE_JSON', 'PACOTE_MANIFESTO', 'exportar_json', 'exportar_pacote', 'importar_pacote', 'fazer_backup', 'backup_pre_import', 'idade_ultimo_backup_dias']
