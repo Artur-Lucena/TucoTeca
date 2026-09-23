@@ -7,7 +7,10 @@ from executar import afirmar
 
 
 def _app_oculto(db_nome="d.db"):
-    import tkinter as tk
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        return None, None
     import app_win
     try:
         root = tk.Tk()
@@ -40,7 +43,11 @@ def _combos(dlg):
 
 
 def teste_dialogo_emulador_autodetect():
-    import tkinter as tk
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
     root, app = _app_oculto("d3.db")
     if root is None:
         print("(sem display: skip)")
@@ -69,7 +76,11 @@ def teste_dialogo_emulador_autodetect():
 
 
 def teste_dialogo_secoes_escuras():
-    import tkinter as tk
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
     root, app = _app_oculto()
     if root is None:
         print("(sem display: skip)")
@@ -87,8 +98,12 @@ def teste_dialogo_secoes_escuras():
 
 
 def teste_dialogo_salva():
-    import tkinter as tk
-    from tkinter import messagebox
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
     root, app = _app_oculto("d2.db")
     if root is None:
         print("(sem display: skip)")

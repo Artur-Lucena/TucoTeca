@@ -109,11 +109,19 @@ def resolver_exe(d: dict) -> tuple[str, str]:
         esp = (d.get("exe_win") or "").strip()
         if esp:
             return esp, "exe_win"
-    else:
-        esp = (d.get("exe_linux") or "").strip()
-        if esp:
-            return esp, "exe_linux"
-    return traduzir_para_atual((d.get("executable_path") or "").strip()), "executavel"
+        legado = traduzir_para_atual((d.get("executable_path") or "").strip())
+        if legado:
+            return legado, "executavel"
+        alt = traduzir_para_atual((d.get("exe_linux") or "").strip())
+        return alt, "exe_linux"
+    esp = (d.get("exe_linux") or "").strip()
+    if esp:
+        return esp, "exe_linux"
+    legado = traduzir_para_atual((d.get("executable_path") or "").strip())
+    if legado:
+        return legado, "executavel"
+    alt = traduzir_para_atual((d.get("exe_win") or "").strip())
+    return alt, "exe_win"
 
 
 def agora_iso() -> str:
@@ -180,8 +188,9 @@ def adquirir_lock(ignorar: bool = False) -> dict:
 
 
 def liberar_lock() -> None:
-    """Remove lock da instância atual (não remove lock de outro pid)."""
+    """Remove lock da instância atual (não remove lock de outro pid/host/SO)."""
     import json as _json
+    import socket as _socket
     lp = lock_path()
     try:
         if not lp.is_file():
@@ -190,7 +199,12 @@ def liberar_lock() -> None:
             dono = _json.loads(lp.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return
-        if int(dono.get("pid") or -1) == os.getpid():
+        try:
+            mesmo_host = (dono.get("host") or "") == _socket.gethostname()
+        except OSError:
+            mesmo_host = False
+        if (int(dono.get("pid") or -1) == os.getpid()
+                and (dono.get("so") or "") == os.name and mesmo_host):
             try:
                 lp.unlink()
             except OSError:

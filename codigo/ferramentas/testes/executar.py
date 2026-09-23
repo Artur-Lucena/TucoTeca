@@ -52,12 +52,19 @@ def isolar(raiz: Path):
     })
     tempfile.tempdir = str(raiz)
 
-    def dentro(p):
+    def dentro(p, dir_fd=-1):
         if isinstance(p, int) or p is None:
             return
         if str(p) == ":memory:":
             return
-        alvo = Path(os.fsdecode(p)).resolve()
+        pp = Path(os.fsdecode(p))
+        if not pp.is_absolute() and isinstance(dir_fd, int) and dir_fd >= 0:
+            try:
+                base = os.readlink(f"/proc/self/fd/{dir_fd}")
+            except OSError:
+                return
+            pp = Path(base) / pp
+        alvo = pp.resolve()
         if alvo != raiz and raiz not in alvo.parents:
             raise PermissionError(f"Teste tentou escrever fora do sandbox: {alvo}")
 
@@ -67,10 +74,24 @@ def isolar(raiz: Path):
             if (isinstance(mode, str) and any(x in mode for x in "wax+")) or (
                     isinstance(flags, int) and flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC)):
                 dentro(path)
-        elif event in ("os.remove", "os.rmdir", "os.mkdir", "os.chmod", "os.utime", "sqlite3.connect"):
+        elif event in ("os.remove", "os.unlink", "os.rmdir"):
+            dentro(args[0], args[1] if len(args) > 1 else -1)
+        elif event in ("os.mkdir", "os.chmod"):
+            dentro(args[0], args[2] if len(args) > 2 else -1)
+        elif event == "os.utime":
+            dentro(args[0], args[3] if len(args) > 3 else -1)
+        elif event == "os.open":
+            path, flags = args[0], args[1] if len(args) > 1 else 0
+            if isinstance(flags, int) and flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC):
+                dentro(path, args[3] if len(args) > 3 else -1)
+        elif event == "sqlite3.connect":
             dentro(args[0])
-        elif event in ("os.rename", "os.link", "os.symlink"):
-            dentro(args[0]); dentro(args[1])
+        elif event in ("os.rename", "os.replace", "os.link"):
+            dentro(args[0], args[2] if len(args) > 2 else -1)
+            dentro(args[1], args[3] if len(args) > 3 else -1)
+        elif event == "os.symlink":
+            dentro(args[0])
+            dentro(args[1], args[2] if len(args) > 2 else -1)
         elif event in ("socket.connect", "subprocess.Popen", "os.system", "os.startfile"):
             raise PermissionError(f"Operação externa bloqueada no teste: {event}")
     sys.addaudithook(audit)

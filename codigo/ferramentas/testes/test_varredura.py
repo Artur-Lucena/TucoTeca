@@ -19,7 +19,10 @@ def teste_horas_nao_finitas():
 
 
 def _app_oculto(db_nome="v.db"):
-    import tkinter as tk
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        return None, None
     import app_win
     try:
         root = tk.Tk()
@@ -32,8 +35,12 @@ def _app_oculto(db_nome="v.db"):
 
 
 def teste_update_mostra_erro_rede():
-    import tkinter as tk
-    from tkinter import messagebox
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
     root, app = _app_oculto()
     if root is None:
         print("(sem display: skip)")
@@ -99,7 +106,11 @@ def teste_prev_tui_sem_score():
 
 
 def teste_prev_gui_sem_score():
-    import tkinter as tk
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
     root, app = _app_oculto("v2.db")
     if root is None:
         print("(sem display: skip)")
@@ -116,8 +127,12 @@ def teste_prev_gui_sem_score():
 
 
 def teste_pacote_exporta_em_thread():
-    import tkinter as tk
-    from tkinter import filedialog, messagebox
+    try:
+        import tkinter as tk
+        from tkinter import filedialog, messagebox
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
     root, app = _app_oculto("v3.db")
     if root is None:
         print("(sem display: skip)")
@@ -148,8 +163,12 @@ def teste_pacote_exporta_em_thread():
 
 
 def teste_pacote_importa_em_thread():
-    import tkinter as tk
-    from tkinter import filedialog, messagebox
+    try:
+        import tkinter as tk
+        from tkinter import filedialog, messagebox
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
     root, app = _app_oculto("v4.db")
     if root is None:
         print("(sem display: skip)")

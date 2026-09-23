@@ -66,16 +66,18 @@ def pontuar(item: dict) -> dict:
     if (item.get("origem") or "") in ("steam-manifest", "epic", "gog", "riot"):
         score += 0.1
         motivos.append("manifesto da loja")
-    if (item.get("origem") or "").startswith("rom-") and (item.get("rom_path") or "").strip():
-        rp = item["rom_path"].strip()
-        if Path(rp).exists():
-            score += 0.5
-            motivos.append("ROM existe neste SO")
-        else:
-            tr = traduzir_para_atual(rp)
-            if tr != rp and Path(tr).exists():
-                score += 0.3
-                motivos.append("ROM existe no outro SO (traduzida)")
+    if (item.get("origem") or "").startswith("rom-"):
+        rp = ((item.get("rom_path") or "").strip()
+              or (item.get("launch_options") or "").strip())
+        if rp:
+            if Path(rp).exists():
+                score += 0.5
+                motivos.append("ROM existe neste SO")
+            else:
+                tr = traduzir_para_atual(rp)
+                if tr != rp and Path(tr).exists():
+                    score += 0.3
+                    motivos.append("ROM existe no outro SO (traduzida)")
     if item.get("tem_metadados"):
         score += 0.1
         motivos.append("metadados internos lidos")
@@ -1400,7 +1402,8 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
             prov_rom = provedor_por_origem(j.get("origem") or "")
             if cur.rowcount and prov_rom is not None:
                 try:  # capa automática: ícone de dentro da própria ROM
-                    rom = (j.get("rom_path") or "").strip()
+                    rom = ((j.get("rom_path") or "").strip()
+                           or (j.get("launch_options") or "").strip())
                     png = prov_rom["icone"](rom) if rom else None
                     if png:
                         salvar_capa_bytes(con, cur.lastrowid,

@@ -77,6 +77,10 @@ def teste_preparar_nds_sem_aviso_cripto():
 
 
 def teste_instalar_desmume_fake():
+    import os
+    if os.name != "nt":
+        print("(só Windows: skip)")
+        return
     tmp = Path(tempfile.mkdtemp(prefix="suite-di-"))
     src = tmp / "rel"
     src.mkdir()

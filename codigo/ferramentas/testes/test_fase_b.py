@@ -34,10 +34,16 @@ def _ambiente():
 
 
 def teste_instala_e_upgrade():
+    import os
     tmp, dest = _ambiente()
-    with patch.object(emuladores, "_emu_dir", return_value=dest):
-        r = emuladores.azahar_instalar(_release(tmp, "v1", b"1"))
-    afirmar(r["ok"] and r["exe"] == str(dest / "azahar.exe"), r)
+    if os.name == "nt":
+        with patch.object(emuladores, "_emu_dir", return_value=dest):
+            r = emuladores.azahar_instalar(_release(tmp, "v1", b"1"))
+        afirmar(r["ok"] and r["exe"] == str(dest / "azahar.exe"), r)
+    else:
+        with patch.object(emuladores, "_emu_dir", return_value=dest):
+            r = emuladores.azahar_instalar(_release(tmp, "v1", b"1", "posix"))
+        afirmar(r["ok"] and r["exe"] == str(dest / "azahar.AppImage"), r)
     antes = upd._manifesto(dest)
     r = upd.instalar(_release(tmp, "v2", b"2"), dest, plataforma="nt")
     afirmar(r["ok"], r)

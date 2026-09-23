@@ -166,6 +166,21 @@ def desmume_dir() -> Path:
     return Path(LINUX_ROOT) / "Games/Emuladores/DeSmuME"
 
 
+def _appimage_na_pasta(pasta: Path, prefixo: str) -> str:
+    """Acha prefixo*.AppImage sem depender de caixa (ext4 é case-sensitive)."""
+    try:
+        if not pasta.is_dir():
+            return ""
+        alvos = [p for p in pasta.iterdir()
+                 if p.is_file() and p.name.lower().startswith(prefixo.lower())
+                 and p.name.lower().endswith(".appimage")]
+        if not alvos:
+            return ""
+        return str(sorted(alvos, key=lambda p: p.name.lower())[-1])
+    except OSError:
+        return ""
+
+
 def default_emu_nds() -> str:
     """Caminho do DeSmuME (BIBLIOTECA_EMULADOR_NDS > DIR > padrão)."""
     env = os.environ.get("BIBLIOTECA_EMULADOR_NDS")
@@ -176,32 +191,45 @@ def default_emu_nds() -> str:
         if os.name == "nt":
             cand = ov / "desmume.exe"
             return str(cand) if cand.is_file() else ""
-        imgs = sorted(ov.glob("desmume*.AppImage"))
-        return str(imgs[-1]) if imgs else ""
+        img = _appimage_na_pasta(ov, "desmume")
+        if img:
+            return img
+        img = _appimage_na_pasta(ov, "desmume_")
+        if img:
+            return img
+        return ""
     if os.name == "nt":
         cand = Path(WIN_ROOT) / "Games/Emuladores/DeSmuME/desmume.exe"
         return str(cand) if cand.is_file() else ""
     pasta = Path(LINUX_ROOT) / "Games/Emuladores/DeSmuME"
-    if pasta.is_dir():
-        imgs = sorted(pasta.glob("desmume*.AppImage"))
-        if imgs:
-            return str(imgs[-1])
+    img = _appimage_na_pasta(pasta, "desmume")
+    if img:
+        return img
     # sem AppImage: aceita DeSmuME do sistema (pacote/flatpak/snap)
+    # apt Ubuntu instala como `desmume-cli` em /usr/games; outros, `desmume`
     import shutil
-    for cand in (shutil.which("desmume"),
+    for cand in (shutil.which("desmume"), shutil.which("desmume-cli"),
                  str(Path.home() / ".local/share/flatpak/exports/bin/org.desmume.DeSmuME"),
                  "/var/lib/flatpak/exports/bin/org.desmume.DeSmuME",
-                 "/snap/bin/desmume"):
+                 "/snap/bin/desmume", "/snap/bin/desmume-emulator"):
         if cand and Path(cand).is_file():
             return cand
     return ""
 
 
 def desmume_user_dir(exe: str = "") -> str:
-    """DeSmuME é portátil por natureza: config (desmume.ini) mora ao lado do exe."""
+    """DeSmuME é portátil por natureza: config (desmume.ini) mora ao lado do exe.
+
+    No Linux com DeSmuME do sistema, a config fica em ~/.config/desmume.
+    """
     exe = exe or default_emu_nds()
     if exe:
         base = Path(exe).parent
+        if (base / "desmume.ini").is_file():
+            return str(base)
+        cfg = Path.home() / ".config" / "desmume"
+        if (cfg / "desmume.ini").is_file():
+            return str(cfg)
         if base.is_dir():
             return str(base)
     return ""
@@ -364,6 +392,30 @@ def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "
                                     close_fds=True)
             return {"ok": True, "modo": "popen-windows"}, proc
         else:
+            ext = p.suffix.lower()
+            if ext in (".lnk", ".url") or p.is_dir():
+                return {"ok": False,
+                        "erro": f"Atalho/pasta Windows não executa no Linux: {exe}"}, None
+            if ext in (".exe", ".bat", ".cmd"):
+                vinho = shutil.which("wine") or shutil.which("wine64")
+                if vinho:
+                    if wine_prefix.strip():
+                        env["WINEPREFIX"] = traduzir_para_atual(wine_prefix.strip())
+                    cmd = [vinho, str(p), *extra]
+                    try:
+                        proc = subprocess.Popen(cmd, cwd=cwd, env=env,
+                                                stdout=subprocess.DEVNULL,
+                                                stderr=subprocess.DEVNULL,
+                                                stdin=subprocess.DEVNULL,
+                                                start_new_session=True,
+                                                close_fds=True)
+                    except Exception as e:
+                        return {"ok": False,
+                                "erro": f"{type(e).__name__}: {e}"}, None
+                    return {"ok": True, "modo": "wine-linux"}, proc
+                return {"ok": False,
+                        "erro": (f"Jogo Windows no Linux sem Wine: {exe} "
+                                 "(instale o wine ou cadastre exe_linux nativo)")}, None
             if not os.access(str(p), os.X_OK):
                 return {"ok": False,
                         "erro": f"Sem permissão de execução: {exe} (rode chmod +x?)"}, None

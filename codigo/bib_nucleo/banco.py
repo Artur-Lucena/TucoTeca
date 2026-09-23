@@ -13,7 +13,8 @@ import uuid as uuid_mod
 from pathlib import Path
 
 from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, _desaspas, _txt,
-                                agora_iso, resolver_exe, slugify)
+                                agora_iso, existe_aqui_ou_traduzido,
+                                resolver_exe, slugify)
 
 
 # --------------------------------------------------------------------------
@@ -285,7 +286,9 @@ def row_to_dict(r: sqlite3.Row) -> dict:
         if prov:
             exe = prov["exe"]()
     try:
-        existe = bool(exe) and Path(exe).exists()
+        existe, exe_ok = existe_aqui_ou_traduzido(exe)
+        if existe:
+            exe = exe_ok
     except (ValueError, OSError):
         existe = False  # caminho malformado vindo de importação antiga
     d["exe_existe"] = existe

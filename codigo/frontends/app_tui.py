@@ -165,16 +165,21 @@ class Tui:
     def perguntar(self, prompt: str, inicial: str = "") -> str | None:
         s = self.stdscr
         rows, cols = s.getmaxyx()
+        mostra = f"{prompt}[{inicial}] " if inicial else prompt
         try:
-            s.addnstr(rows - 1, 0, prompt[: cols - 1], cols - 1, self.cor["mut"])
+            s.addnstr(rows - 1, 0, mostra[: cols - 1], cols - 1, self.cor["mut"])
             s.refresh()
+        except Exception:
+            pass
+        try:
+            curses.curs_set(1)
         except Exception:
             pass
         curses.echo()
         try:
             try:
                 s.timeout(-1)  # entrada bloqueante aqui (restaura depois)
-                raw = s.getstr(rows - 1, min(len(prompt), cols - 1), 500)
+                raw = s.getstr(rows - 1, min(len(mostra), cols - 1), 2000)
             except KeyboardInterrupt:
                 return None
             except Exception:
@@ -185,6 +190,10 @@ class Tui:
                 except Exception:
                     pass
                 curses.noecho()
+                try:
+                    curses.curs_set(0)
+                except Exception:
+                    pass
         except Exception:
             try:
                 curses.noecho()
@@ -200,8 +209,16 @@ class Tui:
             return None
         if isinstance(raw, bytes) and raw in (b"\x1b", b"\x1b\x1b"):
             return None
+        txt = txt.strip()
         if txt == "" and inicial:
             return inicial
+        if len(txt) >= 2 and txt.startswith('"') and txt.endswith('"'):
+            txt = txt[1:-1].strip()
+        if txt.startswith("~"):
+            try:
+                txt = os.path.expanduser(txt)
+            except Exception:
+                pass
         return txt
 
     def confirmar(self, pergunta: str) -> bool:
@@ -530,7 +547,8 @@ class Tui:
                 chk = "[x]" if idx in marcados else "[ ]"
                 bola = "●" if it.get("exe_existe") else "○"
                 tag = f" [{it['regiao']}]" if it.get("regiao") else ""
-                linha = f"{chk} {bola} [{it.get('score', 0):.2f}] {it['titulo']}{tag} ({it.get('fonte') or it['origem']})"
+                shop = f" · {it['shop']}" if it.get("shop") else ""
+                linha = f"{chk} {bola} [{it.get('score', 0):.2f}] {it['titulo']}{tag}{shop} ({it.get('fonte') or it['origem']})"
                 attr = self.cor["acc"] if idx == cur else self.cor["txt"]
                 s.addnstr(1 + i, 0, linha, cols - 1, attr)
             s.addnstr(rows - 1, 0, f"{len(marcados)} marcado(s) de {len(itens)}",
@@ -597,7 +615,11 @@ class Tui:
             return
         partes = [f"{f['fonte']}: {f['n']}" for f in info["fontes"]
                   if f["ok"] and f["n"]]
+        falhas = [f"{f['fonte']}: {f.get('detalhe') or 'falha'}" for f in info["fontes"]
+                  if not f["ok"]]
         sub = f"Disco: {len(itens)} achado(s) ({'; '.join(partes) or 'nada'})"
+        if falhas:
+            sub += f" [falhas: {'; '.join(falhas)}]"
         self.tela_prev(sub, itens)
 
     def _prev_pasta(self, roots):
@@ -891,6 +913,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--db", default=str(core.DEFAULT_DB))
     ap.add_argument("--ignorar-lock", action="store_true",
                     help="abre mesmo com lock de outra instância (após crash)")
+    ap.add_argument("--selftest", action="store_true",
+                    help="monta o TUI sem terminal e sai (verificação)")
     args = ap.parse_args(argv)
     if curses is None:
         print("curses indisponível neste Python (no Windows, use app_win.py).",
@@ -904,6 +928,42 @@ def main(argv: list[str] | None = None) -> int:
     import atexit
     atexit.register(core.liberar_lock)
     core.get_db(Path(args.db)).close()
+    if args.selftest:
+        class _FakeScr:
+            def getmaxyx(self):
+                return (24, 80)
+
+            def addnstr(self, *a):
+                pass
+
+            def erase(self):
+                pass
+
+            def refresh(self):
+                pass
+
+            def getch(self):
+                return ord("q")
+
+        class _FakeCurses:
+            COLOR_CYAN = COLOR_BLACK = COLOR_GREEN = COLOR_RED = 1
+
+            def curs_set(self, *a):
+                pass
+
+            def has_colors(self):
+                return False
+
+        real_curses = curses
+        try:
+            globals()["curses"] = _FakeCurses()
+            app = Tui(_FakeScr(), Path(args.db))
+            app.desenhar()
+            print(f"[ok] selftest: TUI montado, {len(app.jogos)} jogo(s)")
+        finally:
+            globals()["curses"] = real_curses
+            core.liberar_lock()
+        return 0
     try:
         cols = int(__import__("shutil").get_terminal_size().columns)
         rows = int(__import__("shutil").get_terminal_size().lines)
