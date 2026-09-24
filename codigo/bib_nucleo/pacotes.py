@@ -13,7 +13,8 @@ from bib_nucleo.banco import (CAPA_EXTS, get_db, row_to_dict,
                                salvar_capa_bytes)
 from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, DEFAULT_DB, agora_iso,
                                garantir_dirs)
-from bib_nucleo.emuladores import azahar_versao_local, provedores, presets_dir
+from bib_nucleo.emuladores import (azahar_versao_local, presets_dir, presets_prov_dir,
+                                     provedores)
 from bib_nucleo.scans import importar_lista
 
 
@@ -34,7 +35,8 @@ def _jogo_limpo(j: dict) -> dict:
     """Remove campos derivados da UI (exe_existe/traduzido etc) do export."""
     j = dict(j)
     for k in ("exe_existe", "exe_traduzido", "etiquetas_lista", "plataforma",
-              "score", "motivos", "fontes", "fonte", "tem_metadados", "rom_path"):
+              "score", "motivos", "fontes", "fonte", "tem_metadados", "rom_path",
+              "mods_lista", "mods_off"):
         j.pop(k, None)
     return j
 
@@ -276,14 +278,13 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                     res["erros"].append(f"Capa {arq}: {r['erro']}")
             presets = 0
             garantir_dirs()
-            from bib_nucleo.emuladores import presets_prov_dir as _prov_dir
             for nm, cat in cats.items():
                 if cat != "preset":
                     continue
                 try:
                     partes = nm.split("/")
                     if len(partes) == 3:
-                        dest = _prov_dir(partes[1]) / Path(partes[2]).name
+                        dest = presets_prov_dir(partes[1]) / Path(partes[2]).name
                     else:
                         dest = presets_dir() / Path(nm).name
                     # anti traversal: destino precisa ficar dentro de presets_dir

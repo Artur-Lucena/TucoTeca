@@ -502,7 +502,7 @@ class Tui:
         j = self.atual()
         if not j:
             return
-        opcoes = ["Jogar", "Editar", "Apagar", "Voltar"]
+        opcoes = ["Jogar", "Editar", "Mods", "Apagar", "Voltar"]
         idx = self.escolher(j["titulo"], opcoes)
         if idx is None:
             return
@@ -511,8 +511,94 @@ class Tui:
             self.jogar()
         elif escolha == "Editar":
             self.editar()
+        elif escolha == "Mods":
+            self.menu_mods(j)
         elif escolha == "Apagar":
             self.excluir()
+
+    def menu_mods(self, j):
+        """Gerenciar mods LayeredFS (só ROM 3DS com title ID legível)."""
+        try:
+            launch = core.traduzir_para_atual((j.get("launch_options") or "").strip())
+            tid = core.title_id_da_rom(launch)
+        except Exception:
+            tid = ""
+        if not tid:
+            self.msg = "Mods só para ROMs 3DS com title ID legível."
+            return
+        con = self._con()
+        try:
+            while True:
+                row = con.execute("SELECT * FROM jogos WHERE id=?",
+                                  (j["id"],)).fetchone()
+                if row is None:
+                    self.msg = "Jogo sumido."
+                    return
+                atual = core.row_to_dict(row)
+                ativos = set(atual.get("mods_lista") or [])
+                off = bool(atual.get("azahar_mods_off"))
+                try:
+                    disp = core.listar_mods(tid)
+                except Exception:
+                    disp = []
+                estado = "Mods: DESLIGADOS (alternar)" if off else "Mods: ligados (alternar)"
+                opcoes = ([estado]
+                          + [f"[{'x' if m in ativos else ' '}] {m}" for m in disp]
+                          + ["Adicionar mod…", "Remover mod…", "Voltar"])
+                idx = self.escolher(f"Mods — {j.get('titulo') or ''}", opcoes)
+                if idx is None or opcoes[idx] == "Voltar":
+                    self.recarregar()
+                    return
+                escolha = opcoes[idx]
+                if escolha == estado:
+                    core.atualizar_jogo(con, j["id"],
+                                        {"azahar_mods_off": 0 if off else 1})
+                    self.msg = ("Mods ligados ✓" if off
+                                else "Mods desligados (lista preservada).")
+                elif escolha == "Adicionar mod…":
+                    r = self.perguntar("Arquivo (.zip/.7z) ou pasta do mod: ")
+                    if not r:
+                        continue
+                    nome = self.perguntar("Nome do mod (vazio=automático): ")
+                    if nome is None:
+                        continue
+                    res = core.importar_mod(r.strip(), tid, (nome or "").strip())
+                    if not res.get("ok"):
+                        self.msg = f"Falha: {res.get('erro')}"
+                        continue
+                    nova = [m for m in disp if m in ativos] + [res["mod"]]
+                    core.atualizar_jogo(con, j["id"], {"azahar_mods": nova})
+                    self.msg = f"Mod {res['mod']} ✓ ({res['arquivos']} arqs)"
+                elif escolha == "Remover mod…":
+                    if not disp:
+                        self.msg = "Nada para remover."
+                        continue
+                    idx2 = self.escolher("Remover", [*disp, "Voltar"])
+                    if idx2 is None or idx2 >= len(disp):
+                        continue
+                    alvo = disp[idx2]
+                    conf = self.perguntar(f"Apagar '{alvo}' da biblioteca? (s/n): ")
+                    if (conf or "").strip().lower() not in ("s", "sim"):
+                        continue
+                    res = core.remover_mod(tid, alvo)
+                    if not res.get("ok"):
+                        self.msg = f"Falha: {res.get('erro')}"
+                        continue
+                    core.atualizar_jogo(
+                        con, j["id"],
+                        {"azahar_mods": [m for m in ativos if m != alvo]})
+                    self.msg = f"Mod {alvo} removido."
+                else:
+                    pos = next((i for i, m in enumerate(disp)
+                                if f"[{'x' if m in ativos else ' '}] {m}" == escolha), None)
+                    if pos is None:
+                        continue
+                    nome = disp[pos]
+                    nova = ([m for m in disp if m in ativos and m != nome]
+                            + ([nome] if nome not in ativos else []))
+                    core.atualizar_jogo(con, j["id"], {"azahar_mods": nova})
+        finally:
+            con.close()
 
     def menu_principal(self) -> bool:
         """ESC na lista abre as categorias; retorna True se é para sair."""
@@ -712,6 +798,8 @@ class Tui:
                                           j["wine_prefix"] if j else ""),
             "etiquetas": self.perguntar("Etiquetas (vírgula, ex.: rpg, souls-like): ",
                                         (j.get("etiquetas") if j else "") or ""),
+            "save_path": self.perguntar("Pasta de saves (vazio=sem): ",
+                                        (j.get("save_path") if j else "") or ""),
             "observacoes": self.perguntar("Observações: ", j["observacoes"] if j else ""),
         }
         if vals["titulo"] is None or not vals["titulo"].strip():
@@ -731,6 +819,7 @@ class Tui:
                 "azahar_preset": (vals["azahar_preset"] or "").strip(),
                 "wine_prefix": (vals["wine_prefix"] or "").strip(),
                 "etiquetas": (vals["etiquetas"] or "").strip(),
+                "save_path": (vals["save_path"] or "").strip(),
                 "observacoes": (vals["observacoes"] or "").strip(),
             }
         except (TypeError, ValueError):

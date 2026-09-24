@@ -17,9 +17,9 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from bib_nucleo.base import (BACKUP_DIR, LINUX_ROOT, PRESETS_DIR, ROM_EXTS_3DS,
-                               WIN_ROOT, existe_aqui_ou_traduzido, resolver_exe, slugify,
-                               traduzir_para_atual)
+from bib_nucleo.base import (BACKUP_DIR, LINUX_ROOT, MAC_ROOT, PRESETS_DIR, ROM_EXTS_3DS,
+                               ROM_EXTS_SWITCH, WIN_ROOT, eh_mac, existe_aqui_ou_traduzido,
+                               resolver_exe, slugify, traduzir_para_atual)
 from bib_nucleo.banco import contar_por_origem
 
 
@@ -316,6 +316,272 @@ def _prov_desmume() -> dict:
     }
 
 # --------------------------------------------------------------------------
+# Citron (Nintendo Switch): provider nº 3, mesma integração do Azahar
+#
+# Versão pinada: 2026-04-27 (Latest, build 0237a9b88). Launcher externo
+# (BYOB, GPL-safe): nenhum src/ do Citron é copiado; o Hub só baixa o
+# binário oficial, detecta user/ portátil e lança a ROM via subprocesso.
+# Metadados internos v1 = nome do arquivo (NCA/XCI exigem prod.keys).
+# --------------------------------------------------------------------------
+
+CITRON_API_LATEST = "https://api.github.com/repos/citron-neo/emulator/releases/latest"
+
+CITRON_VERSAO_ARQ = "versao-citron.txt"
+
+
+def citron_dir_override() -> Path | None:
+    env = (os.environ.get("BIBLIOTECA_CITRON_DIR") or "").strip()
+    if env:
+        return Path(env)
+    return None
+
+
+def _citron_dir() -> Path:
+    ov = citron_dir_override()
+    if ov is not None:
+        return ov  # bundle: atualiza o emulador dentro do pacote
+    if os.name == "nt":
+        return Path(WIN_ROOT) / "Games/Emuladores/Citron"
+    if eh_mac():
+        return Path(MAC_ROOT) / "Games/Emuladores/Citron"
+    return Path(LINUX_ROOT) / "Games/Emuladores/Citron"
+
+
+def _citron_app_mac(pasta: Path) -> str:
+    """Citron.app dentro da pasta (macOS): bundle -> Contents/MacOS/citron."""
+    try:
+        if not pasta.is_dir():
+            return ""
+        for app in sorted(pasta.glob("*.app")):
+            cand = app / "Contents" / "MacOS" / "citron"
+            if cand.is_file():
+                return str(cand)
+            cands = sorted((app / "Contents" / "MacOS").glob("citron*"))
+            if cands:
+                return str(cands[0])
+        return ""
+    except OSError:
+        return ""
+
+
+def default_emu_switch() -> str:
+    """Caminho do Citron (BIBLIOTECA_EMULADOR_SWITCH > DIR > padrão)."""
+    env = os.environ.get("BIBLIOTECA_EMULADOR_SWITCH")
+    if env:
+        return env
+    ov = citron_dir_override()
+    if ov is not None:
+        if os.name == "nt":
+            for pat in ("citron*.exe",):
+                alvos = sorted(ov.glob(pat))
+                if alvos:
+                    return str(alvos[0])
+            return ""
+        if eh_mac():
+            return _citron_app_mac(ov)
+        return _appimage_na_pasta(ov, "citron")
+    if os.name == "nt":
+        pasta = Path(WIN_ROOT) / "Games/Emuladores/Citron"
+        if pasta.is_dir():
+            alvos = sorted(pasta.glob("citron*.exe"))
+            if alvos:
+                return str(alvos[0])
+        return ""
+    if eh_mac():
+        return _citron_app_mac(Path(MAC_ROOT) / "Games/Emuladores/Citron")
+    pasta = Path(LINUX_ROOT) / "Games/Emuladores/Citron"
+    return _appimage_na_pasta(pasta, "citron")
+
+
+def citron_user_dir(exe: str = "") -> str:
+    """Pasta user do Citron (portátil ao lado do exe vence; é o default
+    do Citron desde 2026-03-27 e casa com dados/saves/ do Hub)."""
+    exe = exe or default_emu_switch()
+    if exe:
+        port = Path(exe).parent / "user"
+        if port.is_dir():
+            return str(port)
+        # macOS .app: user/ fica ao lado do bundle, não dentro de MacOS/
+        if eh_mac():
+            for cima in (Path(exe).parent.parent.parent, Path(exe).parent.parent):
+                port = cima / "user"
+                if port.is_dir():
+                    return str(port)
+    if os.name == "nt":
+        base = Path(os.environ.get("APPDATA", "")) / "Citron"
+    elif eh_mac():
+        base = Path.home() / "Library" / "Application Support" / "Citron"
+    else:
+        base = Path.home() / ".local/share/citron-emu"
+    return str(base) if base.is_dir() else ""
+
+
+def citron_status() -> dict:
+    """Saúde do Citron sem abrir nada: instalado, user dir, config, chaves, fw."""
+    exe = default_emu_switch()
+    st = {"instalado": bool(exe), "exe": exe, "user_dir": "",
+          "configurado": False, "chaves": False, "firmware": False,
+          "versao_local": citron_versao_local()}
+    if not exe:
+        return st
+    ud = citron_user_dir(exe)
+    st["user_dir"] = ud
+    if ud:
+        base = Path(ud)
+        st["configurado"] = (base / "config" / "qt-config.ini").is_file()
+        st["chaves"] = (base / "keys" / "prod.keys").is_file()
+        st["firmware"] = (base / "nand" / "system" / "Contents" / "registered").is_dir()
+    return st
+
+
+def citron_versao_local() -> str:
+    arq = _citron_dir() / CITRON_VERSAO_ARQ
+    try:
+        if arq.is_file():
+            return arq.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    return ""
+
+
+def _citron_arch() -> str:
+    """'aarch64' ou 'x86_64' (p/ escolher o AppImage)."""
+    import platform
+    try:
+        m = (platform.machine() or "").lower()
+    except Exception:
+        m = ""
+    if m in ("aarch64", "arm64"):
+        return "aarch64"
+    return "x86_64"
+
+
+def citron_release_info(timeout: int = 25) -> dict:
+    """{'tag','nome','size','sha256','url'} do asset deste SO, ou {'erro':...}.
+
+    Win: msvc default (BIBLIOTECA_CITRON_ASSET=clangtron troca).
+    Linux: x86_64 default (V3 ou aarch64 via env/arch).
+    macOS: .dmg (instalação manual: arrastar Citron.app).
+    """
+    if os.name == "nt":
+        want = "clangtron" if (os.environ.get("BIBLIOTECA_CITRON_ASSET") or "").strip().lower() == "clangtron" else "msvc"
+
+        def casa(n: str) -> bool:
+            return n.startswith("Citron-windows-nightly-") and n.endswith(f"-x64-{want}.zip")
+    elif eh_mac():
+        def casa(n: str) -> bool:  # noqa: E306
+            return "macos" in n.lower() and n.endswith(".dmg")
+    else:
+        arch = _citron_arch()
+        if arch == "aarch64":
+            sufixo = "linux-aarch64.AppImage"
+        elif (os.environ.get("BIBLIOTECA_CITRON_V3") or "").strip() == "1":
+            sufixo = "linux-x86_64_v3.AppImage"
+        else:
+            sufixo = "linux-x86_64.AppImage"
+
+        def casa(n: str, _s=sufixo) -> bool:  # noqa: E306
+            return n.endswith(_s)
+    try:
+        with urllib.request.urlopen(CITRON_API_LATEST, timeout=timeout) as r:
+            rel = json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        return {"erro": f"falha de rede: {type(e).__name__}: {e}"}
+    tag = (rel.get("tag_name") or "").strip()
+    for a in rel.get("assets", []):
+        nome = a.get("name") or ""
+        if casa(nome):
+            digest = a.get("digest") or ""
+            sha = digest.split(":", 1)[1].strip() if ":" in digest else ""
+            return {"tag": tag, "nome": nome, "size": a.get("size") or 0,
+                    "sha256": sha, "url": a.get("browser_download_url") or ""}
+    return {"erro": "asset deste SO não encontrado no release"}
+
+
+def citron_instalar(info: dict, progresso=None) -> dict:
+    """Baixa e instala o Citron (transacional, como Azahar).
+
+    Win/Linux: automático. macOS: .dmg exige arrastar o .app (manual).
+    """
+    if eh_mac():
+        return {"ok": False, "erro": ("No Mac, monte o .dmg e arraste Citron.app para "
+                                      "Games/Emuladores/Citron (ou defina BIBLIOTECA_CITRON_DIR).")}
+    from bib_nucleo.atualizacao import instalar
+    if os.name == "nt":
+        return instalar(info, _citron_dir(), progresso, exe_nomes=("citron*.exe",),
+                        deps=(), versao_nome=CITRON_VERSAO_ARQ)
+    return instalar(info, _citron_dir(), progresso, versao_nome=CITRON_VERSAO_ARQ,
+                    appimage_nome="citron.AppImage")
+
+
+def citron_config_atual() -> Path | None:
+    ud = citron_user_dir()
+    if ud:
+        cfgdir = Path(ud) / "config"
+        cfg = cfgdir / "qt-config.ini"
+        if cfg.is_file():
+            return cfg
+        try:
+            alts = sorted(p for p in cfgdir.glob("*.ini") if p.is_file())
+        except OSError:
+            alts = []
+        if alts:
+            return alts[0]
+    return None
+
+
+def citron_flags() -> list[str]:
+    """Flags extras ao bootar ROM Switch (padrão -f fullscreen; vazio desliga)."""
+    return shlex.split(os.environ.get("BIBLIOTECA_CITRON_FLAGS", "-f"),
+                       posix=(os.name != "nt"))
+
+
+def ler_metadados_switch(caminho: str) -> dict:
+    """Metadados Switch v1: {} (título vem do nome do arquivo).
+
+    NCA/XCI/NSP exigem prod.keys + descriptografia PFS0/NCA — fora do
+    escopo stdlib do Hub. Com as chaves no user/, o Citron exibe o
+    título sozinho na 1ª execução.
+    """
+    return {}
+
+
+def _icone_switch_none(caminho: str, alvo_px: int = 144) -> bytes | None:
+    """Switch não tem ícone stdlib (ver ler_metadados_switch): capa via Steam/manual."""
+    return None
+
+
+def _prov_citron() -> dict:
+    return {
+        "chave": "citron",
+        "nome": "Citron",
+        "sistemas": ("Nintendo Switch",),
+        "origens": ("rom-switch",),
+        "origem": "rom-switch",
+        "exe": default_emu_switch,          # () -> str
+        "user_dir": citron_user_dir,        # (exe="") -> str
+        "saves_subs": ("nand/user/save", "sdmc"),
+        "pacote_subs": ("nand/user/save", "sdmc"),
+        "rom_exts": ROM_EXTS_SWITCH,
+        "flags": citron_flags,              # () -> list[str]
+        "aplicar_preset": lambda nome: aplicar_preset(nome, "citron"),
+        "release_info": citron_release_info,
+        "versao_local": citron_versao_local,
+        "instalar": citron_instalar,
+        "ler_metadados": ler_metadados_switch,
+        "icone": _icone_switch_none,
+        "dica_instalacao": ("Citron não encontrado — instale em "
+                            "Games/Emuladores/Citron (Win: citron*.exe, "
+                            "Linux: citron*.AppImage, Mac: Citron.app) "
+                            "ou defina BIBLIOTECA_EMULADOR_SWITCH."),
+    }
+
+
+def _campo_preset(chave: str) -> str:
+    """Coluna de preset do provider (citron tem a sua; o resto usa a legada)."""
+    return "citron_preset" if chave == "citron" else "azahar_preset"
+
+# --------------------------------------------------------------------------
 # Execução de jogos (Windows + Linux)
 # --------------------------------------------------------------------------
 
@@ -419,9 +685,10 @@ def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "
             return {"ok": True, "modo": "popen-windows"}, proc
         else:
             ext = p.suffix.lower()
+            nome_so = "Mac" if eh_mac() else "Linux"
             if ext in (".lnk", ".url") or p.is_dir():
                 return {"ok": False,
-                        "erro": f"Atalho/pasta Windows não executa no Linux: {exe}"}, None
+                        "erro": f"Atalho/pasta Windows não executa no {nome_so}: {exe}"}, None
             if ext in (".exe", ".bat", ".cmd"):
                 vinho = shutil.which("wine") or shutil.which("wine64")
                 if vinho:
@@ -449,6 +716,10 @@ def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "
                         return {"ok": False,
                                 "erro": f"{type(e).__name__}: {e}"}, None
                     return {"ok": True, "modo": "wine-linux"}, proc
+                if eh_mac():
+                    return {"ok": False,
+                            "erro": (f"Jogo Windows não executa no Mac: {exe} "
+                                     "(sem Wine no Mac; cadastre exe_mac nativo)")}, None
                 return {"ok": False,
                         "erro": (f"Jogo Windows no Linux sem Wine: {exe} "
                                  "(instale o wine ou cadastre exe_linux nativo)")}, None
@@ -460,7 +731,7 @@ def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                     stdin=subprocess.DEVNULL, start_new_session=True,
                                     close_fds=True)
-            return {"ok": True, "modo": "popen-linux"}, proc
+            return {"ok": True, "modo": "popen-mac" if eh_mac() else "popen-linux"}, proc
     except Exception as e:
         if _eh_elevacao_necessaria(e):
             return {"ok": False, "requer_elevacao": True,
@@ -981,12 +1252,458 @@ def aplicar_preset(nome: str, chave: str = "azahar") -> dict:
     return {"ok": True, "preset": alvo.stem, "config": str(cfg)}
 
 
+# --------------------------------------------------------------------------
+# Mods do Azahar (LayeredFS): biblioteca no HUB + ativação via junction
+#
+# Biblioteca: dados/mods/azahar/<title-id>/<mod>/{romfs,exefs,code.ips}.
+# O Azahar lê tudo em user/load/mods/<title-id>/; o play apaga só os
+# links do HUB e recria os ativos (pastas reais nunca são removidas).
+# --------------------------------------------------------------------------
+
+def title_id_da_rom(rom_path: str) -> str:
+    """Title ID (16 hex) lido do header NCCH; '' se ilegível."""
+    rom = (rom_path or "").strip().strip("\"'")
+    if not rom:
+        return ""
+    try:
+        with Path(rom).open("rb") as f:
+            head = f.read(0x200)
+            if len(head) < 0x200:
+                return ""
+            if head[0x100:0x104] == b"NCSD":
+                base = int.from_bytes(head[0x120:0x124], "little") * 0x200
+                f.seek(base)
+                head = f.read(0x200)
+                if len(head) < 0x200:
+                    return ""
+            if head[0x100:0x104] != b"NCCH":
+                return ""
+            return head[0x118:0x120][::-1].hex().upper()
+    except (OSError, ValueError):
+        return ""
+
+
+def mods_lib_dir() -> Path:
+    from bib_nucleo.base import MODS_DIR
+    d = MODS_DIR / "azahar"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def mods_titulo_dir(title_id: str) -> Path:
+    d = mods_lib_dir() / (title_id or "").strip().upper()
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _k32():
+    """kernel32 com assinaturas explícitas (sem elas, ctypes trunca ponteiro)."""
+    import ctypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.GetFileAttributesW.argtypes = [ctypes.c_wchar_p]
+    k32.GetFileAttributesW.restype = ctypes.c_uint32
+    k32.CreateFileW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32,
+                                ctypes.c_uint32, ctypes.c_void_p,
+                                ctypes.c_uint32, ctypes.c_uint32,
+                                ctypes.c_void_p]
+    k32.CreateFileW.restype = ctypes.c_void_p
+    k32.DeviceIoControl.argtypes = [ctypes.c_void_p, ctypes.c_uint32,
+                                    ctypes.c_void_p, ctypes.c_uint32,
+                                    ctypes.c_void_p, ctypes.c_uint32,
+                                    ctypes.POINTER(ctypes.c_ulong),
+                                    ctypes.c_void_p]
+    k32.DeviceIoControl.restype = ctypes.c_bool
+    k32.CloseHandle.argtypes = [ctypes.c_void_p]
+    k32.CloseHandle.restype = ctypes.c_bool
+    return k32
+
+
+def _eh_reparse(p: Path) -> bool:
+    """É junction/symlink (link do HUB) e não pasta real?"""
+    try:
+        if os.name == "nt":
+            attrs = _k32().GetFileAttributesW(str(p))
+            return attrs != 0xFFFFFFFF and bool(attrs & 0x400)
+        return p.is_symlink()
+    except OSError:
+        return False
+
+
+def remover_link(link: str) -> None:
+    """Remove junction/symlink sem tocar no alvo. Só age em reparse point."""
+    l = Path(link)
+    if _eh_reparse(l):
+        try:
+            os.rmdir(l)
+        except OSError as e:
+            raise OSError(f"não removi {link}: {e}")
+
+
+def _eh_mod_valido(p: Path) -> bool:
+    try:
+        if not p.is_dir() or _eh_reparse(p):
+            return False
+        return ((p / "romfs").is_dir() or (p / "exefs").is_dir()
+                or (p / "code.ips").is_file())
+    except OSError:
+        return False
+
+
+def listar_mods(title_id: str) -> list[str]:
+    """Nomes dos mods na biblioteca p/ este title ID (ordenados)."""
+    tid = (title_id or "").strip().upper()
+    if not tid:
+        return []
+    try:
+        base = mods_lib_dir() / tid
+        if not base.is_dir():
+            return []
+        return sorted(p.name for p in base.iterdir() if _eh_mod_valido(p))
+    except OSError:
+        return []
+
+
+def remover_mod(title_id: str, nome: str) -> dict:
+    """Apaga um mod da biblioteca (só dentro dela; nunca no Azahar)."""
+    tid = (title_id or "").strip().upper()
+    alvo = mods_lib_dir() / tid / Path(nome or "").name
+    try:
+        dentro = alvo.resolve().parent == (mods_lib_dir() / tid).resolve()
+    except OSError:
+        dentro = False
+    if not dentro or not alvo.is_dir() or _eh_reparse(alvo):
+        return {"ok": False, "erro": f"mod '{nome}' não existe na biblioteca."}
+    try:
+        shutil.rmtree(alvo)
+    except OSError as e:
+        return {"ok": False, "erro": f"falha ao apagar: {e}"}
+    return {"ok": True, "mod": alvo.name}
+
+
+def azahar_mods_dir() -> str:
+    """user/load/mods do Azahar atual ('' se emulador ausente)."""
+    ud = azahar_user_dir()
+    if not ud:
+        return ""
+    return str(Path(ud) / "load" / "mods")
+
+
+def mods_ativos(jogo: dict) -> list[str]:
+    from bib_nucleo.banco import mods_de
+    return mods_de(jogo)
+
+
+def _ler_manifesto(pasta: Path) -> dict:
+    """Manifesto do HUB (.hub-mods.json): {'mods': [...], 'arquivos': [...] }."""
+    import json as _json
+    try:
+        d = _json.loads((pasta / ".hub-mods.json").read_text(encoding="utf-8"))
+        if isinstance(d, dict) and isinstance(d.get("mods"), list) \
+                and isinstance(d.get("arquivos"), list):
+            return {"mods": [m for m in d["mods"] if isinstance(m, str)],
+                    "arquivos": [a for a in d["arquivos"] if isinstance(a, str)]}
+    except (OSError, ValueError):
+        pass
+    return {"mods": [], "arquivos": []}
+
+
+def _gravar_manifesto(pasta: Path, mods: list[str], arquivos: list[str]) -> None:
+    """Grava (ou remove, se vazio) o manifesto do HUB. Nunca levanta."""
+    import json as _json
+    alvo = pasta / ".hub-mods.json"
+    try:
+        if not mods and not arquivos:
+            try:
+                alvo.unlink()
+            except OSError:
+                pass
+            return
+        tmp = pasta / ".hub-mods.tmp"
+        tmp.write_text(_json.dumps({"mods": mods, "arquivos": arquivos},
+                                   ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(alvo)
+    except OSError:
+        pass
+
+
+def _limpar_hub(pasta: Path, disponiveis: set[str]) -> list[str]:
+    """Remove junctions legadas do HUB e arquivos do manifesto anterior.
+
+    Pastas/arquivos do usuário (fora do manifesto, sem ser link com nome
+    de mod da biblioteca) nunca são tocados. Retorna avisos.
+    """
+    avisos: list[str] = []
+    mani = _ler_manifesto(pasta)
+    for rel in mani["arquivos"]:
+        alvo = pasta / Path(*Path(rel).parts)
+        try:
+            dentro = alvo.resolve().parent == pasta.resolve() \
+                or pasta.resolve() in alvo.resolve().parents
+        except OSError:
+            dentro = False
+        if not dentro or _eh_reparse(alvo):
+            continue
+        try:
+            if alvo.is_file():
+                alvo.unlink()
+        except OSError as e:
+            avisos.append(f"resto '{rel}' não saiu ({e})")
+    try:
+        for item in sorted(pasta.iterdir()):
+            if item.name in (".hub-mods.json", ".hub-mods.tmp"):
+                continue
+            if _eh_reparse(item) and item.name in disponiveis:
+                try:
+                    remover_link(str(item))
+                except OSError as e:
+                    avisos.append(f"link antigo '{item.name}' não saiu ({e})")
+                    continue
+            try:
+                if item.is_dir() and not any(item.iterdir()):
+                    item.rmdir()  # dir vazio (sobra de link/junction): some
+            except OSError:
+                pass
+    except OSError as e:
+        avisos.append(f"limpeza incompleta ({e})")
+    _gravar_manifesto(pasta, [], [])
+    return avisos
+
+
+def aplicar_mods(jogo: dict) -> dict:
+    """Copia os mods ativos p/ load/mods/<tid>/ (flat, como o Azahar lê).
+
+    Nunca bloqueia o play. Retorna {'aplicados': [...], 'aviso': None|str}.
+    Mods empilham na ordem da lista (o último vence por arquivo). Arquivos
+    do usuário fora do manifesto nunca são removidos.
+    """
+    from bib_nucleo.base import traduzir_para_atual
+    if provedor_por_origem((jogo.get("origem") or "")) is None:
+        return {"aplicados": [], "aviso": None}
+    launch = ((jogo.get("launch_options") or "").strip()
+              .strip("\"'"))
+    if provedor_por_extensao(Path(launch).suffix) is None:
+        return {"aplicados": [], "aviso": None}
+    tid = title_id_da_rom(traduzir_para_atual(launch))
+    if not tid:
+        return {"aplicados": [], "aviso": None}
+    destino = azahar_mods_dir()
+    if not destino:
+        return {"aplicados": [],
+                "aviso": "Azahar não encontrado — mods não aplicados."}
+    avisos: list[str] = []
+    aplicados: list[str] = []
+    try:
+        pasta = Path(destino) / tid
+        pasta.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        return {"aplicados": [], "aviso": f"pasta de mods inacessível ({e})"}
+    disponiveis = set(listar_mods(tid))
+    avisos += _limpar_hub(pasta, disponiveis)
+    try:
+        desligados = int(jogo.get("azahar_mods_off") or 0) != 0
+    except (TypeError, ValueError):
+        desligados = False
+    pedidos = [] if desligados else [m for m in mods_ativos(jogo)]
+    for nome in pedidos:
+        if nome not in disponiveis:
+            avisos.append(f"mod '{nome}' marcado mas fora da biblioteca")
+    pedidos = [m for m in pedidos if m in disponiveis]
+    if not pedidos:
+        return {"aplicados": [], "aviso": "; ".join(avisos) or None}
+    mani = _ler_manifesto(pasta)
+    if mani["mods"] == pedidos and all((pasta / a).is_file() for a in mani["arquivos"]):
+        return {"aplicados": list(pedidos), "aviso": "; ".join(avisos) or None}
+    arquivos: list[str] = []
+    vistos: set[str] = set()
+    for nome in pedidos:
+        src = mods_lib_dir() / tid / nome
+        try:
+            for arq in sorted(src.rglob("*")):
+                if not arq.is_file() or _eh_reparse(arq):
+                    continue
+                try:
+                    rel = arq.relative_to(src).as_posix()
+                except ValueError:
+                    continue
+                dest = pasta / Path(*Path(rel).parts)
+                try:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(arq, dest)
+                except OSError as e:
+                    avisos.append(f"mod '{nome}': {rel} não copiou ({e})")
+                    continue
+                if rel not in vistos:
+                    vistos.add(rel)
+                    arquivos.append(rel)
+            aplicados.append(nome)
+        except OSError as e:
+            avisos.append(f"mod '{nome}' não ativou ({e})")
+    _gravar_manifesto(pasta, pedidos, arquivos)
+    return {"aplicados": aplicados, "aviso": "; ".join(avisos) or None}
+
+
+def _bin_7z() -> str:
+    """7z do Hub (Windows) ou do sistema; '' se ausente."""
+    if os.name == "nt":
+        cand = Path(WIN_ROOT) / "Games/ferramentas/7z.exe"
+        if cand.is_file():
+            return str(cand)
+    return shutil.which("7z") or shutil.which("7zz") or ""
+
+
+def _extrair_arquivo(arq: str, destino: Path) -> None:
+    baixo = arq.lower()
+    if baixo.endswith(".zip"):
+        import zipfile
+        with zipfile.ZipFile(arq) as z:
+            for m in z.namelist():
+                alvo = (destino / m)
+                if not str(alvo.resolve()).startswith(str(destino.resolve())):
+                    raise OSError(f"entrada suspeita no zip: {m}")
+            z.extractall(destino)
+        return
+    sete = _bin_7z()
+    if not sete:
+        raise OSError("archive precisa do 7z (só .zip sem ele"
+                      + ("; no Linux instale o p7zip" if os.name != "nt" else "") + ")")
+    r = subprocess.run([sete, "x", arq, f"-o{destino}", "-y"],
+                       capture_output=True, text=True, timeout=600)
+    if r.returncode != 0:
+        raise OSError(f"7z falhou ({r.returncode}): {(r.stderr or '').strip()[:200]}")
+
+
+def _raiz_layeredfs(base: Path) -> tuple[Path | None, str]:
+    """(pasta do mod, title-id do caminho luma|) procurando até 3 níveis.
+
+    Ordem: caminho luma/titles/<id> vence; depois raiz com arquivos;
+    depois qualquer raiz; por fim conteúdo nu (ex.: 'a/' sem romfs/).
+    """
+    cands: list[tuple[Path, str, bool]] = []
+    nu: Path | None = None
+    for raiz, _dirs, _arqs in os.walk(base):
+        try:
+            rel = Path(raiz).relative_to(base)
+        except ValueError:
+            continue
+        if len(rel.parts) > 3:
+            continue
+        p = Path(raiz)
+        try:
+            baixo = {q.name.lower() for q in p.iterdir()}
+        except OSError:
+            continue
+        tid = ""
+        partes = p.parts
+        if "luma" in partes and "titles" in partes:
+            try:
+                i = list(partes).index("titles")
+                cand = str(partes[i + 1]).upper()
+                if len(cand) == 16 and all(c in "0123456789ABCDEF" for c in cand):
+                    tid = cand
+            except IndexError:
+                pass
+        if "romfs" in baixo or "exefs" in baixo or "code.ips" in baixo or tid:
+            try:
+                tem = any(f.is_file() for f in p.rglob("*"))
+            except OSError:
+                tem = False
+            cands.append((p, tid, tem))
+        elif nu is None and _tem_conteudo_nu(p):
+            nu = p
+    for p, tid, _tem in cands:
+        if tid:
+            return p, tid
+    for p, _tid, tem in cands:
+        if tem:
+            return p, ""
+    if cands:
+        return cands[0][0], cands[0][1]
+    if nu is not None:
+        return nu, ""
+    return None, ""
+
+
+def _tem_conteudo_nu(p: Path) -> bool:
+    """Pasta parece conteúdo de romfs sem o invólucro (ex.: 'a/' do Pokémon)?"""
+    try:
+        for item in p.iterdir():
+            n = item.name.lower()
+            if item.is_dir() and n in ("a", "sound", "m", "data"):
+                return True
+            if item.is_file() and n.endswith((".cro", ".crr", ".moflex", ".bcstm", ".bcsar")):
+                return True
+    except OSError:
+        pass
+    return False
+
+
+def importar_mod(origem: str, title_id: str = "", nome: str = "") -> dict:
+    """Copia pasta ou extrai archive p/ a biblioteca. Retorna dict (sempre).
+
+    Detecta a raiz LayeredFS (romfs/exefs/code.ips, luma/titles/<id> ou
+    conteúdo nu como 'a/') e normaliza. title_id vem do caminho luma ou
+    deve ser informado (o jogo de destino).
+    """
+    import tempfile
+    src = Path((origem or "").strip().strip("\"'"))
+    if not src.exists():
+        return {"ok": False, "erro": f"origem não encontrada: {origem}"}
+    tid = (title_id or "").strip().upper()
+    if tid and (len(tid) != 16 or any(c not in "0123456789ABCDEF" for c in tid)):
+        return {"ok": False, "erro": f"title ID inválido: {title_id}"}
+    rotulo = (nome or "").strip().replace("/", "-").replace("\\", "-")[:60].strip()
+    if not rotulo:
+        rotulo = src.stem.strip()[:60].strip()
+    if not rotulo or rotulo in (".", ".."):
+        return {"ok": False, "erro": "nome de mod vazio."}
+    tmp = Path(tempfile.mkdtemp(prefix="hub-mod-"))
+    try:
+        if src.is_dir():
+            shutil.copytree(src, tmp / "m")
+        elif src.is_file():
+            _extrair_arquivo(str(src), tmp / "m")
+        else:
+            return {"ok": False, "erro": f"origem inválida: {origem}"}
+        raiz, tid_luma = _raiz_layeredfs(tmp / "m")
+        if raiz is None:
+            return {"ok": False, "erro": "estrutura LayeredFS não encontrada (sem romfs/exefs/code.ips)."}
+        tid = tid or tid_luma
+        if not tid:
+            return {"ok": False, "erro": "informe o jogo (title ID) deste mod."}
+        dest = mods_titulo_dir(tid) / rotulo
+        if dest.exists():
+            return {"ok": False, "erro": f"mod '{rotulo}' já existe na biblioteca."}
+        if _tem_conteudo_nu(raiz) and not (raiz / "romfs").is_dir() and not (raiz / "exefs").is_dir():
+            dest.mkdir(parents=True)
+            rf = dest / "romfs"
+            rf.mkdir()
+            for item in sorted(raiz.iterdir()):
+                if item.name.lower() == "code.ips":
+                    continue  # vai p/ raiz do mod (Azahar só lê lá)
+                if item.suffix.lower() in (".txt", ".md") and item.is_file():
+                    continue
+                shutil.move(str(item), str(rf / item.name))
+            if (raiz / "code.ips").is_file():
+                shutil.move(str(raiz / "code.ips"), str(dest / "code.ips"))
+        else:
+            shutil.copytree(raiz, dest)
+        n = sum(1 for _p in dest.rglob("*") if _p.is_file())
+        if not _eh_mod_valido(dest):
+            shutil.rmtree(dest, ignore_errors=True)
+            return {"ok": False, "erro": "nada aproveitável (sem romfs/exefs/code.ips)."}
+        return {"ok": True, "mod": rotulo, "title_id": tid, "arquivos": n}
+    except OSError as e:
+        return {"ok": False, "erro": f"{type(e).__name__}: {e}"}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def preparar_lancamento(jogo: dict) -> dict:
-    """Aplica o preset do provider do jogo. Nunca bloqueia o play."""
+    """Aplica preset + mods do provider do jogo. Nunca bloqueia o play."""
     origem = (jogo.get("origem") or "")
     prov = provedor_por_origem(origem)
     if prov is None:
-        return {"preset_aplicado": None, "aviso": None}
+        return {"preset_aplicado": None, "mods_aplicados": [], "aviso": None}
     avisos: list[str] = []
     aplicado = None
     nome = (jogo.get("azahar_preset") or "").strip()
@@ -997,13 +1714,19 @@ def preparar_lancamento(jogo: dict) -> dict:
         else:
             avisos.append(f"Preset '{nome}' falhou ({r['erro']}); abrindo com config atual.")
     launch = (jogo.get("launch_options") or "").strip()
+    mods_ok: list[str] = []
     if (launch and prov.get("chave") == "azahar"
             and provedor_por_extensao(Path(launch).suffix) is not None):
         if rom_parece_criptografada(launch) and not azahar_tem_chaves():
             avisos.append("ROM parece criptografada e o Azahar está sem aes_keys.txt "
                           "— o jogo não vai abrir. Faça o dump das chaves do seu 3DS "
                           "(GodMode9) para user/sysdata/aes_keys.txt.")
-    return {"preset_aplicado": aplicado, "aviso": " ".join(avisos) or None}
+        mr = aplicar_mods(jogo)
+        mods_ok = mr["aplicados"]
+        if mr["aviso"]:
+            avisos.append(mr["aviso"])
+    return {"preset_aplicado": aplicado, "mods_aplicados": mods_ok,
+            "aviso": " ".join(avisos) or None}
 
 
 def rom_parece_criptografada(rom_path: str) -> bool:
@@ -1027,4 +1750,5 @@ def azahar_tem_chaves() -> bool:
     ud = azahar_user_dir()
     return bool(ud) and (Path(ud) / "sysdata" / "aes_keys.txt").is_file()
 
-__all__ = ['azahar_dir_override', 'default_emu_3ds', 'desmume_dir_override', 'desmume_dir', 'default_emu_nds', 'desmume_user_dir', 'desmume_versao_local', 'desmume_release_info', 'desmume_instalar', 'desmume_config_atual', 'desmume_flags', 'config_atual_emu', 'presets_prov_dir', 'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', 'azahar_versao_local', 'azahar_release_info', 'azahar_instalar', 'executar_elevado', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', 'executar_monitorado', 'iniciar_sessao_manual', 'listar_sessoes_pendentes', 'encerrar_sessao_manual', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'presets_prov_dir', 'listar_presets', 'azahar_config_atual', 'config_atual_emu', 'salvar_preset_de_atual', 'aplicar_preset', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves']
+__all__ = ['azahar_dir_override', 'default_emu_3ds', 'desmume_dir_override', 'desmume_dir', 'default_emu_nds', 'desmume_user_dir', 'desmume_versao_local', 'desmume_release_info', 'desmume_instalar', 'desmume_config_atual', 'desmume_flags', 'config_atual_emu', 'presets_prov_dir', 'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', 'azahar_versao_local', 'azahar_release_info', 'azahar_instalar', 'executar_elevado', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', 'executar_monitorado', 'iniciar_sessao_manual', 'listar_sessoes_pendentes', 'encerrar_sessao_manual', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'listar_presets', 'azahar_config_atual', 'salvar_preset_de_atual', 'aplicar_preset', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves',
+ 'title_id_da_rom', 'mods_lib_dir', 'mods_titulo_dir', 'remover_link', 'listar_mods', 'remover_mod', 'azahar_mods_dir', 'mods_ativos', 'aplicar_mods', 'importar_mod']

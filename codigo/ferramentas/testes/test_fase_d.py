@@ -143,3 +143,18 @@ def teste_backup_pre_import_e_selo():
     afirmar(idade is None or isinstance(idade, float), idade)
     afirmar(core.selo_confianca({"confianca": 0.85}) == " · ◎0.85")
     afirmar(core.selo_confianca({"confianca": 0}) == "")
+
+
+def teste_save_path():
+    con, _tmp = _nova_db()
+    try:
+        g = core.criar_jogo(con, {"titulo": "S", "executable_path": "",
+                                  "status": "backlog",
+                                  "save_path": r"C:\Saves\Jogo"})
+        afirmar(g["save_path"] == r"C:\Saves\Jogo", g)
+        c = core.atualizar_jogo(con, g["id"], {"nota": 5})  # preserva
+        afirmar(c["save_path"] == r"C:\Saves\Jogo", c)
+        c = core.atualizar_jogo(con, g["id"], {"save_path": ""})
+        afirmar(c["save_path"] == "", c)
+    finally:
+        con.close()

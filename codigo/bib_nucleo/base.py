@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Caminhos canônicos, tradução Win<->Linux, dirs, texto e tempo."""
+"""Caminhos canônicos, tradução Win<->Linux<->Mac, dirs, texto e tempo."""
 from __future__ import annotations
 
 import datetime
 import os
 import re
+import sys
 import unicodedata
 from pathlib import Path
 
@@ -20,6 +21,13 @@ WIN_ROOT = os.environ.get("BIBLIOTECA_WIN_ROOT", "D:\\")
 
 LINUX_ROOT = os.environ.get("BIBLIOTECA_LINUX_ROOT", "/run/media/tuco/Games")
 
+MAC_ROOT = os.environ.get("BIBLIOTECA_MAC_ROOT", "/Volumes/Games")
+
+
+def eh_mac() -> bool:
+    """True no macOS (Intel ou Apple Silicon), independente de os.name."""
+    return sys.platform == "darwin"
+
 REL_HOME = Path("Tuco-Compartilhado") / "Jogos" / "biblioteca"
 
 
@@ -31,6 +39,11 @@ def resolve_home() -> Path:
         cand = Path(WIN_ROOT) / REL_HOME
         if cand.is_dir():
             return cand
+    elif eh_mac():
+        for raiz in (MAC_ROOT, LINUX_ROOT):
+            cand = Path(raiz) / REL_HOME
+            if cand.is_dir():
+                return cand
     else:
         cand = Path(LINUX_ROOT) / REL_HOME
         if cand.is_dir():
@@ -58,6 +71,10 @@ SAVES_DIR = DADOS_DIR / "saves"
 
 WINE_PREFIXO = SAVES_DIR / "wine"
 
+# Biblioteca de mods por provider: mods/<prov>/<title-id>/<mod>/ (LayeredFS
+# extraído e normalizado). O play materializa só os ativos via junction.
+MODS_DIR = DADOS_DIR / "mods"
+
 
 def garantir_dirs() -> None:
     HOME_DIR.mkdir(parents=True, exist_ok=True)
@@ -67,6 +84,7 @@ def garantir_dirs() -> None:
     PRESETS_DIR.mkdir(parents=True, exist_ok=True)
     SESSOES_DIR.mkdir(parents=True, exist_ok=True)
     SAVES_DIR.mkdir(parents=True, exist_ok=True)
+    MODS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _com_barra(p: str) -> str:
@@ -91,11 +109,69 @@ def linux_para_win(p: str) -> str:
     return p
 
 
+def win_para_mac(p: str) -> str:
+    """D:\\Games\\X -> /Volumes/Games/Games/X. Fora de D:\\, devolve igual."""
+    n = _com_barra(p)
+    w = _com_barra(WIN_ROOT).rstrip("/") + "/"
+    if n[: len(w)].lower() == w.lower():
+        return _com_barra(MAC_ROOT).rstrip("/") + "/" + n[len(w):]
+    return p
+
+
+def mac_para_win(p: str) -> str:
+    n = _com_barra(p)
+    mx = _com_barra(MAC_ROOT).rstrip("/") + "/"
+    if n[: len(mx)].lower() == mx.lower():
+        resto = n[len(mx):].replace("/", "\\")
+        return WIN_ROOT.rstrip("\\") + "\\" + resto
+    return p
+
+
+def linux_para_mac(p: str) -> str:
+    """Troca o prefixo do mount Linux pelo do Mac; fora dele, devolve igual."""
+    n = _com_barra(p)
+    lx = _com_barra(LINUX_ROOT).rstrip("/") + "/"
+    if n[: len(lx)].lower() == lx.lower():
+        return _com_barra(MAC_ROOT).rstrip("/") + "/" + n[len(lx):]
+    return p
+
+
+def mac_para_linux(p: str) -> str:
+    n = _com_barra(p)
+    mx = _com_barra(MAC_ROOT).rstrip("/") + "/"
+    if n[: len(mx)].lower() == mx.lower():
+        return _com_barra(LINUX_ROOT).rstrip("/") + "/" + n[len(mx):]
+    return p
+
+
+def _sob(p: str, raiz: str) -> bool:
+    """p está dentro de raiz? (compara com barra, sem caixa)."""
+    n = _com_barra(p).lower()
+    r = _com_barra(raiz).rstrip("/") + "/"
+    return n.startswith(r.lower())
+
+
+# Sufixos que o Windows executa de verdade (fallback de outro SO com
+# outra extensão — ex.: .AppImage — existe no disco mas nunca abre aqui).
+_WIN_EXEC = (".exe", ".bat", ".cmd", ".lnk", ".com")
+
+
 def traduzir_para_atual(p: str) -> str:
     """Converte um caminho gravado para o equivalente neste SO (ou igual)."""
     if not p:
         return p
-    return linux_para_win(p) if os.name == "nt" else win_para_linux(p)
+    if os.name == "nt":
+        if _sob(p, MAC_ROOT):
+            return mac_para_win(p)
+        return linux_para_win(p)
+    if eh_mac():
+        t = win_para_mac(p)
+        if t != p:
+            return t
+        return linux_para_mac(p)
+    if _sob(p, MAC_ROOT):
+        return mac_para_linux(p)
+    return win_para_linux(p)
 
 
 def existe_aqui_ou_traduzido(p: str) -> tuple[bool, str]:
@@ -111,29 +187,46 @@ def existe_aqui_ou_traduzido(p: str) -> tuple[bool, str]:
 
 
 def resolver_exe(d: dict) -> tuple[str, str]:
-    """(executável final neste SO, origem). exe_win/exe_linux vencem o legado.
+    """(executável final neste SO, origem). exe_win/exe_linux/exe_mac vencem o legado.
 
     O campo do outro SO só vale como fallback se existir aqui ou traduzido;
     senão o legado (mesmo vazio) prevalece para o provider completar.
+    No Mac, exe_mac vence; .exe/.AppImage de Win/Linux nunca executam lá.
     """
     if os.name == "nt":
         esp = (d.get("exe_win") or "").strip()
         if esp:
             return esp, "exe_win"
         legado = traduzir_para_atual((d.get("executable_path") or "").strip())
-        alt = traduzir_para_atual((d.get("exe_linux") or "").strip())
-        if alt and existe_aqui_ou_traduzido(alt)[0]:
-            return alt, "exe_linux"
+        if legado and existe_aqui_ou_traduzido(legado)[0]:
+            return legado, "executavel"
+        for campo in ("exe_linux", "exe_mac"):
+            alt = traduzir_para_atual((d.get(campo) or "").strip())
+            if alt and Path(alt).suffix.lower() in _WIN_EXEC and existe_aqui_ou_traduzido(alt)[0]:
+                return alt, campo
         return legado, "executavel"
+    if eh_mac():
+        esp = (d.get("exe_mac") or "").strip()
+        if esp:
+            return esp, "exe_mac"
+        legado = traduzir_para_atual((d.get("executable_path") or "").strip())
+        if legado:
+            return legado, "executavel"
+        for campo in ("exe_linux", "exe_win"):
+            alt = traduzir_para_atual((d.get(campo) or "").strip())
+            if alt and existe_aqui_ou_traduzido(alt)[0]:
+                return alt, campo
+        return "", "executavel"
     esp = (d.get("exe_linux") or "").strip()
     if esp:
         return esp, "exe_linux"
     legado = traduzir_para_atual((d.get("executable_path") or "").strip())
     if legado:
         return legado, "executavel"
-    alt = traduzir_para_atual((d.get("exe_win") or "").strip())
-    if alt and existe_aqui_ou_traduzido(alt)[0]:
-        return alt, "exe_win"
+    for campo in ("exe_win", "exe_mac"):
+        alt = traduzir_para_atual((d.get(campo) or "").strip())
+        if alt and existe_aqui_ou_traduzido(alt)[0]:
+            return alt, campo
     return "", "executavel"
 
 
@@ -251,5 +344,8 @@ def slugify(s: str) -> str:
 # Extensões de ROM por provider (aqui p/ scans e emuladores usarem sem ciclo).
 ROM_EXTS_3DS = {".cci", ".cxi", ".3ds", ".3dsx", ".elf", ".app", ".axf"}
 
-__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
- 'ROM_EXTS_3DS']
+# Nintendo Switch (Citron 2026-04-27): dumps e homebrew suportados pelo Hub.
+ROM_EXTS_SWITCH = {".nsp", ".xci", ".nca", ".nro", ".nso"}
+
+__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'MAC_ROOT', 'eh_mac', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'MODS_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'win_para_mac', 'mac_para_win', 'linux_para_mac', 'mac_para_linux', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
+ 'ROM_EXTS_3DS', 'ROM_EXTS_SWITCH']

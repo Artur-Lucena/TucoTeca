@@ -13,7 +13,8 @@ import uuid as uuid_mod
 import zlib
 from pathlib import Path
 
-from bib_nucleo.banco import STATUS_VALIDOS, chave_dedup, normalizar_etiquetas, salvar_capa_bytes
+from bib_nucleo.banco import (STATUS_VALIDOS, chave_dedup, normalizar_etiquetas, normalizar_mods,
+                                salvar_capa_bytes)
 from bib_nucleo.base import (LINUX_ROOT, WIN_ROOT, agora_iso,
                              existe_aqui_ou_traduzido, slugify, traduzir_para_atual,
                              win_para_linux)
@@ -1312,6 +1313,12 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
         if len(erros) < 20:
             erros.append(motivo)
 
+    def _mods_seguro(v) -> str:
+        try:
+            return normalizar_mods(v)
+        except ValueError:
+            return "[]"
+
     for pos, j in enumerate(itens):
         if not isinstance(j, dict):
             _ignorar(f"item {pos}: não é objeto")
@@ -1375,13 +1382,15 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                 ignorados += 1
                 continue
             cur = con.execute(
-                """INSERT OR IGNORE INTO jogos
-                   (titulo, executable_path, exe_win, exe_linux, wine_prefix, launch_options,
+                   """INSERT OR IGNORE INTO jogos
+                   (titulo, executable_path, exe_win, exe_linux, exe_mac, wine_prefix, launch_options,
                     status, nota, favorito, horas, ultima_execucao, observacoes, origem, shop, object_id,
-                    game_code, regiao, azahar_preset, uuid, etiquetas, confianca, criado_em, atualizado_em)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    game_code, regiao, azahar_preset, uuid, etiquetas, azahar_mods, azahar_mods_off,
+                    confianca, criado_em, atualizado_em)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (titulo, (j.get("executable_path") or "").strip(),
                  (j.get("exe_win") or "").strip(), (j.get("exe_linux") or "").strip(),
+                 (j.get("exe_mac") or "").strip(),
                  (j.get("wine_prefix") or ""), (j.get("launch_options") or ""),
                  j.get("status") if j.get("status") in STATUS_VALIDOS else "backlog",
                  nota, 1 if j.get("favorito") else 0,
@@ -1390,8 +1399,10 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                  j.get("origem") or "manual", (j.get("shop") or ""),
                  (j.get("object_id") or ""), (j.get("game_code") or "").strip(),
                  (j.get("regiao") or "").strip(), (j.get("azahar_preset") or "").strip(),
-                 uid, normalizar_etiquetas(j.get("etiquetas") or ""),
-                 confianca, j.get("criado_em") or agora, j.get("atualizado_em") or agora),
+                  uid, normalizar_etiquetas(j.get("etiquetas") or ""),
+                  _mods_seguro(j.get("azahar_mods")),
+                  1 if j.get("azahar_mods_off") else 0,
+                  confianca, j.get("criado_em") or agora, j.get("atualizado_em") or agora),
             )
             novos += cur.rowcount
             if not cur.rowcount:

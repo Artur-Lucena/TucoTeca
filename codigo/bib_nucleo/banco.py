@@ -44,11 +44,16 @@ CREATE TABLE IF NOT EXISTS jogos (
     confianca REAL DEFAULT 0,
     exe_win TEXT DEFAULT '',
     exe_linux TEXT DEFAULT '',
+    exe_mac TEXT DEFAULT '',
     game_code TEXT DEFAULT '',
     regiao TEXT DEFAULT '',
     azahar_preset TEXT DEFAULT '',
+    citron_preset TEXT DEFAULT '',
     uuid TEXT DEFAULT '',
     etiquetas TEXT DEFAULT '',
+    save_path TEXT DEFAULT '',
+    azahar_mods TEXT DEFAULT '',
+    azahar_mods_off INTEGER DEFAULT 0,
     criado_em TEXT,
     atualizado_em TEXT,
     UNIQUE(titulo, executable_path, launch_options)
@@ -58,24 +63,32 @@ CREATE TABLE IF NOT EXISTS jogos (
 
 # Migração de bancos antigos: v1 (sem capa/confianca), v2 (sem exe por SO),
 # v3 (sem game_code/regiao), v4 (sem azahar_preset), v5 (sem uuid),
-# v6 (sem etiquetas).
+# v6 (sem etiquetas), v7 (sem save_path), v8 (sem exe_mac),
+# v9 (sem azahar_mods), v10 (sem azahar_mods_off), v11 (sem citron_preset).
 MIGRACOES = (
     "ALTER TABLE jogos ADD COLUMN capa TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN confianca REAL DEFAULT 0",
     "ALTER TABLE jogos ADD COLUMN exe_win TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN exe_linux TEXT DEFAULT ''",
+    "ALTER TABLE jogos ADD COLUMN exe_mac TEXT DEFAULT ''",
+    "ALTER TABLE jogos ADD COLUMN azahar_mods TEXT DEFAULT ''",
+    "ALTER TABLE jogos ADD COLUMN azahar_mods_off INTEGER DEFAULT 0",
     "ALTER TABLE jogos ADD COLUMN game_code TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN regiao TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN azahar_preset TEXT DEFAULT ''",
+    "ALTER TABLE jogos ADD COLUMN citron_preset TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN uuid TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN etiquetas TEXT DEFAULT ''",
+    "ALTER TABLE jogos ADD COLUMN save_path TEXT DEFAULT ''",
 )
 
 
 CAMPOS_EDITAVEIS = ("titulo", "executable_path", "exe_win", "exe_linux",
+                    "exe_mac",
                     "wine_prefix", "launch_options", "status", "nota", "favorito",
                     "horas", "observacoes", "shop", "object_id", "origem",
-                    "game_code", "regiao", "azahar_preset", "etiquetas")
+                    "game_code", "regiao", "azahar_preset", "citron_preset", "etiquetas",
+                    "save_path", "azahar_mods", "azahar_mods_off")
 
 
 # --------------------------------------------------------------------------
@@ -131,12 +144,14 @@ def etiquetas_de(j: dict | None) -> list[str]:
 
 
 def plataforma_de_origem(origem: str) -> str:
-    """PC/3DS/NDS a partir da origem (sem consultar o registro)."""
+    """PC/3DS/NDS/Switch a partir da origem (sem consultar o registro)."""
     o = (origem or "").strip().lower()
     if o == "rom-3ds":
         return "3DS"
     if o == "rom-nds":
         return "NDS"
+    if o == "rom-switch":
+        return "Switch"
     return "PC"
 
 
@@ -154,6 +169,8 @@ def plataforma_jogo(j: dict | None) -> str:
                 return "3DS"
             if re.search(r"\bNDS\b|Nintendo DS", sist):
                 return "NDS"
+            if re.search(r"Switch", sist):
+                return "Switch"
     except Exception:
         pass
     return plataforma_de_origem(origem)
@@ -182,10 +199,11 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
                          str(BACKUP_DIR / f"pre-migracao-unique-{ts}.db"))
     except OSError:
         pass
-    cols = ["id", "titulo", "executable_path", "exe_win", "exe_linux", "wine_prefix",
+    cols = ["id", "titulo", "executable_path", "exe_win", "exe_linux", "exe_mac", "wine_prefix",
             "launch_options", "status", "nota", "favorito", "horas", "ultima_execucao",
             "observacoes", "origem", "shop", "object_id", "game_code", "regiao",
-            "azahar_preset", "uuid", "etiquetas", "capa", "confianca", "criado_em", "atualizado_em"]
+            "azahar_preset", "citron_preset", "uuid", "etiquetas", "save_path", "azahar_mods", "azahar_mods_off",
+            "capa", "confianca", "criado_em", "atualizado_em"]
     todos = ", ".join(cols)
     con.executescript(f"""
         CREATE TABLE jogos_nova (
@@ -194,6 +212,7 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
             executable_path TEXT DEFAULT '',
             exe_win TEXT DEFAULT '',
             exe_linux TEXT DEFAULT '',
+            exe_mac TEXT DEFAULT '',
             wine_prefix TEXT DEFAULT '',
             launch_options TEXT DEFAULT '',
             status TEXT DEFAULT 'backlog',
@@ -208,8 +227,12 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
             game_code TEXT DEFAULT '',
             regiao TEXT DEFAULT '',
             azahar_preset TEXT DEFAULT '',
+            citron_preset TEXT DEFAULT '',
             uuid TEXT DEFAULT '',
             etiquetas TEXT DEFAULT '',
+            save_path TEXT DEFAULT '',
+            azahar_mods TEXT DEFAULT '',
+            azahar_mods_off INTEGER DEFAULT 0,
             capa TEXT DEFAULT '',
             confianca REAL DEFAULT 0,
             criado_em TEXT,
@@ -278,6 +301,16 @@ def row_to_dict(r: sqlite3.Row) -> dict:
     d["favorito"] = bool(d.get("favorito"))
     d["etiquetas"] = normalizar_etiquetas(d.get("etiquetas") or "")
     d["etiquetas_lista"] = etiquetas_de(d)
+    try:
+        d["azahar_mods"] = normalizar_mods(d.get("azahar_mods"))
+    except ValueError:
+        d["azahar_mods"] = "[]"  # JSON antigo corrompido: lista vazia, sem quebrar
+    d["mods_lista"] = mods_de(d)
+    try:
+        d["azahar_mods_off"] = 1 if d.get("azahar_mods_off") else 0
+    except (TypeError, ValueError):
+        d["azahar_mods_off"] = 0
+    d["mods_off"] = bool(d["azahar_mods_off"])
     d["plataforma"] = plataforma_jogo(d)
     exe, _origem = resolver_exe(d)
     if not exe:
@@ -306,11 +339,13 @@ def validar_dados(dados: dict, parcial: bool = False) -> dict:
         limpo["titulo"] = titulo
     if "executable_path" in dados or not parcial:
         limpo["executable_path"] = _desaspas(_txt(dados.get("executable_path")))
-    for campo in ("exe_win", "exe_linux", "game_code", "regiao", "azahar_preset"):
+    for campo in ("exe_win", "exe_linux", "exe_mac", "game_code", "regiao", "azahar_preset",
+                    "citron_preset"):
         if campo in dados or not parcial:
             v = _txt(dados.get(campo))
             limpo[campo] = _desaspas(v) if campo.startswith("exe_") else v
-    for campo in ("wine_prefix", "launch_options", "observacoes", "shop", "object_id"):
+    for campo in ("wine_prefix", "launch_options", "observacoes", "shop", "object_id",
+                    "save_path"):
         if campo in dados or not parcial:
             limpo[campo] = _txt(dados.get(campo))
     if "status" in dados or not parcial:
@@ -344,7 +379,69 @@ def validar_dados(dados: dict, parcial: bool = False) -> dict:
         limpo["origem"] = _txt(dados.get("origem")) or "manual"
     if "etiquetas" in dados or not parcial:
         limpo["etiquetas"] = normalizar_etiquetas(dados.get("etiquetas") or "")
+    if "azahar_mods" in dados or not parcial:
+        limpo["azahar_mods"] = normalizar_mods(dados.get("azahar_mods"))
+    if "azahar_mods_off" in dados or not parcial:
+        limpo["azahar_mods_off"] = 1 if dados.get("azahar_mods_off") else 0
     return limpo
+
+
+MODS_MAX_NOME = 60
+
+MODS_MAX_QTD = 20
+
+
+def normalizar_mods(v) -> str:
+    """Lista JSON de mods ativos do jogo (nomes da biblioteca, ordem mantida).
+
+    Aceita JSON (gravado), lista/tupla ou str única. Remove vazios e
+    duplicados (sem caixa), limita a MODS_MAX_QTD nomes de até
+    MODS_MAX_NOME chars. Nome não pode conter separador de caminho ou
+    NUL. Retorna '"[]"' se vazio.
+    """
+    import json as _json
+    if v is None or v == "":
+        return "[]"
+    if isinstance(v, str):
+        s = v.strip()
+        if s.startswith("["):
+            try:
+                v = _json.loads(s)
+            except ValueError:
+                raise ValueError("azahar_mods inválido (JSON esperado)")
+        else:
+            v = [s]
+    if not isinstance(v, (list, tuple)):
+        raise ValueError("azahar_mods inválido (lista esperada)")
+    vistos: dict[str, str] = {}
+    for item in v:
+        t = (item if isinstance(item, str) else str(item or "")).replace(
+            "\x00", "").strip().strip("/\\")
+        if not t or "/" in t or "\\" in t:
+            continue
+        t = t[:MODS_MAX_NOME].strip()
+        if not t:
+            continue
+        if t.casefold() not in vistos:
+            vistos[t.casefold()] = t
+        if len(vistos) >= MODS_MAX_QTD:
+            break
+    return _json.dumps(list(vistos.values()), ensure_ascii=False)
+
+
+def mods_de(j: dict | None) -> list[str]:
+    """Nomes dos mods ativos do jogo (a partir do campo gravado)."""
+    import json as _json
+    if not j:
+        return []
+    v = j.get("azahar_mods")
+    if isinstance(v, (list, tuple)):
+        return [t.strip() for t in v if isinstance(t, str) and t.strip()]
+    try:
+        v = _json.loads(v or "[]")
+    except (ValueError, TypeError):
+        return []
+    return [t for t in v if isinstance(t, str) and t] if isinstance(v, list) else []
 
 
 def _like_esc(s: str) -> str:
@@ -415,17 +512,20 @@ def criar_jogo(con: sqlite3.Connection, dados: dict) -> dict:
             raise ValueError("jogo já cadastrado (mesmo título + executável)")
     try:
         cur = con.execute(
-            """INSERT INTO jogos (titulo, executable_path, exe_win, exe_linux, wine_prefix,
+            """INSERT INTO jogos (titulo, executable_path, exe_win, exe_linux, exe_mac, wine_prefix,
                launch_options, status, nota, favorito, horas, observacoes, origem, shop,
-               object_id, game_code, regiao, azahar_preset, uuid, etiquetas, criado_em, atualizado_em)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               object_id, game_code, regiao, azahar_preset, citron_preset, uuid, etiquetas, save_path, azahar_mods,
+               azahar_mods_off, criado_em, atualizado_em)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
              (limpo["titulo"], limpo["executable_path"], limpo["exe_win"],
-              limpo["exe_linux"], limpo["wine_prefix"],
-              limpo["launch_options"], limpo["status"], limpo["nota"],
-              limpo["favorito"], limpo["horas"], limpo["observacoes"],
-              limpo["origem"], limpo["shop"], limpo["object_id"],
-              limpo["game_code"], limpo["regiao"], limpo["azahar_preset"],
-              limpo["uuid"], limpo["etiquetas"], agora, agora),
+              limpo["exe_linux"], limpo["exe_mac"], limpo["wine_prefix"],
+               limpo["launch_options"], limpo["status"], limpo["nota"],
+               limpo["favorito"], limpo["horas"], limpo["observacoes"],
+               limpo["origem"], limpo["shop"], limpo["object_id"],
+               limpo["game_code"], limpo["regiao"], limpo["azahar_preset"],
+               limpo["citron_preset"],
+               limpo["uuid"], limpo["etiquetas"], limpo["save_path"], limpo["azahar_mods"],
+               limpo["azahar_mods_off"], agora, agora),
         )
         con.commit()
     except sqlite3.IntegrityError:
@@ -440,16 +540,18 @@ def atualizar_jogo(con: sqlite3.Connection, gid: int, dados: dict) -> dict:
     atual = dict(row)
     limpo = validar_dados({**{c: atual.get(c) for c in CAMPOS_EDITAVEIS}, **dados})
     con.execute(
-        """UPDATE jogos SET titulo=?, executable_path=?, exe_win=?, exe_linux=?,
+        """UPDATE jogos SET titulo=?, executable_path=?, exe_win=?, exe_linux=?, exe_mac=?,
            wine_prefix=?, launch_options=?, status=?, nota=?, favorito=?, horas=?,
            observacoes=?, shop=?, object_id=?, origem=?, game_code=?, regiao=?,
-           azahar_preset=?, etiquetas=?, atualizado_em=? WHERE id=?""",
+           azahar_preset=?, citron_preset=?, etiquetas=?, save_path=?, azahar_mods=?, azahar_mods_off=?,
+           atualizado_em=? WHERE id=?""",
         (limpo["titulo"], limpo["executable_path"], limpo["exe_win"],
-         limpo["exe_linux"], limpo["wine_prefix"], limpo["launch_options"],
+         limpo["exe_linux"], limpo["exe_mac"], limpo["wine_prefix"], limpo["launch_options"],
          limpo["status"], limpo["nota"], limpo["favorito"],
          limpo["horas"], limpo["observacoes"], limpo["shop"], limpo["object_id"],
          limpo["origem"], limpo["game_code"], limpo["regiao"],
-         limpo["azahar_preset"], limpo["etiquetas"], agora_iso(), gid),
+         limpo["azahar_preset"], limpo["citron_preset"], limpo["etiquetas"], limpo["save_path"], limpo["azahar_mods"],
+         limpo["azahar_mods_off"], agora_iso(), gid),
     )
     con.commit()
     return row_to_dict(con.execute("SELECT * FROM jogos WHERE id=?", (gid,)).fetchone())
@@ -625,4 +727,4 @@ def selo_confianca(j: dict) -> str:
         return ""
     return f" · ◎{conf:.2f}" if conf > 0 else ""
 
-__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']
+__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'MODS_MAX_NOME', 'MODS_MAX_QTD', 'normalizar_mods', 'mods_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']

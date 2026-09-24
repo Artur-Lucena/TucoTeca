@@ -143,7 +143,7 @@ def _aplicar(stage: Path, dest: Path, tag: str) -> dict:
 def instalar(info: dict, dest: Path, progresso=None, plataforma=None,
                exe_nomes=("azahar.exe",), deps=("Qt6Core.dll", "Qt6Gui.dll",
                "plugins/platforms/qwindows.dll"), renomear_exe=None,
-               versao_nome=VERSAO) -> dict:
+               versao_nome=VERSAO, appimage_nome="azahar.AppImage") -> dict:
     plataforma = plataforma or os.name
     url, tag = info.get("url"), str(info.get("tag") or "").strip()
     if not url or not tag:
@@ -200,7 +200,7 @@ def instalar(info: dict, dest: Path, progresso=None, plataforma=None,
                     exe_baixado.rename(stage / renomear_exe)
                     nome_exe = renomear_exe
             else:
-                nome_exe, assinatura = "azahar.AppImage", b"\x7fELF"
+                nome_exe, assinatura = appimage_nome, b"\x7fELF"
                 shutil.copy2(pacote, stage / nome_exe)
                 (stage / nome_exe).chmod(0o755)
             exe = stage / nome_exe

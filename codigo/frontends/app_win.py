@@ -895,11 +895,18 @@ class App:
             plat = "PC"
         tags = list(j.get("etiquetas_lista") or [])
         fichas = [x for x in (j.get("game_code"), j.get("regiao")) if x]
+        mods = list(j.get("mods_lista") or [])
+        mods_txt = ""
+        if mods:
+            mods_txt = ((f"\n🎨 OFF · {', '.join(mods)}") if j.get("mods_off")
+                        else (f"\n🎨 {', '.join(mods)}"))
         self.det_meta.configure(
             text=f"{j['status']}{nota}{horas}{core.selo_confianca(j)} · {core.provedor_nome(j)}"
             + f"\n🏷 {plat}" + (f" · {', '.join(tags)}" if tags else "")
+            + (f"\n💾 {j['save_path']}" if (j.get("save_path") or "").strip() else "")
             + (f"\n🔖 {' · '.join(fichas)}" if fichas else "")
             + (f"\n🎛 preset {j['azahar_preset']}" if j.get("azahar_preset") else "")
+            + mods_txt
             + (f"\n▶ {j['ultima_execucao']}" if j.get("ultima_execucao") else "")
             + (f"\n📝 {j['observacoes']}" if j.get("observacoes") else ""))
         exe = j["exe_traduzido"] or j["executable_path"] or "(sem executável)"
@@ -1220,6 +1227,51 @@ class App:
 
         ttk.Button(fr_emu, text="📸", width=4, command=foto_preset).grid(
             row=1, column=2, padx=(6, 0))
+        ttk.Label(fr_emu, text="Mods", style="Sec.TLabel").grid(
+            row=2, column=0, sticky="w", padx=(0, 8), pady=6)
+        mods_sel = {"ativos": list((j.get("mods_lista") or []) if j else []),
+                    "off": bool((j.get("azahar_mods_off") or 0) if j else False)}
+        var_mods = tk.StringVar()
+        ttk.Entry(fr_emu, textvariable=var_mods, state="readonly",
+                  font=("Segoe UI", 12)).grid(row=2, column=1, sticky="ew", pady=6)
+        btn_mods_off = ttk.Button(fr_emu, width=9)
+        btn_mods_off.grid(row=2, column=2, padx=(6, 0))
+
+        def _refresh_mods():
+            base = ", ".join(mods_sel["ativos"]) or "—"
+            var_mods.set(("OFF · " if mods_sel["off"] else "") + base)
+            try:
+                btn_mods_off.configure(text="Ligar" if mods_sel["off"] else "Desligar")
+            except tk.TclError:
+                pass
+
+        def alternar_mods():
+            mods_sel["off"] = not mods_sel["off"]
+            _refresh_mods()
+
+        btn_mods_off.configure(command=alternar_mods)
+
+        def _tid_do_jogo():
+            if not j:
+                return ""
+            try:
+                launch = core.traduzir_para_atual(
+                    (j.get("launch_options") or "").strip())
+                return core.title_id_da_rom(launch)
+            except Exception:
+                return ""
+
+        def gerenciar_mods():
+            tid = _tid_do_jogo()
+            if not tid:
+                messagebox.showwarning(
+                    "Mods", "Salve o jogo com a ROM primeiro.")
+                return
+            self._janela_mods(dlg, tid, mods_sel, _refresh_mods)
+
+        ttk.Button(fr_emu, text="…", width=4, command=gerenciar_mods).grid(
+            row=2, column=3, padx=(6, 0))
+        _refresh_mods()
 
         # -- notas
         fr_obs = secao("Observações")
@@ -1284,6 +1336,8 @@ class App:
                     "favorito": (bool(j.get("favorito")) if j else False),
                     "launch_options": ((j.get("launch_options") or "") if j else ""),
                     "azahar_preset": campos["azahar_preset"].get().strip(),
+                    "azahar_mods": list(mods_sel["ativos"]),
+                    "azahar_mods_off": 1 if mods_sel["off"] else 0,
                     "etiquetas": campos["etiquetas"].get().strip(),
                     "observacoes": txt.get("1.0", "end").strip(),
                 }
@@ -1358,6 +1412,106 @@ class App:
             threading.Thread(target=trabalho_capa, daemon=True).start()
 
         btn_salvar.configure(command=salvar)
+
+    # -- mods LayeredFS (biblioteca dados/mods/azahar/<tid>/; play ativa via junction)
+    def _janela_mods(self, pai, tid, holder, ao_ok=None):
+        win = tk.Toplevel(pai)
+        _titulo_escuro(win)
+        win.title(f"Mods — {tid}" + (" (desligados)" if holder.get("off") else ""))
+        win.transient(pai)
+        win.grab_set()
+        fr = ttk.Frame(win, padding=12)
+        fr.pack(fill="both", expand=True)
+        tmp_ativos = set(holder["ativos"])
+        lst = tk.Listbox(fr, selectmode="single", width=52, height=10,
+                         bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                         font=("Segoe UI", 11))
+        lst.pack(fill="both", expand=True)
+
+        def disp():
+            try:
+                return core.listar_mods(tid)
+            except Exception:
+                return []
+
+        def redesenhar():
+            nomes = disp()
+            lst.delete(0, "end")
+            for nome in nomes:
+                lst.insert("end", f"[{'x' if nome in tmp_ativos else ' '}] {nome}")
+            tmp_ativos.intersection_update(nomes)
+            return nomes
+
+        def alternar(_e=None):
+            sel = lst.curselection()
+            if not sel:
+                return
+            nomes = disp()
+            if sel[0] >= len(nomes):
+                return
+            nome = nomes[sel[0]]
+            if nome in tmp_ativos:
+                tmp_ativos.discard(nome)
+            else:
+                tmp_ativos.add(nome)
+            redesenhar()
+            lst.selection_set(sel[0])
+
+        def adicionar():
+            if not messagebox.askyesno("Mods", "De arquivo (.zip/.7z)?\n(Não = de pasta)"):
+                pasta = filedialog.askdirectory(title="Pasta do mod", parent=win)
+                origem = pasta or ""
+            else:
+                origem = filedialog.askopenfilename(
+                    title="Arquivo do mod", parent=win,
+                    filetypes=[("Mods", "*.zip *.7z"), ("Todos", "*.*")]) or ""
+            if not origem:
+                return
+            nome = simpledialog.askstring(
+                "Mods", "Nome do mod (vazio=automático):", parent=win)
+            if nome is None:
+                return
+            r = core.importar_mod(origem, tid, (nome or "").strip())
+            if not r.get("ok"):
+                messagebox.showwarning("Mods", r.get("erro", "falha"))
+                return
+            tmp_ativos.add(r["mod"])
+            redesenhar()
+
+        def remover():
+            sel = lst.curselection()
+            nomes = disp()
+            if not sel or sel[0] >= len(nomes):
+                return
+            nome = nomes[sel[0]]
+            if not messagebox.askokcancel(
+                    "Mods", f"Apagar '{nome}' da biblioteca?"):
+                return
+            r = core.remover_mod(tid, nome)
+            if not r.get("ok"):
+                messagebox.showwarning("Mods", r.get("erro", "falha"))
+                return
+            tmp_ativos.discard(nome)
+            redesenhar()
+
+        def ok():
+            holder["ativos"] = [m for m in disp() if m in tmp_ativos]
+            if ao_ok:
+                try:
+                    ao_ok()
+                except Exception:
+                    pass
+            win.destroy()
+
+        lst.bind("<Double-Button-1>", alternar)
+        redesenhar()
+        fr_btn = ttk.Frame(fr)
+        fr_btn.pack(fill="x", pady=(10, 0))
+        ttk.Button(fr_btn, text="Alternar", command=alternar).pack(side="left")
+        ttk.Button(fr_btn, text="Adicionar…", command=adicionar).pack(side="left", padx=6)
+        ttk.Button(fr_btn, text="Remover", command=remover).pack(side="left")
+        ttk.Button(fr_btn, text="OK", command=ok).pack(side="right")
+        ttk.Button(fr_btn, text="Cancelar", command=win.destroy).pack(side="right", padx=6)
 
     # -- importação unificada (pasta ou arquivo; emulador detectado sozinho)
     def importar_unificado(self):

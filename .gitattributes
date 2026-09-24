@@ -5,5 +5,6 @@
 *.json text eol=lf
 *.txt text eol=lf
 *.sh text eol=lf
+*.command text eol=lf
 *.vbs text eol=crlf
 *.bat text eol=crlf
