@@ -819,13 +819,14 @@ def procurar_rom(nome_arquivo: str, roots: list[str] | None = None,
     Só leitura, com teto. Compara case-insensitive pelo nome do arquivo.
     """
     from bib_nucleo.scans import (SKIP_DIRS, default_roms_nds_roots,
-                                   default_roms_roots, default_scan_roots)
+                                   default_roms_roots, default_roms_switch_roots,
+                                   default_scan_roots)
     alvo = (nome_arquivo or "").strip().lower()
     if not alvo:
         return []
     if roots is None:
         vistas: list[str] = []
-        for r in default_roms_roots() + default_roms_nds_roots() + default_scan_roots():
+        for r in default_roms_roots() + default_roms_nds_roots() + default_roms_switch_roots() + default_scan_roots():
             if r not in vistas:
                 vistas.append(r)
         roots = vistas
@@ -1028,7 +1029,8 @@ def _prov_azahar() -> dict:
 
 def provedores() -> dict:
     """chave -> spec. Construído sob demanda (as funções existem no import)."""
-    return {"azahar": _prov_azahar(), "desmume": _prov_desmume()}
+    return {"azahar": _prov_azahar(), "desmume": _prov_desmume(),
+            "citron": _prov_citron()}
 
 
 def provedor_por_origem(origem: str) -> dict | None:
@@ -1199,6 +1201,8 @@ def salvar_preset_de_atual(nome: str, chave: str = "azahar") -> dict:
 def config_atual_emu(chave: str) -> Path | None:
     if chave == "desmume":
         return desmume_config_atual()
+    if chave == "citron":
+        return citron_config_atual()
     return azahar_config_atual()
 
 
@@ -1706,7 +1710,8 @@ def preparar_lancamento(jogo: dict) -> dict:
         return {"preset_aplicado": None, "mods_aplicados": [], "aviso": None}
     avisos: list[str] = []
     aplicado = None
-    nome = (jogo.get("azahar_preset") or "").strip()
+    campo = _campo_preset(prov.get("chave") or "")
+    nome = (jogo.get(campo) or jogo.get("azahar_preset") or "").strip()
     if nome:
         r = prov["aplicar_preset"](nome)
         if r.get("ok"):
@@ -1725,6 +1730,14 @@ def preparar_lancamento(jogo: dict) -> dict:
         mods_ok = mr["aplicados"]
         if mr["aviso"]:
             avisos.append(mr["aviso"])
+    if (launch and prov.get("chave") == "citron"
+            and provedor_por_extensao(Path(launch).suffix) is not None):
+        if not citron_tem_chaves():
+            avisos.append("Citron sem user/keys/prod.keys — dumps NSP/XCI não abrem. "
+                          "Faça o dump das chaves do seu Switch para user/keys/.")
+        elif not citron_tem_firmware():
+            avisos.append("Citron sem firmware em user/nand/system — alguns jogos "
+                          "não abrem. Instale o firmware do seu Switch.")
     return {"preset_aplicado": aplicado, "mods_aplicados": mods_ok,
             "aviso": " ".join(avisos) or None}
 
@@ -1750,5 +1763,20 @@ def azahar_tem_chaves() -> bool:
     ud = azahar_user_dir()
     return bool(ud) and (Path(ud) / "sysdata" / "aes_keys.txt").is_file()
 
-__all__ = ['azahar_dir_override', 'default_emu_3ds', 'desmume_dir_override', 'desmume_dir', 'default_emu_nds', 'desmume_user_dir', 'desmume_versao_local', 'desmume_release_info', 'desmume_instalar', 'desmume_config_atual', 'desmume_flags', 'config_atual_emu', 'presets_prov_dir', 'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', 'azahar_versao_local', 'azahar_release_info', 'azahar_instalar', 'executar_elevado', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', 'executar_monitorado', 'iniciar_sessao_manual', 'listar_sessoes_pendentes', 'encerrar_sessao_manual', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'listar_presets', 'azahar_config_atual', 'salvar_preset_de_atual', 'aplicar_preset', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves',
+
+def backup_saves_citron(manter: int = 10) -> dict:
+    """Zipa nand/user/save/ + sdmc/ do Citron em backups/. Retorna dict (sempre)."""
+    return backup_saves_emu("citron", manter)
+
+
+def citron_tem_chaves() -> bool:
+    ud = citron_user_dir()
+    return bool(ud) and (Path(ud) / "keys" / "prod.keys").is_file()
+
+
+def citron_tem_firmware() -> bool:
+    ud = citron_user_dir()
+    return bool(ud) and (Path(ud) / "nand" / "system" / "Contents" / "registered").is_dir()
+
+__all__ = ['azahar_dir_override', 'default_emu_3ds', 'desmume_dir_override', 'desmume_dir', 'default_emu_nds', 'desmume_user_dir', 'desmume_versao_local', 'desmume_release_info', 'desmume_instalar', 'desmume_config_atual', 'desmume_flags', 'citron_dir_override', 'default_emu_switch', 'citron_user_dir', 'citron_status', 'CITRON_API_LATEST', 'CITRON_VERSAO_ARQ', 'citron_versao_local', 'citron_release_info', 'citron_instalar', 'citron_config_atual', 'citron_flags', 'ler_metadados_switch', 'citron_tem_chaves', 'citron_tem_firmware', 'backup_saves_citron', 'config_atual_emu', 'presets_prov_dir', 'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', 'azahar_versao_local', 'azahar_release_info', 'azahar_instalar', 'executar_elevado', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', 'executar_monitorado', 'iniciar_sessao_manual', 'listar_sessoes_pendentes', 'encerrar_sessao_manual', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'listar_presets', 'azahar_config_atual', 'salvar_preset_de_atual', 'aplicar_preset', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves',
  'title_id_da_rom', 'mods_lib_dir', 'mods_titulo_dir', 'remover_link', 'listar_mods', 'remover_mod', 'azahar_mods_dir', 'mods_ativos', 'aplicar_mods', 'importar_mod']

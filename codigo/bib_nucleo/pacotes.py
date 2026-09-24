@@ -13,8 +13,8 @@ from bib_nucleo.banco import (CAPA_EXTS, get_db, row_to_dict,
                                salvar_capa_bytes)
 from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, DEFAULT_DB, agora_iso,
                                garantir_dirs)
-from bib_nucleo.emuladores import (azahar_versao_local, presets_dir, presets_prov_dir,
-                                     provedores)
+from bib_nucleo.emuladores import (azahar_versao_local, citron_versao_local,
+                                     presets_dir, presets_prov_dir, provedores)
 from bib_nucleo.scans import importar_lista
 
 
@@ -116,6 +116,7 @@ def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
     info = {"app": "biblioteca-jogos", "esquema": PACOTE_ESQUEMA,
             "exportado_em": dados["exportado_em"], "jogos": len(dados["jogos"]),
             "inclui_saves": com_saves, "azahar_versao": azahar_versao_local(),
+            "citron_versao": citron_versao_local(),
             "provedores": sorted(provedores())}
     manifesto = {}
     for j in dados["jogos"]:

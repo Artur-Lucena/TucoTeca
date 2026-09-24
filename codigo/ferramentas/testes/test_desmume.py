@@ -25,7 +25,7 @@ def _rom_nds(d, nome="Jogo Teste.nds", titulo="JOGO TESTE", code=b"ATCE",
 
 def teste_spec_desmume():
     provs = core.provedores()
-    afirmar(set(provs) == {"azahar", "desmume"}, set(provs))
+    afirmar(set(provs) == {"azahar", "desmume", "citron"}, set(provs))
     dm = provs["desmume"]
     afirmar(dm["origem"] == "rom-nds" and dm["origens"] == ("rom-nds",), dm)
     afirmar(dm["rom_exts"] == {".nds", ".dsi"}, dm)

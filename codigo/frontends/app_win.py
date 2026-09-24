@@ -151,7 +151,7 @@ class App:
         self.nav_idx = 0
         self.filtro_prov: str | None = None  # chave do provider (fundo, não jogo)
         self.prov_btns: dict[str, ttk.Button] = {}
-        self.filtro_plat: str | None = None  # PC/3DS/NDS (derivado da origem)
+        self.filtro_plat: str | None = None  # PC/3DS/NDS/Switch (derivado da origem)
         self.plat_btns: dict[str, ttk.Button] = {}
         self._deb = None
         self.cards: list[dict] = []  # {frame, jogo}
@@ -259,10 +259,10 @@ class App:
         self.btn_usuario = ttk.Button(topo, text="👤 —", style="Chip.TButton",
                                       command=self.dlg_usuario)
         self.btn_usuario.pack(side="right")
-        # linha de filtros: plataforma (PC/3DS/NDS) + etiqueta livre
+        # linha de filtros: plataforma (PC/3DS/NDS/Switch) + etiqueta livre
         ffilt = ttk.Frame(centro)
         ffilt.pack(fill="x", padx=12, pady=(0, 2))
-        for plat in ("PC", "3DS", "NDS"):
+        for plat in ("PC", "3DS", "NDS", "Switch"):
             b = ttk.Button(ffilt, text=plat, width=5, style="Chip.TButton",
                            command=lambda p=plat: self._ir_plat(p))
             b.pack(side="left", padx=(0, 4))
@@ -906,6 +906,7 @@ class App:
             + (f"\n💾 {j['save_path']}" if (j.get("save_path") or "").strip() else "")
             + (f"\n🔖 {' · '.join(fichas)}" if fichas else "")
             + (f"\n🎛 preset {j['azahar_preset']}" if j.get("azahar_preset") else "")
+            + (f"\n🎛 preset {j['citron_preset']}" if j.get("citron_preset") else "")
             + mods_txt
             + (f"\n▶ {j['ultima_execucao']}" if j.get("ultima_execucao") else "")
             + (f"\n📝 {j['observacoes']}" if j.get("observacoes") else ""))
@@ -1043,7 +1044,8 @@ class App:
             if escolhido is None:
                 escolhido = filedialog.askopenfilename(title="Localizar ROM movida", parent=self.root,
                     filetypes=[("ROMs 3DS", "*.cci *.cxi *.3ds *.3dsx *.app *.elf *.axf"),
-                               ("ROMs NDS", "*.nds *.dsi"), ("Todos", "*.*")])
+                               ("ROMs NDS", "*.nds *.dsi"),
+                               ("ROMs Switch", "*.nsp *.xci *.nca *.nro *.nso"), ("Todos", "*.*")])
                 if escolhido and not messagebox.askyesno("Localizar ROM", f"Gravar este novo caminho?\n{escolhido}"):
                     return None
             if not escolhido:
@@ -1186,12 +1188,18 @@ class App:
         fr_emu.grid_columnconfigure(1, weight=1)
         ttk.Label(fr_emu, text="Preset", style="Sec.TLabel").grid(
             row=1, column=0, sticky="w", padx=(0, 8), pady=6)
+        def _campo_preset_dlg(chave: str) -> str:
+            return "citron_preset" if chave == "citron" else "azahar_preset"
+
+        preset_vals = {"azahar_preset": ((j.get("azahar_preset") or "") if j else ""),
+                       "citron_preset": ((j.get("citron_preset") or "") if j else "")}
         var_preset = tk.StringVar(
-            value=(j.get("azahar_preset") if j else "") or "")
+            value=preset_vals[_campo_preset_dlg(_prov_do_jogo(j))])
         cmb_preset = ttk.Combobox(fr_emu, textvariable=var_preset,
                                   font=("Segoe UI", 12))
         cmb_preset.grid(row=1, column=1, sticky="ew", pady=6)
         campos["azahar_preset"] = var_preset
+        campos["citron_preset"] = var_preset
 
         def _chave_sel():
             return chaves_prov.get(var_prov.get(), "")
@@ -1202,6 +1210,11 @@ class App:
             cmb_preset.configure(values=vals)
 
         def _troca_prov(_e=None):
+            anterior = getattr(_troca_prov, "anterior", _prov_do_jogo(j))
+            preset_vals[_campo_preset_dlg(anterior)] = var_preset.get()
+            chave = _chave_sel()
+            var_preset.set(preset_vals[_campo_preset_dlg(chave)])
+            _troca_prov.anterior = chave
             _recarrega_presets()
 
         cmb_prov.bind("<<ComboboxSelected>>", _troca_prov)
@@ -1323,6 +1336,7 @@ class App:
 
         def salvar():
             try:
+                preset_vals[_campo_preset_dlg(chaves_prov.get(var_prov.get(), ""))] = var_preset.get().strip()
                 dados = {
                     "titulo": campos["titulo"].get().strip(),
                     "executable_path": campos["executable_path"].get().strip(),
@@ -1335,7 +1349,8 @@ class App:
                     "horas": float(var_horas.get().strip() or 0),
                     "favorito": (bool(j.get("favorito")) if j else False),
                     "launch_options": ((j.get("launch_options") or "") if j else ""),
-                    "azahar_preset": campos["azahar_preset"].get().strip(),
+                    "azahar_preset": preset_vals["azahar_preset"].strip(),
+                    "citron_preset": preset_vals["citron_preset"].strip(),
                     "azahar_mods": list(mods_sel["ativos"]),
                     "azahar_mods_off": 1 if mods_sel["off"] else 0,
                     "etiquetas": campos["etiquetas"].get().strip(),
@@ -1540,10 +1555,11 @@ class App:
                 title="Arquivo para importar", parent=dlg,
                 filetypes=[("Suportados",
                             "*.exe *.lnk *.bat *.cmd *.3ds *.3dsx *.cci *.cxi "
-                            "*.elf *.app *.axf *.nds *.dsi *.json *.zip"),
+                            "*.elf *.app *.axf *.nds *.dsi *.nsp *.xci *.nca *.nro *.nso *.json *.zip"),
                            ("Executáveis", "*.exe *.lnk *.bat *.cmd"),
                            ("ROMs 3DS", "*.3ds *.3dsx *.cci *.cxi *.elf *.app *.axf"),
                            ("ROMs NDS", "*.nds *.dsi"),
+                           ("ROMs Switch", "*.nsp *.xci *.nca *.nro *.nso"),
                            ("JSON", "*.json"), ("Pacote", "*.zip"),
                            ("Todos", "*.*")])
             if not arq:
@@ -1749,6 +1765,18 @@ class App:
         else:
             messagebox.showwarning("Saves 3DS", res.get("erro", "falha"))
 
+    def backup_saves_switch(self):
+        try:
+            res = core.backup_saves_citron()
+        except Exception as e:
+            messagebox.showerror("Saves Switch", f"falha: {e}")
+            return
+        if res.get("ok"):
+            messagebox.showinfo("Saves Switch",
+                                f"{res['arquivos']} arquivo(s)\n{res['arquivo']}")
+        else:
+            messagebox.showwarning("Saves Switch", res.get("erro", "falha"))
+
     def abrir_configuracoes(self):
         """Técnico fora da tela inicial: backup, sessão, emuladores, JSON."""
         dlg = tk.Toplevel(self.root)
@@ -1771,6 +1799,7 @@ class App:
         fr_banco = secao("Banco")
         for rotulo, cmd in (("💾 Backup agora", self.backup),
                             ("💾 Saves 3DS", self.backup_saves),
+                            ("💾 Saves Switch", self.backup_saves_switch),
                             ("⏱ Registrar sessão", self.registrar_sessao_manual),
                             ("💾 Exportar JSON…", self.exportar_json),
                             ("📦 Pacote…", self.exportar_pacote)):
@@ -1778,7 +1807,8 @@ class App:
                 fill="x", padx=4, pady=3)
         fr_emu = secao("Emuladores")
         for rotulo, cmd in (("⬇ Atualizar Azahar", self.atualizar_azahar),
-                            ("⬇ Atualizar DeSmuME", self.atualizar_desmume)):
+                            ("⬇ Atualizar DeSmuME", self.atualizar_desmume),
+                            ("⬇ Atualizar Citron", self.atualizar_citron)):
             ttk.Button(fr_emu, text=rotulo, command=cmd).pack(
                 fill="x", padx=4, pady=3)
         ttk.Button(dlg, text="Fechar", command=dlg.destroy).pack(pady=14)
@@ -1794,6 +1824,9 @@ class App:
 
     def atualizar_desmume(self):
         self.atualizar_emu("desmume")
+
+    def atualizar_citron(self):
+        self.atualizar_emu("citron")
 
     def atualizar_emu(self, chave: str):
         prov = core.provedores()[chave]
@@ -1946,7 +1979,7 @@ class App:
 
     def exportar_pacote(self):
         dest = filedialog.asksaveasfilename(
-            title="Pacote portátil (banco + capas + presets + saves 3DS)",
+            title="Pacote portátil (banco + capas + presets + saves)",
             defaultextension=".zip", filetypes=[("ZIP", "*.zip")],
             initialfile="biblioteca-pacote.zip")
         if not dest:
@@ -1989,7 +2022,7 @@ class App:
                 kb = res["bytes"] // 1024
                 messagebox.showinfo("Pacote",
                                     f"{res['jogos']} jogo(s) · {res['arquivos']} arquivo(s) · "
-                                    f"{kb} KB{' · +saves 3DS' if res['inclui_saves'] else ''}\n"
+                                    f"{kb} KB{' · +saves' if res['inclui_saves'] else ''}\n"
                                     f"{res['destino']}")
 
             na_ui(pronto)
@@ -2002,7 +2035,7 @@ class App:
                 title="Pacote portátil", filetypes=[("ZIP", "*.zip")])
             if not arq:
                 return
-        quer_saves = messagebox.askyesno("Pacote", "Restaurar os saves 3DS do pacote?")
+        quer_saves = messagebox.askyesno("Pacote", "Restaurar os saves do pacote?")
         prog = tk.Toplevel(self.root)
         _titulo_escuro(prog)
         prog.title("Pacote")
