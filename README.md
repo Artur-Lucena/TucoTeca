@@ -8,6 +8,16 @@ Sua biblioteca de jogos, sem depender do Hydra. Só Python 3.10+, sem instalar n
 - **Linux:** `./BibliotecaHub.sh` na raiz do projeto.
 - **Mac:** duplo-clique em **`BibliotecaHubMac.command`** (suporte em construção — por enquanto, só ROMs 3DS/NDS).
 
+## Instalar em outra máquina
+
+Tudo 100% offline (Python + emuladores dentro, nada baixa nada):
+
+- **Windows:** `TucoTeca-Setup.exe` — wizard clássico, sem admin, com desinstalador (a coleção em `dados\` é preservada).
+- **Linux:** `tucoteca-setup.run` — `./tucoteca-setup.run`, pergunta a pasta, cria o ícone no menu e o `desinstalar.sh`.
+- **Portátil:** o `.zip` de sempre continua existindo (extrair e abrir).
+
+Os instaladores saem de `dist/` via `codigo/ferramentas/montar_portatil.py --setup` (Windows, precisa do Inno Setup 6) e `montar_linux.py` (Linux).
+
 Tudo mora numa pasta só (banco, capas, backups): `D:\Tuco-Compartilhado\Jogos\biblioteca\` no Windows. Nunca abra em dois sistemas ao mesmo tempo — o app trava a segunda instância sozinho.
 
 ## O que ela faz
