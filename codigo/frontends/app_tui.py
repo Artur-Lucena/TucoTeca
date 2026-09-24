@@ -65,7 +65,10 @@ class Tui:
             curses.curs_set(0)
         except Exception:
             pass
-        self.cor = {"txt": 0, "mut": 0, "acc": 0, "ok": 0, "ruim": 0}
+        self.cor = {"txt": 0, "mut": 0, "acc": 0, "ok": 0, "ruim": 0,
+                    "fav": 0, "tag": 0, "head": 0}
+        self.abold = getattr(curses, "A_BOLD", 0)
+        self.adim = getattr(curses, "A_DIM", 0)
         try:
             if curses.has_colors():
                 curses.start_color()
@@ -77,11 +80,28 @@ class Tui:
                 curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_CYAN)
                 curses.init_pair(3, curses.COLOR_GREEN, -1)
                 curses.init_pair(4, curses.COLOR_RED, -1)
+                try:
+                    curses.init_pair(5, curses.COLOR_YELLOW, -1)
+                    curses.init_pair(6, curses.COLOR_MAGENTA, -1)
+                    curses.init_pair(7, curses.COLOR_WHITE, -1)
+                except Exception:
+                    pass
                 self.cor = {"txt": 0, "mut": curses.color_pair(1),
                             "acc": curses.color_pair(2), "ok": curses.color_pair(3),
-                            "ruim": curses.color_pair(4)}
+                            "ruim": curses.color_pair(4), "fav": curses.color_pair(5),
+                            "tag": curses.color_pair(6), "head": curses.color_pair(7)}
         except Exception:
             pass
+
+    def _attr_linha(self, j: dict, selecionada: bool) -> int:
+        """Cor da linha: seleção vence; ★ negrito amarelo; ○ ausente vermelho."""
+        if selecionada:
+            return self.cor["acc"] | self.abold
+        if not j.get("exe_existe"):
+            return self.cor["ruim"] | (self.abold if j.get("favorito") else 0)
+        if j.get("favorito"):
+            return self.cor["fav"] | self.abold
+        return self.cor["txt"]
 
     def _con(self):
         return core.get_db(self.db_path)
@@ -120,13 +140,56 @@ class Tui:
         return (f"{marca} {estrela}{j['titulo']} [{plat}]{sufixo_tags} "
                 f"[{j['status']}]{horas}{nota}{reg}{core.selo_confianca(j)}")
 
+    TECLAS_RODAPE = ("/ busca · f status · * fav · V prov · Y plat · T tags · "
+                       "Enter joga · a/e/d · I importa · b/U/E/P/S/A/G · q sai")
+
+    AJUDA_LADO = (
+        (" Navegação ", [("↑↓/jk", "mover"), ("PgUp/Dn", "página"),
+                         ("Enter", "jogar"), ("q", "sair")]),
+        (" Filtros ", [("/", "busca"), ("f", "status"), ("*", "favorito"),
+                       ("V", "provider"), ("Y", "plataforma"),
+                       ("T", "etiquetas")]),
+        (" Ações ", [("a/e/d", "add/edita/apaga"), ("I", "importar"),
+                     ("b", "backup"), ("S", "sessão")]),
+        (" Emulador ", [("A", "atual. Azahar"), ("G", "atual. DeSmuME"),
+                        ("r", "recarregar")]),
+    )
+
+    def _desenhar_ajuda_lado(self, s, x0: int, larg_p: int, rows: int) -> None:
+        """Quadrinho único de teclas à direita (só em terminal largo e alto)."""
+        linhas: list[tuple[str, int]] = []
+        for titulo, teclas in self.AJUDA_LADO:
+            linhas.append((titulo, 1))
+            linhas.extend((f" {t.ljust(7)[:7]} {f}", 0) for t, f in teclas)
+        if len(linhas) + 2 > rows - 1:
+            return
+        cor_t = self.cor["head"] | self.abold
+        cor_b = self.cor["mut"] | self.adim
+        s.addnstr(0, x0, "┌" + "─" * (larg_p - 2) + "┐", larg_p, cor_b)
+        y = 1
+        for texto, destaque in linhas:
+            if destaque:
+                s.addnstr(y, x0, f"│{texto.center(larg_p - 2)[:larg_p - 2]}│",
+                          larg_p, cor_t)
+            else:
+                s.addnstr(y, x0, ("│" + texto[:larg_p - 2]).ljust(larg_p - 1) + "│",
+                          larg_p, self.cor["txt"])
+            y += 1
+        s.addnstr(y, x0, "└" + "─" * (larg_p - 2) + "┘", larg_p, cor_b)
+
     def desenhar(self):
         s = self.stdscr
         try:
             s.erase()
             rows, cols = s.getmaxyx()
-            titulo = "🎮 TucoTeca  │  / busca · f status · * fav · V prov · Y plat · T tags · Enter joga · a/e/d · I importa · b/U/E/P/S/A/G · q sai"
-            s.addnstr(0, 0, titulo, cols - 1, self.cor["mut"])
+            larg_total = max(1, cols - 1)
+            painel = 32 if cols >= 112 else 0
+            larg = larg_total - painel
+            if painel:
+                self._desenhar_ajuda_lado(s, larg, painel, rows)
+            titulo = "🎮 TucoTeca"
+            s.addnstr(0, 0, titulo.ljust(larg)[:larg], larg,
+                      self.cor["head"] | self.abold)
             az = core.azahar_status()
             azg = "🎮✓" if az["instalado"] and az["chaves"] else ("🎮!" if az["instalado"] else "🎮✗")
             ndsg = "NDS✓" if core.default_emu_nds() else "NDS✗"
@@ -134,7 +197,7 @@ class Tui:
             plat_txt = f" plat={self.filtro_plat}" if self.filtro_plat else ""
             tags_txt = f" tags={','.join(self.filtro_tags)}" if self.filtro_tags else ""
             filtro = f"busca='{self.q}' status={self.statuses[self.si] or 'todos'} fav={'sim' if self.fav else 'não'}{prov_txt}{plat_txt}{tags_txt} {azg} {ndsg}"
-            s.addnstr(1, 0, f"{filtro} — {len(self.jogos)} jogo(s)", cols - 1, self.cor["mut"])
+            s.addnstr(1, 0, f"{filtro} — {len(self.jogos)} jogo(s)", larg, self.cor["mut"])
             area = rows - 4
             if self.cur < self.top:
                 self.top = self.cur
@@ -144,15 +207,22 @@ class Tui:
                 idx = self.top + i
                 if idx >= len(self.jogos):
                     break
-                attr = self.cor["acc"] if idx == self.cur else self.cor["txt"]
-                s.addnstr(2 + i, 0, self.linha_jogo(self.jogos[idx]), cols - 1, attr)
+                j = self.jogos[idx]
+                sel = idx == self.cur
+                linha = self.linha_jogo(j).ljust(larg)[:larg]
+                s.addnstr(2 + i, 0, linha, larg, self._attr_linha(j, sel))
             if self.jogos and rows >= 4:
                 j = self.jogos[self.cur]
                 exe = j["exe_traduzido"] or j["executable_path"] or "(sem executável)"
-                s.addnstr(rows - 2, 0, exe[: cols - 1], cols - 1, self.cor["mut"])
+                s.addnstr(rows - 2, 0, f"▶ {exe}"[:larg], larg, self.cor["mut"] | self.adim)
             if self.msg:
-                s.addnstr(rows - 1, 0, self.msg[: cols - 1], cols - 1, self.cor["ok"])
+                cor_msg = self.cor["ruim"] if self.msg[:6].lower().startswith(
+                    ("falha", "[erro", "erro")) else self.cor["ok"]
+                s.addnstr(rows - 1, 0, self.msg[:larg], larg, cor_msg | self.abold)
                 self.msg = ""
+            else:
+                s.addnstr(rows - 1, 0, self.TECLAS_RODAPE[:larg], larg,
+                          self.cor["mut"] | self.adim)
             s.refresh()
         except Exception:
             # resize ou terminal pequeno no meio do desenho: ignora, próximo loop redesenha
@@ -533,8 +603,9 @@ class Tui:
         while True:
             s.erase()
             rows, cols = s.getmaxyx()
-            s.addnstr(0, 0, f"{titulo} — Espaço marca · i importa · q volta",
-                      cols - 1, self.cor["mut"])
+            larg = max(1, cols - 1)
+            s.addnstr(0, 0, f"{titulo} — Espaço marca · i importa · q volta"[:larg],
+                      larg, self.cor["head"] | self.abold)
             area = rows - 2
             top = max(0, min(cur - area + 1, max(0, len(itens) - area)))
             if cur < top:
@@ -549,10 +620,18 @@ class Tui:
                 tag = f" [{it['regiao']}]" if it.get("regiao") else ""
                 shop = f" · {it['shop']}" if it.get("shop") else ""
                 linha = f"{chk} {bola} [{it.get('score', 0):.2f}] {it['titulo']}{tag}{shop} ({it.get('fonte') or it['origem']})"
-                attr = self.cor["acc"] if idx == cur else self.cor["txt"]
-                s.addnstr(1 + i, 0, linha, cols - 1, attr)
-            s.addnstr(rows - 1, 0, f"{len(marcados)} marcado(s) de {len(itens)}",
-                      cols - 1, self.cor["mut"])
+                linha = linha.ljust(larg)[:larg]
+                if idx == cur:
+                    attr = self.cor["acc"] | self.abold
+                elif it.get("score", 0) >= 0.7:
+                    attr = self.cor["ok"]
+                elif it.get("score", 0) >= 0.3:
+                    attr = self.cor["txt"]
+                else:
+                    attr = self.cor["ruim"]
+                s.addnstr(1 + i, 0, linha, larg, attr)
+            s.addnstr(rows - 1, 0, f"{len(marcados)} marcado(s) de {len(itens)}"[:larg],
+                      larg, self.cor["mut"] | self.adim)
             s.refresh()
             ch = s.getch()
             if ch in (ord("q"), 27):
