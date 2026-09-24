@@ -108,7 +108,6 @@ def teste_mac_payload_e_instalador():
 
 
 def teste_universal_junta_tres():
-    import montar_mac as MM
     import montar_universal as MU
     tmp = Path(tempfile.mkdtemp(prefix="suite-inst-"))
     dist = tmp / "dist"

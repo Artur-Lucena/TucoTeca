@@ -8,6 +8,8 @@ Sua biblioteca de jogos, sem depender do Hydra. Só Python 3.10+, sem instalar n
 - **Linux:** `./BibliotecaHub.sh` na raiz do projeto.
 - **Mac:** duplo-clique em **`BibliotecaHubMac.command`** (suporte em construção — por enquanto, só ROMs 3DS/NDS).
 
+Tudo mora numa pasta só (banco, capas, backups): `D:\Tuco-Compartilhado\Jogos\biblioteca\` no Windows. Nunca abra em dois sistemas ao mesmo tempo — o app trava a segunda instância sozinho.
+
 ## Instalar em outra máquina
 
 Tudo 100% offline (Python + emuladores dentro, nada baixa nada):
@@ -22,13 +24,11 @@ Os instaladores saem de `dist/` via `codigo/ferramentas/montar_portatil.py --set
 
 `dist/tucoteca-universal-<data>/` (via `montar_universal.py`): 1 pasta com os 3 instaladores — `windows/` (Setup.exe), `linux/` (.run), `mac/` (experimental) — e um **`INSTALAR.html`**: abra em qualquer navegador, ele detecta o sistema e mostra o instalador certo com o passo a passo.
 
-Tudo mora numa pasta só (banco, capas, backups): `D:\Tuco-Compartilhado\Jogos\biblioteca\` no Windows. Nunca abra em dois sistemas ao mesmo tempo — o app trava a segunda instância sozinho.
-
 ## O que ela faz
 
 - 📚 **Catálogo** — cadastre jogos com capa, nota, status (backlog, jogando, zerado…), etiquetas e favorito. Busca e filtros por tudo isso.
 - ▶️ **Play direto** — um clique abre o jogo no emulador ou exe certo, já com o caminho traduzido pro sistema atual.
-- 🎮 **3DS e NDS** — scan de ROMs que lê título e capa de dentro do arquivo, atualiza o Azahar/DeSmuME sozinho e guarda saves com backup próprio.
+- 🎮 **3DS, NDS e Switch** — scan de ROMs que lê título e capa de dentro do arquivo, atualiza Azahar/DeSmuME/Citron sozinho e guarda saves com backup próprio.
 - 🎨 **Mods 3DS por jogo** — importe um pack uma vez, ligue/desligue por jogo, e o Hub monta tudo sozinho na hora de jogar.
 - ⏱️ **Horas automáticas** — o tempo jogado é somado sozinho.
 - 📥 **Importar de tudo** — pasta, arquivo avulso, ou leitura do disco (Steam, GOG, Epic, Hydra…) sem duplicar o que já existe.

@@ -177,11 +177,16 @@ def incluir_azahar_linux(dest_base: Path) -> str:
     return ver
 
 
-def montar_base_linux() -> tuple[Path, dict]:
-    """Monta a árvore tucoteca/ p/ Linux. Retorna (pasta, versões)."""
-    if LIN_BUILD.exists():
-        shutil.rmtree(LIN_BUILD)
-    base = LIN_BUILD / "tucoteca"
+def montar_base_linux(trab: Path | None = None) -> tuple[Path, dict]:
+    """Monta a árvore tucoteca/ p/ Linux. Retorna (pasta, versões).
+
+    trab: pasta de trabalho (padrão .build/lin; testes passam o tmp
+    da sandbox, que veta escrita fora dela).
+    """
+    raiz = trab if trab is not None else LIN_BUILD
+    if raiz.exists():
+        shutil.rmtree(raiz)
+    base = raiz / "tucoteca"
     app = base / "app"
     app.mkdir(parents=True)
     for origem in ("codigo/bib_core.py", "codigo/frontends/app_win.py",
