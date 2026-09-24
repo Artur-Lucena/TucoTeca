@@ -48,6 +48,7 @@ setlocal
 set BIBLIOTECA_HOME=%~dp0dados
 set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
+set BIBLIOTECA_CITRON_DIR=%~dp0emuladores\\Citron
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
 set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
 start "BibliotecaHub" "%~dp0python\\pythonw.exe" "%~dp0app\\app_win.py"
@@ -58,6 +59,7 @@ setlocal
 set BIBLIOTECA_HOME=%~dp0dados
 set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
+set BIBLIOTECA_CITRON_DIR=%~dp0emuladores\\Citron
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
 set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
 "%~dp0python\\python.exe" "%~dp0app\\app_win.py" %*
@@ -245,6 +247,67 @@ def garantir_gpl() -> Path:
 
 DESMUME_URL = "https://github.com/TASEmulators/desmume"
 
+CITRON_URL = "https://github.com/citron-neo/emulator"
+
+
+def citron_instalado_dir() -> Path:
+    """De onde copiar o Citron (instalação real; nunca o bundle)."""
+    env = (os.environ.get("BIBLIOTECA_EMULADOR_SWITCH") or "").strip()
+    if env and Path(env).is_file():
+        return Path(env).parent
+    for cand in (Path("D:/Games/Emuladores/Citron"),
+                 Path("/run/media/tuco/Games/Games/Emuladores/Citron")):
+        if list(cand.glob("citron*.exe")) or list(cand.glob("citron*.AppImage")):
+            return cand
+    raise SystemExit("Citron instalado não achado (instale com o botão ⬇ primeiro).")
+
+
+def incluir_citron(dest_base: Path) -> str:
+    """Copia o Citron instalado p/ emuladores/Citron. Retorna a versão."""
+    src = citron_instalado_dir()
+    dst = dest_base / "emuladores" / "Citron"
+    if dst.exists():
+        shutil.rmtree(dst)
+    dst.mkdir(parents=True)
+    for item in sorted(src.iterdir()):
+        if item.name == "user":
+            continue  # user/ tem chaves (prod.keys) e firmware: pessoais
+        if item.suffix.lower() in (".bak", ".log"):
+            continue
+        if item.is_dir():
+            shutil.copytree(item, dst / item.name)
+        else:
+            shutil.copy2(item, dst / item.name)
+    (dst / "user").mkdir(exist_ok=True)  # Citron cria o resto no 1º boot
+    ver = ""
+    varq = src / "versao-citron.txt"
+    if varq.is_file():
+        try:
+            ver = varq.read_text(encoding="utf-8", errors="ignore").strip()
+        except OSError:
+            pass
+    (dst / "FONTE.txt").write_text(
+        "Citron \u2014 emulador de Nintendo Switch (terceiros, sem modifica\u00e7\u00e3o).\n"
+        f"Vers\u00e3o empacotada: {ver or 'desconhecida'}\n"
+        f"Fonte: {CITRON_URL} (c\u00f3digo-fonte e releases oficiais)\n"
+        "Licen\u00e7a: GPL-3.0 (texto em COPYING.txt).\n"
+        "\n"
+        "NÃO acompanham: chaves (user/keys/prod.keys) nem firmware\n"
+        "(user/nand/system) — dumps pessoais e intransferíveis do SEU Switch.\n",
+        encoding="utf-8")
+    try:
+        req = urllib.request.Request(
+            "https://www.gnu.org/licenses/gpl-3.0.txt",
+            headers={"User-Agent": "biblioteca-hub"})
+        with urllib.request.urlopen(req, timeout=60) as r, \
+                open(dst / "COPYING.txt", "wb") as f:
+            shutil.copyfileobj(r, f, 1024 * 64)
+    except Exception as e:
+        raise SystemExit(f"sem a GPL-3.0 não dá p/ redistribuir: {e}")
+    mb = sum(f.stat().st_size for f in dst.rglob("*") if f.is_file()) / 1048576
+    print(f"[ok] Citron {ver or '?'} embutido ({mb:.0f} MB, sem user/)")
+    return ver
+
 
 def desmume_instalado_dir() -> Path:
     """De onde copiar o DeSmuME (instalação real; nunca o bundle)."""
@@ -350,7 +413,94 @@ def incluir_azahar(dest_base: Path) -> str:
     return ver
 
 
-def montar(sem_azahar: bool = False) -> Path:
+def podar_dieta(build: Path) -> int:
+    """Remove gordura do BUILD (__pycache__, *.pyc). Retorna bytes livres."""
+    livres = 0
+    for pycache in sorted(build.rglob("__pycache__")):
+        try:
+            livres += sum(f.stat().st_size for f in pycache.rglob("*")
+                          if f.is_file())
+            shutil.rmtree(pycache)
+        except OSError:
+            pass
+    for pyc in sorted(build.rglob("*.py[cod]")):
+        try:
+            livres += pyc.stat().st_size
+            pyc.unlink()
+        except OSError:
+            pass
+    if livres:
+        print(f"[ok] dieta: {livres / 1048576:.1f} MB podados")
+    return livres
+
+
+def empacotar_zip(build: Path, sufixo: str = "") -> Path:
+    """Portátil .zip clássico (ZIP_DEFLATED: abre em qualquer lugar)."""
+    DIST.mkdir(parents=True, exist_ok=True)
+    hoje = datetime.date.today().strftime("%Y%m%d")
+    saida = DIST / f"tucoteca-portatil-{hoje}{sufixo}.zip"
+    with zipfile.ZipFile(saida, "w", zipfile.ZIP_DEFLATED) as z:
+        for arq in sorted(build.rglob("*")):
+            z.write(arq, arq.relative_to(build))
+    print(f"[ok] {saida.name} — {saida.stat().st_size / 1048576:.1f} MB")
+    return saida
+
+
+def empacotar_tarxz(build: Path, nome: str) -> Path:
+    """Payload .tar.xz (LZMA2 stdlib): base dos instaladores Win/Linux.
+
+    tar.xz abre nativo no Linux (tar -xJf), no Windows (7-Zip) e no
+    Mac (tar) — ~30-40% menor que o .zip com o mesmo conteúdo.
+    """
+    import tarfile
+    DIST.mkdir(parents=True, exist_ok=True)
+    saida = DIST / nome
+    with tarfile.open(saida, "w:xz", preset=6, format=tarfile.PAX_FORMAT) as t:
+        for arq in sorted(build.rglob("*")):
+            t.add(arq, arq.relative_to(build), recursive=False)
+    print(f"[ok] {saida.name} — {saida.stat().st_size / 1048576:.1f} MB")
+    return saida
+
+
+def _achar_iscc() -> str:
+    env = (os.environ.get("ISCC_EXE") or "").strip()
+    if env and Path(env).is_file():
+        return env
+    exe = shutil.which("iscc")
+    if exe:
+        return exe
+    for cand in (Path(os.environ.get("ProgramFiles", "")) / "Inno Setup 6" / "ISCC.exe",
+                 Path(os.environ.get("ProgramFiles(x86)", "")) / "Inno Setup 6" / "ISCC.exe"):
+        if cand.is_file():
+            return str(cand)
+    raise SystemExit("ISCC.exe não achado — instale o Inno Setup 6 "
+                     "(https://jrsoftware.org/isinfo.php) e rode de novo.")
+
+
+def compilar_setup(iss: Path, build: Path, versao: str) -> Path:
+    """Compila instalador.iss contra o BUILD. Retorna o Setup.exe."""
+    iscc = _achar_iscc()
+    DIST.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run(
+        [iscc, f'/DBuildDir={build}', f'/DVersao={versao}',
+         f'/O{ DIST}', str(iss)],
+        capture_output=True, text=True, timeout=600)
+    if r.returncode != 0:
+        raise SystemExit(f"Inno falhou:\n{(r.stdout or '')[-1500:]}"
+                         f"\n{(r.stderr or '')[-1500:]}")
+    exes = sorted(DIST.glob("TucoTeca-Setup-*.exe"))
+    if not exes:
+        raise SystemExit("iscc rodou mas não gerou o Setup.exe.")
+    print(f"[ok] {exes[-1].name} — {exes[-1].stat().st_size / 1048576:.1f} MB")
+    return exes[-1]
+
+
+def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
+    """Monta a árvore BUILD (portátil) e retorna (pasta, versões).
+
+    As provas reais (tkinter no embutido + selftest + overrides) rodam
+    aqui — todo empacotamento posterior (zip, tar.xz, setup) reaproveita.
+    """
     if os.name != "nt":
         raise SystemExit("o portátil Windows só é montado no Windows.")
     vi = sys.version_info
@@ -396,17 +546,22 @@ def montar(sem_azahar: bool = False) -> Path:
     (BUILD / "README-PORTATIL.txt").write_text(LEIAME_PORTATIL, encoding="utf-8")
     for sub in ("dados", "dados/backups", "dados/capas", "dados/presets", "dados/sessoes"):
         (BUILD / sub).mkdir(parents=True, exist_ok=True)
-    azahar_ver = desmume_ver = ""
+    azahar_ver = desmume_ver = citron_ver = ""
     if not sem_azahar:
         azahar_ver = incluir_azahar(BUILD)
         desmume_ver = incluir_desmume(BUILD)
+        try:
+            citron_ver = incluir_citron(BUILD)
+        except SystemExit as e:
+            print(f"[aviso] sem Citron no pacote: {e}")
     else:
         print("[aviso] pacote magro, sem emulador (--sem-azahar)")
     (BUILD / "VERSAO.txt").write_text(
         f"TucoTeca — build {datetime.date.today():%Y-%m-%d}\n"
         f"Python embutido: {versao}\n"
         f"Azahar: {azahar_ver or 'ausente (--sem-azahar)'}\n"
-        f"DeSmuME: {desmume_ver or 'ausente (--sem-azahar)'}\n",
+        f"DeSmuME: {desmume_ver or 'ausente (--sem-azahar)'}\n"
+        f"Citron: {citron_ver or 'ausente (não instalado aqui)'}\n",
         encoding="utf-8")
 
     # prova real: o python embutido importa tkinter e monta a UI oculta
@@ -473,25 +628,44 @@ def montar(sem_azahar: bool = False) -> Path:
             raise SystemExit(f"override NDS não resolve:\n{r.stdout[-800:]}\n{r.stderr[-800:]}")
         print("[ok] BIBLIOTECA_DESMUME_DIR resolve o embutido")
 
-    DIST.mkdir(parents=True, exist_ok=True)
-    hoje = datetime.date.today().strftime("%Y%m%d")
-    sufixo = "-slim" if sem_azahar else ""
-    saida = DIST / f"tucoteca-portatil-{hoje}{sufixo}.zip"
-    with zipfile.ZipFile(saida, "w", zipfile.ZIP_DEFLATED) as z:
-        for arq in sorted(BUILD.rglob("*")):
-            z.write(arq, arq.relative_to(BUILD))
-    mb = saida.stat().st_size / 1048576
-    print(f"[ok] {saida.name} — {mb:.1f} MB")
-    return saida
+    podar_dieta(BUILD)
+    versoes = {"python": versao, "serie_tk": serie, "azahar": azahar_ver,
+               "desmume": desmume_ver, "citron": citron_ver,
+               "data": datetime.date.today().strftime("%Y%m%d"),
+               "magro": sem_azahar}
+    return BUILD, versoes
+
+
+def montar(sem_azahar: bool = False, formato: str = "zip",
+           setup: bool = False) -> list[Path]:
+    """Compat + fluxo novo: monta a base e empacota. Retorna artefatos."""
+    BUILD, v = montar_base(sem_azahar=sem_azahar)
+    sufixo = "-slim" if v["magro"] else ""
+    saidas: list[Path] = []
+    if formato in ("zip", "todos"):
+        saidas.append(empacotar_zip(BUILD, sufixo))
+    if formato in ("tarxz", "todos"):
+        saidas.append(empacotar_tarxz(
+            BUILD, f"tucoteca-payload-{v['data']}{sufixo}.tar.xz"))
+    if setup:
+        iss = Path(__file__).resolve().parent / "instalador.iss"
+        if not iss.is_file():
+            raise SystemExit("instalador.iss sumiu de ferramentas/.")
+        saidas.append(compilar_setup(iss, BUILD, v["data"] + sufixo))
+    return saidas
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Monta o HUB portátil Windows.")
     ap.add_argument("--sem-azahar", action="store_true",
                     help="pacote magro sem emulador (só p/ iteração rápida)")
+    ap.add_argument("--formato", default="zip", choices=("zip", "tarxz", "todos"),
+                    help="empacotamento (padrão: zip)")
+    ap.add_argument("--setup", action="store_true",
+                    help="compila o instalador Windows (precisa do Inno Setup 6)")
     args = ap.parse_args(argv)
     try:
-        montar(sem_azahar=args.sem_azahar)
+        montar(sem_azahar=args.sem_azahar, formato=args.formato, setup=args.setup)
     except SystemExit as e:
         print(f"ERRO: {e}", file=sys.stderr)
         return 1
