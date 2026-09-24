@@ -85,3 +85,56 @@ def teste_iss_classico():
 
 def montar_iss() -> str:
     return str(Path(__file__).resolve().parent.parent / "instalador.iss")
+
+
+def teste_mac_payload_e_instalador():
+    import montar_mac as MM
+    tmp = Path(tempfile.mkdtemp(prefix="suite-inst-"))
+    velho, MM.DIST = MM.DIST, tmp / "dist"
+    try:
+        base, v = MM.montar_base_mac(tmp / "trab")
+        payload, inst = MM.empacotar_mac(base, "20990101")
+        afirmar(payload.is_file() and inst.is_file())
+        afirmar(payload.name in inst.read_text(encoding="utf-8"),
+                "instalador não aponta o payload")
+        with tarfile.open(payload, "r:xz") as t:
+            nomes = t.getnames()
+        for alvo in ("tucoteca/VERSAO.txt",
+                     "tucoteca/BibliotecaHubMac.command",
+                     "tucoteca/app/app_win.py"):
+            afirmar(alvo in nomes, nomes)
+    finally:
+        MM.DIST = velho
+
+
+def teste_universal_junta_tres():
+    import montar_mac as MM
+    import montar_universal as MU
+    tmp = Path(tempfile.mkdtemp(prefix="suite-inst-"))
+    dist = tmp / "dist"
+    dist.mkdir()
+    (dist / "TucoTeca-Setup-20990101.exe").write_bytes(b"MZfake")
+    (dist / "tucoteca-setup-20990101.run").write_bytes(b"#!/bin/sh\n")
+    mac = dist / "mac"
+    mac.mkdir()
+    (mac / "tucoteca-mac-20990101.tar.xz").write_bytes(b"xzfake")
+    (mac / "Instalar-Mac.command").write_bytes(b"#!/bin/sh\n")
+    (mac / "LEIA-ME-MAC.txt").write_bytes(b"mac")
+    velho_dist, velho_mac = MU.DIST, MU.montar_mac
+    MU.DIST = dist
+    MU.montar_mac = lambda: (mac / "tucoteca-mac-20990101.tar.xz",
+                             mac / "Instalar-Mac.command")
+    try:
+        saida = MU.montar(sem_zip=True)
+        for alvo in ("windows/TucoTeca-Setup-20990101.exe",
+                     "linux/tucoteca-setup-20990101.run",
+                     "mac/Instalar-Mac.command",
+                     "INSTALAR.html", "LEIA-ME.txt"):
+            afirmar((saida / alvo).is_file(), alvo)
+        html = (saida / "INSTALAR.html").read_text(encoding="utf-8")
+        afirmar("TucoTeca-Setup-20990101.exe" in html, "html sem exe?")
+        afirmar("tucoteca-setup-20990101.run" in html, "html sem run?")
+        afirmar("__EXE__" not in html and "__RUN__" not in html, "placeholder vazou")
+        afirmar("navigator.platform" in html, "sem detecção de SO?")
+    finally:
+        MU.DIST, MU.montar_mac = velho_dist, velho_mac

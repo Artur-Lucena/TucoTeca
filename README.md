@@ -18,6 +18,10 @@ Tudo 100% offline (Python + emuladores dentro, nada baixa nada):
 
 Os instaladores saem de `dist/` via `codigo/ferramentas/montar_portatil.py --setup` (Windows, precisa do Inno Setup 6) e `montar_linux.py` (Linux).
 
+## Pacote universal (levar pra outro PC)
+
+`dist/tucoteca-universal-<data>/` (via `montar_universal.py`): 1 pasta com os 3 instaladores — `windows/` (Setup.exe), `linux/` (.run), `mac/` (experimental) — e um **`INSTALAR.html`**: abra em qualquer navegador, ele detecta o sistema e mostra o instalador certo com o passo a passo.
+
 Tudo mora numa pasta só (banco, capas, backups): `D:\Tuco-Compartilhado\Jogos\biblioteca\` no Windows. Nunca abra em dois sistemas ao mesmo tempo — o app trava a segunda instância sozinho.
 
 ## O que ela faz
