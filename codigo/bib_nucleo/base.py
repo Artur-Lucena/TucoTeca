@@ -52,6 +52,12 @@ PRESETS_DIR = DADOS_DIR / "presets"
 
 SESSOES_DIR = DADOS_DIR / "sessoes"
 
+# Pasta-mãe de saves do HUB: todo jogo aberto pelo app grava aqui dentro.
+# PC (Wine): prefixo único do HUB; emuladores: dirs compartilhados na partilha.
+SAVES_DIR = DADOS_DIR / "saves"
+
+WINE_PREFIXO = SAVES_DIR / "wine"
+
 
 def garantir_dirs() -> None:
     HOME_DIR.mkdir(parents=True, exist_ok=True)
@@ -60,6 +66,7 @@ def garantir_dirs() -> None:
     CAPAS_DIR.mkdir(parents=True, exist_ok=True)
     PRESETS_DIR.mkdir(parents=True, exist_ok=True)
     SESSOES_DIR.mkdir(parents=True, exist_ok=True)
+    SAVES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _com_barra(p: str) -> str:
@@ -104,16 +111,20 @@ def existe_aqui_ou_traduzido(p: str) -> tuple[bool, str]:
 
 
 def resolver_exe(d: dict) -> tuple[str, str]:
-    """(executável final neste SO, origem). exe_win/exe_linux vencem o legado."""
+    """(executável final neste SO, origem). exe_win/exe_linux vencem o legado.
+
+    O campo do outro SO só vale como fallback se existir aqui ou traduzido;
+    senão o legado (mesmo vazio) prevalece para o provider completar.
+    """
     if os.name == "nt":
         esp = (d.get("exe_win") or "").strip()
         if esp:
             return esp, "exe_win"
         legado = traduzir_para_atual((d.get("executable_path") or "").strip())
-        if legado:
-            return legado, "executavel"
         alt = traduzir_para_atual((d.get("exe_linux") or "").strip())
-        return alt, "exe_linux"
+        if alt and existe_aqui_ou_traduzido(alt)[0]:
+            return alt, "exe_linux"
+        return legado, "executavel"
     esp = (d.get("exe_linux") or "").strip()
     if esp:
         return esp, "exe_linux"
@@ -121,7 +132,9 @@ def resolver_exe(d: dict) -> tuple[str, str]:
     if legado:
         return legado, "executavel"
     alt = traduzir_para_atual((d.get("exe_win") or "").strip())
-    return alt, "exe_win"
+    if alt and existe_aqui_ou_traduzido(alt)[0]:
+        return alt, "exe_win"
+    return "", "executavel"
 
 
 def agora_iso() -> str:
@@ -200,11 +213,13 @@ def liberar_lock() -> None:
         except (OSError, ValueError):
             return
         try:
-            mesmo_host = (dono.get("host") or "") == _socket.gethostname()
+            host_atual = _socket.gethostname()
         except OSError:
-            mesmo_host = False
-        if (int(dono.get("pid") or -1) == os.getpid()
-                and (dono.get("so") or "") == os.name and mesmo_host):
+            host_atual = ""
+        # campos ausentes = lock de versão antiga: aceita como próprio
+        so_ok = dono.get("so") in (None, "", os.name)
+        host_ok = dono.get("host") in (None, "") or dono.get("host") == host_atual
+        if (int(dono.get("pid") or -1) == os.getpid() and so_ok and host_ok):
             try:
                 lp.unlink()
             except OSError:
@@ -236,5 +251,5 @@ def slugify(s: str) -> str:
 # Extensões de ROM por provider (aqui p/ scans e emuladores usarem sem ciclo).
 ROM_EXTS_3DS = {".cci", ".cxi", ".3ds", ".3dsx", ".elf", ".app", ".axf"}
 
-__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
+__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
  'ROM_EXTS_3DS']

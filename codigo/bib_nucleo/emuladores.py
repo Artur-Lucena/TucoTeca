@@ -191,13 +191,7 @@ def default_emu_nds() -> str:
         if os.name == "nt":
             cand = ov / "desmume.exe"
             return str(cand) if cand.is_file() else ""
-        img = _appimage_na_pasta(ov, "desmume")
-        if img:
-            return img
-        img = _appimage_na_pasta(ov, "desmume_")
-        if img:
-            return img
-        return ""
+        return _appimage_na_pasta(ov, "desmume")
     if os.name == "nt":
         cand = Path(WIN_ROOT) / "Games/Emuladores/DeSmuME/desmume.exe"
         return str(cand) if cand.is_file() else ""
@@ -351,6 +345,38 @@ def executar_elevado(executable_path: str, launch_options: str = "") -> dict:
     return {"ok": False, "erro": "elevação só existe no Windows"}
 
 
+def _tem_nvidia() -> str:
+    """Nome da GPU NVIDIA discreta ou ''. Só liga o PRIME+DXVK se houver."""
+    import shutil
+    import subprocess
+    try:
+        if shutil.which("nvidia-smi") is not None:
+            out = subprocess.run(["nvidia-smi", "--query-gpu=name",
+                                  "--format=csv,noheader"],
+                                 capture_output=True, text=True, timeout=10)
+            nomes = (out.stdout or "").strip().splitlines()
+            if out.returncode == 0 and nomes:
+                return nomes[0].strip()
+    except Exception:
+        pass
+    try:
+        if Path("/usr/share/vulkan/icd.d/nvidia_icd.json").is_file():
+            return "NVIDIA"
+    except OSError:
+        pass
+    return ""
+
+
+def prefixo_wine_hub() -> str:
+    """Prefixo Wine do HUB (`dados/saves/wine`); cria na primeira chamada."""
+    from bib_nucleo.base import WINE_PREFIXO
+    try:
+        WINE_PREFIXO.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    return str(WINE_PREFIXO)
+
+
 def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "",
             elevar: bool = False) -> tuple[dict, object | None]:
     """Núcleo do lançamento. Retorna (resultado, Popen|None).
@@ -401,6 +427,16 @@ def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "
                 if vinho:
                     if wine_prefix.strip():
                         env["WINEPREFIX"] = traduzir_para_atual(wine_prefix.strip())
+                    else:
+                        env["WINEPREFIX"] = prefixo_wine_hub()  # saves no HUB
+                    # híbrido Intel+NVIDIA: jogo na discreta via PRIME com o
+                    # DXVK filtrado para ela; sem NVIDIA, Wine decide sozinho
+                    gpu = _tem_nvidia()
+                    if gpu:
+                        env.setdefault("__NV_PRIME_RENDER_OFFLOAD", "1")
+                        env.setdefault("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
+                        env.setdefault("__VK_LAYER_NV_optimus", "NVIDIA_only_1")
+                        env.setdefault("DXVK_FILTER_DEVICE_NAME", gpu)
                     cmd = [vinho, str(p), *extra]
                     try:
                         proc = subprocess.Popen(cmd, cwd=cwd, env=env,
@@ -492,7 +528,7 @@ def diagnosticar_exe(jogo: dict) -> dict:
 
 def diagnosticar_rom(jogo: dict) -> dict:
     """A ROM (launch_options) existe? Se não, procura candidatas pelo nome."""
-    launch = (jogo.get("launch_options") or "").strip().strip('"')
+    launch = (jogo.get("launch_options") or "").strip().strip("\"'")
     if provedor_por_origem(jogo.get("origem") or "") is None:
         return {"estado": "nao-rom", "candidatos": []}
     if not launch:
@@ -543,7 +579,10 @@ def procurar_rom(nome_arquivo: str, roots: list[str] | None = None,
                 if vistos > 30_000 or len(achados) >= max_resultados:
                     return sorted(achados)
                 if fn.lower() == alvo:
-                    p = (Path(dirpath) / fn).resolve()
+                    try:
+                        p = (Path(dirpath) / fn).resolve()
+                    except (OSError, RuntimeError):
+                        continue
                     if p not in caminhos_vistos:
                         caminhos_vistos.add(p)
                         achados.append(str(p))

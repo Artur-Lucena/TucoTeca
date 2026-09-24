@@ -121,3 +121,135 @@ def teste_lock_nao_apaga_de_outro():
     afirmar(r.get("ok"), r)
     base.liberar_lock()
     afirmar(not lp.is_file(), "não liberou lock próprio")
+
+
+def _tui_fake(db, teclas, cols=150):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path("codigo/frontends").resolve()))
+    import app_tui as tui
+
+    class Scr:
+        def __init__(self):
+            self.cells = {}
+            self.teclas = list(teclas)
+        def getmaxyx(self):
+            return (24, cols)
+        def addnstr(self, y, x, s, n, a=0):
+            pass
+        def erase(self):
+            pass
+        def refresh(self):
+            pass
+        def getch(self):
+            return self.teclas.pop(0) if self.teclas else ord("q")
+
+    class FakeCurses:
+        COLOR_CYAN = COLOR_BLACK = COLOR_GREEN = COLOR_RED = 1
+        COLOR_YELLOW = COLOR_MAGENTA = COLOR_WHITE = 1
+        KEY_DOWN = 258
+        KEY_UP = 259
+        KEY_ENTER = 343
+        KEY_PPAGE = 339
+        KEY_NPAGE = 338
+        A_BOLD = 1
+        A_DIM = 0
+        def curs_set(self, *a):
+            pass
+        def has_colors(self):
+            return False
+        def color_pair(self, n):
+            return 0
+
+    tui.curses = FakeCurses()
+    return tui.Tui(Scr(), db)
+
+
+def teste_menu_principal_abre_e_cancela():
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    app = _tui_fake(db, [27, ord("q")])
+    afirmar(app.menu_principal() is False, "ESC deveria voltar à lista")
+
+
+def teste_menu_principal_sair():
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    teclas = [ord("j")] * 7 + [10]
+    app = _tui_fake(db, teclas)
+    afirmar(app.menu_principal() is True, "navegar até Sair + Enter deveria pedir saída")
+
+
+def teste_menu_jogo_volta():
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    con = core.get_db(db)
+    try:
+        core.criar_jogo(con, {"titulo": "LX Menu", "executable_path": "",
+                              "status": "backlog"})
+    finally:
+        con.close()
+    app = _tui_fake(db, [10, ord("q")])
+    cur_antes = app.cur
+    app.menu_jogo()
+    afirmar(app.cur == cur_antes, "Voltar não deveria mudar a seleção")
+
+
+def teste_menu_filtros_cicla_status():
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    app = _tui_fake(db, [10, ord("q")])
+    si_antes = app.si
+    app.menu_filtros()
+    afirmar(app.si == (si_antes + 1) % len(app.statuses), app.si)
+
+
+def teste_resolver_exe_fantasma_cai_no_provider():
+    from bib_nucleo import base
+    exe, origem = base.resolver_exe({"executable_path": "", "exe_win": "",
+                                     "exe_linux": ""})
+    afirmar(exe == "" and origem == "executavel", (exe, origem))
+    exe, origem = base.resolver_exe({"executable_path": "",
+                                     "exe_win": "D:\\Games\\Inexistente\\jogo.exe",
+                                     "exe_linux": ""})
+    if os.name == "nt":
+        afirmar(exe != "", (exe, origem))
+    else:
+        afirmar(exe == "" and origem == "executavel", (exe, origem))
+
+
+def teste_lock_antigo_sem_host_so_libera():
+    from bib_nucleo import base
+    import json
+    lp = base.lock_path()
+    try:
+        if lp.is_file():
+            lp.unlink()
+    except OSError:
+        pass
+    lp.parent.mkdir(parents=True, exist_ok=True)
+    lp.write_text(json.dumps({"pid": os.getpid()}), encoding="utf-8")
+    base.liberar_lock()
+    afirmar(not lp.is_file(), "lock antigo sem host/so deveria liberar")
+
+
+def teste_tem_nvidia_nao_levanta():
+    from bib_nucleo import emuladores as EMU
+    r = EMU._tem_nvidia()
+    afirmar(isinstance(r, str), r)
+
+
+def teste_prefixo_wine_no_hub():
+    from bib_nucleo import base
+    from bib_nucleo import emuladores as EMU
+    p = EMU.prefixo_wine_hub()
+    afirmar(p == str(base.WINE_PREFIXO), p)
+    afirmar("saves" in p.replace("\\", "/"), p)

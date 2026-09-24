@@ -140,42 +140,45 @@ class Tui:
         return (f"{marca} {estrela}{j['titulo']} [{plat}]{sufixo_tags} "
                 f"[{j['status']}]{horas}{nota}{reg}{core.selo_confianca(j)}")
 
-    TECLAS_RODAPE = ("/ busca · f status · * fav · V prov · Y plat · T tags · "
-                       "Enter joga · a/e/d · I importa · b/U/E/P/S/A/G · q sai")
+    TECLAS_RODAPE = "↑↓ move · Enter menu · ESC ações · q sai"
 
     AJUDA_LADO = (
-        (" Navegação ", [("↑↓/jk", "mover"), ("PgUp/Dn", "página"),
-                         ("Enter", "jogar"), ("q", "sair")]),
-        (" Filtros ", [("/", "busca"), ("f", "status"), ("*", "favorito"),
-                       ("V", "provider"), ("Y", "plataforma"),
-                       ("T", "etiquetas")]),
-        (" Ações ", [("a/e/d", "add/edita/apaga"), ("I", "importar"),
-                     ("b", "backup"), ("S", "sessão")]),
-        (" Emulador ", [("A", "atual. Azahar"), ("G", "atual. DeSmuME"),
-                        ("r", "recarregar")]),
+        (" NAVEGAÇÃO ", [(("↑↓/jk", "mover"), ("PgUp/Dn", "página")),
+                         (("Enter", "menu jogo"), ("ESC", "ações")),
+                         (("q", "sair"), ("", ""))]),
+        (" MENU (ESC) ", [(("›", "Buscar"), ("›", "Filtros")),
+                          (("›", "Adicionar"), ("›", "Importar")),
+                          (("›", "Backup"), ("›", "Sessão")),
+                          (("›", "Emuladores"), ("›", "Sair"))]),
     )
 
     def _desenhar_ajuda_lado(self, s, x0: int, larg_p: int, rows: int) -> None:
-        """Quadrinho único de teclas à direita (só em terminal largo e alto)."""
+        """Quadrinho duplo de teclas à direita (terminal largo e alto)."""
         linhas: list[tuple[str, int]] = []
-        for titulo, teclas in self.AJUDA_LADO:
+        for titulo, pares in self.AJUDA_LADO:
             linhas.append((titulo, 1))
-            linhas.extend((f" {t.ljust(7)[:7]} {f}", 0) for t, f in teclas)
+            for (t1, f1), (t2, f2) in pares:
+                esq = f" {t1.ljust(6)[:6]} {f1}"[:22].ljust(22)
+                if t2:
+                    dir_ = f"{t2.ljust(7)[:7]} {f2}"[:18].ljust(18)
+                else:
+                    dir_ = " " * 18
+                linhas.append((esq + dir_, 0))
         if len(linhas) + 2 > rows - 1:
             return
         cor_t = self.cor["head"] | self.abold
-        cor_b = self.cor["mut"] | self.adim
-        s.addnstr(0, x0, "┌" + "─" * (larg_p - 2) + "┐", larg_p, cor_b)
+        cor_b = self.cor["fav"] | self.abold
+        s.addnstr(0, x0, "╔" + "═" * (larg_p - 2) + "╗", larg_p, cor_b)
         y = 1
         for texto, destaque in linhas:
             if destaque:
-                s.addnstr(y, x0, f"│{texto.center(larg_p - 2)[:larg_p - 2]}│",
+                s.addnstr(y, x0, f"║{texto.center(larg_p - 2)[:larg_p - 2]}║",
                           larg_p, cor_t)
             else:
-                s.addnstr(y, x0, ("│" + texto[:larg_p - 2]).ljust(larg_p - 1) + "│",
+                s.addnstr(y, x0, ("║" + texto[:larg_p - 2]).ljust(larg_p - 1) + "║",
                           larg_p, self.cor["txt"])
             y += 1
-        s.addnstr(y, x0, "└" + "─" * (larg_p - 2) + "┘", larg_p, cor_b)
+        s.addnstr(y, x0, "╚" + "═" * (larg_p - 2) + "╝", larg_p, cor_b)
 
     def desenhar(self):
         s = self.stdscr
@@ -183,7 +186,7 @@ class Tui:
             s.erase()
             rows, cols = s.getmaxyx()
             larg_total = max(1, cols - 1)
-            painel = 32 if cols >= 112 else 0
+            painel = 42 if cols >= 100 else 0
             larg = larg_total - painel
             if painel:
                 self._desenhar_ajuda_lado(s, larg, painel, rows)
@@ -451,6 +454,213 @@ class Tui:
             j = core.atualizar_jogo(con, j["id"], {"launch_options": escolhido})
         return j
 
+    def escolher(self, titulo: str, opcoes: list[str]) -> int | None:
+        """Caixinha central: ↑↓/jk move, Enter confirma, ESC/q cancela."""
+        s = self.stdscr
+        cur = 0
+        k_down = getattr(curses, "KEY_DOWN", -2)
+        k_up = getattr(curses, "KEY_UP", -2)
+        k_enter = getattr(curses, "KEY_ENTER", -2)
+        larg_m = max(26, max((len(titulo) + 4, *(len(o) + 6 for o in opcoes))))
+        while True:
+            try:
+                rows, cols = s.getmaxyx()
+                x0 = max(0, (cols - larg_m) // 2)
+                y0 = max(0, (rows - (len(opcoes) + 2)) // 2)
+                s.addnstr(y0, x0, "┌" + "─" * (larg_m - 2) + "┐", larg_m,
+                          self.cor["mut"])
+                s.addnstr(y0 + 1, x0,
+                          ("│" + f" {titulo} ".center(larg_m - 2)[:larg_m - 2] + "│"),
+                          larg_m, self.cor["head"] | self.abold)
+                for i, op in enumerate(opcoes):
+                    attr = self.cor["acc"] | self.abold if i == cur else self.cor["txt"]
+                    s.addnstr(y0 + 2 + i, x0,
+                              (f"│ {'▶' if i == cur else ' '} {op}".ljust(larg_m - 1) + "│")[:larg_m],
+                              larg_m, attr)
+                s.addnstr(y0 + 2 + len(opcoes), x0,
+                          "└" + "─" * (larg_m - 2) + "┘", larg_m, self.cor["mut"])
+                s.refresh()
+            except Exception:
+                return None
+            try:
+                ch = s.getch()
+            except Exception:
+                ch = -1
+            if ch == -1:
+                continue
+            if ch in (k_down, ord("j")):
+                cur = min(len(opcoes) - 1, cur + 1)
+            elif ch in (k_up, ord("k")):
+                cur = max(0, cur - 1)
+            elif ch in (27, ord("q")):
+                return None
+            elif ch in (k_enter, 10, 13):
+                return cur
+
+    def menu_jogo(self):
+        """Enter virou select: caixinha de ações do jogo; ESC volta à lista."""
+        j = self.atual()
+        if not j:
+            return
+        opcoes = ["Jogar", "Editar", "Apagar", "Voltar"]
+        idx = self.escolher(j["titulo"], opcoes)
+        if idx is None:
+            return
+        escolha = opcoes[idx]
+        if escolha == "Jogar":
+            self.jogar()
+        elif escolha == "Editar":
+            self.editar()
+        elif escolha == "Apagar":
+            self.excluir()
+
+    def menu_principal(self) -> bool:
+        """ESC na lista abre as categorias; retorna True se é para sair."""
+        opcoes = ["Buscar", "Filtros", "Adicionar jogo", "Importar",
+                  "Backup e saves", "Sessão", "Emuladores", "Sair"]
+        while True:
+            idx = self.escolher("TucoTeca", opcoes)
+            if idx is None:
+                return False
+            escolha = opcoes[idx]
+            if escolha == "Buscar":
+                r = self.perguntar("Buscar: ", self.q)
+                if r is not None:
+                    self.q = r.strip()
+                    self.cur = 0
+                    self.recarregar()
+            elif escolha == "Filtros":
+                self.menu_filtros()
+            elif escolha == "Adicionar jogo":
+                self.adicionar()
+            elif escolha == "Importar":
+                self.menu_importar()
+            elif escolha == "Backup e saves":
+                self.menu_backup()
+            elif escolha == "Sessão":
+                self.menu_sessao()
+            elif escolha == "Emuladores":
+                self.menu_emuladores()
+            elif escolha == "Sair":
+                return True
+        return False
+
+    def menu_filtros(self):
+        while True:
+            opcoes = [
+                f"Status: {self.statuses[self.si] or 'todos'}",
+                f"Favoritos: {'sim' if self.fav else 'não'}",
+                f"Provider: {self.filtro_prov or 'todos'}",
+                f"Plataforma: {self.filtro_plat or 'todas'}",
+                f"Etiquetas: {', '.join(self.filtro_tags) or '—'}",
+                "Limpar filtros",
+                "Voltar",
+            ]
+            idx = self.escolher("Filtros", opcoes)
+            if idx is None or opcoes[idx] == "Voltar":
+                return
+            escolha = opcoes[idx]
+            if escolha.startswith("Status:"):
+                self.si = (self.si + 1) % len(self.statuses)
+                self.cur = 0
+                self.recarregar()
+            elif escolha.startswith("Favoritos:"):
+                self.fav = not self.fav
+                self.cur = 0
+                self.recarregar()
+            elif escolha.startswith("Provider:"):
+                chaves = [None, *core.provedores()]
+                i = chaves.index(self.filtro_prov) if self.filtro_prov in chaves else 0
+                self.filtro_prov = chaves[(i + 1) % len(chaves)]
+                self.cur = 0
+                self.recarregar()
+                self.msg = f"Filtro prov: {self.filtro_prov or 'todos'}."
+            elif escolha.startswith("Plataforma:"):
+                plats = [None, "PC", "3DS", "NDS"]
+                i = plats.index(self.filtro_plat) if self.filtro_plat in plats else 0
+                self.filtro_plat = plats[(i + 1) % len(plats)]
+                self.cur = 0
+                self.recarregar()
+                self.msg = f"Filtro plataforma: {self.filtro_plat or 'todas'}."
+            elif escolha.startswith("Etiquetas:"):
+                r = self.perguntar("Filtrar etiquetas (vírgula=vazio limpa): ",
+                                   ", ".join(self.filtro_tags))
+                if r is not None:
+                    self.filtro_tags = [t.strip() for t in
+                                        r.replace(";", ",").split(",") if t.strip()]
+                    self.cur = 0
+                    self.recarregar()
+            elif escolha == "Limpar filtros":
+                self.si = 0
+                self.fav = False
+                self.filtro_prov = None
+                self.filtro_plat = None
+                self.filtro_tags = []
+                self.cur = 0
+                self.recarregar()
+                self.msg = "Filtros limpos."
+
+    def menu_importar(self):
+        opcoes = ["Arquivo (exe, ROM, JSON, .zip)", "Pasta", "Disco (Hydra/lojas)",
+                  "Voltar"]
+        while True:
+            idx = self.escolher("Importar", opcoes)
+            if idx is None or opcoes[idx] == "Voltar":
+                return
+            escolha = opcoes[idx]
+            if escolha.startswith("Arquivo"):
+                arq = self.perguntar("Arquivo (exe, ROM, JSON, .zip): ")
+                if arq:
+                    self._importar_arquivo(arq.strip())
+            elif escolha == "Pasta":
+                r = self.perguntar("Pasta (; separadas, vazio=tudo): ")
+                if r is None:
+                    continue
+                roots = [x.strip() for x in r.split(";") if x.strip()] or None
+                self._prev_pasta(roots)
+            elif escolha.startswith("Disco"):
+                self._prev_disco()
+
+    def menu_backup(self):
+        opcoes = ["Backup do banco", "Backup saves 3DS", "Exportar JSON",
+                  "Exportar pacote", "Importar pacote", "Voltar"]
+        while True:
+            idx = self.escolher("Backup e saves", opcoes)
+            if idx is None or opcoes[idx] == "Voltar":
+                return
+            escolha = opcoes[idx]
+            if escolha == "Backup do banco":
+                self.backup()
+            elif escolha == "Backup saves 3DS":
+                self.backup_saves()
+            elif escolha == "Exportar JSON":
+                self.exportar_json()
+            elif escolha == "Exportar pacote":
+                self.exportar_pacote()
+            elif escolha == "Importar pacote":
+                arq = self.perguntar("Pacote .zip: ")
+                if arq:
+                    self.importar_pacote(arq.strip())
+
+    def menu_sessao(self):
+        opcoes = ["Registrar sessão manual", "Voltar"]
+        while True:
+            idx = self.escolher("Sessão", opcoes)
+            if idx is None or opcoes[idx] == "Voltar":
+                return
+            self.registrar_sessao_manual()
+
+    def menu_emuladores(self):
+        opcoes = ["Atualizar Azahar", "Atualizar DeSmuME", "Voltar"]
+        while True:
+            idx = self.escolher("Emuladores", opcoes)
+            if idx is None or opcoes[idx] == "Voltar":
+                return
+            if opcoes[idx] == "Atualizar Azahar":
+                self.atualizar_azahar()
+            else:
+                self.atualizar_desmume()
+
     def _aplicar_sessoes(self):
         """Drena a fila de sessões sem trocar sua referência na thread vigia."""
         pend = []
@@ -662,27 +872,6 @@ class Tui:
                 self.msg = core.resumo_importacao(res).replace("\n", " · ")
                 self.recarregar()
                 return
-
-    def importar_unificado(self):
-        """Um ponto de entrada: arquivo, pasta ou disco (emu detectado só)."""
-        r = self.perguntar("Importar: [A]rquivo, [P]asta, [D]isco, [C]ancela? ")
-        if r is None:
-            return
-        op = r.strip().lower()
-        if op in ("a", "arq", "arquivo"):
-            arq = self.perguntar("Arquivo (exe, ROM, JSON, .zip): ")
-            if not arq:
-                return
-            self._importar_arquivo(arq.strip())
-        elif op in ("p", "pasta"):
-            r = self.perguntar("Pasta (; separadas, vazio=tudo): ")
-            if r is None:
-                return
-            roots = [x.strip() for x in r.split(";") if x.strip()] or None
-            self._prev_pasta(roots)
-        elif op in ("d", "disco"):
-            self._prev_disco()
-        # resto = cancela
 
     def _prev_disco(self):
         self.msg = "Lendo Hydra, lojas e programas (só leitura)..."
@@ -918,73 +1107,14 @@ class Tui:
                 self.cur = min(len(self.jogos) - 1, self.cur + 10) if self.jogos else 0
             elif ch == curses.KEY_PPAGE:
                 self.cur = max(0, self.cur - 10)
-            elif ch == ord("/"):
-                r = self.perguntar("Buscar: ", self.q)
-                if r is not None:
-                    self.q = r.strip()
-                    self.cur = 0
-                    self.recarregar()
-            elif ch == ord("f"):
-                self.si = (self.si + 1) % len(self.statuses)
-                self.cur = 0
-                self.recarregar()
-            elif ch == ord("*"):
-                self.fav = not self.fav
-                self.cur = 0
-                self.recarregar()
-            elif ch in (ord("V"), ord("v")):
-                chaves = [None, *core.provedores()]
-                idx = chaves.index(self.filtro_prov) if self.filtro_prov in chaves else 0
-                self.filtro_prov = chaves[(idx + 1) % len(chaves)]
-                self.cur = 0
-                self.recarregar()
-                self.msg = f"Filtro prov: {self.filtro_prov or 'todos'}."
-            elif ch in (ord("Y"), ord("y")):
-                plats = [None, "PC", "3DS", "NDS"]
-                idx = plats.index(self.filtro_plat) if self.filtro_plat in plats else 0
-                self.filtro_plat = plats[(idx + 1) % len(plats)]
-                self.cur = 0
-                self.recarregar()
-                self.msg = f"Filtro plataforma: {self.filtro_plat or 'todas'}."
-            elif ch in (ord("T"), ord("t")):
-                r = self.perguntar("Filtrar etiquetas (vírgula=vazio limpa): ",
-                                   ", ".join(self.filtro_tags))
-                if r is None:
-                    pass
-                else:
-                    self.filtro_tags = [t.strip() for t in
-                                        r.replace(";", ",").split(",") if t.strip()]
-                    self.cur = 0
-                    self.recarregar()
-                    self.msg = (f"Filtro tags: {', '.join(self.filtro_tags)}."
-                                if self.filtro_tags else "Filtro tags limpo.")
+            elif ch == 27:
+                if self.menu_principal():
+                    antes = self.msg
+                    self._aplicar_sessoes()
+                    self.msg_final = self.msg or antes
+                    return
             elif ch in (curses.KEY_ENTER, 10, 13):
-                self.jogar()
-            elif ch == ord("a"):
-                self.adicionar()
-            elif ch == ord("e"):
-                self.editar()
-            elif ch == ord("d"):
-                self.excluir()
-            elif ch == ord("b"):
-                self.backup()
-            elif ch == ord("U"):
-                self.backup_saves()
-            elif ch == ord("S"):
-                self.registrar_sessao_manual()
-            elif ch == ord("E"):
-                self.exportar_json()
-            elif ch == ord("I"):
-                self.importar_unificado()
-            elif ch == ord("P"):
-                self.exportar_pacote()
-            elif ch == ord("A"):
-                self.atualizar_azahar()
-            elif ch == ord("G"):
-                self.atualizar_desmume()
-            elif ch == ord("r"):
-                self.recarregar()
-                self.msg = "Recarregado."
+                self.menu_jogo()
 
 
 def main(argv: list[str] | None = None) -> int:
