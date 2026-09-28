@@ -34,8 +34,9 @@ def azahar_dir_override() -> Path | None:
 def _app_macos(pasta: Path) -> str:
     """Binário dentro de *.app (macOS): bundle -> Contents/MacOS/<bin>.
 
-    Prefere o binário com o nome do .app; senão, o maior. Qualquer
-    emulador (Azahar, Citron, DeSmuME) resolve pelo mesmo caminho.
+    Ordem: nome exato do .app > prefixo do nome > maior arquivo (helpers
+    tipo *-room nunca vencem um binário da família). Qualquer emulador
+    (Azahar, Citron, DeSmuME) resolve pelo mesmo caminho.
     """
     try:
         if not pasta.is_dir():
@@ -51,10 +52,12 @@ def _app_macos(pasta: Path) -> str:
             exatos = [b for b in bins if b.name.lower() == alvo]
             if exatos:
                 return str(exatos[0])
+            familia = [b for b in bins if b.name.lower().startswith(alvo)]
+            cands = familia or bins
             try:
-                return str(max(bins, key=lambda b: b.stat().st_size))
+                return str(max(cands, key=lambda b: b.stat().st_size))
             except OSError:
-                return str(bins[0])
+                return str(cands[0])
         return ""
     except OSError:
         return ""

@@ -96,7 +96,7 @@ def mais_novo(padrao: str) -> Path | None:
     return cands[-1] if cands else None
 
 
-def montar(sem_zip: bool = False) -> Path:
+def montar(sem_zip: bool = False, mac_leve: bool = False) -> Path:
     data = datetime.date.today().strftime("%Y%m%d")
     uni = DIST / f"tucoteca-universal-{data}"
     if uni.exists():
@@ -114,8 +114,12 @@ def montar(sem_zip: bool = False) -> Path:
     else:
         (uni / "linux").mkdir(parents=True)
         shutil.copy2(run, uni / "linux" / run.name)
-    payload_mac, inst_mac = montar_mac()
+    payload_mac, inst_mac = montar_mac(leve=mac_leve)
     shutil.copytree(payload_mac.parent, uni / "mac")
+    mb_mac = sum(f.stat().st_size for f in (uni / "mac").rglob("*")
+                 if f.is_file()) / 1048576
+    print(f"[ok] mac/ no universal: {mb_mac:.0f} MB"
+          f"{' (leve)' if mac_leve else ''}")
     (uni / "INSTALAR.html").write_text(
         HTML.replace("__VERSAO__", data)
         .replace("__EXE__", exe.name if exe else "TucoTeca-Setup-*.exe")
@@ -140,9 +144,11 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Monta o pacote universal.")
     ap.add_argument("--sem-zip", action="store_true",
                     help="só a pasta, sem zzipar")
+    ap.add_argument("--mac-leve", action="store_true",
+                    help="mac/ sem Python/emuladores (baixa pelo ⬇ no Mac)")
     args = ap.parse_args(argv)
     try:
-        montar(sem_zip=args.sem_zip)
+        montar(sem_zip=args.sem_zip, mac_leve=args.mac_leve)
     except SystemExit as e:
         print(f"ERRO: {e}", file=sys.stderr)
         return 1

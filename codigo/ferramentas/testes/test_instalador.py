@@ -128,8 +128,8 @@ def teste_universal_junta_tres():
     (mac / "LEIA-ME-MAC.txt").write_bytes(b"mac")
     velho_dist, velho_mac = MU.DIST, MU.montar_mac
     MU.DIST = dist
-    MU.montar_mac = lambda: (mac / "tucoteca-mac-20990101.tar.xz",
-                             mac / "Instalar-Mac.command")
+    MU.montar_mac = lambda leve=False: (
+        mac / "tucoteca-mac-20990101.tar.xz", mac / "Instalar-Mac.command")
     try:
         saida = MU.montar(sem_zip=True)
         for alvo in ("windows/TucoTeca-Setup-20990101.exe",

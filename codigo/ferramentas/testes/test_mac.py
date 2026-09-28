@@ -198,6 +198,106 @@ def teste_default_emu_3ds_no_mac_ramo_padrao():
             os.environ["BIBLIOTECA_AZAHAR_DIR"] = velho_dir
 
 
+def teste_extrair_app_mac_dmg_com_hdiutil_mockado():
+    from bib_nucleo import atualizacao as ATUAL
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
+    dmg = tmp / "fake.dmg"
+    dmg.write_bytes(b"DMGfake")
+    stage = tmp / "stage"
+    stage.mkdir()
+    chamadas = []
+
+    class R:
+        def __init__(self, rc):
+            self.returncode = rc
+            self.stderr = ""
+
+    def fake_run(cmd, **kw):
+        chamadas.append(cmd)
+        if cmd[1] == "attach":
+            mnt = Path(cmd[cmd.index("-mountpoint") + 1])
+            macos = mnt / "Fake.app" / "Contents" / "MacOS"
+            macos.mkdir(parents=True)
+            (macos / "fakebin").write_bytes(b"x" * 2_000_000)
+            return R(0)
+        return R(0)  # detach
+
+    velho = ATUAL.subprocess.run
+    ATUAL.subprocess.run = fake_run
+    try:
+        nome = ATUAL._extrair_app_mac(dmg, stage)
+    finally:
+        ATUAL.subprocess.run = velho
+    afirmar(nome == "Fake.app", nome)
+    afirmar((stage / "Fake.app" / "Contents" / "MacOS" / "fakebin").is_file())
+    afirmar(any(c[1] == "detach" for c in chamadas), "não desmontou!")
+
+
+def teste_extrair_app_mac_zip_rejeita_macosx():
+    import zipfile
+    from bib_nucleo import atualizacao as ATUAL
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
+    zf = tmp / "fake.zip"
+    with zipfile.ZipFile(zf, "w") as z:
+        z.writestr("Top/Fake.app/Contents/MacOS/fakebin", b"x" * 2_000_000)
+        z.writestr("__MACOSX/lixo", b"meta")
+    stage = tmp / "stage"
+    stage.mkdir()
+    try:
+        ATUAL._extrair_app_mac(zf, stage)
+        afirmar(False, "aceitou __MACOSX?")
+    except ValueError:
+        pass
+
+
+def teste_links_darwin_internos_e_vetos():
+    from bib_nucleo import atualizacao as ATUAL
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
+    raiz = tmp / "rt"
+    (raiz / "sub").mkdir(parents=True)
+    (raiz / "sub" / "real.bin").write_bytes(b"R" * 100)
+    try:
+        (raiz / "sonda").symlink_to(raiz / "sub" / "real.bin")
+    except OSError:
+        print("[pula] sem privilégio de symlink (WinError 1314)")
+        return
+    (raiz / "sonda").unlink()
+    fora = tmp / "fora.bin"
+    fora.write_bytes(b"F" * 100)
+    (raiz / "ok-link").symlink_to(raiz / "sub" / "real.bin")
+    arqs = ATUAL._arquivos(raiz, links=True)
+    afirmar("ok-link" in arqs and "sub/real.bin" in arqs, sorted(arqs))
+    afirmar(ATUAL._manifesto(raiz, links=True)["ok-link"].startswith("link->"))
+    (raiz / "externo").symlink_to(fora)
+    try:
+        ATUAL._arquivos(raiz, links=True)
+        afirmar(False, "aceitou link externo?")
+    except ValueError:
+        pass
+    (raiz / "externo").unlink()
+    (raiz / "quebrado").symlink_to(raiz / "sumiu.bin")
+    try:
+        ATUAL._arquivos(raiz, links=True)
+        afirmar(False, "aceitou link quebrado?")
+    except ValueError:
+        pass
+    (raiz / "quebrado").unlink()
+    (raiz / "loop-a").symlink_to(raiz / "loop-b")
+    (raiz / "loop-b").symlink_to(raiz / "loop-a")
+    try:
+        ATUAL._arquivos(raiz, links=True)
+        afirmar(False, "aceitou loop?")
+    except ValueError:
+        pass
+    (raiz / "loop-a").unlink()
+    (raiz / "loop-b").unlink()
+    try:
+        ATUAL._arquivos(raiz)  # links=False: veto clássico
+        afirmar(False, "aceitou link sem flag?")
+    except ValueError:
+        pass
+
+
 def teste_asset_matchers_por_so():
     velha = sys.platform
     try:

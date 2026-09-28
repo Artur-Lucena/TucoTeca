@@ -51,8 +51,8 @@ def _arquivos(raiz: Path, links: bool = False) -> dict[str, Path]:
             try:
                 alvo = p.resolve()
                 dentro = alvo == raiz.resolve() or raiz.resolve() in alvo.parents
-            except OSError:
-                dentro = False
+            except (OSError, RuntimeError):
+                dentro = False  # quebrado ou loop: veta
             if not dentro:
                 raise ValueError(f"link externo no runtime: {p.relative_to(raiz)}")
             out[p.relative_to(raiz).as_posix()] = p

@@ -31,12 +31,16 @@ MAC_CACHE = AQUI / ".cache" / "mac"
 # fontes em 28/09/2026: python.org/downloads/macos + APIs GitHub
 # (azahar-emu/azahar, citron-neo/emulator, TASEmulators/desmume).
 MAC_ARQS = (
+    # sha: GitHub digest (azahar/citron) ou pin local do baixado (python,
+    # desmume sem digest no release) — qualquer troca futura quebra alto.
     ("python-3.14.7-macos11.pkg",  # novo (mesma série do Montar Win)
      "https://www.python.org/ftp/python/3.14.7/python-3.14.7-macos11.pkg",
-     20_000_000, ""),
+     20_000_000,
+     "70c5239ad2d62925d2947e46921d0ddd3d35be3d2f0a2d50db33da507dbcb419"),
     ("python-3.10.11-macos11.pkg",  # antigo (mínimo suportado 3.10)
      "https://www.python.org/ftp/python/3.10.11/python-3.10.11-macos11.pkg",
-     20_000_000, ""),
+     20_000_000,
+     "767ed35ad688d28ea4494081ae96408a0318d0d5bb9ca0139d74d6247b231cfc"),
     ("azahar-macos-universal-2126.1.2.zip",  # novo (universal Intel+ARM)
      "https://github.com/azahar-emu/azahar/releases/download/2126.1.2/"
      "azahar-macos-universal-2126.1.2.zip",
@@ -45,42 +49,55 @@ MAC_ARQS = (
     ("azahar-macos-universal-2126.1.1.zip",  # antigo (fallback)
      "https://github.com/azahar-emu/azahar/releases/download/2126.1.1/"
      "azahar-macos-universal-2126.1.1.zip",
-     90_000_000, ""),
+     90_000_000,
+     "46839e22772b75f76fc3021a5aed07c2fedb52cfa434f43030e48c3514a8aa1a"),
     ("Citron-macOS-nightly-0237a9b88.dmg",
      "https://github.com/citron-neo/emulator/releases/download/2026-04-27/"
      "Citron-macOS-nightly-0237a9b88.dmg",
-     50_000_000, ""),
+     50_000_000,
+     "4813ad4bbc72387643def021e28a03f677dc420c87b8e66b35f1b212ec79a2d9"),
     ("desmume-0.9.13-macOS.dmg",
      "https://github.com/TASEmulators/desmume/releases/download/"
      "release_0_9_13/desmume-0.9.13-macOS.dmg",
-     8_000_000, ""),
+     8_000_000,
+     "d42e4bbf8f96b6bfdb3c8be6cf469b606a3b105352460636b1051b8dd0365ebc"),
 )
+
+
+def _sha_arq(p: Path) -> str:
+    import hashlib
+    h = hashlib.sha256()
+    with p.open("rb") as f:
+        for bloco in iter(lambda: f.read(1024 * 256), b""):
+            h.update(bloco)
+    return h.hexdigest()
 
 
 def garantir_mac() -> Path:
     """Baixa (uma vez) os arquivos oficiais do Mac p/ .cache/mac/."""
-    import hashlib
     import urllib.request
     MAC_CACHE.mkdir(parents=True, exist_ok=True)
     for nome, url, minimo, sha in MAC_ARQS:
         dest = MAC_CACHE / nome
         if dest.is_file() and dest.stat().st_size > minimo:
+            if sha and _sha_arq(dest) != sha:
+                dest.unlink(missing_ok=True)
+                raise SystemExit(f"{nome} no cache com sha divergente (apaguei; rode de novo)")
             print(f"[cache] {nome} ({dest.stat().st_size // 1048576} MB)")
             continue
         print(f"[baixar] {nome}")
         req = urllib.request.Request(url, headers={"User-Agent": "tucoteca-hub"})
         with urllib.request.urlopen(req, timeout=300) as r, open(dest, "wb") as f:
-            h = hashlib.sha256()
             while True:
                 bloco = r.read(1024 * 256)
                 if not bloco:
                     break
                 f.write(bloco)
-                h.update(bloco)
+        h = _sha_arq(dest)
         if dest.stat().st_size < minimo:
             dest.unlink(missing_ok=True)
             raise SystemExit(f"{nome} veio pequeno demais (link quebrou?)")
-        if sha and h.hexdigest() != sha:
+        if sha and h != sha:
             dest.unlink(missing_ok=True)
             raise SystemExit(f"{nome}: sha256 divergente (descartado)")
         print(f"[ok] {nome} ({dest.stat().st_size // 1048576} MB)")
@@ -123,14 +140,18 @@ deszipar() { # $1=zip $2=destino $3=versao-arq $4=versao
   echo "$4" > "$2/$3"
 }
 montar_dmg() { # $1=dmg $2=destino $3=versao-arq $4=versao
-  rm -rf "$2" && mkdir -p "$2"
+  rm -rf "$2" && mkdir -p "$2" || return 1
   MNT="$(mktemp -d /tmp/tuco.XXXXXX)" || return 1
-  hdiutil attach -nobrowse -mountpoint "$MNT" "$1" >/dev/null || return 1
+  hdiutil attach -nobrowse -mountpoint "$MNT" "$1" >/dev/null || {
+    rmdir "$MNT" 2>/dev/null; return 1; }
   APP="$(find "$MNT" -maxdepth 2 -name '*.app' | head -n 1)"
-  [ -n "$APP" ] && cp -R "$APP" "$2/"
-  hdiutil detach "$MNT" >/dev/null
+  RC=1
+  if [ -n "$APP" ] && [ -d "$APP" ]; then
+    cp -R "$APP" "$2/" && RC=0
+  fi
+  hdiutil detach "$MNT" >/dev/null || RC=1
   rmdir "$MNT" 2>/dev/null
-  [ -d "$2"/*.app ] || return 1
+  [ "$RC" = 0 ] || return 1
   echo "$4" > "$2/$3"
 }
 deszipar "$AQUI"/azahar-macos-universal-*.zip "$HUB/emuladores/Azahar" \
@@ -204,11 +225,12 @@ MAC_NAVIO = ("python-3.14.7-macos11.pkg", "python-3.10.11-macos11.pkg",
                "Citron-macOS-nightly-0237a9b88.dmg", "desmume-0.9.13-macOS.dmg")
 
 
-def empacotar_mac(build: Path, data: str) -> tuple[Path, Path]:
+def empacotar_mac(build: Path, data: str, leve: bool = False) -> tuple[Path, Path]:
     """Monta dist/mac/ profissional: payload + Python + 3 emuladores.
 
     Retorna (payload .tar.xz, Instalar-Mac.command). O Azahar antigo fica
     só no cache (fallback manual); o resto viaja junto (100% offline).
+    leve=True: só payload+instalador (mac baixa o resto pelo ⬇ do app).
     """
     cache = garantir_mac()
     pasta = DIST / "mac"
@@ -220,8 +242,11 @@ def empacotar_mac(build: Path, data: str) -> tuple[Path, Path]:
                       format=tarfile.PAX_FORMAT) as t:
         for arq in sorted(build.parent.rglob("*")):
             t.add(arq, arq.relative_to(build.parent), recursive=False)
-    for nome in MAC_NAVIO:
-        shutil.copy2(cache / nome, pasta / nome)
+    if leve:
+        print("[aviso] mac leve: sem Python/emuladores (baixa pelo ⬇ no Mac)")
+    else:
+        for nome in MAC_NAVIO:
+            shutil.copy2(cache / nome, pasta / nome)
     inst = pasta / "Instalar-Mac.command"
     inst.write_text(INSTALADOR.replace("PAYLOAD", payload.name),
                     encoding="utf-8")
@@ -235,9 +260,9 @@ def empacotar_mac(build: Path, data: str) -> tuple[Path, Path]:
     return payload, inst
 
 
-def montar() -> tuple[Path, Path]:
+def montar(leve: bool = False) -> tuple[Path, Path]:
     base, v = montar_base_mac()
-    return empacotar_mac(base, v["data"])
+    return empacotar_mac(base, v["data"], leve)
 
 
 def main(argv: list[str] | None = None) -> int:
