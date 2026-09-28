@@ -1,4 +1,4 @@
-"""Mac: tradução Win/Linux/Mac, exe_mac (migração v8, CRUD, import) e erros."""
+"""Mac: tradução Win/Linux/Mac, exe_mac (migração v8, CRUD, import), .app e erros."""
 import os
 import sqlite3
 import sys
@@ -6,7 +6,15 @@ import tempfile
 from pathlib import Path
 
 import bib_core as core
+from bib_nucleo import emuladores as EMU
 from executar import afirmar
+
+
+def _app_fake(pasta: Path, nome: str = "Azahar.app", binario: str = "azahar"):
+    macos = pasta / nome / "Contents" / "MacOS"
+    macos.mkdir(parents=True)
+    (macos / binario).write_bytes(b"x" * 2_000_000)
+    return pasta / nome
 
 
 def _mac():
@@ -133,6 +141,74 @@ def teste_importar_lista_leva_exe_mac():
         afirmar(len(jogos) == 1 and jogos[0]["exe_mac"] == "/Volumes/Games/Games/m", jogos)
     finally:
         con.close()
+
+
+def teste_app_macos_resolve_binario():
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
+    _app_fake(tmp / "Emu", "Azahar.app", "azahar")
+    exe = EMU._app_macos(tmp / "Emu")
+    afirmar(exe.endswith(os.path.join("Azahar.app", "Contents", "MacOS", "azahar")), exe)
+    afirmar(EMU._app_macos(tmp / "vazia-inexistente") == "")
+    (tmp / "oco").mkdir()
+    afirmar(EMU._app_macos(tmp / "oco") == "")
+
+
+def teste_default_emu_3ds_no_mac_acha_app():
+    base, mac = _mac()
+    emu = mac / "Games" / "Emuladores" / "Azahar"
+    emu.mkdir(parents=True)
+    _app_fake(emu)
+    # a sandbox fixa BIBLIOTECA_AZAHAR_DIR: este ramo é o override
+    velha, velho_dir = sys.platform, os.environ.get("BIBLIOTECA_AZAHAR_DIR")
+    os.environ["BIBLIOTECA_AZAHAR_DIR"] = str(emu)
+    sys.platform = "darwin"
+    try:
+        exe = EMU.default_emu_3ds()
+        afirmar(exe.endswith(os.path.join("Azahar.app", "Contents", "MacOS", "azahar")), exe)
+        ud = EMU.azahar_user_dir(exe)
+        afirmar(ud == "", ud)  # sem user/ ainda: vazio honesto, não lixo do Linux
+        (emu / "user").mkdir()
+        afirmar(EMU.azahar_user_dir(exe) == str(emu / "user"))
+    finally:
+        sys.platform = velha
+        if velho_dir is None:
+            os.environ.pop("BIBLIOTECA_AZAHAR_DIR", None)
+        else:
+            os.environ["BIBLIOTECA_AZAHAR_DIR"] = velho_dir
+
+
+def teste_default_emu_3ds_no_mac_ramo_padrao():
+    base, mac = _mac()
+    emu = mac / "Games" / "Emuladores" / "Azahar"
+    emu.mkdir(parents=True)
+    _app_fake(emu)
+    # sem override: cai no padrão MAC_ROOT (importado por valor no EMU)
+    velha, velho_dir, velho_root = (sys.platform,
+                                    os.environ.pop("BIBLIOTECA_AZAHAR_DIR", None),
+                                    EMU.MAC_ROOT)
+    EMU.MAC_ROOT = str(mac)
+    sys.platform = "darwin"
+    try:
+        exe = EMU.default_emu_3ds()
+        afirmar(exe.endswith(os.path.join("Azahar.app", "Contents", "MacOS", "azahar")), exe)
+    finally:
+        sys.platform = velha
+        EMU.MAC_ROOT = velho_root
+        if velho_dir is not None:
+            os.environ["BIBLIOTECA_AZAHAR_DIR"] = velho_dir
+
+
+def teste_asset_matchers_por_so():
+    velha = sys.platform
+    try:
+        sys.platform = "darwin"
+        afirmar(EMU._asset_azahar_ok("azahar-macos-universal-2126.1.2.zip"))
+        afirmar(not EMU._asset_azahar_ok("azahar.AppImage"))
+        afirmar(not EMU._asset_azahar_ok("azahar-windows-msys2-2126.1.2.zip"))
+        afirmar(EMU._asset_desmume_ok("desmume-0.9.13-macOS.dmg"))
+        afirmar(not EMU._asset_desmume_ok("desmume-0.9.13-win64.zip"))
+    finally:
+        sys.platform = velha
 
 
 def teste_lancar_exe_sem_wine_no_mac_mensagem():

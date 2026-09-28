@@ -31,6 +31,35 @@ def azahar_dir_override() -> Path | None:
     return None
 
 
+def _app_macos(pasta: Path) -> str:
+    """Binário dentro de *.app (macOS): bundle -> Contents/MacOS/<bin>.
+
+    Prefere o binário com o nome do .app; senão, o maior. Qualquer
+    emulador (Azahar, Citron, DeSmuME) resolve pelo mesmo caminho.
+    """
+    try:
+        if not pasta.is_dir():
+            return ""
+        for app in sorted(pasta.glob("*.app")):
+            macos = app / "Contents" / "MacOS"
+            if not macos.is_dir():
+                continue
+            bins = [b for b in macos.iterdir() if b.is_file()]
+            if not bins:
+                continue
+            alvo = app.stem.lower()
+            exatos = [b for b in bins if b.name.lower() == alvo]
+            if exatos:
+                return str(exatos[0])
+            try:
+                return str(max(bins, key=lambda b: b.stat().st_size))
+            except OSError:
+                return str(bins[0])
+        return ""
+    except OSError:
+        return ""
+
+
 def default_emu_3ds() -> str:
     """Caminho do Azahar neste SO (BIBLIOTECA_EMULADOR_3DS > BIBLIOTECA_AZAHAR_DIR > padrão)."""
     env = os.environ.get("BIBLIOTECA_EMULADOR_3DS")
@@ -38,6 +67,8 @@ def default_emu_3ds() -> str:
         return env
     ov = azahar_dir_override()
     if ov is not None:
+        if eh_mac():
+            return _app_macos(ov)
         if os.name == "nt":
             cand = ov / "azahar.exe"
             return str(cand) if cand.is_file() else ""
@@ -45,6 +76,8 @@ def default_emu_3ds() -> str:
         if imgs:
             return str(imgs[-1])
         return ""
+    if eh_mac():
+        return _app_macos(Path(MAC_ROOT) / "Games/Emuladores/Azahar")
     if os.name == "nt":
         cand = Path(WIN_ROOT) / "Games/Emuladores/Azahar/azahar.exe"
         return str(cand) if cand.is_file() else ""
@@ -57,12 +90,26 @@ def default_emu_3ds() -> str:
 
 
 def azahar_user_dir(exe: str = "") -> str:
-    """Pasta user do Azahar (portátil ao lado do exe vence os padrões do SO)."""
+    """Pasta user do Azahar (portátil ao lado do exe vence os padrões do SO).
+
+    No Mac, user/ mora na pasta do emulador (estilo portátil, criado pelo
+    instalador) — .app não guarda estado dentro do bundle.
+    """
     exe = exe or default_emu_3ds()
     if exe:
         port = Path(exe).parent / "user"
         if port.is_dir():
             return str(port)
+        if eh_mac():  # .app: user/ fica ao lado do bundle (até 3 acima)
+            for cima in list(Path(exe).parents[1:4]):
+                port = cima / "user"
+                if port.is_dir():
+                    return str(port)
+    if eh_mac():
+        cand = Path(MAC_ROOT) / "Games/Emuladores/Azahar/user"
+        if cand.is_dir():
+            return str(cand)
+        return ""
     if os.name == "nt":
         base = Path(os.environ.get("APPDATA", "")) / "Azahar"
     else:
@@ -101,7 +148,18 @@ def _emu_dir() -> Path:
         return ov  # bundle: atualiza o emulador dentro do pacote
     if os.name == "nt":
         return Path(WIN_ROOT) / "Games/Emuladores/Azahar"
+    if eh_mac():
+        return Path(MAC_ROOT) / "Games/Emuladores/Azahar"
     return Path(LINUX_ROOT) / "Games/Emuladores/Azahar"
+
+
+def _asset_azahar_ok(nome: str) -> bool:
+    """O asset do release serve p/ este SO? (testável sem rede)."""
+    if eh_mac():
+        return nome.startswith("azahar-macos-universal-") and nome.endswith(".zip")
+    if os.name == "nt":
+        return nome.startswith("azahar-windows-msys2-") and nome.endswith(".zip")
+    return nome == "azahar.AppImage"
 
 
 def azahar_versao_local() -> str:
@@ -122,13 +180,9 @@ def azahar_release_info(timeout: int = 25) -> dict:
     except Exception as e:
         return {"erro": f"falha de rede: {type(e).__name__}: {e}"}
     tag = (rel.get("tag_name") or "").strip()
-    if os.name == "nt":
-        casa = lambda n: n.startswith("azahar-windows-msys2-") and n.endswith(".zip")  # noqa: E731
-    else:
-        casa = lambda n: n == "azahar.AppImage"  # noqa: E731
     for a in rel.get("assets", []):
         nome = a.get("name") or ""
-        if casa(nome):
+        if _asset_azahar_ok(nome):
             digest = a.get("digest") or ""
             sha = digest.split(":", 1)[1].strip() if ":" in digest else ""
             return {"tag": tag, "nome": nome, "size": a.get("size") or 0,
@@ -139,6 +193,8 @@ def azahar_release_info(timeout: int = 25) -> dict:
 def azahar_instalar(info: dict, progresso=None) -> dict:
     """Atualiza o runtime atual com backup, diário e verificação SHA-256."""
     from bib_nucleo.atualizacao import instalar
+    if eh_mac():
+        return instalar(info, _emu_dir(), progresso, plataforma="darwin")
     return instalar(info, _emu_dir(), progresso)
 
 
@@ -163,7 +219,18 @@ def desmume_dir() -> Path:
         return ov
     if os.name == "nt":
         return Path(WIN_ROOT) / "Games/Emuladores/DeSmuME"
+    if eh_mac():
+        return Path(MAC_ROOT) / "Games/Emuladores/DeSmuME"
     return Path(LINUX_ROOT) / "Games/Emuladores/DeSmuME"
+
+
+def _asset_desmume_ok(nome: str) -> bool:
+    """O asset do release serve p/ este SO? (testável sem rede)."""
+    if eh_mac():
+        return "macos" in nome.lower() and nome.endswith(".dmg")
+    if os.name == "nt":
+        return "-win64.zip" in nome
+    return False  # Linux: sem asset oficial (AppImage manual)
 
 
 def _appimage_na_pasta(pasta: Path, prefixo: str) -> str:
@@ -188,10 +255,14 @@ def default_emu_nds() -> str:
         return env
     ov = desmume_dir_override()
     if ov is not None:
+        if eh_mac():
+            return _app_macos(ov)
         if os.name == "nt":
             cand = ov / "desmume.exe"
             return str(cand) if cand.is_file() else ""
         return _appimage_na_pasta(ov, "desmume")
+    if eh_mac():
+        return _app_macos(Path(MAC_ROOT) / "Games/Emuladores/DeSmuME")
     if os.name == "nt":
         cand = Path(WIN_ROOT) / "Games/Emuladores/DeSmuME/desmume.exe"
         return str(cand) if cand.is_file() else ""
@@ -240,12 +311,9 @@ def desmume_versao_local() -> str:
 
 
 def desmume_release_info(timeout: int = 25) -> dict:
-    """{'tag','nome','size','sha256','url'} do win64.zip, ou {'erro':...}.
-
-    Linux: release oficial só tem zip Windows; AppImage manual.
-    """
-    if os.name != "nt":
-        return {"erro": ("Atualização automática do DeSmuME só no Windows. "
+    """{'tag','nome','size','sha256','url'} do asset deste SO, ou {'erro':...}."""
+    if os.name != "nt" and not eh_mac():
+        return {"erro": ("Atualização automática do DeSmuME só no Windows e no Mac. "
                          "No Linux, baixe o AppImage manual para Games/Emuladores/DeSmuME "
                          "ou defina BIBLIOTECA_EMULADOR_NDS.")}
     try:
@@ -256,20 +324,23 @@ def desmume_release_info(timeout: int = 25) -> dict:
     tag = (rel.get("tag_name") or "").strip()
     for a in rel.get("assets", []):
         nome = a.get("name") or ""
-        if "-win64.zip" in nome:
+        if _asset_desmume_ok(nome):
             digest = a.get("digest") or ""
             sha = digest.split(":", 1)[1].strip() if ":" in digest else ""
             return {"tag": tag, "nome": nome, "size": a.get("size") or 0,
                     "sha256": sha, "url": a.get("browser_download_url") or ""}
-    return {"erro": "asset Windows não encontrado no release"}
+    return {"erro": "asset deste SO não encontrado no release"}
 
 
 def desmume_instalar(info: dict, progresso=None) -> dict:
-    """Baixa o win64.zip e instala como desmume.exe (transacional, como Azahar)."""
-    if os.name != "nt":
-        return {"ok": False, "erro": ("Instalação automática do DeSmuME só no Windows. "
-                                      "No Linux use AppImage manual.")}
+    """Baixa e instala o DeSmuME (transacional, como Azahar)."""
     from bib_nucleo.atualizacao import instalar
+    if eh_mac():
+        return instalar(info, desmume_dir(), progresso, plataforma="darwin",
+                        versao_nome=DESMUME_VERSAO_ARQ)
+    if os.name != "nt":
+        return {"ok": False, "erro": ("Instalação automática do DeSmuME só no Windows e no Mac. "
+                                      "No Linux use AppImage manual.")}
     return instalar(info, desmume_dir(), progresso, exe_nomes=("DeSmuME*.exe",),
                     deps=(), renomear_exe="desmume.exe",
                     versao_nome=DESMUME_VERSAO_ARQ)
@@ -347,21 +418,7 @@ def _citron_dir() -> Path:
     return Path(LINUX_ROOT) / "Games/Emuladores/Citron"
 
 
-def _citron_app_mac(pasta: Path) -> str:
-    """Citron.app dentro da pasta (macOS): bundle -> Contents/MacOS/citron."""
-    try:
-        if not pasta.is_dir():
-            return ""
-        for app in sorted(pasta.glob("*.app")):
-            cand = app / "Contents" / "MacOS" / "citron"
-            if cand.is_file():
-                return str(cand)
-            cands = sorted((app / "Contents" / "MacOS").glob("citron*"))
-            if cands:
-                return str(cands[0])
-        return ""
-    except OSError:
-        return ""
+
 
 
 def default_emu_switch() -> str:
@@ -371,15 +428,17 @@ def default_emu_switch() -> str:
         return env
     ov = citron_dir_override()
     if ov is not None:
+        if eh_mac():
+            return _app_macos(ov)
         if os.name == "nt":
             for pat in ("citron*.exe",):
                 alvos = sorted(ov.glob(pat))
                 if alvos:
                     return str(alvos[0])
             return ""
-        if eh_mac():
-            return _citron_app_mac(ov)
         return _appimage_na_pasta(ov, "citron")
+    if eh_mac():
+        return _app_macos(Path(MAC_ROOT) / "Games/Emuladores/Citron")
     if os.name == "nt":
         pasta = Path(WIN_ROOT) / "Games/Emuladores/Citron"
         if pasta.is_dir():
@@ -387,8 +446,6 @@ def default_emu_switch() -> str:
             if alvos:
                 return str(alvos[0])
         return ""
-    if eh_mac():
-        return _citron_app_mac(Path(MAC_ROOT) / "Games/Emuladores/Citron")
     pasta = Path(LINUX_ROOT) / "Games/Emuladores/Citron"
     return _appimage_na_pasta(pasta, "citron")
 
@@ -501,12 +558,12 @@ def citron_release_info(timeout: int = 25) -> dict:
 def citron_instalar(info: dict, progresso=None) -> dict:
     """Baixa e instala o Citron (transacional, como Azahar).
 
-    Win/Linux: automático. macOS: .dmg exige arrastar o .app (manual).
+    Win/Linux/Mac (.dmg via hdiutil): automático.
     """
-    if eh_mac():
-        return {"ok": False, "erro": ("No Mac, monte o .dmg e arraste Citron.app para "
-                                      "Games/Emuladores/Citron (ou defina BIBLIOTECA_CITRON_DIR).")}
     from bib_nucleo.atualizacao import instalar
+    if eh_mac():
+        return instalar(info, _citron_dir(), progresso, plataforma="darwin",
+                        versao_nome=CITRON_VERSAO_ARQ)
     if os.name == "nt":
         return instalar(info, _citron_dir(), progresso, exe_nomes=("citron*.exe",),
                         deps=(), versao_nome=CITRON_VERSAO_ARQ)

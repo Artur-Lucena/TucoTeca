@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import urllib.request
 import zipfile
@@ -28,7 +29,13 @@ def _sha(p: Path) -> str:
     return h.hexdigest()
 
 
-def _arquivos(raiz: Path) -> dict[str, Path]:
+def _arquivos(raiz: Path, links: bool = False) -> dict[str, Path]:
+    """Arquivos (+ links, se links=True) sob raiz, sem user/.
+
+    links=True (só darwin, p/ .app): aceita links simbólicos INTERNOS
+    (alvo dentro da raiz; externos seguem vetados). Win/Linux: links
+    seguem cancelando a atualização, como antes.
+    """
     out = {}
     if not raiz.exists():
         return out
@@ -36,16 +43,33 @@ def _arquivos(raiz: Path) -> dict[str, Path]:
         if Path(pasta) == raiz:
             dirs[:] = [d for d in dirs if d.casefold() != "user"]
         for nome in [*dirs, *nomes]:
-            if (Path(pasta) / nome).is_symlink():
+            p = Path(pasta) / nome
+            if not p.is_symlink():
+                continue
+            if not links:
                 raise ValueError("Runtime com links simbólicos: atualização cancelada")
+            try:
+                alvo = p.resolve()
+                dentro = alvo == raiz.resolve() or raiz.resolve() in alvo.parents
+            except OSError:
+                dentro = False
+            if not dentro:
+                raise ValueError(f"link externo no runtime: {p.relative_to(raiz)}")
+            out[p.relative_to(raiz).as_posix()] = p
         for nome in nomes:
             p = Path(pasta) / nome
+            if p.is_symlink():
+                continue  # já registrado acima
             out[p.relative_to(raiz).as_posix()] = p
     return out
 
 
-def _manifesto(raiz: Path) -> dict[str, str]:
-    return {n: _sha(p) for n, p in _arquivos(raiz).items()}
+def _manifesto(raiz: Path, links: bool = False) -> dict[str, str]:
+    def resume(p: Path) -> str:
+        if p.is_symlink():
+            return "link->" + os.readlink(p)
+        return _sha(p)
+    return {n: resume(p) for n, p in _arquivos(raiz, links).items()}
 
 
 def _json_atomico(p: Path, dados):
@@ -56,6 +80,17 @@ def _json_atomico(p: Path, dados):
 
 def _copiar(orig: Path, dest: Path):
     dest.parent.mkdir(parents=True, exist_ok=True)
+    if orig.is_symlink():  # só acontece com links=True (darwin)
+        alvo = os.readlink(orig)
+        try:
+            if dest.is_symlink() or dest.is_file():
+                dest.unlink()
+            elif dest.is_dir() and not dest.is_symlink():
+                shutil.rmtree(dest)
+        except OSError:
+            pass
+        dest.symlink_to(alvo)
+        return
     tmp = dest.with_name(dest.name + ".hub-tmp")
     try:
         shutil.copy2(orig, tmp)
@@ -65,7 +100,7 @@ def _copiar(orig: Path, dest: Path):
             tmp.unlink()
 
 
-def recuperar(dest: Path) -> dict:
+def recuperar(dest: Path, links: bool = False) -> dict:
     """Recupera apenas transações pendentes. Preserva backup se houver erro."""
     anterior = dest.with_name(dest.name + ".anterior")
     diario = anterior / DIARIO
@@ -77,15 +112,15 @@ def recuperar(dest: Path) -> dict:
             return {"ok": True, "recuperado": False}
         esperados = estado["arquivos"]
         orig = anterior / "runtime"
-        if _manifesto(orig) != esperados:
+        if _manifesto(orig, links) != esperados:
             raise OSError("backup anterior incompleto; restauração automática interrompida")
         dest.mkdir(parents=True, exist_ok=True)
-        for nome, arq in _arquivos(dest).items():
+        for nome, arq in _arquivos(dest, links).items():
             if nome not in esperados:
                 arq.unlink()
-        for nome, arq in _arquivos(orig).items():
+        for nome, arq in _arquivos(orig, links).items():
             _copiar(arq, dest / nome)
-        if _manifesto(dest) != esperados:
+        if _manifesto(dest, links) != esperados:
             raise OSError("arquivos restaurados não correspondem ao backup")
         estado["estado"] = "restaurado"
         _json_atomico(diario, estado)
@@ -95,9 +130,9 @@ def recuperar(dest: Path) -> dict:
                 "erro": f"Recuperação incompleta: {e}. Backup preservado em {anterior}"}
 
 
-def _aplicar(stage: Path, dest: Path, tag: str) -> dict:
+def _aplicar(stage: Path, dest: Path, tag: str, links: bool = False) -> dict:
     anterior = dest.with_name(dest.name + ".anterior")
-    recuperacao = recuperar(dest)
+    recuperacao = recuperar(dest, links)
     if not recuperacao["ok"]:
         return recuperacao
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -106,10 +141,10 @@ def _aplicar(stage: Path, dest: Path, tag: str) -> dict:
         backup = Path(tmp)
         runtime = backup / "runtime"
         runtime.mkdir()
-        antigos = _manifesto(dest)
-        for nome, arq in _arquivos(dest).items():
+        antigos = _manifesto(dest, links)
+        for nome, arq in _arquivos(dest, links).items():
             _copiar(arq, runtime / nome)
-        if _manifesto(runtime) != antigos:
+        if _manifesto(runtime, links) != antigos:
             raise OSError("backup não conferiu; instalação atual preservada")
         estado = {"estado": "pendente", "tag": tag, "arquivos": antigos}
         _json_atomico(backup / DIARIO, estado)
@@ -118,17 +153,17 @@ def _aplicar(stage: Path, dest: Path, tag: str) -> dict:
         backup.rename(anterior)
     try:
         dest.mkdir(parents=True, exist_ok=True)
-        novos = _manifesto(stage)
+        novos = _manifesto(stage, links)
         # Avisos/licenças locais e marcador portátil sobrevivem ao update.
         preservados = {n: h for n, h in antigos.items()
                        if Path(n).name in ("COPYING.txt", "FONTE.txt", "portable.txt")
                        and n not in novos}
-        for nome, arq in _arquivos(dest).items():
+        for nome, arq in _arquivos(dest, links).items():
             if nome not in novos and nome not in preservados:
                 arq.unlink()
-        for nome, arq in _arquivos(stage).items():
+        for nome, arq in _arquivos(stage, links).items():
             _copiar(arq, dest / nome)
-        if _manifesto(dest) != {**novos, **preservados}:
+        if _manifesto(dest, links) != {**novos, **preservados}:
             raise OSError("verificação final do runtime falhou")
         estado["estado"] = "concluido"
         _json_atomico(anterior / DIARIO, estado)
@@ -140,6 +175,57 @@ def _aplicar(stage: Path, dest: Path, tag: str) -> dict:
                 "erro": f"Atualização falhou: {e}; {detalhe}"}
 
 
+def _extrair_app_mac(pacote: Path, stage: Path) -> str:
+    """Extrai *.app de .zip/.dmg p/ stage. Retorna o nome do .app.
+
+    macOS: Azahar vem em .zip, Citron/DeSmuME em .dmg (hdiutil). Valida
+    que Contents/MacOS tem binário real (≥ 1 MB). Só roda em darwin.
+    """
+    tmp = stage / ".mac"
+    tmp.mkdir()
+    try:
+        if pacote.suffix.lower() == ".dmg":
+            mnt = tmp / "mnt"
+            mnt.mkdir()
+            r = subprocess.run(
+                ["hdiutil", "attach", "-nobrowse", "-mountpoint", str(mnt),
+                 str(pacote)], capture_output=True, text=True, timeout=300)
+            try:
+                if r.returncode != 0:
+                    raise ValueError(f"hdiutil falhou: {(r.stderr or '')[-300:]}")
+                origem = mnt
+                apps = sorted(p for p in origem.glob("*.app") if p.is_dir())
+                if not apps:
+                    raise ValueError("nenhum .app no .dmg")
+                shutil.copytree(apps[0], stage / apps[0].name, symlinks=True)
+                nome = apps[0].name
+            finally:
+                subprocess.run(["hdiutil", "detach", str(mnt)],
+                               capture_output=True, timeout=120)
+        else:
+            with zipfile.ZipFile(pacote) as z:
+                for i in z.infolist():
+                    partes = PurePosixPath(i.filename.replace("\\", "/")).parts
+                    if (not partes or ".." in partes
+                            or i.filename.startswith(("/", "\\"))
+                            or partes[0] in ("__MACOSX",)
+                            or any(":" in p or p.casefold() == "user" for p in partes)):
+                        raise ValueError("pacote contém caminho inválido ou dados de usuário")
+                z.extractall(tmp / "zip")
+            apps = sorted(p for p in (tmp / "zip").rglob("*.app") if p.is_dir())
+            if not apps:
+                raise ValueError("nenhum .app no .zip")
+            shutil.copytree(apps[0], stage / apps[0].name, symlinks=True)
+            nome = apps[0].name
+        macos = stage / nome / "Contents" / "MacOS"
+        bins = [b for b in macos.iterdir() if b.is_file()] if macos.is_dir() else []
+        if not bins or max(b.stat().st_size for b in bins) < 1_000_000:
+            raise ValueError(".app sem binário válido")
+        return nome
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def instalar(info: dict, dest: Path, progresso=None, plataforma=None,
                exe_nomes=("azahar.exe",), deps=("Qt6Core.dll", "Qt6Gui.dll",
                "plugins/platforms/qwindows.dll"), renomear_exe=None,
@@ -148,7 +234,8 @@ def instalar(info: dict, dest: Path, progresso=None, plataforma=None,
     url, tag = info.get("url"), str(info.get("tag") or "").strip()
     if not url or not tag:
         return {"ok": False, "erro": "release inválido (sem URL/tag)"}
-    rec = recuperar(dest)
+    darwin = (plataforma == "darwin")
+    rec = recuperar(dest, darwin)
     if not rec["ok"]:
         return rec
     try:
@@ -199,16 +286,21 @@ def instalar(info: dict, dest: Path, progresso=None, plataforma=None,
                 if renomear_exe and exe_baixado.name != renomear_exe:
                     exe_baixado.rename(stage / renomear_exe)
                     nome_exe = renomear_exe
+            elif plataforma == "darwin":
+                nome_exe = _extrair_app_mac(pacote, stage)
+                exe, assinatura = stage / nome_exe, b""
             else:
                 nome_exe, assinatura = appimage_nome, b"\x7fELF"
                 shutil.copy2(pacote, stage / nome_exe)
                 (stage / nome_exe).chmod(0o755)
             exe = stage / nome_exe
-            with exe.open("rb") as f:
-                if f.read(len(assinatura)) != assinatura or exe.stat().st_size < 10_000_000:
-                    raise ValueError("executável inválido no pacote")
+            if assinatura:  # darwin: .app já validado em _extrair_app_mac
+                with exe.open("rb") as f:
+                    if (f.read(len(assinatura)) != assinatura
+                            or exe.stat().st_size < 10_000_000):
+                        raise ValueError("executável inválido no pacote")
             (stage / versao_nome).write_text(tag, encoding="utf-8")
-            r = _aplicar(stage, dest, tag)
+            r = _aplicar(stage, dest, tag, darwin)
             if r["ok"]:
                 r.update(tag=tag, exe=str(dest / nome_exe), exe_existe=True)
             return r
