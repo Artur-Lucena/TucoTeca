@@ -75,6 +75,11 @@ WINE_PREFIXO = SAVES_DIR / "wine"
 # extraído e normalizado). O play materializa só os ativos via junction.
 MODS_DIR = DADOS_DIR / "mods"
 
+# Trilhas/OSTs por jogo (preparo p/ download MP3 futuro): musicas/<gid>-<slug>.<ext>.
+# Fora do git (dados/ ignorado), fora do scanner (SKIP_DIRS) e fora dos pacotes
+# de emulador — módulo próprio futuro reutiliza o padrão atualizacao.instalar.
+MUSICAS_DIR = DADOS_DIR / "musicas"
+
 
 def garantir_dirs() -> None:
     HOME_DIR.mkdir(parents=True, exist_ok=True)
@@ -85,63 +90,54 @@ def garantir_dirs() -> None:
     SESSOES_DIR.mkdir(parents=True, exist_ok=True)
     SAVES_DIR.mkdir(parents=True, exist_ok=True)
     MODS_DIR.mkdir(parents=True, exist_ok=True)
+    MUSICAS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _com_barra(p: str) -> str:
     return p.replace("\\", "/")
 
 
+def _trocar_prefixo(p: str, origem: str, destino: str, para_win: bool = False) -> str:
+    """Troca o prefixo origem pelo destino (sem caixa). Fora da origem, devolve igual.
+
+    Compacta os 6 win/linux/mac_para_* sem mudar comportamento: ida sempre
+    com barra (/), volta p/ Win com contrabarra (\\).
+    """
+    n = _com_barra(p)
+    ori = _com_barra(origem).rstrip("/") + "/"
+    if n[: len(ori)].lower() != ori.lower():
+        return p
+    resto = n[len(ori):]
+    if para_win:
+        return destino.rstrip("\\") + "\\" + resto.replace("/", "\\")
+    return _com_barra(destino).rstrip("/") + "/" + resto
+
+
 def win_para_linux(p: str) -> str:
     """D:\\Games\\X -> /run/media/tuco/Games/Games/X. Fora de D:\\, devolve igual."""
-    n = _com_barra(p)
-    w = _com_barra(WIN_ROOT).rstrip("/") + "/"
-    if n[: len(w)].lower() == w.lower():
-        return LINUX_ROOT.rstrip("/") + "/" + n[len(w):]
-    return p
+    return _trocar_prefixo(p, WIN_ROOT, LINUX_ROOT)
 
 
 def linux_para_win(p: str) -> str:
-    n = _com_barra(p)
-    lx = LINUX_ROOT.rstrip("/") + "/"
-    if n[: len(lx)].lower() == lx.lower():
-        resto = n[len(lx):].replace("/", "\\")
-        return WIN_ROOT.rstrip("\\") + "\\" + resto
-    return p
+    return _trocar_prefixo(p, LINUX_ROOT, WIN_ROOT, para_win=True)
 
 
 def win_para_mac(p: str) -> str:
     """D:\\Games\\X -> /Volumes/Games/Games/X. Fora de D:\\, devolve igual."""
-    n = _com_barra(p)
-    w = _com_barra(WIN_ROOT).rstrip("/") + "/"
-    if n[: len(w)].lower() == w.lower():
-        return _com_barra(MAC_ROOT).rstrip("/") + "/" + n[len(w):]
-    return p
+    return _trocar_prefixo(p, WIN_ROOT, MAC_ROOT)
 
 
 def mac_para_win(p: str) -> str:
-    n = _com_barra(p)
-    mx = _com_barra(MAC_ROOT).rstrip("/") + "/"
-    if n[: len(mx)].lower() == mx.lower():
-        resto = n[len(mx):].replace("/", "\\")
-        return WIN_ROOT.rstrip("\\") + "\\" + resto
-    return p
+    return _trocar_prefixo(p, MAC_ROOT, WIN_ROOT, para_win=True)
 
 
 def linux_para_mac(p: str) -> str:
     """Troca o prefixo do mount Linux pelo do Mac; fora dele, devolve igual."""
-    n = _com_barra(p)
-    lx = _com_barra(LINUX_ROOT).rstrip("/") + "/"
-    if n[: len(lx)].lower() == lx.lower():
-        return _com_barra(MAC_ROOT).rstrip("/") + "/" + n[len(lx):]
-    return p
+    return _trocar_prefixo(p, LINUX_ROOT, MAC_ROOT)
 
 
 def mac_para_linux(p: str) -> str:
-    n = _com_barra(p)
-    mx = _com_barra(MAC_ROOT).rstrip("/") + "/"
-    if n[: len(mx)].lower() == mx.lower():
-        return _com_barra(LINUX_ROOT).rstrip("/") + "/" + n[len(mx):]
-    return p
+    return _trocar_prefixo(p, MAC_ROOT, LINUX_ROOT)
 
 
 def _sob(p: str, raiz: str) -> bool:
@@ -347,5 +343,8 @@ ROM_EXTS_3DS = {".cci", ".cxi", ".3ds", ".3dsx", ".elf", ".app", ".axf"}
 # Nintendo Switch (Citron 2026-04-27): dumps e homebrew suportados pelo Hub.
 ROM_EXTS_SWITCH = {".nsp", ".xci", ".nca", ".nro", ".nso"}
 
-__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'MAC_ROOT', 'eh_mac', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'MODS_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'win_para_mac', 'mac_para_win', 'linux_para_mac', 'mac_para_linux', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
- 'ROM_EXTS_3DS', 'ROM_EXTS_SWITCH']
+# Áudio por jogo (OST futura): só formatos que o Hub vai baixar/guardar.
+MUSICA_EXTS = {".mp3", ".ogg", ".m4a", ".flac", ".wav"}
+
+__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'MAC_ROOT', 'eh_mac', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'MODS_DIR', 'MUSICAS_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'win_para_mac', 'mac_para_win', 'linux_para_mac', 'mac_para_linux', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
+ 'ROM_EXTS_3DS', 'ROM_EXTS_SWITCH', 'MUSICA_EXTS']

@@ -39,7 +39,7 @@ def pontuar(item: dict) -> dict:
     motivos: list[str] = []
     exe = (item.get("executable_path") or "").strip()
     existe, traduzido = existe_aqui_ou_traduzido(exe)
-    if exe and Path(exe).exists():
+    if exe and existe and traduzido == exe:
         score += 0.5
         motivos.append("executável existe neste SO")
     elif existe:
@@ -194,7 +194,7 @@ def scan_hydra_db(db_dir: Path, limite_bytes_por_arquivo: int = 20_000_000) -> l
 SKIP_DIRS = {
     "windowsapps", "system volume information", "$recycle.bin",
     ".pnpm-store", "msdownld.tmp", "found.000", "wpsystem",
-    "backups", "capas", "presets", "sessoes",
+    "backups", "capas", "presets", "sessoes", "saves", "mods", "musicas",
     ".git", ".build", ".cache", "__pycache__", "dist",
     "node_modules", ".venv", "venv", ".mypy_cache", ".pytest_cache",
 }
