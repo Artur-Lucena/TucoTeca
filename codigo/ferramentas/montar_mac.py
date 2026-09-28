@@ -25,6 +25,66 @@ sys.path.insert(0, str(AQUI))
 from montar_portatil import REPO, DIST, podar_dieta
 
 MAC_BUILD = AQUI / ".build" / "mac"
+MAC_CACHE = AQUI / ".cache" / "mac"
+
+# Arquivos oficiais p/ Mac (Intel+ARM, velho+novo). Tudo verificado nas
+# fontes em 28/09/2026: python.org/downloads/macos + APIs GitHub
+# (azahar-emu/azahar, citron-neo/emulator, TASEmulators/desmume).
+MAC_ARQS = (
+    ("python-3.14.7-macos11.pkg",  # novo (mesma série do Montar Win)
+     "https://www.python.org/ftp/python/3.14.7/python-3.14.7-macos11.pkg",
+     20_000_000, ""),
+    ("python-3.10.11-macos11.pkg",  # antigo (mínimo suportado 3.10)
+     "https://www.python.org/ftp/python/3.10.11/python-3.10.11-macos11.pkg",
+     20_000_000, ""),
+    ("azahar-macos-universal-2126.1.2.zip",  # novo (universal Intel+ARM)
+     "https://github.com/azahar-emu/azahar/releases/download/2126.1.2/"
+     "azahar-macos-universal-2126.1.2.zip",
+     90_000_000,
+     "085653f1a4c1879aef98235a0f258b1333e4a3a5e5a7e8bafe1ccddc952bb75d"),
+    ("azahar-macos-universal-2126.1.1.zip",  # antigo (fallback)
+     "https://github.com/azahar-emu/azahar/releases/download/2126.1.1/"
+     "azahar-macos-universal-2126.1.1.zip",
+     90_000_000, ""),
+    ("Citron-macOS-nightly-0237a9b88.dmg",
+     "https://github.com/citron-neo/emulator/releases/download/2026-04-27/"
+     "Citron-macOS-nightly-0237a9b88.dmg",
+     50_000_000, ""),
+    ("desmume-0.9.13-macOS.dmg",
+     "https://github.com/TASEmulators/desmume/releases/download/"
+     "release_0_9_13/desmume-0.9.13-macOS.dmg",
+     8_000_000, ""),
+)
+
+
+def garantir_mac() -> Path:
+    """Baixa (uma vez) os arquivos oficiais do Mac p/ .cache/mac/."""
+    import hashlib
+    import urllib.request
+    MAC_CACHE.mkdir(parents=True, exist_ok=True)
+    for nome, url, minimo, sha in MAC_ARQS:
+        dest = MAC_CACHE / nome
+        if dest.is_file() and dest.stat().st_size > minimo:
+            print(f"[cache] {nome} ({dest.stat().st_size // 1048576} MB)")
+            continue
+        print(f"[baixar] {nome}")
+        req = urllib.request.Request(url, headers={"User-Agent": "tucoteca-hub"})
+        with urllib.request.urlopen(req, timeout=300) as r, open(dest, "wb") as f:
+            h = hashlib.sha256()
+            while True:
+                bloco = r.read(1024 * 256)
+                if not bloco:
+                    break
+                f.write(bloco)
+                h.update(bloco)
+        if dest.stat().st_size < minimo:
+            dest.unlink(missing_ok=True)
+            raise SystemExit(f"{nome} veio pequeno demais (link quebrou?)")
+        if sha and h.hexdigest() != sha:
+            dest.unlink(missing_ok=True)
+            raise SystemExit(f"{nome}: sha256 divergente (descartado)")
+        print(f"[ok] {nome} ({dest.stat().st_size // 1048576} MB)")
+    return MAC_CACHE
 
 COMMAND_LAUNCHER = """#!/bin/sh
 # TucoTeca (instalada no Mac) — duplo-clique abre a GUI.
@@ -34,29 +94,73 @@ exec python3 "$HUB/app/app_win.py" "$@"
 """
 
 INSTALADOR = """#!/bin/sh
-# Instala a TucoTeca no Mac (Fase 0: ROMs 3DS/NDS, GUI tkinter).
-# Precisa do Python 3.10+ com tkinter (python.org ou brew install python-tk).
+# TucoTeca no Mac — instalador 100% offline (Python + 3 emuladores inclusos).
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 DEST="$HOME/Applications/TucoTeca"
-command -v python3 >/dev/null || { echo "ERRO: instale o Python 3.10+ primeiro."; exit 1; }
-python3 -c 'import tkinter' 2>/dev/null || {
-  echo "[aviso] sem tkinter: instale o Python do python.org (o da App Store não traz Tk)."
+falha() { echo "ERRO: $1" >&2; exit 1; }
+[ -d "$AQUI" ] || falha "pasta do instalador sumiu."
+
+# 1. Python 3.10+ com tkinter (python.org; o da App Store não traz Tk)
+if ! python3 -c 'import sys,tkinter; assert sys.version_info>=(3,10)' 2>/dev/null; then
+  echo "[hub] instalando o Python oficial (precisa da sua senha, uma vez só)..."
+  open "$AQUI"/python-3.14.7-macos11.pkg || falha "não abri o pkg do Python."
+  echo "Termine a instalação do Python e rode este instalador de novo."
+  exit 0
+fi
+
+# 2. App (código do Hub)
+mkdir -p "$DEST" || falha "não criei $DEST."
+tar -xJf "$AQUI/PAYLOAD" -C "$DEST" || falha "extração do app falhou."
+HUB="$DEST/tucoteca"
+
+# 3. Emuladores (.app oficiais, sem modificação)
+deszipar() { # $1=zip $2=destino $3=versao-arq $4=versao
+  rm -rf "$2" && mkdir -p "$2"
+  unzip -q -o "$1" -d "$2/.zip" || return 1
+  APP="$(find "$2/.zip" -maxdepth 2 -name '*.app' | head -n 1)"
+  [ -n "$APP" ] || return 1
+  mv "$APP" "$2/" && rm -rf "$2/.zip"
+  echo "$4" > "$2/$3"
 }
-mkdir -p "$DEST" || { echo "ERRO: não criei $DEST."; exit 1; }
-tar -xJf "$AQUI/PAYLOAD" -C "$DEST" || { echo "ERRO: extração falhou."; exit 1; }
-chmod +x "$DEST"/tucoteca/BibliotecaHubMac.command
-echo "[ok] TucoTeca instalada em $DEST/tucoteca"
+montar_dmg() { # $1=dmg $2=destino $3=versao-arq $4=versao
+  rm -rf "$2" && mkdir -p "$2"
+  MNT="$(mktemp -d /tmp/tuco.XXXXXX)" || return 1
+  hdiutil attach -nobrowse -mountpoint "$MNT" "$1" >/dev/null || return 1
+  APP="$(find "$MNT" -maxdepth 2 -name '*.app' | head -n 1)"
+  [ -n "$APP" ] && cp -R "$APP" "$2/"
+  hdiutil detach "$MNT" >/dev/null
+  rmdir "$MNT" 2>/dev/null
+  [ -d "$2"/*.app ] || return 1
+  echo "$4" > "$2/$3"
+}
+deszipar "$AQUI"/azahar-macos-universal-*.zip "$HUB/emuladores/Azahar" \
+  versao-azahar.txt 2126.1.2 || falha "Azahar não instalou."
+mkdir -p "$HUB/emuladores/Azahar/user"
+montar_dmg "$AQUI"/Citron-macOS-*.dmg "$HUB/emuladores/Citron" \
+  versao-citron.txt 2026-04-27 || echo "[aviso] Citron não instalou (use o botão ⬇ do app)."
+mkdir -p "$HUB/emuladores/Citron/user"
+montar_dmg "$AQUI"/desmume-*.dmg "$HUB/emuladores/DeSmuME" \
+  desmume-versao.txt release_0_9_13 || echo "[aviso] DeSmuME não instalou (use o botão ⬇ do app)."
+
+chmod +x "$HUB/BibliotecaHubMac.command"
+xattr -dr com.apple.quarantine "$HUB/emuladores" 2>/dev/null
+echo "[ok] TucoTeca instalada em $HUB"
 echo "     abrir: duplo-clique em BibliotecaHubMac.command"
+echo "     (1ª vez: clique direito > Abrir, por causa do Gatekeeper)"
 exit 0
 """
 
-LEIAME_MAC = """TucoTeca no Mac (Fase 0 — experimental).
+LEIAME_MAC = """TucoTeca no Mac (experimental — ainda não testado num Mac real).
 
+INSTALAÇÃO (tudo offline, nesta pasta):
 1. Duplo-clique em Instalar-Mac.command (1ª vez: clique direito > Abrir).
-2. Precisa do Python 3.10+ com tkinter: baixe em python.org.
-3. Por enquanto: só ROMs 3DS/NDS (Azahar/Citron de Mac ainda não embutidos;
-   use o botão ⬇ do app depois, ou aponte p/ o seu emulador).
+2. Ele pede o Python oficial se faltar (pkg incluído: python-3.14.7;
+   tem o 3.10.11 p/ macs mais velhos — troque o nome no instalador).
+3. Emuladores oficiais inclusos: Azahar 2126.1.2 (3DS), Citron
+   (Switch, nightly 2026-04-27), DeSmuME 0.9.13 (NDS).
 4. A coleção fica em ~/Applications/TucoTeca/tucoteca/dados.
+
+ATUALIZAR DEPOIS: botão ⬇ dentro do app (baixa build oficial sozinho).
 """
 
 
@@ -95,15 +199,29 @@ def montar_base_mac(trab: Path | None = None) -> tuple[Path, dict]:
     return base, {"data": data}
 
 
+MAC_NAVIO = ("python-3.14.7-macos11.pkg", "python-3.10.11-macos11.pkg",
+               "azahar-macos-universal-2126.1.2.zip",
+               "Citron-macOS-nightly-0237a9b88.dmg", "desmume-0.9.13-macOS.dmg")
+
+
 def empacotar_mac(build: Path, data: str) -> tuple[Path, Path]:
-    """Gera (payload .tar.xz, Instalar-Mac.command) em dist/mac/."""
+    """Monta dist/mac/ profissional: payload + Python + 3 emuladores.
+
+    Retorna (payload .tar.xz, Instalar-Mac.command). O Azahar antigo fica
+    só no cache (fallback manual); o resto viaja junto (100% offline).
+    """
+    cache = garantir_mac()
     pasta = DIST / "mac"
-    pasta.mkdir(parents=True, exist_ok=True)
+    if pasta.exists():
+        shutil.rmtree(pasta)
+    pasta.mkdir(parents=True)
     payload = pasta / f"tucoteca-mac-{data}.tar.xz"
     with tarfile.open(payload, "w:xz", preset=6,
                       format=tarfile.PAX_FORMAT) as t:
         for arq in sorted(build.parent.rglob("*")):
             t.add(arq, arq.relative_to(build.parent), recursive=False)
+    for nome in MAC_NAVIO:
+        shutil.copy2(cache / nome, pasta / nome)
     inst = pasta / "Instalar-Mac.command"
     inst.write_text(INSTALADOR.replace("PAYLOAD", payload.name),
                     encoding="utf-8")
@@ -112,7 +230,8 @@ def empacotar_mac(build: Path, data: str) -> tuple[Path, Path]:
         os.chmod(inst, 0o755)
     except OSError:
         pass
-    print(f"[ok] {payload.name} — {payload.stat().st_size / 1048576:.1f} MB")
+    mb = sum(f.stat().st_size for f in pasta.rglob("*") if f.is_file()) / 1048576
+    print(f"[ok] mac/ com {len(MAC_NAVIO)} oficiais ({mb:.0f} MB)")
     return payload, inst
 
 

@@ -90,13 +90,20 @@ def montar_iss() -> str:
 def teste_mac_payload_e_instalador():
     import montar_mac as MM
     tmp = Path(tempfile.mkdtemp(prefix="suite-inst-"))
-    velho, MM.DIST = MM.DIST, tmp / "dist"
+    cache = tmp / "cache"
+    cache.mkdir()
+    (cache / "f.bin").write_bytes(b"0" * 10)
+    velhos = (MM.DIST, MM.MAC_CACHE, MM.MAC_ARQS, MM.MAC_NAVIO)
+    MM.DIST = tmp / "dist"
+    MM.MAC_CACHE, MM.MAC_ARQS, MM.MAC_NAVIO = (
+        cache, (("f.bin", "http://x", 1, ""),), ("f.bin",))
     try:
         base, v = MM.montar_base_mac(tmp / "trab")
         payload, inst = MM.empacotar_mac(base, "20990101")
         afirmar(payload.is_file() and inst.is_file())
         afirmar(payload.name in inst.read_text(encoding="utf-8"),
                 "instalador não aponta o payload")
+        afirmar((MM.DIST / "mac" / "f.bin").is_file(), "oficial não embarcou")
         with tarfile.open(payload, "r:xz") as t:
             nomes = t.getnames()
         for alvo in ("tucoteca/VERSAO.txt",
@@ -104,7 +111,7 @@ def teste_mac_payload_e_instalador():
                      "tucoteca/app/app_win.py"):
             afirmar(alvo in nomes, nomes)
     finally:
-        MM.DIST = velho
+        MM.DIST, MM.MAC_CACHE, MM.MAC_ARQS, MM.MAC_NAVIO = velhos
 
 
 def teste_universal_junta_tres():

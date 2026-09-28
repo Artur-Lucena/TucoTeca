@@ -59,9 +59,9 @@ ol{margin:8px 0}li{margin:4px 0}.nota{color:#666;font-size:.9em}
 </div>
 <div class="card" id="c-mac">
 <h2>🍎 Mac (experimental)<span class="badge" id="b-mac" hidden>este computador</span></h2>
-<ol><li>Abra a pasta <b>mac</b></li>
-<li>Duplo-clique em <b>Instalar-Mac.command</b> (precisa do Python 3.10+ do python.org)</li></ol>
-<p class="nota">Fase 0: só ROMs 3DS/NDS, sem emulador embutido.</p>
+<ol><li>Abra a pasta <b>mac</b> (Python + 3 emuladores já dentro, offline)</li>
+<li>Duplo-clique em <b>Instalar-Mac.command</b> (1ª vez: clique direito > Abrir)</li></ol>
+<p class="nota">Ainda não testado num Mac real. Inclui Azahar (3DS), Citron (Switch) e DeSmuME (NDS).</p>
 </div>
 <p class="nota">Prefere portátil sem instalar? O .zip clássico de Windows continua saindo do montar_portatil.py.</p>
 <script>
@@ -115,9 +115,7 @@ def montar(sem_zip: bool = False) -> Path:
         (uni / "linux").mkdir(parents=True)
         shutil.copy2(run, uni / "linux" / run.name)
     payload_mac, inst_mac = montar_mac()
-    (uni / "mac").mkdir(parents=True)
-    for arq in (payload_mac, inst_mac, payload_mac.parent / "LEIA-ME-MAC.txt"):
-        shutil.copy2(arq, uni / "mac" / arq.name)
+    shutil.copytree(payload_mac.parent, uni / "mac")
     (uni / "INSTALAR.html").write_text(
         HTML.replace("__VERSAO__", data)
         .replace("__EXE__", exe.name if exe else "TucoTeca-Setup-*.exe")
