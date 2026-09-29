@@ -716,7 +716,8 @@ class Tui:
     def menu_principal(self) -> bool:
         """ESC na lista abre as categorias; retorna True se é para sair."""
         opcoes = ["Buscar", "Filtros", "Adicionar jogo", "Importar",
-                  "Músicas", "Backup e saves", "Sessão", "Emuladores", "Sair"]
+                  "Músicas", "Controles", "Backup e saves", "Sessão",
+                  "Emuladores", "Sair"]
         while True:
             idx = self.escolher("TucoTeca", opcoes)
             if idx is None:
@@ -736,6 +737,8 @@ class Tui:
                 self.menu_importar()
             elif escolha == "Músicas":
                 self.menu_musicas()
+            elif escolha == "Controles":
+                self.menu_controles()
             elif escolha == "Backup e saves":
                 self.menu_backup()
             elif escolha == "Sessão":
@@ -811,6 +814,104 @@ class Tui:
                                     self.msg = f"Falha: {e}"
         finally:
             con.close()
+
+    def menu_controles(self):
+        """Controles no Hub: listar, testar, fotografar, aplicar, gerar."""
+        import time
+        while True:
+            try:
+                pads = core.listar_controles()
+            except Exception:
+                pads = []
+            try:
+                presets = core.listar_presets_controle()
+            except Exception:
+                presets = []
+            info = "; ".join(
+                f"{p.get('nome') or '?'}"
+                f"{' [' + p['familia'] + ']' if p.get('familia') else ''}"
+                for p in pads) or "nenhum controle"
+            opcoes = [f"Pads: {info}", "Testar apertos (5s)…",
+                      "Fotografar perfil do Azahar…", "Aplicar preset…",
+                      "Gerar mapa padrão…", "Voltar"]
+            idx = self.escolher("Controles (feche o Azahar p/ aplicar)",
+                                opcoes)
+            if idx is None or opcoes[idx] == "Voltar":
+                self.recarregar()
+                return
+            escolha = opcoes[idx]
+            if escolha.startswith("Pads:"):
+                continue
+            if escolha.startswith("Testar"):
+                vistos: set[str] = set()
+                t0 = time.monotonic()
+                while time.monotonic() - t0 < 5:
+                    try:
+                        est = core.ler_estado_xinput(0)
+                    except Exception:
+                        est = None
+                    if est:
+                        try:
+                            vistos.add(core.resumir_estado(est))
+                        except Exception:
+                            pass
+                    time.sleep(0.1)
+                vistos.discard("(neutro)")
+                self.msg = ("Vistos: " + " | ".join(sorted(vistos))
+                            if vistos else "Nada apertado (XInput slot 0).")
+            elif escolha.startswith("Fotografar"):
+                nome = self.perguntar("Nome do preset: ")
+                if not nome:
+                    continue
+                try:
+                    res = core.fotografar_perfil(nome.strip())
+                except Exception as e:
+                    res = {"ok": False, "erro": str(e)}
+                self.msg = (f"Preset {res['preset']} ✓" if res.get("ok")
+                            else f"Falha: {res.get('erro')}")
+            elif escolha.startswith("Aplicar"):
+                if not presets:
+                    self.msg = "Sem presets (fotografe ou gere um)."
+                    continue
+                idx2 = self.escolher("Aplicar", presets + ["Voltar"])
+                if idx2 is None or idx2 >= len(presets):
+                    continue
+                try:
+                    res = core.aplicar_preset_controle(presets[idx2])
+                except Exception as e:
+                    res = {"ok": False, "erro": str(e)}
+                self.msg = (f"{res.get('chaves', 0)} binds no Azahar ✓"
+                            if res.get("ok")
+                            else f"Falha: {res.get('erro')}")
+            elif escolha.startswith("Gerar"):
+                try:
+                    tipos = sorted(core.NOMES_TIPO.items())
+                except Exception:
+                    continue
+                rot = [f"{t} — {core.NOMES_TIPO[t]}" for t, _ in tipos]
+                idx2 = self.escolher("Tipo", rot + ["Voltar"])
+                if idx2 is None or idx2 >= len(tipos):
+                    continue
+                tipo = tipos[idx2][0]
+                guid, port, rotulos = "", 0, {}
+                try:
+                    det = core.detectar_sdl()
+                    if det:
+                        guid, port = det[0]["guid"], det[0]["port"]
+                    rotulos = core.nomes_sdl()
+                except Exception:
+                    pass
+                try:
+                    res = core.salvar_mapa_gerado(
+                        tipo, guid=guid, port=port, nome=f"{tipo}-hub",
+                        rotulos=rotulos)
+                except ValueError as e:
+                    res = {"ok": False, "erro": str(e)}
+                if not res.get("ok"):
+                    self.msg = f"Falha: {res.get('erro')}"
+                    continue
+                self.msg = (f"Preset {res['preset']} ✓ "
+                            f"({res['chaves']} binds) — aplique p/ usar.")
 
     def menu_filtros(self):
         while True:

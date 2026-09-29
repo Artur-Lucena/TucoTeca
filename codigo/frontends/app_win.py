@@ -2066,6 +2066,10 @@ class App:
                             ("📥 Importar músicas…", self.importar_musicas)):
             ttk.Button(fr_mus, text=rotulo, command=cmd).pack(
                 fill="x", padx=4, pady=3)
+        fr_ctl = secao("Controles")
+        for rotulo, cmd in (("🎮 Controles…", self._janela_controles),):
+            ttk.Button(fr_ctl, text=rotulo, command=cmd).pack(
+                fill="x", padx=4, pady=3)
         ttk.Button(dlg, text="Fechar", command=dlg.destroy).pack(pady=14)
 
     def _depois(self, fn):
@@ -2188,6 +2192,201 @@ class App:
         ttk.Button(fr_btn, text="Excluir", command=excluir).pack(side="left")
         ttk.Button(fr_btn, text="Fechar",
                    command=win.destroy).pack(side="right")
+
+    # -- controles (configura no Hub, aplica no Azahar fechado)
+    def _janela_controles(self):
+        win_ant = getattr(self, "_win_controles", None)
+        try:
+            if win_ant is not None and win_ant.winfo_exists():
+                win_ant.lift()
+                win_ant.focus_force()
+                return
+        except tk.TclError:
+            pass
+        win = tk.Toplevel(self.root)
+        self._win_controles = win
+        _titulo_escuro(win)
+        win.title("Controles (feche o Azahar p/ aplicar)")
+        win.transient(self.root)
+        filhas = []
+
+        def fechar_tudo():
+            for vw in list(filhas):
+                try:
+                    vw.destroy()
+                except tk.TclError:
+                    pass
+            filhas.clear()
+            try:
+                win.destroy()
+            except tk.TclError:
+                pass
+            self._win_controles = None
+        win.protocol("WM_DELETE_WINDOW", fechar_tudo)
+        fr = ttk.Frame(win, padding=12)
+        fr.pack(fill="both", expand=True)
+        try:
+            pads = core.listar_controles()
+        except Exception:
+            pads = []
+        txt_pads = "; ".join(
+            f"{p.get('nome') or '?'}"
+            f"{' [' + p['familia'] + ']' if p.get('familia') else ''}"
+            for p in pads) or "nenhum controle"
+        ttk.Label(fr, text=f"Pads: {txt_pads}",
+                  font=("Segoe UI", 11)).pack(anchor="w")
+        lst = tk.Listbox(fr, selectmode="single", width=52, height=8,
+                         bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                         font=("Segoe UI", 11))
+        lst.pack(fill="both", expand=True, pady=(8, 0))
+
+        def redesenhar():
+            try:
+                nomes = core.listar_presets_controle()
+            except Exception:
+                nomes = []
+            lst.delete(0, "end")
+            for nome in nomes:
+                lst.insert("end", nome)
+            return nomes
+
+        def selecionado():
+            sel = lst.curselection()
+            nomes = redesenhar()
+            if not sel or sel[0] >= len(nomes):
+                return ""
+            return nomes[sel[0]]
+
+        def fotografar():
+            nome = simpledialog.askstring("Controles", "Nome do preset:",
+                                          parent=win)
+            if not nome:
+                return
+            try:
+                r = core.fotografar_perfil(nome.strip())
+            except Exception as e:
+                messagebox.showwarning("Controles", f"falha: {e}")
+                return
+            if not r.get("ok"):
+                messagebox.showwarning("Controles", r.get("erro", "falha"))
+                return
+            redesenhar()
+
+        def aplicar():
+            nome = selecionado()
+            if not nome:
+                return
+            try:
+                r = core.aplicar_preset_controle(nome)
+            except Exception as e:
+                messagebox.showwarning("Controles", f"falha: {e}")
+                return
+            if not r.get("ok"):
+                messagebox.showwarning("Controles", r.get("erro", "falha"))
+                return
+            messagebox.showinfo(
+                "Controles",
+                f"{r.get('chaves', 0)} binds no Azahar ✓")
+
+        def gerar():
+            tipos = sorted(core.NOMES_TIPO)
+            win2 = tk.Toplevel(win)
+            _titulo_escuro(win2)
+            win2.title("Gerar mapa padrão")
+            win2.transient(win)
+            win2.grab_set()
+            lb = tk.Listbox(win2, selectmode="single", width=40, height=6,
+                            bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                            font=("Segoe UI", 11))
+            lb.pack(fill="both", expand=True, padx=12, pady=12)
+            for t in tipos:
+                lb.insert("end", f"{t} — {core.NOMES_TIPO[t]}")
+
+            def ok():
+                sel = lb.curselection()
+                if not sel:
+                    return
+                tipo = tipos[sel[0]]
+                guid, port, rot = "", 0, {}
+                try:
+                    det = core.detectar_sdl()
+                    if det:
+                        guid, port = det[0]["guid"], det[0]["port"]
+                    rot = core.nomes_sdl()
+                except Exception:
+                    pass
+                try:
+                    r = core.salvar_mapa_gerado(
+                        tipo, guid=guid, port=port, nome=f"{tipo}-hub",
+                        rotulos=rot)
+                except ValueError as e:
+                    messagebox.showwarning("Controles", str(e))
+                    return
+                if not r.get("ok"):
+                    messagebox.showwarning(
+                        "Controles", r.get("erro", "falha"))
+                    return
+                win2.destroy()
+                redesenhar()
+                messagebox.showinfo(
+                    "Controles",
+                    f"Preset {r['preset']} ✓ — aplique p/ usar.")
+
+            ttk.Button(win2, text="Gerar",
+                       command=ok).pack(pady=(0, 12))
+
+        def testar():
+            vw = tk.Toplevel(win)
+            _titulo_escuro(vw)
+            vw.title("Testar (aperte botões/mexa sticks)")
+            vw.transient(win)
+            filhas.append(vw)
+            lbl = ttk.Label(vw, text="—", font=("Consolas", 14))
+            lbl.pack(padx=20, pady=20)
+            vivo = {"ok": True}
+
+            def ciclo():
+                if not vivo["ok"]:
+                    return
+                try:
+                    est = core.ler_estado_xinput(0)
+                    lbl.configure(text=core.resumir_estado(est))
+                except tk.TclError:
+                    vivo["ok"] = False
+                    return
+                except Exception:
+                    pass
+                try:
+                    vw.after(120, ciclo)
+                except tk.TclError:
+                    vivo["ok"] = False
+
+            def fechar():
+                vivo["ok"] = False
+                try:
+                    filhas.remove(vw)
+                except ValueError:
+                    pass
+                try:
+                    vw.destroy()
+                except tk.TclError:
+                    pass
+            vw.protocol("WM_DELETE_WINDOW", fechar)
+            ciclo()
+
+        redesenhar()
+        fr_btn = ttk.Frame(fr)
+        fr_btn.pack(fill="x", pady=(10, 0))
+        ttk.Button(fr_btn, text="Fotografar…",
+                   command=fotografar).pack(side="left")
+        ttk.Button(fr_btn, text="Aplicar",
+                   command=aplicar).pack(side="left", padx=6)
+        ttk.Button(fr_btn, text="Gerar…",
+                   command=gerar).pack(side="left")
+        ttk.Button(fr_btn, text="Testar…",
+                   command=testar).pack(side="left", padx=6)
+        ttk.Button(fr_btn, text="Fechar",
+                   command=fechar_tudo).pack(side="right")
 
     def atualizar_azahar(self):
         self.atualizar_emu("azahar")

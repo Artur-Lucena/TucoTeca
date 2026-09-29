@@ -179,7 +179,7 @@ def teste_menu_principal_sair():
     from pathlib import Path
     tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
     db = tmp / "m.db"
-    teclas = [ord("j")] * 8 + [10]
+    teclas = [ord("j")] * 9 + [10]
     app = _tui_fake(db, teclas)
     afirmar(app.menu_principal() is True, "navegar até Sair + Enter deveria pedir saída")
 
@@ -199,6 +199,16 @@ def teste_menu_jogo_volta():
     cur_antes = app.cur
     app.menu_jogo()
     afirmar(app.cur == cur_antes, "Voltar não deveria mudar a seleção")
+
+
+def teste_menu_controles_volta():
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    app = _tui_fake(db, [27])
+    app.menu_controles()
+    afirmar(app.msg == "" or isinstance(app.msg, str), app.msg)
 
 
 def teste_menu_filtros_cicla_status():

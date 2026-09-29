@@ -6,8 +6,8 @@
   (outros — darwin-safe: nenhum import win32 no topo).
 - Gera o perfil `[Controls]` do Azahar com binds `engine:sdl` (GUIDs
   verificados no SDL_GameControllerDB) + fotografa/aplica presets Hub em
-  `dados/presets/controles/`. Azahar lê no boot — aplique com ele fechado
-  (o play do Hub aplica sozinho, como os presets gráficos).
+  `dados/presets/controles/`. Aplique com o Azahar fechado (ele lê no boot
+  e reescreve o arquivo ao sair).
 - Testa apertos por polling (viewer), sem rede, stdlib só.
 """
 from __future__ import annotations
@@ -19,7 +19,8 @@ import sys
 import time
 from pathlib import Path
 
-# GUIDs SDL verificados (gamecontrollerdb, platform Windows).
+# GUIDs SDL de fallback (gamecontrollerdb; o guid REAL varia por sistema —
+# use `detectar_sdl()`, que lê o guid gravado pelo próprio Azahar).
 GUIDS = {
     "xbox360": "030000005e0400008e02000000000000",
     "xboxone": "030000005e040000d102000000000000",
@@ -36,131 +37,234 @@ NOMES_TIPO = {
     "switchpro": "Switch Pro",
 }
 
-# 3DS <- pad (posicional: B=baixo, A=direita, Y=esquerda, X=cima).
-# ("btn", i) | ("eixo", i, "+/-") | ("chapeu", 0, "up/down/left/right").
+# 3DS <- pad (posicional; índices = enum SDL_GameControllerButton, uniforme
+# nas 3 famílias via mapeamento padrão do SDL). Gatilhos variam por família.
+# ("btn", indice, "Rótulo") | ("eixo", indice, "+/-", "Rótulo").
 MAPAS = {
-    "xbox360": {"button_b": ("btn", 0), "button_a": ("btn", 1),
-                "button_y": ("btn", 2), "button_x": ("btn", 3),
-                "button_l": ("btn", 4), "button_r": ("btn", 5),
-                "button_zl": ("eixo", 2, "+"), "button_zr": ("eixo", 2, "-"),
-                "button_start": ("btn", 7), "button_select": ("btn", 6),
-                "button_home": ("btn", 5),
-                "dpad": ("chapeu", 0), "analog_esq": (0, 1),
-                "analog_dir": (3, 4)},
-    "xboxone": {"button_b": ("btn", 0), "button_a": ("btn", 1),
-                "button_y": ("btn", 2), "button_x": ("btn", 3),
-                "button_l": ("btn", 4), "button_r": ("btn", 5),
-                "button_zl": ("eixo", 2, "+"), "button_zr": ("eixo", 5, "+"),
-                "button_start": ("btn", 7), "button_select": ("btn", 6),
-                "button_home": ("btn", 5),
-                "dpad": ("chapeu", 0), "analog_esq": (0, 1),
-                "analog_dir": (3, 4)},
-    "ps4": {"button_b": ("btn", 1), "button_a": ("btn", 2),
-            "button_y": ("btn", 0), "button_x": ("btn", 3),
-            "button_l": ("btn", 4), "button_r": ("btn", 5),
-            "button_zl": ("eixo", 3, "+"), "button_zr": ("eixo", 4, "+"),
-            "button_start": ("btn", 9), "button_select": ("btn", 8),
-            "button_home": ("btn", 12),
-            "dpad": ("chapeu", 0), "analog_esq": (0, 1),
-            "analog_dir": (2, 5)},
-    "dualsense": {"button_b": ("btn", 1), "button_a": ("btn", 2),
-                  "button_y": ("btn", 0), "button_x": ("btn", 3),
-                  "button_l": ("btn", 4), "button_r": ("btn", 5),
-                  "button_zl": ("eixo", 3, "+"),
-                  "button_zr": ("eixo", 4, "+"),
-                  "button_start": ("btn", 9), "button_select": ("btn", 8),
-                  "button_home": ("btn", 12),
-                  "dpad": ("chapeu", 0), "analog_esq": (0, 1),
-                  "analog_dir": (2, 5)},
-    "switchpro": {"button_b": ("btn", 0), "button_a": ("btn", 1),
-                  "button_y": ("btn", 2), "button_x": ("btn", 3),
-                  "button_l": ("btn", 4), "button_r": ("btn", 5),
-                  "button_zl": ("btn", 6), "button_zr": ("btn", 7),
-                  "button_start": ("btn", 9), "button_select": ("btn", 8),
-                  "button_home": ("btn", 12),
-                  "dpad": ("chapeu", 0), "analog_esq": (0, 1),
-                  "analog_dir": (2, 3)},
+    "xbox360": {"button_b": ("btn", 0, "A"), "button_a": ("btn", 1, "B"),
+                "button_y": ("btn", 2, "X"), "button_x": ("btn", 3, "Y"),
+                "button_l": ("btn", 9, "LB"), "button_r": ("btn", 10, "RB"),
+                "button_zl": ("eixo", 2, "+", "Left Trigger"),
+                "button_zr": ("eixo", 2, "-", "Right Trigger"),
+                "button_start": ("btn", 6, "Start"),
+                "button_select": ("btn", 4, "Back/Select"),
+                "button_home": ("btn", 5, "Guide/Home")},
+    "xboxone": {"button_b": ("btn", 0, "A"), "button_a": ("btn", 1, "B"),
+                "button_y": ("btn", 2, "X"), "button_x": ("btn", 3, "Y"),
+                "button_l": ("btn", 9, "LB"), "button_r": ("btn", 10, "RB"),
+                "button_zl": ("eixo", 2, "+", "Left Trigger"),
+                "button_zr": ("eixo", 5, "+", "Right Trigger"),
+                "button_start": ("btn", 6, "Start"),
+                "button_select": ("btn", 4, "Back/Select"),
+                "button_home": ("btn", 5, "Guide/Home")},
+    "ps4": {"button_b": ("btn", 1, "Cross"), "button_a": ("btn", 2, "Circle"),
+            "button_y": ("btn", 0, "Square"),
+            "button_x": ("btn", 3, "Triangle"),
+            "button_l": ("btn", 9, "L1"), "button_r": ("btn", 10, "R1"),
+            "button_zl": ("eixo", 3, "+", "L2"),
+            "button_zr": ("eixo", 4, "+", "R2"),
+            "button_start": ("btn", 9, "Options"),
+            "button_select": ("btn", 8, "Share"),
+            "button_home": ("btn", 12, "PS")},
+    "dualsense": {"button_b": ("btn", 1, "Cross"),
+                  "button_a": ("btn", 2, "Circle"),
+                  "button_y": ("btn", 0, "Square"),
+                  "button_x": ("btn", 3, "Triangle"),
+                  "button_l": ("btn", 9, "L1"),
+                  "button_r": ("btn", 10, "R1"),
+                  "button_zl": ("eixo", 3, "+", "L2"),
+                  "button_zr": ("eixo", 4, "+", "R2"),
+                  "button_start": ("btn", 9, "Options"),
+                  "button_select": ("btn", 8, "Create"),
+                  "button_home": ("btn", 12, "PS")},
+    "switchpro": {"button_b": ("btn", 0, "B"), "button_a": ("btn", 1, "A"),
+                  "button_y": ("btn", 2, "Y"), "button_x": ("btn", 3, "X"),
+                  "button_l": ("btn", 9, "L"),
+                  "button_r": ("btn", 10, "R"),
+                  "button_zl": ("btn", 6, "ZL"),
+                  "button_zr": ("btn", 7, "ZR"),
+                  "button_start": ("btn", 9, "+"),
+                  "button_select": ("btn", 8, "-"),
+                  "button_home": ("btn", 12, "Home")},
 }
+
+# DPad e sticks: idênticos nas 3 famílias (padrão SDL).
+DPAD = {"button_up": ("btn", 11, "D-Pad Up"),
+        "button_down": ("btn", 12, "D-Pad Down"),
+        "button_left": ("btn", 13, "D-Pad Left"),
+        "button_right": ("btn", 14, "D-Pad Right")}
+STICK_ESQ = (0, 1, "Left Stick X", "Left Stick Y")
+STICK_DIR = (2, 3, "Right Stick X", "Right Stick Y")
 
 BOTOES_3DS = ("button_a", "button_b", "button_x", "button_y", "button_l",
               "button_r", "button_zl", "button_zr", "button_start",
               "button_select", "button_home")
-
-DIRECOES = (("up", "-y"), ("down", "+y"), ("left", "-x"), ("right", "+x"))
-
-
-def _escapar(texto: str) -> str:
-    """Escape ParamPackage aninhado (`$`->`$0`, `:`->`$`, `,`->`$1`).
-
-    Confirmado nos inis do próprio Azahar (`modifier:code$068$1engine...`
-    = `{code:68, engine:keyboard}`).
-    """
-    return texto.replace("$", "$0").replace(":", "$").replace(",", "$1")
 
 
 def _serializar(pares: list[tuple[str, str]]) -> str:
     return ",".join(f"{k}:{v}" for k, v in pares)
 
 
-def bind_botao(guid: str, port: int, spec: tuple) -> str:
-    """Bind digital/hat/eixo no formato `engine:sdl` do Azahar."""
-    if spec[0] == "btn":
-        return _serializar([("button", str(spec[1])), ("engine", "sdl"),
-                            ("guid", guid), ("port", str(port))])
-    if spec[0] == "eixo":
-        return _serializar([("axis", str(spec[1])),
-                            ("direction", spec[2]), ("engine", "sdl"),
-                            ("guid", guid), ("port", str(port)),
-                            ("threshold", "0.5")])
-    if spec[0] == "chapeu":
-        return _serializar([("direction", spec[2]), ("engine", "sdl"),
-                            ("guid", guid), ("hat", str(spec[1])),
-                            ("port", str(port))])
-    raise ValueError(f"spec inválida: {spec!r}")
+def bind_botao(guid: str, port: int, indice: int, rotulo: str) -> str:
+    """Bind digital no formato exato do Azahar 2126 (amostra real)."""
+    return _serializar([("api", "controller"), ("button", str(indice)),
+                        ("engine", "sdl"), ("guid", guid),
+                        ("maptype", "guid+port"), ("name", rotulo),
+                        ("port", str(port))])
 
 
-def bind_analogico(guid: str, port: int, eixo_x: int, eixo_y: int) -> str:
-    """Analog real como 4 sub-binds (padrão `SetAnalogButton` do Azahar)."""
-    subs = []
-    for nome, par in (("up", (eixo_y, "-")), ("down", (eixo_y, "+")),
-                      ("left", (eixo_x, "-")), ("right", (eixo_x, "+"))):
-        subs.append((nome, _escapar(_serializar(
-            [("axis", str(par[0])), ("direction", par[1]),
-             ("engine", "sdl"), ("guid", guid), ("port", str(port)),
-             ("threshold", "0.5")]))))
-    return _serializar([("engine", "analog_from_button")] + subs
-                       + [("deadzone", "0.15"), ("modifier_scale", "0.5")])
+def bind_eixo(guid: str, port: int, eixo: int, direcao: str,
+              rotulo: str) -> str:
+    """Gatilho analógico como botão (ex.: ZL/ZR)."""
+    return _serializar([("api", "controller"), ("axis", str(eixo)),
+                        ("direction", direcao), ("engine", "sdl"),
+                        ("guid", guid), ("maptype", "guid+port"),
+                        ("name", rotulo), ("port", str(port)),
+                        ("threshold", "0.500000")])
 
 
-def gerar_perfil(tipo: str, guid: str = "", port: int = 0) -> dict:
+def bind_analogico(guid: str, port: int, eixo_x: int, eixo_y: int,
+                   rotulo_x: str, rotulo_y: str) -> str:
+    """Stick real, plano (sem sub-binds aninhados — amostra real)."""
+    return _serializar([("api", "controller"), ("axis_x", str(eixo_x)),
+                        ("axis_y", str(eixo_y)), ("deadzone", "0.100000"),
+                        ("engine", "sdl"), ("guid", guid),
+                        ("maptype", "guid+port"), ("name_x", rotulo_x),
+                        ("name_y", rotulo_y), ("port", str(port))])
+
+
+def gerar_perfil(tipo: str, guid: str = "", port: int = 0,
+                 rotulos: dict | None = None) -> dict:
     """Mapa 3DS completo p/ chaves `profiles\\1\\*` do ini (puro, testável).
 
-    EXPERIMENTAL: GUIDs/índices verificados no SDL_GameControllerDB, mas o
-    Azahar 2126 resetou binds `engine:sdl` de teste p/ teclado em 5 boots
-    (detalhe no `.md`). Fluxo confiável hoje: mapear 1x no Azahar e usar
-    `fotografar_perfil()` — o gerador serve de ponto de partida/inspeção.
+    Calibrado com amostra real do Azahar 2126 (perfil fotografado).
+    `guid` vazio = fallback da tabela (prefira o `detectar_sdl()`).
+    `rotulos` = {(kind, idx[, dir]): nome} do `nomes_sdl()`; sem ele valem
+    os genéricos (o Azahar pode ignorar nomes desconhecidos).
     """
     if tipo not in MAPAS:
         raise ValueError(f"tipo desconhecido: {tipo}")
     guid = guid or GUIDS[tipo]
+    rotulos = rotulos or {}
     mapa = MAPAS[tipo]
+
+    def rot(kind, *a, padrao):
+        return rotulos.get((kind, *a), padrao)
+
     perfil = {}
     for chave in BOTOES_3DS:
-        perfil[f"profiles\\1\\{chave}"] = bind_botao(guid, port, mapa[chave])
-    hat = mapa["dpad"][1]
-    perfil["profiles\\1\\button_up"] = bind_botao(
-        guid, port, ("chapeu", hat, "up"))
-    perfil["profiles\\1\\button_down"] = bind_botao(
-        guid, port, ("chapeu", hat, "down"))
-    perfil["profiles\\1\\button_left"] = bind_botao(
-        guid, port, ("chapeu", hat, "left"))
-    perfil["profiles\\1\\button_right"] = bind_botao(
-        guid, port, ("chapeu", hat, "right"))
-    ex, ey = mapa["analog_esq"]
-    dx, dy = mapa["analog_dir"]
-    perfil["profiles\\1\\circle_pad"] = bind_analogico(guid, port, ex, ey)
-    perfil["profiles\\1\\c_stick"] = bind_analogico(guid, port, dx, dy)
+        spec = mapa[chave]
+        if spec[0] == "btn":
+            perfil[f"profiles\\1\\{chave}"] = bind_botao(
+                guid, port, spec[1], rot("btn", spec[1], padrao=spec[2]))
+        else:
+            perfil[f"profiles\\1\\{chave}"] = bind_eixo(
+                guid, port, spec[1], spec[2],
+                rot("eixo", spec[1], spec[2], padrao=spec[3]))
+    for chave, spec in DPAD.items():
+        perfil[f"profiles\\1\\{chave}"] = bind_botao(
+            guid, port, spec[1], rot("btn", spec[1], padrao=spec[2]))
+    ex, ey, rx, ry = (*STICK_ESQ[:2], *STICK_DIR[:2])
+    perfil["profiles\\1\\circle_pad"] = bind_analogico(
+        guid, port, ex, ey,
+        rotulos.get(("stick", "x"), STICK_ESQ[2]),
+        rotulos.get(("stick", "y"), STICK_ESQ[3]))
+    perfil["profiles\\1\\c_stick"] = bind_analogico(
+        guid, port, rx, ry,
+        rotulos.get(("rstick", "x"), STICK_DIR[2]),
+        rotulos.get(("rstick", "y"), STICK_DIR[3]))
     return perfil
+
+
+def detectar_sdl() -> list[dict]:
+    """Dispositivos sdl já gravados nos perfis ([{guid, nome, port, perfil}]).
+
+    Fonte da verdade p/ gerar/aplicar (guid real do SDL, não da tabela).
+    """
+    import re as _re
+    ini, _ = _ler_controls()
+    out = []
+    if not ini.has_section("Controls"):
+        return out
+    for chave, valor in ini.items("Controls"):
+        m = _re.search(r"guid:([0-9a-fA-F]{32})", valor)
+        if not m or "engine:sdl" not in valor:
+            continue
+        mn = _re.search(r"name:([^,]+),port:(\d+)", valor)
+        if mn is None:
+            mn = _re.search(r"name_x:([^,]+),", valor)
+        prof = chave.split("\\")[0] if "\\" in chave else ""
+        item = {"guid": m.group(1).lower(),
+                "nome": mn.group(1) if mn else "",
+                "port": int(mn.group(2)) if mn and mn.lastindex == 2 else 0,
+                "perfil": prof}
+        if not any(o["guid"] == item["guid"] and o["port"] == item["port"]
+                   for o in out):
+            out.append(item)
+    return out
+
+
+def nomes_sdl() -> dict:
+    """Tabela {(tipo, indice[, dir]): rótulo} dos binds sdl live.
+
+    Rótulos reais do Azahar p/ o gerador (ex.: ('btn', 0) -> 'A / ?').
+    Vazio se nenhum bind sdl gravado.
+    """
+    import re as _re
+    ini, _ = _ler_controls()
+    tab: dict = {}
+    sticks = 0
+    if not ini.has_section("Controls"):
+        return tab
+    for _, valor in ini.items("Controls"):
+        if "engine:sdl" not in valor:
+            continue
+        v = valor.strip()
+        if len(v) >= 2 and v[0] == '"' and v[-1] == '"':
+            v = v[1:-1]
+        mn = _re.search(r"name:([^,]+),port:", v)
+        rot = mn.group(1) if mn else ""
+        mb = _re.search(r",button:(\d+),", v)
+        if mb and rot:
+            tab[("btn", int(mb.group(1)))] = rot
+            continue
+        ma = _re.search(r",axis:(\d+),direction:([+-]),", v)
+        if ma and rot:
+            tab[("eixo", int(ma.group(1)), ma.group(2))] = rot
+            continue
+        mx = _re.search(r"axis_x:(\d+),axis_y:(\d+)", v)
+        if mx:
+            prefixo = "stick" if sticks == 0 else "rstick"
+            sticks += 1
+            for suf, chave in (("name_x", "x"), ("name_y", "y")):
+                m2 = _re.search(rf"{suf}:([^,]+),", v)
+                if m2:
+                    tab[(prefixo, chave)] = m2.group(1)
+    return tab
+
+
+def perfil_ativo(ini: configparser.ConfigParser | None = None) -> int:
+    """Índice 0-based do perfil ativo (`profile`, padrão 0)."""
+    if ini is None:
+        ini, _ = _ler_controls()
+    try:
+        if ini.has_section("Controls") and ini.has_option("Controls",
+                                                           "profile"):
+            return max(0, int(ini.get("Controls", "profile")))
+    except (ValueError, configparser.Error):
+        pass
+    return 0
+
+
+def _prefixo_origem(novo: configparser.ConfigParser) -> str:
+    """Prefixo `profiles\\N\\` único do preset (padrão `profiles\\1\\`)."""
+    if novo.has_section("Controls"):
+        for k, _ in novo.items("Controls"):
+            partes = k.split("\\")
+            if len(partes) >= 3 and partes[0] == "profiles" \
+                    and partes[1].isdigit():
+                return f"profiles\\{partes[1]}\\"
+    return "profiles\\1\\"
 
 
 def _presets_dir() -> Path:
@@ -201,7 +305,7 @@ def ler_perfil_atual() -> dict:
 
 
 def fotografar_perfil(nome: str) -> dict:
-    """Guarda o `[Controls]` atual como preset Hub (molde salvar_preset)."""
+    """Guarda o perfil ATIVO como preset Hub (template `profiles\\1`)."""
     from bib_nucleo.base import slugify
     if not (nome or "").strip():
         return {"ok": False, "erro": "nome de preset vazio."}
@@ -210,12 +314,18 @@ def fotografar_perfil(nome: str) -> dict:
     if not ini.has_section("Controls"):
         return {"ok": False,
                 "erro": "config do Azahar não encontrada (abra-o uma vez)."}
+    origem = f"profiles\\{perfil_ativo(ini) + 1}\\"
     dest = _presets_dir() / f"{slug}.ini"
     foto = configparser.ConfigParser()
     foto.optionxform = str  # type: ignore[assignment]
     foto.add_section("Controls")
     for k, v in ini.items("Controls"):
-        foto.set("Controls", k, v)
+        if not k.startswith(origem) or "\\default" in k:
+            continue  # flags o Azahar regenera; evita `X\default\default`
+        curto = k[len(origem):]
+        if curto in ("name", "input_maptype"):
+            continue  # identidade do slot, não bind
+        foto.set("Controls", "profiles\\1\\" + curto, v)
     try:
         with open(dest, "w", encoding="utf-8") as fh:
             foto.write(fh)
@@ -224,8 +334,49 @@ def fotografar_perfil(nome: str) -> dict:
     return {"ok": True, "preset": slug, "arquivo": str(dest)}
 
 
-def aplicar_preset_controle(nome: str) -> dict:
-    """Mescla preset Hub sobre o `[Controls]` live (Azahar fechado!)."""
+def higienizar_controles() -> dict:
+    """Limpa crud que quebra a leitura dos perfis pelo Azahar.
+
+    Remove linhas `X\\default\\default` (lixo que o próprio Azahar grava
+    ao re-salvar) e chaves duplicadas exatas (vale a 1ª). Descoberto por
+    bisseção: arquivo limpo = seleção e binds estáveis no game-boot.
+    Só mexe no texto; nunca reordena nem reformatta o resto.
+    """
+    from bib_nucleo import emuladores as EMU
+    cfg = EMU.config_atual_emu("azahar")
+    if cfg is None:
+        return {"ok": False, "erro": "config do Azahar não encontrada."}
+    try:
+        linhas = cfg.read_text(encoding="utf-8").splitlines()
+    except OSError as e:
+        return {"ok": False, "erro": f"falha ao ler: {e}"}
+    vistas, limpas, removidas = set(), [], 0
+    for l in linhas:
+        k = l.split("=", 1)[0]
+        if k.endswith("\\default\\default") or k in vistas:
+            removidas += 1
+            continue
+        vistas.add(k)
+        limpas.append(l)
+    if not removidas:
+        return {"ok": True, "removidas": 0}
+    try:
+        cfg.write_text("\n".join(limpas) + "\n", encoding="utf-8")
+    except OSError as e:
+        return {"ok": False, "erro": f"falha ao gravar: {e}"}
+    return {"ok": True, "removidas": removidas}
+
+
+def aplicar_preset_controle(nome: str, perfil: int | None = None) -> dict:
+    """Mescla preset Hub no perfil live (Azahar fechado!).
+
+    `perfil` = índice 0-based alvo (None = o ativo). Garante `profile=`,
+    `profiles\\size` e remove o veneno `profile\\default`.
+
+    Cirurgia por linhas no estilo nativo do Azahar (`chave="valor"` +
+    `chave\\default=false`): o Qt descarta binds fora desse padrão,
+    então NÃO reescrevemos o arquivo via configparser.
+    """
     from bib_nucleo.base import slugify
     slug = slugify(nome or "")
     alvo = _presets_dir() / f"{slug}.ini"
@@ -239,30 +390,110 @@ def aplicar_preset_controle(nome: str) -> dict:
     if cfg is None:
         return {"ok": False, "erro": "config do Azahar não encontrada."}
     try:
+        higienizar_controles()
         bak = cfg.with_name(cfg.name + ".bak")
         if not bak.is_file():
             shutil.copy2(str(cfg), str(bak))
         novo = configparser.ConfigParser()
         novo.optionxform = str  # type: ignore[assignment]
         novo.read(alvo, encoding="utf-8")
-        if not ini.has_section("Controls"):
-            ini.add_section("Controls")
-        if novo.has_section("Controls"):
-            for k, valor in novo.items("Controls"):
-                ini.set("Controls", k, valor)
-        with cfg.open("w", encoding="utf-8") as fh:
-            ini.write(fh)
+        if not novo.has_section("Controls"):
+            return {"ok": False, "erro": "preset sem seção Controls."}
+        origem = _prefixo_origem(novo)
+        alvo_idx = perfil if perfil is not None else perfil_ativo(ini)
+        if alvo_idx < 0:
+            return {"ok": False, "erro": "índice de perfil inválido."}
+        destino = f"profiles\\{alvo_idx + 1}\\"
+        ativo = alvo_idx + 1
+        pares = []
+        for k, v in novo.items("Controls"):
+            if not k.startswith(origem):
+                continue
+            v = v.strip()
+            if len(v) >= 2 and v[0] == '"' and v[-1] == '"':
+                v = v[1:-1]  # preset herdou as aspas literais do Azahar
+            pares.append((destino + k[len(origem):], v))
+        if not pares:
+            return {"ok": False, "erro": "preset sem binds de perfil."}
+        linhas = cfg.read_text(encoding="utf-8").splitlines()
+        try:
+            ini_sec = next(i for i, l in enumerate(linhas)
+                           if l.strip() == "[Controls]")
+        except StopIteration:
+            linhas.append("[Controls]")
+            ini_sec = len(linhas) - 1
+        fim_sec = next((i for i in range(ini_sec + 1, len(linhas))
+                        if linhas[i].strip().startswith("[")),
+                       len(linhas))
+        alvos = {chave for chave, _ in pares}
+        alvos |= {ch + "\\default" for ch, _ in pares}
+        corpo = [l for l in linhas[ini_sec + 1:fim_sec]
+                 if l.split("=", 1)[0] not in alvos]
+        novas = []
+        for chave, valor in pares:
+            novas.append(f"{chave}\\default=false")
+            novas.append(f'{chave}="{valor}"')
+        linhas[ini_sec + 1:fim_sec] = corpo + novas
+        # o Azahar REGENERA no game-boot todo perfil chamado "Default":
+        # garante nome próprio p/ não perder os binds aplicados.
+        nome_chave = f"profiles\\{ativo}\\name"
+        for i, l in enumerate(linhas):
+            if l.split("=", 1)[0] != nome_chave or "=" not in l:
+                continue
+            atual = l.split("=", 1)[1].strip().strip('"')
+            if atual in ("", "Default"):
+                linhas[i] = f'{nome_chave}="{slug}"'
+                if f"{nome_chave}\\default" not in {
+                        x.split("=", 1)[0] for x in linhas}:
+                    linhas.insert(i + 1, f"{nome_chave}\\default=false")
+            break
+        else:
+            linhas.insert(ini_sec + 1, f'{nome_chave}="{slug}"')
+            linhas.insert(ini_sec + 2, f"{nome_chave}\\default=false")
+        # `profile\default=true` trava o perfil 0 p/ sempre (fonte: config.cpp
+        # ReadSetting): sem ele com ativo>0, e `profile=<ativo>` garantido.
+        linhas = [l for l in linhas
+                 if l.split("=", 1)[0] != "profile\\default"]
+        tem_profile = False
+        for i, l in enumerate(linhas):
+            if l.split("=", 1)[0] != "profile" or "=" not in l:
+                continue
+            tem_profile = True
+            if ativo > 1:
+                linhas[i] = f"profile={ativo - 1}"
+            break
+        if not tem_profile:
+            linhas.insert(ini_sec + 1, f"profile={ativo - 1}")
+        # o Azahar ignora perfis além de profiles\size: garante cobertura
+        for i, l in enumerate(linhas):
+            if l.split("=", 1)[0] != "profiles\\size" or "=" not in l:
+                continue
+            try:
+                if int(l.split("=", 1)[1]) < ativo:
+                    linhas[i] = f"profiles\\size={ativo}"
+            except ValueError:
+                linhas[i] = f"profiles\\size={ativo}"
+            break
+        else:
+            linhas.insert(ini_sec + 1 + len(corpo) + len(novas),
+                           f"profiles\\size={ativo}")
+        cfg.write_text("\n".join(linhas) + "\n", encoding="utf-8")
     except (OSError, configparser.Error) as e:
         return {"ok": False, "erro": f"falha ao mesclar: {e}"}
-    return {"ok": True, "preset": slug, "config": str(cfg)}
+    return {"ok": True, "preset": slug, "config": str(cfg),
+            "chaves": len(pares)}
 
 
 def salvar_mapa_gerado(tipo: str, guid: str = "", port: int = 0,
-                       nome: str = "") -> dict:
-    """Gera o mapa padrão e grava como preset Hub (sem tocar no live)."""
+                       nome: str = "", rotulos: dict | None = None) -> dict:
+    """Gera o mapa padrão e grava como preset Hub (sem tocar no live).
+
+    `rotulos` = tabela do `nomes_sdl()` (rótulos reais do Azahar);
+    sem ela valem os genéricos.
+    """
     from bib_nucleo.base import slugify
     try:
-        perfil = gerar_perfil(tipo, guid, port)
+        perfil = gerar_perfil(tipo, guid, port, rotulos=rotulos)
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
     slug = slugify(nome or f"{tipo}-padrao") or f"{tipo}-padrao"
@@ -301,7 +532,10 @@ def _oem_nome(chave_reg: str) -> str:
 
 
 def _xinput_slots() -> dict[int, dict]:
+    """Estados XInput (Win). {} sem driver/dispositivo. Nunca levanta."""
     import ctypes
+    if os.name != "nt" or not hasattr(ctypes, "WinDLL"):
+        return {}
     from ctypes import wintypes
     for dll in ("xinput1_4.dll", "xinput9_1_0.dll", "xinput1_3.dll"):
         try:
@@ -462,9 +696,20 @@ def ler_estado_xinput(slot: int = 0) -> dict | None:
             "lx": st["lx"], "ly": st["ly"], "rx": st["rx"], "ry": st["ry"]}
 
 
-XINPUT_NOMES = {0: "A", 1: "B", 2: "X", 3: "Y", 4: "Start", 5: "Guia",
-                6: "Back", 7: "L3", 8: "R3", 9: "LB", 10: "RB",
-                12: "↑", 13: "↓", 14: "←", 15: "→"}
+# Bits do wButtons XInput -> nome (A=0x1000=bit 12, ...). Não confundir
+# com os índices SDL (0-14) usados nos binds do Azahar.
+XINPUT_NOMES = {12: "A", 13: "B", 14: "X", 15: "Y", 8: "LB", 9: "RB",
+                4: "Start", 5: "Back", 6: "L3", 7: "R3", 10: "Guia",
+                0: "↑", 1: "↓", 2: "←", 3: "→"}
+
+# Bit XInput -> índice enum SDL_GameControllerButton (p/ futuro wizard).
+XINPUT_PARA_SDL = {12: 0, 13: 1, 14: 2, 15: 3, 5: 4, 10: 5, 4: 6,
+                   6: 7, 7: 8, 8: 9, 9: 10, 0: 11, 1: 12, 2: 13, 3: 14}
+
+
+def xinput_para_sdl(bit: int) -> int | None:
+    """Traduz bit XInput p/ índice SDL (None se sem equivalente digital)."""
+    return XINPUT_PARA_SDL.get(bit)
 
 
 def resumir_estado(estado: dict | None) -> str:
@@ -486,7 +731,8 @@ def resumir_estado(estado: dict | None) -> str:
 def capturar(poll, timeout: float = 10.0, limiar_eixo: int = 16000) -> dict:
     """Aguarda UM aperto/movimento: {tipo, indice/direção}. Puro e testável.
 
-    poll() -> {"botoes": set[int], "eixos": {nome: valor}}.
+    poll() -> {"botoes": set[int], "eixos": {nome: valor}}. Índices de
+    botão saem crus (ex.: bits XInput) — traduza com `xinput_para_sdl()`.
     """
     descr = {"lx": (0, "esquerdo"), "rx": (2, "direito")}
     fim = time.monotonic() + max(1.0, timeout)
@@ -513,8 +759,11 @@ def capturar(poll, timeout: float = 10.0, limiar_eixo: int = 16000) -> dict:
     return {"ok": False, "erro": "tempo esgotado."}
 
 
-__all__ = ['GUIDS', 'NOMES_TIPO', 'MAPAS', 'BOTOES_3DS', 'gerar_perfil',
-           'bind_botao', 'bind_analogico', 'listar_controles',
+__all__ = ['GUIDS', 'NOMES_TIPO', 'MAPAS', 'BOTOES_3DS', 'DPAD',
+           'gerar_perfil', 'bind_botao', 'bind_eixo', 'bind_analogico',
+           'detectar_sdl', 'nomes_sdl', 'perfil_ativo', 'higienizar_controles',
+           'listar_controles',
            'ler_perfil_atual', 'fotografar_perfil', 'listar_presets_controle',
            'aplicar_preset_controle', 'salvar_mapa_gerado', 'ler_estado_xinput',
+           'XINPUT_NOMES', 'XINPUT_PARA_SDL', 'xinput_para_sdl',
            'resumir_estado', 'capturar']
