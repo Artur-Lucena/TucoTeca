@@ -18,6 +18,7 @@ CHEATS_MAX_QTD = 64
 CHEAT_MAX_LINHAS = 1024
 
 _TID_RE = re.compile(r"^[0-9A-Fa-f]{16}$")
+_BLOCO_RE = re.compile(r"^\[(.+)\]$")
 _LINHA_COD = re.compile(r"^[0-9A-Fa-f]{8} [0-9A-Fa-f]{8}$")
 _ATIVO = "*citra_enabled"
 
@@ -53,7 +54,7 @@ def _ler_blocos(texto: str) -> tuple[list[str], list[tuple[str, list[str]]]]:
     pre, blocos = [], []
     atual = None
     for linha in texto.splitlines():
-        m = re.match(r"^\[(.+)\]$", linha.strip())
+        m = _BLOCO_RE.match(linha.strip())
         if m:
             atual = (m.group(1), [])
             blocos.append(atual)

@@ -12,9 +12,10 @@ mesmo trato dos mods).
 from __future__ import annotations
 
 import os
-import re
 import shutil
 from pathlib import Path
+
+from bib_nucleo.cheats import titulo_ok  # TID canônico (um só, sem divergir)
 
 # Os 6 Pokémon do Hub (title IDs lidos do header NCCH das ROMs).
 TITULOS = {
@@ -26,14 +27,7 @@ TITULOS = {
     "00040000001B5100": "Pokémon Ultra Moon",
 }
 
-_TID_RE = re.compile(r"^[0-9A-Fa-f]{16}$")
 _SUFIJO_OFF = ".off"
-
-
-def titulo_ok(tid: str) -> str:
-    """Normaliza e valida o title ID (16 hex). '' se inválido."""
-    tid = (tid or "").strip().upper()
-    return tid if _TID_RE.match(tid) else ""
 
 
 def load_textures_dir() -> Path | None:
