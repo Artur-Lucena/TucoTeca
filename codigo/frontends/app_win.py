@@ -913,6 +913,15 @@ class App:
                     tex_txt = "\n🖼️ HD desligado"
         except Exception:
             tex_txt = ""
+        ch_txt = ""
+        try:
+            _cl = core.listar_cheats(_tid) if _tid else []
+            if _cl:
+                _on = sum(1 for c in _cl if c["ativo"])
+                ch_txt = (f"\n💥 {_on}/{len(_cl)} cheats"
+                          if _on else f"\n💥 {len(_cl)} cheats off")
+        except Exception:
+            ch_txt = ""
         self.det_meta.configure(
             text=f"{j['status']}{nota}{horas}{core.selo_confianca(j)} · {core.provedor_nome(j)}"
             + f"\n🏷 {plat}" + (f" · {', '.join(tags)}" if tags else "")
@@ -922,6 +931,7 @@ class App:
             + (f"\n🎛 preset {j['citron_preset']}" if j.get("citron_preset") else "")
             + mods_txt
             + tex_txt
+            + ch_txt
             + (f"\n▶ {j['ultima_execucao']}" if j.get("ultima_execucao") else "")
             + (f"\n📝 {j['observacoes']}" if j.get("observacoes") else ""))
         exe = j["exe_traduzido"] or j["executable_path"] or "(sem executável)"
@@ -1357,6 +1367,37 @@ class App:
         btn_tex.configure(command=alternar_tex)
         _ler_tex()
 
+        ttk.Label(fr_emu, text="Cheats", style="Sec.TLabel").grid(
+            row=4, column=0, sticky="w", padx=(0, 8), pady=6)
+        var_cheats = tk.StringVar()
+        ttk.Entry(fr_emu, textvariable=var_cheats, state="readonly",
+                  font=("Segoe UI", 12)).grid(row=4, column=1, sticky="ew",
+                                              pady=6)
+
+        def _refresh_cheats():
+            tid = _tid_do_jogo()
+            try:
+                lst = core.listar_cheats(tid) if tid else []
+            except Exception:
+                lst = []
+            on = sum(1 for c in lst if c["ativo"])
+            var_cheats.set("—" if not lst else
+                           (f"{on}/{len(lst)} ativos" if on
+                            else f"{len(lst)} desligados"))
+
+        def gerenciar_cheats():
+            tid = _tid_do_jogo()
+            if not tid:
+                messagebox.showwarning(
+                    "Cheats", "Salve o jogo com a ROM primeiro.")
+                return
+            self._janela_cheats(dlg, tid, _refresh_cheats)
+
+        ttk.Button(fr_emu, text="…", width=4,
+                   command=gerenciar_cheats).grid(row=4, column=2,
+                                                 padx=(6, 0))
+        _refresh_cheats()
+
         # -- notas
         fr_obs = secao("Observações")
         txt = tk.Text(fr_obs, height=4, bg="#0b0d12", fg=TXT, insertbackground=TXT,
@@ -1598,6 +1639,103 @@ class App:
         ttk.Button(fr_btn, text="Remover", command=remover).pack(side="left")
         ttk.Button(fr_btn, text="OK", command=ok).pack(side="right")
         ttk.Button(fr_btn, text="Cancelar", command=win.destroy).pack(side="right", padx=6)
+
+    # -- cheats Gateway (user/cheats/<tid>.txt; toggle imediato, vale no reboot)
+    def _janela_cheats(self, pai, tid, ao_ok=None):
+        win = tk.Toplevel(pai)
+        _titulo_escuro(win)
+        win.title(f"Cheats — {tid} (vale após reiniciar)")
+        win.transient(pai)
+        win.grab_set()
+        fr = ttk.Frame(win, padding=12)
+        fr.pack(fill="both", expand=True)
+        lst = tk.Listbox(fr, selectmode="single", width=52, height=10,
+                         bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                         font=("Segoe UI", 11))
+        lst.pack(fill="both", expand=True)
+
+        def redesenhar():
+            try:
+                nomes = core.listar_cheats(tid)
+            except Exception:
+                nomes = []
+            lst.delete(0, "end")
+            for c in nomes:
+                lst.insert("end", f"[{'x' if c['ativo'] else ' '}] {c['nome']}")
+            return [c["nome"] for c in nomes]
+
+        def alternar(_e=None):
+            sel = lst.curselection()
+            nomes = redesenhar()
+            if not sel or sel[0] >= len(nomes):
+                return
+            try:
+                core.alternar_cheat(tid, nomes[sel[0]])
+            except Exception as e:
+                messagebox.showwarning("Cheats", f"falha: {e}")
+                return
+            redesenhar()
+            lst.selection_set(sel[0])
+            if ao_ok:
+                try:
+                    ao_ok()
+                except Exception:
+                    pass
+
+        def adicionar():
+            nome = simpledialog.askstring(
+                "Cheats", "Nome do cheat:", parent=win)
+            if not nome:
+                return
+            caixa = tk.Toplevel(win)
+            _titulo_escuro(caixa)
+            caixa.title("Código (XXXXXXXX YYYYYYYY por linha)")
+            caixa.transient(win)
+            caixa.grab_set()
+            txt = tk.Text(caixa, width=52, height=8, bg="#0b0d12", fg=TXT,
+                          insertbackground=TXT, font=("Consolas", 11))
+            txt.pack(fill="both", expand=True, padx=12, pady=12)
+
+            def gravar():
+                r = core.adicionar_cheat(tid, nome.strip(),
+                                         txt.get("1.0", "end"))
+                if not r.get("ok"):
+                    messagebox.showwarning("Cheats", r.get("erro", "falha"))
+                    return
+                caixa.destroy()
+                redesenhar()
+
+            ttk.Button(caixa, text="Salvar (desligado)",
+                       command=gravar).pack(pady=(0, 12))
+
+        def remover():
+            sel = lst.curselection()
+            nomes = redesenhar()
+            if not sel or sel[0] >= len(nomes):
+                return
+            if not messagebox.askokcancel(
+                    "Cheats", f"Apagar '{nomes[sel[0]]}'?"):
+                return
+            r = core.remover_cheat(tid, nomes[sel[0]])
+            if not r.get("ok"):
+                messagebox.showwarning("Cheats", r.get("erro", "falha"))
+                return
+            redesenhar()
+            if ao_ok:
+                try:
+                    ao_ok()
+                except Exception:
+                    pass
+
+        lst.bind("<Double-Button-1>", alternar)
+        redesenhar()
+        fr_btn = ttk.Frame(fr)
+        fr_btn.pack(fill="x", pady=(10, 0))
+        ttk.Button(fr_btn, text="Alternar", command=alternar).pack(side="left")
+        ttk.Button(fr_btn, text="Adicionar…", command=adicionar).pack(side="left", padx=6)
+        ttk.Button(fr_btn, text="Remover", command=remover).pack(side="left")
+        ttk.Button(fr_btn, text="Fechar",
+                   command=win.destroy).pack(side="right")
 
     # -- importação unificada (pasta ou arquivo; emulador detectado sozinho)
     def importar_unificado(self):

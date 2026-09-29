@@ -503,7 +503,8 @@ class Tui:
         j = self.atual()
         if not j:
             return
-        opcoes = ["Jogar", "Editar", "Mods", "Texturas", "Apagar", "Voltar"]
+        opcoes = ["Jogar", "Editar", "Mods", "Texturas", "Cheats",
+                  "Apagar", "Voltar"]
         idx = self.escolher(j["titulo"], opcoes)
         if idx is None:
             return
@@ -516,6 +517,8 @@ class Tui:
             self.menu_mods(j)
         elif escolha == "Texturas":
             self.menu_texturas(j)
+        elif escolha == "Cheats":
+            self.menu_cheats(j)
         elif escolha == "Apagar":
             self.excluir()
 
@@ -640,6 +643,74 @@ class Tui:
             else:
                 res = core.definir_textura(tid, not est["ativo"])
                 self.msg = (f"HD {'ligado ✓' if res.get('ativo') else 'desligado.'}"
+                            if res.get("ok") else f"Falha: {res.get('erro')}")
+
+    def menu_cheats(self, j):
+        """Liga/desliga cheats Gateway (vale após reiniciar o jogo)."""
+        try:
+            launch = core.traduzir_para_atual((j.get("launch_options") or "").strip())
+            tid = core.title_id_da_rom(launch)
+        except Exception:
+            tid = ""
+        if not tid:
+            self.msg = "Cheats só para ROMs 3DS com title ID legível."
+            return
+        while True:
+            try:
+                disp = core.listar_cheats(tid)
+            except Exception:
+                disp = []
+            ativos = {c["nome"] for c in disp if c["ativo"]}
+            opcoes = ([f"[{'x' if c['nome'] in ativos else ' '}] {c['nome']}"
+                       for c in disp]
+                      + ["Adicionar cheat…", "Remover cheat…", "Voltar"])
+            idx = self.escolher(f"Cheats — {j.get('titulo') or ''} (reinicie p/ valer)",
+                                opcoes)
+            if idx is None or opcoes[idx] == "Voltar":
+                self.recarregar()
+                return
+            escolha = opcoes[idx]
+            if escolha == "Adicionar cheat…":
+                nome = self.perguntar("Nome do cheat: ")
+                if not nome:
+                    continue
+                print("Cole as linhas (XXXXXXXX YYYYYYYY), vazio p/ terminar:")
+                linhas = []
+                while True:
+                    try:
+                        l = input()
+                    except EOFError:
+                        break
+                    if not l.strip():
+                        break
+                    linhas.append(l)
+                res = core.adicionar_cheat(tid, nome.strip(), "\n".join(linhas))
+                self.msg = (f"Cheat {nome.strip()} ✓ (desligado)"
+                            if res.get("ok") else f"Falha: {res.get('erro')}")
+            elif escolha == "Remover cheat…":
+                if not disp:
+                    self.msg = "Nada para remover."
+                    continue
+                idx2 = self.escolher("Remover", [c["nome"] for c in disp]
+                                     + ["Voltar"])
+                if idx2 is None or idx2 >= len(disp):
+                    continue
+                alvo = disp[idx2]["nome"]
+                conf = self.perguntar(f"Apagar '{alvo}'? (s/n): ")
+                if (conf or "").strip().lower() not in ("s", "sim"):
+                    continue
+                res = core.remover_cheat(tid, alvo)
+                self.msg = (f"Cheat {alvo} removido."
+                            if res.get("ok") else f"Falha: {res.get('erro')}")
+            else:
+                pos = next((i for i, c in enumerate(disp)
+                            if f"[{'x' if c['nome'] in ativos else ' '}] {c['nome']}"
+                            == escolha), None)
+                if pos is None:
+                    continue
+                res = core.alternar_cheat(tid, disp[pos]["nome"])
+                self.msg = (f"{disp[pos]['nome']}: "
+                            f"{'ligado ✓ (reinicie)' if res.get('ativo') else 'desligado.'}"
                             if res.get("ok") else f"Falha: {res.get('erro')}")
 
     def menu_principal(self) -> bool:
