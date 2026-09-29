@@ -1790,6 +1790,15 @@ def preparar_lancamento(jogo: dict) -> dict:
         mods_ok = mr["aplicados"]
         if mr["aviso"]:
             avisos.append(mr["aviso"])
+        try:  # texturas HD: pasta ativa sem flag global = HD invisível
+            from bib_nucleo import texturas as _TEX
+            tid_tex = title_id_da_rom(traduzir_para_atual(launch))
+            if tid_tex and _TEX.tem_textura(tid_tex):
+                if _TEX.flag_custom_textures() is False:
+                    avisos.append("Texturas HD ligadas mas o preset está sem "
+                                  "custom textures — troque p/ hd2x.")
+        except Exception:
+            pass
     if (launch and prov.get("chave") == "citron"
             and provedor_por_extensao(Path(launch).suffix) is not None):
         if not citron_tem_chaves():

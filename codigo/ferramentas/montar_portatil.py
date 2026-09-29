@@ -377,6 +377,9 @@ def incluir_azahar(dest_base: Path) -> str:
                 s = src_user / sub
                 if s.is_dir():
                     shutil.copytree(s, u_dst / sub)
+            shutil.rmtree(u_dst / "load" / "textures", ignore_errors=True)
+            # texturas HD (GBs) não viajam no instalador — mesmo trato dos
+            # mods: ficam na máquina, fora do pacote portátil.
             for sub in ("sdmc", "states", "cheats"):
                 (u_dst / sub).mkdir(parents=True, exist_ok=True)
             continue

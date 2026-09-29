@@ -195,6 +195,7 @@ SKIP_DIRS = {
     "windowsapps", "system volume information", "$recycle.bin",
     ".pnpm-store", "msdownld.tmp", "found.000", "wpsystem",
     "backups", "capas", "presets", "sessoes", "saves", "mods", "musicas",
+    "texturas",
     ".git", ".build", ".cache", "__pycache__", "dist",
     "node_modules", ".venv", "venv", ".mypy_cache", ".pytest_cache",
 }

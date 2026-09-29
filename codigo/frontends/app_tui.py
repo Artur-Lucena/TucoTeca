@@ -503,7 +503,7 @@ class Tui:
         j = self.atual()
         if not j:
             return
-        opcoes = ["Jogar", "Editar", "Mods", "Apagar", "Voltar"]
+        opcoes = ["Jogar", "Editar", "Mods", "Texturas", "Apagar", "Voltar"]
         idx = self.escolher(j["titulo"], opcoes)
         if idx is None:
             return
@@ -514,6 +514,8 @@ class Tui:
             self.editar()
         elif escolha == "Mods":
             self.menu_mods(j)
+        elif escolha == "Texturas":
+            self.menu_texturas(j)
         elif escolha == "Apagar":
             self.excluir()
 
@@ -600,6 +602,45 @@ class Tui:
                     core.atualizar_jogo(con, j["id"], {"azahar_mods": nova})
         finally:
             con.close()
+
+    def menu_texturas(self, j):
+        """Liga/desliga texturas HD (só ROM 3DS com title ID legível)."""
+        try:
+            launch = core.traduzir_para_atual((j.get("launch_options") or "").strip())
+            tid = core.title_id_da_rom(launch)
+        except Exception:
+            tid = ""
+        if not tid:
+            self.msg = "Texturas só para ROMs 3DS com title ID legível."
+            return
+        while True:
+            try:
+                est = core.estado_textura(tid)
+            except Exception:
+                est = {"instalado": False, "ativo": False,
+                       "arquivos": 0, "mb": 0.0}
+            if not est.get("instalado"):
+                opcoes = ["Instalar de pasta…", "Voltar"]
+            else:
+                acao = ("DESLIGAR" if est["ativo"] else "LIGAR")
+                opcoes = [f"HD {acao} ({est['arquivos']} arqs)",
+                          "Instalar de pasta…", "Voltar"]
+            idx = self.escolher(f"Texturas — {j.get('titulo') or ''}", opcoes)
+            if idx is None or opcoes[idx] == "Voltar":
+                self.recarregar()
+                return
+            escolha = opcoes[idx]
+            if escolha == "Instalar de pasta…":
+                r = self.perguntar("Pasta extraída com os .png: ")
+                if not r:
+                    continue
+                res = core.instalar_textura(tid, r.strip())
+                self.msg = (f"HD instalado ✓ ({res['arquivos']} arqs)"
+                            if res.get("ok") else f"Falha: {res.get('erro')}")
+            else:
+                res = core.definir_textura(tid, not est["ativo"])
+                self.msg = (f"HD {'ligado ✓' if res.get('ativo') else 'desligado.'}"
+                            if res.get("ok") else f"Falha: {res.get('erro')}")
 
     def menu_principal(self) -> bool:
         """ESC na lista abre as categorias; retorna True se é para sair."""

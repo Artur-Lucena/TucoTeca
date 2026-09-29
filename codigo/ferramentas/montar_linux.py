@@ -148,6 +148,8 @@ def incluir_azahar_linux(dest_base: Path) -> str:
                 s = src / "user" / sub
                 if s.is_dir():
                     shutil.copytree(s, u_dst / sub)
+            shutil.rmtree(u_dst / "load" / "textures", ignore_errors=True)
+            # texturas HD (GBs) não viajam no instalador (vide montar_portatil).
             for sub in ("sdmc", "states", "cheats"):
                 (u_dst / sub).mkdir(parents=True, exist_ok=True)
             continue

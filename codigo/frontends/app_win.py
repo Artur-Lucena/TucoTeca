@@ -900,6 +900,19 @@ class App:
         if mods:
             mods_txt = ((f"\n🎨 OFF · {', '.join(mods)}") if j.get("mods_off")
                         else (f"\n🎨 {', '.join(mods)}"))
+        tex_txt = ""
+        try:
+            _launch = core.traduzir_para_atual(
+                (j.get("launch_options") or "").strip())
+            _tid = core.title_id_da_rom(_launch)
+            _base = core.load_textures_dir() if _tid else None
+            if _base is not None:
+                if (_base / _tid).is_dir():
+                    tex_txt = "\n🖼️ HD ligado"
+                elif (_base / (_tid + ".off")).is_dir():
+                    tex_txt = "\n🖼️ HD desligado"
+        except Exception:
+            tex_txt = ""
         self.det_meta.configure(
             text=f"{j['status']}{nota}{horas}{core.selo_confianca(j)} · {core.provedor_nome(j)}"
             + f"\n🏷 {plat}" + (f" · {', '.join(tags)}" if tags else "")
@@ -908,6 +921,7 @@ class App:
             + (f"\n🎛 preset {j['azahar_preset']}" if j.get("azahar_preset") else "")
             + (f"\n🎛 preset {j['citron_preset']}" if j.get("citron_preset") else "")
             + mods_txt
+            + tex_txt
             + (f"\n▶ {j['ultima_execucao']}" if j.get("ultima_execucao") else "")
             + (f"\n📝 {j['observacoes']}" if j.get("observacoes") else ""))
         exe = j["exe_traduzido"] or j["executable_path"] or "(sem executável)"
@@ -1285,6 +1299,63 @@ class App:
         ttk.Button(fr_emu, text="…", width=4, command=gerenciar_mods).grid(
             row=2, column=3, padx=(6, 0))
         _refresh_mods()
+
+        ttk.Label(fr_emu, text="Texturas HD",
+                  style="Sec.TLabel").grid(
+            row=3, column=0, sticky="w", padx=(0, 8), pady=6)
+        tex_sel = {"ativo": False, "arquivos": 0, "instalado": False}
+        var_tex = tk.StringVar()
+        ttk.Entry(fr_emu, textvariable=var_tex, state="readonly",
+                  font=("Segoe UI", 12)).grid(row=3, column=1, sticky="ew",
+                                              pady=6)
+        btn_tex = ttk.Button(fr_emu, width=9)
+        btn_tex.grid(row=3, column=2, padx=(6, 0))
+
+        def _refresh_tex():
+            if not tex_sel["instalado"]:
+                var_tex.set("—")
+            else:
+                base = (f"{tex_sel['arquivos']} arqs · "
+                        f"{'ligado 🖼️' if tex_sel['ativo'] else 'desligado'}")
+                var_tex.set(base)
+            try:
+                btn_tex.configure(
+                    text="Desligar" if tex_sel["ativo"] else "Ligar")
+            except tk.TclError:
+                pass
+
+        def _ler_tex():
+            tid = _tid_do_jogo()
+            if not tid:
+                tex_sel.update(instalado=False, ativo=False, arquivos=0)
+            else:
+                try:
+                    est = core.estado_textura(tid)
+                except Exception:
+                    est = {}
+                tex_sel.update(instalado=bool(est.get("instalado")),
+                               ativo=bool(est.get("ativo")),
+                               arquivos=int(est.get("arquivos") or 0))
+            _refresh_tex()
+
+        def alternar_tex():
+            tid = _tid_do_jogo()
+            if not tid:
+                messagebox.showwarning(
+                    "Texturas", "Salve o jogo com a ROM primeiro.")
+                return
+            try:
+                res = core.definir_textura(tid, not tex_sel["ativo"])
+            except Exception as e:
+                messagebox.showwarning("Texturas", f"falha: {e}")
+                return
+            if not res.get("ok"):
+                messagebox.showwarning("Texturas", res.get("erro", "falha"))
+                return
+            _ler_tex()
+
+        btn_tex.configure(command=alternar_tex)
+        _ler_tex()
 
         # -- notas
         fr_obs = secao("Observações")
