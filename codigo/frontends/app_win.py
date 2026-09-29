@@ -952,6 +952,21 @@ class App:
             desenhar_tile(self.det_capa, j["titulo"], 216, 280, grande=True,
                           subtitulo=plat)
 
+    def _aviso_barra(self, msg: str) -> None:
+        """Aviso não-modal na barra de contagem (sem popup, sem empilhar)."""
+        try:
+            base = self.lbl_cont.cget("text")
+        except (tk.TclError, AttributeError):
+            return
+        anterior = getattr(self, "_ultimo_aviso", "")
+        if anterior and base.endswith(anterior):
+            base = base[: -len(anterior)].rstrip(" ·")
+        self._ultimo_aviso = msg
+        try:
+            self.lbl_cont.configure(text=f"{base} · {msg}" if base else msg)
+        except (tk.TclError, AttributeError):
+            pass
+
     # -- ações
     def jogar(self):
         j = self.selecionado()
@@ -977,16 +992,16 @@ class App:
                         core.iniciar_sessao_manual(j["id"], j.get("titulo") or "")
                     except Exception:
                         pass
-                    messagebox.showinfo("Jogar", "Executando ✓ (UAC — sessão manual aberta; ao terminar use ⏱ Registrar sessão)")
+                    self._aviso_barra("Executando (UAC) — ao terminar use ⏱ Registrar sessão")
                 else:
                     messagebox.showerror("Jogar", res.get("erro", "falha"))
             elif res.get("ok"):
                 core.marcar_execucao(con, j["id"])
                 if res.get("rastreado"):
-                    extra = " ⏱ tempo será registrado"
+                    extra = "⏱ tempo será registrado"
                 else:
-                    extra = " ⏱ sem rastreio (startfile/UAC) — sessão manual aberta; ao terminar use ⏱ Registrar sessão"
-                messagebox.showinfo("Jogar", f"Executando ✓ ({res.get('modo')}){extra}")
+                    extra = "⏱ sem rastreio — sessão manual aberta; ao terminar use ⏱ Registrar sessão"
+                self._aviso_barra(f"Executando ({res.get('modo')}) — {extra}")
             else:
                 messagebox.showerror("Jogar", res.get("erro", "falha"))
         finally:
@@ -1078,7 +1093,7 @@ class App:
         return j
 
     def _sessao_fim(self, gid: int, sessao: float, rastreado: bool) -> None:
-        """Callback da vigia (já na thread de UI): soma, recarrega, avisa."""
+        """Callback da vigia (já na thread de UI): soma, recarrega, avisa na barra."""
         if not rastreado:
             return
         con = self._con()
@@ -1088,7 +1103,7 @@ class App:
             con.close()
         self.recarregar()
         if ok:
-            messagebox.showinfo("Sessão registrada", msg)
+            self._aviso_barra(msg)
 
     @staticmethod
     def _registrar_sessao(con, gid: int, sessao: float) -> tuple[bool, str]:
@@ -1338,15 +1353,41 @@ class App:
             tid = _tid_do_jogo()
             if not tid:
                 tex_sel.update(instalado=False, ativo=False, arquivos=0)
-            else:
-                try:
-                    est = core.estado_textura(tid)
-                except Exception:
-                    est = {}
-                tex_sel.update(instalado=bool(est.get("instalado")),
-                               ativo=bool(est.get("ativo")),
-                               arquivos=int(est.get("arquivos") or 0))
+                _refresh_tex()
+                return
+            # estado barato primeiro (sem contar PNGs — 15k arqs = ~2s);
+            # a contagem vem em thread como a capa.
+            try:
+                base = core.load_textures_dir()
+                on = bool(base) and (base / tid).is_dir()
+                off = bool(base) and (base / (tid + ".off")).is_dir()
+            except Exception:
+                on = off = False
+            tex_sel.update(instalado=bool(on or off), ativo=bool(on),
+                           arquivos=0)
             _refresh_tex()
+            if not tex_sel["instalado"]:
+                return
+
+            def _contar(tid_fx=tid):
+                try:
+                    est = core.estado_textura(tid_fx)
+                except Exception:
+                    return
+
+                def _aplica(est=est, tid_fx=tid_fx):
+                    try:
+                        if _tid_do_jogo() != tid_fx:
+                            return
+                    except tk.TclError:
+                        return
+                    tex_sel.update(
+                        instalado=bool(est.get("instalado")),
+                        ativo=bool(est.get("ativo")),
+                        arquivos=int(est.get("arquivos") or 0))
+                    _refresh_tex()
+                self._depois(_aplica)
+            threading.Thread(target=_contar, daemon=True).start()
 
         def alternar_tex():
             tid = _tid_do_jogo()
@@ -2020,6 +2061,11 @@ class App:
                             ("⬇ Atualizar Citron", self.atualizar_citron)):
             ttk.Button(fr_emu, text=rotulo, command=cmd).pack(
                 fill="x", padx=4, pady=3)
+        fr_mus = secao("Músicas")
+        for rotulo, cmd in (("🎵 Músicas…", self._janela_musicas),
+                            ("📥 Importar músicas…", self.importar_musicas)):
+            ttk.Button(fr_mus, text=rotulo, command=cmd).pack(
+                fill="x", padx=4, pady=3)
         ttk.Button(dlg, text="Fechar", command=dlg.destroy).pack(pady=14)
 
     def _depois(self, fn):
@@ -2027,6 +2073,121 @@ class App:
             self.root.after(0, fn)
         except tk.TclError:
             pass  # janela fechada
+
+    # -- músicas (selfhost de áudio; play no player do SO por ação explícita)
+    def importar_musicas(self):
+        pasta = filedialog.askdirectory(
+            title="Pasta do Harmoni (music/) ou qualquer pasta de áudio",
+            parent=self.root)
+        if not pasta:
+            return
+        prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
+        prog.title("Importando músicas…")
+        prog.transient(self.root)
+        ttk.Label(prog, text="Copiando e catalogando…").pack(padx=24, pady=20)
+        try:
+            prog.update()
+        except tk.TclError:
+            return
+
+        def trabalho(pasta_fx=pasta):
+            con = self._con()
+            try:
+                res = core.importar_musicas(con, pasta_fx)
+            except Exception as e:
+                res = {"novos": 0, "ignorados": 0, "erros": [str(e)]}
+            finally:
+                con.close()
+
+            def fim(res=res):
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    pass
+                detalhe = f"{res['novos']} nova(s), {res['ignorados']} ignorada(s)"
+                if res["erros"]:
+                    detalhe += f"\n{res['erros'][0]}"
+                    if len(res["erros"]) > 1:
+                        detalhe += f"\n(+{len(res['erros']) - 1})"
+                messagebox.showinfo("Músicas", detalhe)
+            self._depois(fim)
+        threading.Thread(target=trabalho, daemon=True).start()
+
+    def _janela_musicas(self):
+        win = tk.Toplevel(self.root)
+        _titulo_escuro(win)
+        win.title("Músicas")
+        win.transient(self.root)
+        fr = ttk.Frame(win, padding=12)
+        fr.pack(fill="both", expand=True)
+        lst = tk.Listbox(fr, selectmode="single", width=64, height=14,
+                         bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                         font=("Segoe UI", 11))
+        lst.pack(fill="both", expand=True)
+        ids: list[int] = []
+
+        def redesenhar():
+            con = self._con()
+            try:
+                try:
+                    itens = core.listar_musicas(con)
+                except Exception:
+                    itens = []
+            finally:
+                con.close()
+            lst.delete(0, "end")
+            ids.clear()
+            for m in itens:
+                base = m["titulo"]
+                if m.get("artista"):
+                    base = f"{m['artista']} — {base}"
+                lst.insert("end", base)
+                ids.append(m["id"])
+
+        def tocar(_e=None):
+            sel = lst.curselection()
+            if not sel or sel[0] >= len(ids):
+                return
+            con = self._con()
+            try:
+                row = con.execute("SELECT musica_path FROM musicas WHERE id=?",
+                                  (ids[sel[0]],)).fetchone()
+                caminho = row["musica_path"] if row else ""
+            except Exception:
+                caminho = ""
+            finally:
+                con.close()
+            r = core.tocar_musica(caminho)
+            if not r.get("ok"):
+                messagebox.showwarning("Músicas", r.get("erro", "falha"))
+
+        def excluir():
+            sel = lst.curselection()
+            if not sel or sel[0] >= len(ids):
+                return
+            if not messagebox.askokcancel("Músicas", "Apagar do Hub (arquivo junto)?"):
+                return
+            con = self._con()
+            try:
+                core.excluir_musica(con, ids[sel[0]])
+            except (LookupError, ValueError) as e:
+                messagebox.showwarning("Músicas", str(e))
+                return
+            finally:
+                con.close()
+            redesenhar()
+
+        lst.bind("<Double-Button-1>", tocar)
+        redesenhar()
+        fr_btn = ttk.Frame(fr)
+        fr_btn.pack(fill="x", pady=(10, 0))
+        ttk.Button(fr_btn, text="Tocar", command=tocar).pack(side="left")
+        ttk.Button(fr_btn, text="Importar…",
+                   command=self.importar_musicas).pack(side="left", padx=6)
+        ttk.Button(fr_btn, text="Excluir", command=excluir).pack(side="left")
+        ttk.Button(fr_btn, text="Fechar",
+                   command=win.destroy).pack(side="right")
 
     def atualizar_azahar(self):
         self.atualizar_emu("azahar")

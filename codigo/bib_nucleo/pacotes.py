@@ -9,10 +9,11 @@ import sqlite3
 import zipfile
 from pathlib import Path
 
-from bib_nucleo.banco import (CAPA_EXTS, get_db, row_to_dict,
-                               salvar_capa_bytes)
-from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, DEFAULT_DB, agora_iso,
-                               garantir_dirs)
+from bib_nucleo.banco import (CAPA_EXTS, criar_musica, get_db,
+                                musica_to_dict, row_to_dict,
+                                salvar_capa_bytes)
+from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, DEFAULT_DB, MUSICAS_DIR,
+                               agora_iso, garantir_dirs)
 from bib_nucleo.emuladores import (azahar_versao_local, citron_versao_local,
                                      presets_dir, presets_prov_dir, provedores)
 from bib_nucleo.scans import importar_lista
@@ -22,7 +23,7 @@ from bib_nucleo.scans import importar_lista
 # Pacote portátil (.zip): banco + capas + presets + saves 3DS
 # --------------------------------------------------------------------------
 
-PACOTE_ESQUEMA = 3  # v3: presets/<prov>/*.ini (v2 manifesto uuid, v1 title)
+PACOTE_ESQUEMA = 4  # v4: +musicas/ (v3 presets/<prov>, v2 uuid, v1 title)
 
 PACOTE_INFO = "pacote-info.json"
 
@@ -43,8 +44,14 @@ def _jogo_limpo(j: dict) -> dict:
 
 def _dados_exportacao(con: sqlite3.Connection) -> dict:
     rows = con.execute("SELECT * FROM jogos ORDER BY id").fetchall()
+    try:
+        mus = [musica_to_dict(r)
+               for r in con.execute("SELECT * FROM musicas ORDER BY id").fetchall()]
+    except sqlite3.OperationalError:
+        mus = []  # banco pré-v12: sem tabela, sem músicas
     return {"exportado_em": agora_iso(),
-            "jogos": [_jogo_limpo(row_to_dict(r)) for r in rows]}
+            "jogos": [_jogo_limpo(row_to_dict(r)) for r in rows],
+            "musicas": mus}
 
 
 def exportar_json(destino, db_path=None) -> dict:
@@ -98,6 +105,32 @@ def _saves_para_pacote() -> list[tuple[str, Path]]:
     return pares
 
 
+def _musicas_para_pacote(musicas: list[dict]) -> list[tuple[str, Path]]:
+    """[(membro_no_zip, caminho)] das músicas (`musicas/<arquivo>`).
+
+    Membro pelo nome do arquivo gravado (único por importação); o restore
+    casa pela linha do JSON. Arquivo ausente = fora do pacote.
+    """
+    from bib_nucleo.base import MUSICA_EXTS
+    pares: list[tuple[str, Path]] = []
+    vistos: set[str] = set()
+    for m in musicas:
+        if not isinstance(m, dict):
+            continue
+        nome = Path(str(m.get("musica_path") or "")).name
+        arq = MUSICAS_DIR / nome
+        try:
+            ok = bool(nome) and arq.is_file() \
+                and arq.suffix.lower() in MUSICA_EXTS
+        except OSError:
+            continue
+        if not ok or nome in vistos:
+            continue
+        vistos.add(nome)
+        pares.append((f"musicas/{nome}", arq))
+    return pares
+
+
 def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
     """Empacota tudo para levar a outra máquina (ou guardar)."""
     destino = Path(destino)
@@ -113,8 +146,10 @@ def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
         con.close()
     pares_saves = _saves_para_pacote() if incluir_saves else []
     com_saves = bool(pares_saves)
+    pares_mus = _musicas_para_pacote(dados.get("musicas") or [])
     info = {"app": "biblioteca-jogos", "esquema": PACOTE_ESQUEMA,
             "exportado_em": dados["exportado_em"], "jogos": len(dados["jogos"]),
+            "musicas": len(dados.get("musicas") or []),
             "inclui_saves": com_saves, "azahar_versao": azahar_versao_local(),
             "citron_versao": citron_versao_local(),
             "provedores": sorted(provedores())}
@@ -162,16 +197,20 @@ def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
                 for membro, arq in pares_saves:
                     z.write(arq, membro)
                     n += 1
+            for membro, arq in pares_mus:
+                z.write(arq, membro)
+                n += 1
     except OSError as e:
         return {"ok": False, "erro": f"falha ao gravar pacote: {e}"}
     return {"ok": True, "destino": str(destino), "arquivos": n,
             "bytes": destino.stat().st_size, "jogos": len(dados["jogos"]),
+            "musicas": len(dados.get("musicas") or []),
             "inclui_saves": com_saves}
 
 
 def _membro_pacote_ok(nome: str) -> str | None:
-    """Categoria do membro ('json','info','manifesto','capa','preset','save')
-    ou None se proibido (traversal, absoluto, fora da allowlist)."""
+    """Categoria do membro ('json','info','manifesto','capa','preset','save',
+    'musica') ou None se proibido (traversal, absoluto, fora da allowlist)."""
     if not nome:
         return None
     n = nome.replace("\\", "/")
@@ -184,6 +223,12 @@ def _membro_pacote_ok(nome: str) -> str | None:
         return "info"
     if n == PACOTE_MANIFESTO:
         return "manifesto"
+    if n.startswith("musicas/") and "/" not in n[8:]:
+        from bib_nucleo.base import MUSICA_EXTS
+        if Path(n).suffix.lower() in MUSICA_EXTS and Path(n).stem \
+                and "." not in Path(n).stem:
+            return "musica"
+        return None
     if n.startswith("capas/") and "/" not in n[6:] \
             and Path(n).suffix.lower() in CAPA_EXTS:
         return "capa"
@@ -232,7 +277,7 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
             if PACOTE_INFO in cats:
                 info = json.loads(zf.read(PACOTE_INFO).decode("utf-8"))
                 esquema = info.get("esquema", 1)
-            if esquema not in (1, 2, 3):
+            if esquema not in (1, 2, 3, 4):
                 return {"ok": False, "erro": "versão do pacote não suportada"}
             if zf.testzip() is not None:
                 return {"ok": False, "erro": "pacote corrompido (CRC)"}
@@ -242,6 +287,9 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
         lista = dados if isinstance(dados, list) else dados.get("jogos") if isinstance(dados, dict) else None
         if not isinstance(lista, list):
             return {"ok": False, "erro": "biblioteca.json deve ser lista ou {jogos:[...]}"}
+        lista_mus = dados.get("musicas", []) if isinstance(dados, dict) else []
+        if not isinstance(lista_mus, list):
+            return {"ok": False, "erro": "biblioteca.json: 'musicas' deve ser lista"}
         try:
             manifesto = json.loads(zf.read(PACOTE_MANIFESTO).decode("utf-8")) \
                 if PACOTE_MANIFESTO in cats else {}
@@ -264,7 +312,7 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                     raw = zf.read(f"capas/{Path(arq).name}")
                 except KeyError:
                     continue
-                if esquema in (2, 3):
+                if esquema in (2, 3, 4):
                     alvo = con.execute("SELECT id FROM jogos WHERE uuid=?", (ident.strip(),)).fetchone()
                 else:
                     candidatos = con.execute("SELECT id FROM jogos WHERE titulo=?", (ident.strip(),)).fetchall()
@@ -321,6 +369,38 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                         saves += 1
                     except (OSError, ValueError):
                         saves_ignorados += 1
+            musicas, musicas_ignoradas = 0, 0
+            if lista_mus:
+                from bib_nucleo.base import MUSICAS_DIR
+                MUSICAS_DIR.mkdir(parents=True, exist_ok=True)
+                for m in lista_mus:
+                    if not isinstance(m, dict):
+                        musicas_ignoradas += 1
+                        continue
+                    sha = str(m.get("musica_sha") or "").strip()
+                    membro = f"musicas/{Path(str(m.get('musica_path') or '')).name}"
+                    if not sha or cats.get(membro) != "musica":
+                        musicas_ignoradas += 1
+                        continue
+                    dest = MUSICAS_DIR / Path(membro).name
+                    try:
+                        if dest.is_file():
+                            from bib_nucleo.musicas import sha_arquivo
+                            if sha_arquivo(dest) != sha:
+                                musicas_ignoradas += 1
+                                continue
+                        else:
+                            dest.write_bytes(zf.read(membro))
+                        criar_musica(con, {
+                            "titulo": m.get("titulo") or Path(membro).stem,
+                            "artista": m.get("artista") or "",
+                            "album": m.get("album") or "",
+                            "musica_path": str(dest),
+                            "musica_sha": sha,
+                            "origem": m.get("origem") or "pacote"})
+                        musicas += 1
+                    except (OSError, ValueError):
+                        musicas_ignoradas += 1
         finally:
             con.close()
     return {"ok": True, "novos": res["novos"], "atualizados": res["atualizados"],
@@ -328,7 +408,8 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
             "avisos": avisos, "backup": backup,
             "total_no_banco": res["total_no_banco"],
             "capas": capas, "presets": presets, "saves": saves,
-            "saves_ignorados": saves_ignorados}
+            "saves_ignorados": saves_ignorados, "musicas": musicas,
+            "musicas_ignoradas": musicas_ignoradas}
 
 
 def fazer_backup(db_path: Path, manter: int = 10) -> dict:

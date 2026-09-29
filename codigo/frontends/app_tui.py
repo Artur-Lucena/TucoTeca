@@ -716,7 +716,7 @@ class Tui:
     def menu_principal(self) -> bool:
         """ESC na lista abre as categorias; retorna True se é para sair."""
         opcoes = ["Buscar", "Filtros", "Adicionar jogo", "Importar",
-                  "Backup e saves", "Sessão", "Emuladores", "Sair"]
+                  "Músicas", "Backup e saves", "Sessão", "Emuladores", "Sair"]
         while True:
             idx = self.escolher("TucoTeca", opcoes)
             if idx is None:
@@ -734,6 +734,8 @@ class Tui:
                 self.adicionar()
             elif escolha == "Importar":
                 self.menu_importar()
+            elif escolha == "Músicas":
+                self.menu_musicas()
             elif escolha == "Backup e saves":
                 self.menu_backup()
             elif escolha == "Sessão":
@@ -743,6 +745,72 @@ class Tui:
             elif escolha == "Sair":
                 return True
         return False
+
+    def menu_musicas(self):
+        """Catálogo de áudio: buscar, tocar, importar, excluir."""
+        con = self._con()
+        try:
+            q = ""
+            while True:
+                try:
+                    itens = core.listar_musicas(con, q=q)
+                except Exception:
+                    itens = []
+                rotulos = [f"{m['artista']} — {m['titulo']}" if m.get("artista")
+                           else m["titulo"] for m in itens]
+                opcoes = rotulos + ["Buscar…", "Importar de pasta…", "Voltar"]
+                idx = self.escolher(f"Músicas ({len(itens)})", opcoes)
+                if idx is None or opcoes[idx] == "Voltar":
+                    self.recarregar()
+                    return
+                escolha = opcoes[idx]
+                if escolha == "Buscar…":
+                    r = self.perguntar("Buscar música: ", q)
+                    if r is not None:
+                        q = r.strip()
+                elif escolha == "Importar de pasta…":
+                    sugest = ""
+                    try:
+                        sugest = str(core.harmoni_dir() or "")
+                    except Exception:
+                        pass
+                    r = self.perguntar("Pasta de áudio"
+                                       + (f" [{sugest}]: " if sugest else ": "))
+                    if r is None:
+                        continue
+                    pasta = (r.strip() or sugest)
+                    if not pasta:
+                        continue
+                    try:
+                        res = core.importar_musicas(con, pasta)
+                    except Exception as e:
+                        res = {"novos": 0, "ignorados": 0, "erros": [str(e)]}
+                    detalhe = (f"{res['novos']} nova(s), "
+                               f"{res['ignorados']} ignorada(s)")
+                    if res["erros"]:
+                        detalhe += f" — {res['erros'][0]}"
+                    self.msg = detalhe
+                else:
+                    pos = idx
+                    if 0 <= pos < len(itens):
+                        sub = self.escolher(rotulos[pos],
+                                            ["Tocar", "Excluir", "Voltar"])
+                        if sub == 0:
+                            r = core.tocar_musica(itens[pos].get("musica_path") or "")
+                            self.msg = ("Tocando no player do SO ✓"
+                                        if r.get("ok")
+                                        else f"Falha: {r.get('erro')}")
+                        elif sub == 1:
+                            conf = self.perguntar(
+                                f"Apagar '{rotulos[pos]}' do Hub? (s/n): ")
+                            if (conf or "").strip().lower() in ("s", "sim"):
+                                try:
+                                    core.excluir_musica(con, itens[pos]["id"])
+                                    self.msg = "Música apagada."
+                                except (LookupError, ValueError) as e:
+                                    self.msg = f"Falha: {e}"
+        finally:
+            con.close()
 
     def menu_filtros(self):
         while True:

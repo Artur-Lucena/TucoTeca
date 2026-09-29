@@ -179,7 +179,7 @@ def teste_menu_principal_sair():
     from pathlib import Path
     tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
     db = tmp / "m.db"
-    teclas = [ord("j")] * 7 + [10]
+    teclas = [ord("j")] * 8 + [10]
     app = _tui_fake(db, teclas)
     afirmar(app.menu_principal() is True, "navegar até Sair + Enter deveria pedir saída")
 

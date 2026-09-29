@@ -298,6 +298,34 @@ def teste_links_darwin_internos_e_vetos():
         pass
 
 
+def teste_tocar_musica_cai_no_dados_local():
+    from bib_nucleo import base as B
+    from bib_nucleo import musicas as MUS
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
+    casa = tmp / "dados" / "musicas"
+    casa.mkdir(parents=True)
+    (casa / "x.mp3").write_bytes(b"ID3fake")
+    chamadas = []
+    velho_pop, velho_dir = MUS.subprocess.Popen, B.MUSICAS_DIR
+    MUS.subprocess.Popen = lambda *a, **k: chamadas.append(a) or object()
+    B.MUSICAS_DIR = casa  # tocar_musica lê base.MUSICAS_DIR ao vivo
+    tinha_start = hasattr(os, "startfile")
+    if tinha_start:
+        velho_start = os.startfile
+        os.startfile = lambda p: chamadas.append(p)
+    try:
+        r = MUS.tocar_musica(str(tmp / "outra-maquina" / "x.mp3"))
+        afirmar(r.get("ok") and r.get("path") == str(casa / "x.mp3"), r)
+        afirmar(chamadas, "não chamou o player?")
+        r2 = MUS.tocar_musica(str(tmp / "sumiu.mp3"))
+        afirmar(not r2.get("ok"), r2)
+    finally:
+        MUS.subprocess.Popen = velho_pop
+        B.MUSICAS_DIR = velho_dir
+        if tinha_start:
+            os.startfile = velho_start
+
+
 def teste_asset_matchers_por_so():
     velha = sys.platform
     try:

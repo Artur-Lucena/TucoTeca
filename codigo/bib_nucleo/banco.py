@@ -64,7 +64,8 @@ CREATE TABLE IF NOT EXISTS jogos (
 # Migração de bancos antigos: v1 (sem capa/confianca), v2 (sem exe por SO),
 # v3 (sem game_code/regiao), v4 (sem azahar_preset), v5 (sem uuid),
 # v6 (sem etiquetas), v7 (sem save_path), v8 (sem exe_mac),
-# v9 (sem azahar_mods), v10 (sem azahar_mods_off), v11 (sem citron_preset).
+# v9 (sem azahar_mods), v10 (sem azahar_mods_off), v11 (sem citron_preset),
+# v12 (sem tabela musicas — catálogo de áudio do selfhost).
 MIGRACOES = (
     "ALTER TABLE jogos ADD COLUMN capa TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN confianca REAL DEFAULT 0",
@@ -269,6 +270,28 @@ def _garantir_uuid(con: sqlite3.Connection) -> None:
         con.commit()
 
 
+SCHEMA_MUSICAS = """
+CREATE TABLE IF NOT EXISTS musicas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo TEXT NOT NULL,
+    artista TEXT DEFAULT '',
+    album TEXT DEFAULT '',
+    musica_path TEXT DEFAULT '',
+    musica_sha TEXT DEFAULT '',
+    origem TEXT DEFAULT 'harmoni',
+    criado_em TEXT,
+    atualizado_em TEXT,
+    UNIQUE(musica_sha)
+);
+"""
+
+
+def _garantir_tabela_musicas(con: sqlite3.Connection) -> None:
+    """v12: catálogo de áudio. Idempotente; preserva linhas (sem backup:
+    só cria tabela vazia quando ausente)."""
+    con.execute(SCHEMA_MUSICAS)
+
+
 def get_db(db_path: Path) -> sqlite3.Connection:
     db_path = Path(db_path)
     if str(db_path.parent) and not db_path.parent.exists():
@@ -292,6 +315,7 @@ def get_db(db_path: Path) -> sqlite3.Connection:
             con.execute(sql)
     _garantir_unique_triplo(con, db_path)
     _garantir_uuid(con)
+    _garantir_tabela_musicas(con)
     con.commit()
     return con
 
@@ -570,6 +594,66 @@ def excluir_jogo(con: sqlite3.Connection, gid: int) -> None:
             pass
 
 
+# --------------------------------------------------------------------------
+# Músicas (selfhost de áudio): catálogo próprio, fora da tabela de jogos
+# --------------------------------------------------------------------------
+
+def musica_to_dict(r: sqlite3.Row) -> dict:
+    return dict(r)
+
+
+def criar_musica(con: sqlite3.Connection, dados: dict) -> dict:
+    titulo = _txt(dados.get("titulo"))
+    if not titulo:
+        raise ValueError("música sem título")
+    sha = _txt(dados.get("musica_sha"))
+    if not sha:
+        raise ValueError("música sem sha")
+    if con.execute("SELECT id FROM musicas WHERE musica_sha=?",
+                   (sha,)).fetchone():
+        raise ValueError("música já cadastrada (mesmo arquivo)")
+    agora = agora_iso()
+    try:
+        cur = con.execute(
+            """INSERT INTO musicas (titulo, artista, album, musica_path,
+               musica_sha, origem, criado_em, atualizado_em)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (titulo, _txt(dados.get("artista")), _txt(dados.get("album")),
+             _txt(dados.get("musica_path")), sha,
+             _txt(dados.get("origem")) or "harmoni", agora, agora))
+        con.commit()
+    except sqlite3.IntegrityError:
+        raise ValueError("música já cadastrada (mesmo arquivo)")
+    return musica_to_dict(con.execute(
+        "SELECT * FROM musicas WHERE id=?", (cur.lastrowid,)).fetchone())
+
+
+def listar_musicas(con: sqlite3.Connection, q: str = "") -> list[dict]:
+    q = (q or "").strip().lower()
+    rows = con.execute("SELECT * FROM musicas ORDER BY artista, titulo").fetchall()
+    out = [musica_to_dict(r) for r in rows]
+    if q:
+        out = [m for m in out
+               if q in (m.get("titulo") or "").lower()
+               or q in (m.get("artista") or "").lower()
+               or q in (m.get("album") or "").lower()]
+    return out
+
+
+def excluir_musica(con: sqlite3.Connection, mid: int) -> None:
+    row = con.execute("SELECT musica_path FROM musicas WHERE id=?",
+                      (mid,)).fetchone()
+    if not row:
+        raise LookupError("música não encontrada")
+    con.execute("DELETE FROM musicas WHERE id=?", (mid,))
+    con.commit()
+    if row["musica_path"]:
+        try:
+            Path(row["musica_path"]).unlink()
+        except OSError:
+            pass
+
+
 CAPA_EXTS = {".png": "image/png", ".jpg": "image/jpeg",
              ".jpeg": "image/jpeg", ".webp": "image/webp"}
 
@@ -727,4 +811,4 @@ def selo_confianca(j: dict) -> str:
         return ""
     return f" · ◎{conf:.2f}" if conf > 0 else ""
 
-__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'MODS_MAX_NOME', 'MODS_MAX_QTD', 'normalizar_mods', 'mods_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']
+__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'MODS_MAX_NOME', 'MODS_MAX_QTD', 'normalizar_mods', 'mods_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'SCHEMA_MUSICAS', 'musica_to_dict', 'criar_musica', 'listar_musicas', 'excluir_musica', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']
