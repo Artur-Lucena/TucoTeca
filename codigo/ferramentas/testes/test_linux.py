@@ -211,6 +211,30 @@ def teste_menu_controles_volta():
     afirmar(app.msg == "" or isinstance(app.msg, str), app.msg)
 
 
+def teste_escolher_rola_lista_longa():
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    ops = [f"opcao-{i:02d}" for i in range(50)]
+    app = _tui_fake(db, [ord("j")] * 45 + [10])
+    afirmar(app.escolher("T", ops) == 45, "rolagem quebrou o índice")
+    app = _tui_fake(db, [ord("j")] * 60 + [10])
+    afirmar(app.escolher("T", ops) == 49, "teto da rolagem")
+    app = _tui_fake(db, [27])
+    afirmar(app.escolher("T", ops) is None, "ESC deveria cancelar")
+
+
+def teste_escolher_terminal_estreito():
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    ops = ["x" * 200, "curta"]
+    app = _tui_fake(db, [10], cols=30)
+    afirmar(app.escolher("T", ops) == 0, "largura estreita quebrou")
+
+
 def teste_menu_filtros_cicla_status():
     import tempfile
     from pathlib import Path
@@ -263,3 +287,13 @@ def teste_prefixo_wine_no_hub():
     p = EMU.prefixo_wine_hub()
     afirmar(p == str(base.WINE_PREFIXO), p)
     afirmar("saves" in p.replace("\\", "/"), p)
+
+
+def teste_dedup_cross_os_mesmo_jogo():
+    from bib_nucleo import base
+    win = str(base.WIN_ROOT).rstrip("\\")
+    lin = str(base.LINUX_ROOT).rstrip("/")
+    sep_w, sep_l = "\\", "/"
+    a = core.chave_dedup("Jogo X", win + sep_w + "Games" + sep_w + "Jogo" + sep_w + "jogo.exe", "")
+    b = core.chave_dedup("jogo x", lin + sep_l + "Games" + sep_l + "Jogo" + sep_l + "jogo.exe", "")
+    afirmar(a == b, (a, b))

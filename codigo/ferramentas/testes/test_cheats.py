@@ -10,10 +10,10 @@ COD = "08C650C0 00000002\nD3000000 08000000"
 
 
 def _emu_fake():
+    from executar import azahar_fake
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user").mkdir(parents=True, exist_ok=True)
-    (emu / "azahar.exe").write_bytes(b"MZ" + b"0" * 64)
-    return emu
+    return azahar_fake(emu)
 
 
 def teste_cheats_add_toggle_remove():

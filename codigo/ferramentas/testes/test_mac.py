@@ -34,10 +34,10 @@ def teste_traducao_mac_ida_e_volta():
     lin = base._com_barra(str(base.LINUX_ROOT)).rstrip("/") + "/Games/Roms 3Ds/x.cci"
     m1 = base.win_para_mac(win)
     afirmar(str(Path(m1)).startswith(str(mac)), (win, m1))
-    afirmar(Path(base.mac_para_win(m1)) == Path(win), (m1, win))
+    afirmar(base._com_barra(base.mac_para_win(m1)) == base._com_barra(win), (m1, win))
     m2 = base.linux_para_mac(lin)
     afirmar(str(Path(m2)).startswith(str(mac)), (lin, m2))
-    afirmar(str(Path(base.mac_para_linux(m2))).lower() == str(Path(lin)).lower(), (m2, lin))
+    afirmar(base._com_barra(base.mac_para_linux(m2)).lower() == base._com_barra(lin).lower(), (m2, lin))
     fora = "C:\\Outro\\x.exe" if os.name == "nt" else "/tmp/outro/x"
     afirmar(base.win_para_mac(fora) == fora, fora)
     afirmar(base.mac_para_win(fora) == fora, fora)

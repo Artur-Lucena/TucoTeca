@@ -58,7 +58,8 @@ def teste_fotografar_aplicar_roundtrip():
     tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
-    (emu / "azahar.exe").write_bytes(b"MZ")
+    from executar import azahar_fake as _azahar_fake
+    _azahar_fake(emu)
     cfg = emu / "user" / "config" / "qt-config.ini"
     cfg.write_text("[Controls]\nprofiles\\1\\button_a=code:65,engine:keyboard\n[Renderer]\nresolution_factor=1\n",
                    encoding="utf-8")
@@ -100,7 +101,8 @@ def teste_fotografar_pula_identidade():
     tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
-    (emu / "azahar.exe").write_bytes(b"MZ")
+    from executar import azahar_fake as _azahar_fake
+    _azahar_fake(emu)
     (emu / "user" / "config" / "qt-config.ini").write_text(
         "[Controls]\nprofiles\\1\\name=Pad\n"
         "profiles\\1\\input_maptype=2\n"
@@ -121,7 +123,8 @@ def teste_perfil_ativo_e_detectar_sdl():
     tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
-    (emu / "azahar.exe").write_bytes(b"MZ")
+    from executar import azahar_fake as _azahar_fake
+    _azahar_fake(emu)
     cfg = emu / "user" / "config" / "qt-config.ini"
     g = C.GUIDS["xbox360"]
     cfg.write_text("[Controls]\nprofile=1\n"
@@ -154,7 +157,8 @@ def teste_aplicar_garante_size():
     tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
-    (emu / "azahar.exe").write_bytes(b"MZ")
+    from executar import azahar_fake as _azahar_fake
+    _azahar_fake(emu)
     cfg = emu / "user" / "config" / "qt-config.ini"
     cfg.write_text("[Controls]\nprofile=1\nprofiles\\size=1\n"
                    "profiles\\2\\button_a=code:65,engine:keyboard\n",
@@ -176,7 +180,8 @@ def teste_fotografar_pula_flags():
     tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
-    (emu / "azahar.exe").write_bytes(b"MZ")
+    from executar import azahar_fake as _azahar_fake
+    _azahar_fake(emu)
     cfg = emu / "user" / "config" / "qt-config.ini"
     cfg.write_text("[Controls]\nprofile=0\n"
                    "profiles\\1\\button_a\\default=false\n"
@@ -196,7 +201,8 @@ def teste_aplicar_em_slot_explicito():
     tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
-    (emu / "azahar.exe").write_bytes(b"MZ")
+    from executar import azahar_fake as _azahar_fake
+    _azahar_fake(emu)
     cfg = emu / "user" / "config" / "qt-config.ini"
     cfg.write_text("[Controls]\nprofile=0\nprofiles\\size=1\n"
                    "profiles\\1\\button_a=code:65,engine:keyboard\n",
@@ -219,7 +225,8 @@ def teste_higienizar_remove_crud():
     tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
-    (emu / "azahar.exe").write_bytes(b"MZ")
+    from executar import azahar_fake as _azahar_fake
+    _azahar_fake(emu)
     cfg = emu / "user" / "config" / "qt-config.ini"
     cfg.write_text("[Controls]\nprofile=1\nprofiles\\size=2\n"
                    "profiles\\1\\button_a\\default\\default=false\n"
@@ -243,7 +250,8 @@ def teste_nomes_sdl_da_amostra():
     tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
-    (emu / "azahar.exe").write_bytes(b"MZ")
+    from executar import azahar_fake as _azahar_fake
+    _azahar_fake(emu)
     g = C.GUIDS["xbox360"]
     (emu / "user" / "config" / "qt-config.ini").write_text(
         "[Controls]\n"

@@ -456,30 +456,57 @@ class Tui:
         return j
 
     def escolher(self, titulo: str, opcoes: list[str]) -> int | None:
-        """Caixinha central: ↑↓/jk move, Enter confirma, ESC/q cancela."""
+        """Caixinha central: ↑↓/jk move, Enter confirma, ESC/q cancela.
+
+        Com rolagem (listas longas) e largura limitada ao terminal.
+        """
         s = self.stdscr
         cur = 0
         k_down = getattr(curses, "KEY_DOWN", -2)
         k_up = getattr(curses, "KEY_UP", -2)
         k_enter = getattr(curses, "KEY_ENTER", -2)
-        larg_m = max(26, max((len(titulo) + 4, *(len(o) + 6 for o in opcoes))))
+        rodape = "↑↓ move · Enter ok · ESC volta"
         while True:
             try:
                 rows, cols = s.getmaxyx()
+                larg_m = max(26, max((len(titulo) + 4,
+                                      *(len(o) + 6 for o in opcoes))))
+                larg_m = min(larg_m, max(12, cols))
+                max_vis = max(1, rows - 6)  # título+bordas+rodapé+setas
+                if len(opcoes) > max_vis:
+                    ini = min(max(0, cur - max_vis // 2),
+                              len(opcoes) - max_vis)
+                else:
+                    ini = 0
+                vis = opcoes[ini:ini + max_vis]
                 x0 = max(0, (cols - larg_m) // 2)
-                y0 = max(0, (rows - (len(opcoes) + 2)) // 2)
-                s.addnstr(y0, x0, "┌" + "─" * (larg_m - 2) + "┐", larg_m,
+                y0 = max(0, (rows - (len(vis) + 2)) // 2)
+                if ini > 0:
+                    s.addnstr(y0, x0, ("▲" + " " * (larg_m - 1))[:larg_m],
+                              larg_m, self.cor["mut"])
+                s.addnstr(y0 + (1 if ini > 0 else 0), x0,
+                          "┌" + "─" * (larg_m - 2) + "┐", larg_m,
                           self.cor["mut"])
-                s.addnstr(y0 + 1, x0,
+                s.addnstr(y0 + (2 if ini > 0 else 1), x0,
                           ("│" + f" {titulo} ".center(larg_m - 2)[:larg_m - 2] + "│"),
                           larg_m, self.cor["head"] | self.abold)
-                for i, op in enumerate(opcoes):
+                base = y0 + (3 if ini > 0 else 2)
+                for pos, op in enumerate(vis):
+                    i = ini + pos
                     attr = self.cor["acc"] | self.abold if i == cur else self.cor["txt"]
-                    s.addnstr(y0 + 2 + i, x0,
+                    s.addnstr(base + pos, x0,
                               (f"│ {'▶' if i == cur else ' '} {op}".ljust(larg_m - 1) + "│")[:larg_m],
                               larg_m, attr)
-                s.addnstr(y0 + 2 + len(opcoes), x0,
+                fim = base + len(vis)
+                if ini + len(vis) < len(opcoes):
+                    s.addnstr(fim, x0, ("▼" + " " * (larg_m - 1))[:larg_m],
+                              larg_m, self.cor["mut"])
+                    fim += 1
+                s.addnstr(fim, x0,
                           "└" + "─" * (larg_m - 2) + "┘", larg_m, self.cor["mut"])
+                if fim + 1 < rows:
+                    s.addnstr(fim + 1, x0, rodape[:larg_m].center(larg_m),
+                              larg_m, self.cor["mut"])
                 s.refresh()
             except Exception:
                 return None
@@ -674,16 +701,14 @@ class Tui:
                 nome = self.perguntar("Nome do cheat: ")
                 if not nome:
                     continue
-                print("Cole as linhas (XXXXXXXX YYYYYYYY), vazio p/ terminar:")
                 linhas = []
                 while True:
-                    try:
-                        l = input()
-                    except EOFError:
-                        break
-                    if not l.strip():
+                    l = self.perguntar(f"Linha {len(linhas) + 1} (vazio termina): ")
+                    if l is None or not l.strip():
                         break
                     linhas.append(l)
+                if not linhas:
+                    continue
                 res = core.adicionar_cheat(tid, nome.strip(), "\n".join(linhas))
                 self.msg = (f"Cheat {nome.strip()} ✓ (desligado)"
                             if res.get("ok") else f"Falha: {res.get('erro')}")
@@ -831,6 +856,8 @@ class Tui:
                 f"{p.get('nome') or '?'}"
                 f"{' [' + p['familia'] + ']' if p.get('familia') else ''}"
                 for p in pads) or "nenhum controle"
+            if len(info) > 100:
+                info = info[:99] + "…"
             opcoes = [f"Pads: {info}", "Testar apertos (5s)…",
                       "Fotografar perfil do Azahar…", "Aplicar preset…",
                       "Gerar mapa padrão…", "Voltar"]
@@ -1197,6 +1224,14 @@ class Tui:
         while True:
             s.erase()
             rows, cols = s.getmaxyx()
+            if rows < 4 or cols < 10:
+                try:
+                    s.addnstr(0, 0, "Terminal pequeno demais (min 10x4).", max(1, cols - 1))
+                    s.refresh()
+                    s.getch()
+                except Exception:
+                    pass
+                return
             larg = max(1, cols - 1)
             s.addnstr(0, 0, f"{titulo} — Espaço marca · i importa · q volta"[:larg],
                       larg, self.cor["head"] | self.abold)

@@ -30,6 +30,54 @@ def _dlg(app, root, jogo=None):
     return dlgs[-1]
 
 
+def _listas(dlg):
+    out = []
+
+    def walk(w):
+        for ch in w.winfo_children():
+            if ch.winfo_class() == "Listbox":
+                out.append(ch)
+            walk(ch)
+    walk(dlg)
+    return out
+
+
+def teste_dialogo_listas_tem_rolagem():
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
+    root, app = _app_oculto("d4.db")
+    if root is None:
+        print("(sem display: skip)")
+        return
+    try:
+        app._janela_musicas()
+        root.update()
+        wins = [w for w in root.winfo_children()
+                if w.winfo_class() == "Toplevel"]
+        afirmar(wins, "janela músicas não abriu")
+        lbs = []
+
+        def walk(w):
+            for ch in w.winfo_children():
+                if ch.winfo_class() == "Listbox":
+                    lbs.append(ch)
+                walk(ch)
+        walk(wins[-1])
+        afirmar(lbs, "janela sem Listbox?")
+        for lb in lbs:
+            irmas = [ch for ch in lb.master.winfo_children()
+                     if ch.winfo_class() == "TScrollbar"]
+            afirmar(irmas, "Listbox sem Scrollbar irmã")
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass
+
+
 def _combos(dlg):
     out = []
 

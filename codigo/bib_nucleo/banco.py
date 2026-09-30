@@ -14,7 +14,7 @@ from pathlib import Path
 
 from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, _desaspas, _txt,
                                 agora_iso, existe_aqui_ou_traduzido,
-                                resolver_exe, slugify)
+                                resolver_exe, slugify, win_para_linux)
 
 
 # --------------------------------------------------------------------------
@@ -473,14 +473,18 @@ def _like_esc(s: str) -> str:
 
 
 def chave_dedup(titulo: str, exe: str, launch: str) -> tuple:
-    """Chave anti-duplicata: barra e caixa normalizadas.
+    """Chave anti-duplicata: SO canônico + barra e caixa normalizadas.
 
     Sem isso, o mesmo exe gravado como D:/... e D:\\... vira duas linhas
-    a cada re-scan (UNIQUE do banco é literal e não pega).
+    a cada re-scan (UNIQUE do banco é literal e não pega) — e o mesmo vale
+    para o mesmo jogo visto como D:\\... no Windows e /run/... no Linux.
     """
-    def _n(c):
-        return (c or "").strip().replace("/", "\\").casefold()
-    return (_n(titulo), _n(exe), _n(launch))
+    def _n(c, caminho=True):
+        c = (c or "").strip()
+        if caminho:
+            c = win_para_linux(c)
+        return c.replace("/", "\\").casefold()
+    return (_n(titulo, False), _n(exe), _n(launch))
 
 
 def listar_jogos(con: sqlite3.Connection, q: str = "", status: str = "",

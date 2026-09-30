@@ -121,6 +121,17 @@ def _titulo_escuro(janela) -> None:
         pass
 
 
+def _com_rolagem(lst: tk.Listbox) -> tk.Listbox:
+    """Acopla Scrollbar vertical num Listbox já empacotado. Nunca levanta."""
+    try:
+        bar = ttk.Scrollbar(lst.master, orient="vertical", command=lst.yview)
+        bar.pack(side="right", fill="y")
+        lst.configure(yscrollcommand=bar.set)
+    except (tk.TclError, AttributeError):
+        pass
+    return lst
+
+
 def desenhar_tile(cv: tk.Canvas, titulo: str, w: int, h: int,
                    selecionado: bool = False, grande: bool = False,
                    subtitulo: str = ""):
@@ -529,6 +540,7 @@ class App:
         lb = tk.Listbox(dlg, bg="#0b0d12", fg=TXT, selectbackground=ACC,
                         font=("Segoe UI", 12), height=4)
         lb.pack(fill="x", padx=14)
+        _com_rolagem(lb)
         usuarios = list(est.get("usuarios") or [])
         atual = (est.get("atual") or "").strip()
         for u in usuarios:
@@ -1469,7 +1481,8 @@ class App:
             dica_pillow = ""
         except Exception:
             dica_pillow = " (jpg/webp exigem Pillow p/ preview; png sempre funciona)"
-        lbl_capa = ttk.Label(fr_capa, style="Sec.TLabel",
+        lbl_capa = ttk.Label(fr_capa, style="Sec.TLabel", wraplength=380,
+                             justify="left",
                              text=f"{j['capa']}" if j and j.get("capa") else "Sem capa" + dica_pillow)
         lbl_capa.grid(row=0, column=1, sticky="w")
 
@@ -1588,6 +1601,7 @@ class App:
         win.title(f"Mods — {tid}" + (" (desligados)" if holder.get("off") else ""))
         win.transient(pai)
         win.grab_set()
+        win.minsize(420, 320)
         fr = ttk.Frame(win, padding=12)
         fr.pack(fill="both", expand=True)
         tmp_ativos = set(holder["ativos"])
@@ -1595,6 +1609,7 @@ class App:
                          bg="#0b0d12", fg=TXT, selectbackground=ACC,
                          font=("Segoe UI", 11))
         lst.pack(fill="both", expand=True)
+        _com_rolagem(lst)
 
         def disp():
             try:
@@ -1688,12 +1703,14 @@ class App:
         win.title(f"Cheats — {tid} (vale após reiniciar)")
         win.transient(pai)
         win.grab_set()
+        win.minsize(420, 320)
         fr = ttk.Frame(win, padding=12)
         fr.pack(fill="both", expand=True)
         lst = tk.Listbox(fr, selectmode="single", width=52, height=10,
                          bg="#0b0d12", fg=TXT, selectbackground=ACC,
                          font=("Segoe UI", 11))
         lst.pack(fill="both", expand=True)
+        _com_rolagem(lst)
 
         def redesenhar():
             try:
@@ -1922,11 +1939,15 @@ class App:
         lb = tk.Listbox(dlg, selectmode="multiple", bg="#0b0d12", fg=TXT,
                         selectbackground=ACC, font=("Segoe UI", 10))
         lb.pack(fill="both", expand=True, padx=10)
+        _com_rolagem(lb)
         for i, it in enumerate(itens):
             bola = "●" if it.get("exe_existe") else "○"
             tag = f" [{it['regiao']}]" if it.get("regiao") else ""
-            lb.insert("end", f"{bola} [{it.get('score', 0):.2f}] {it['titulo']}{tag} — {it.get('fonte') or it['origem']}"
-                             + (f" · {it['shop']}" if it.get("shop") else ""))
+            linha = (f"{bola} [{it.get('score', 0):.2f}] {it['titulo']}{tag} — {it.get('fonte') or it['origem']}"
+                     + (f" · {it['shop']}" if it.get("shop") else ""))
+            if len(linha) > 120:
+                linha = linha[:119] + "…"
+            lb.insert("end", linha)
             if it.get("score", 0) >= 0.3:
                 lb.selection_set(i)
 
@@ -2123,12 +2144,15 @@ class App:
         _titulo_escuro(win)
         win.title("Músicas")
         win.transient(self.root)
+        win.grab_set()
+        win.minsize(480, 360)
         fr = ttk.Frame(win, padding=12)
         fr.pack(fill="both", expand=True)
         lst = tk.Listbox(fr, selectmode="single", width=64, height=14,
                          bg="#0b0d12", fg=TXT, selectbackground=ACC,
                          font=("Segoe UI", 11))
         lst.pack(fill="both", expand=True)
+        _com_rolagem(lst)
         ids: list[int] = []
 
         def redesenhar():
@@ -2208,6 +2232,7 @@ class App:
         _titulo_escuro(win)
         win.title("Controles (feche o Azahar p/ aplicar)")
         win.transient(self.root)
+        win.minsize(460, 360)
         filhas = []
 
         def fechar_tudo():
@@ -2233,12 +2258,14 @@ class App:
             f"{p.get('nome') or '?'}"
             f"{' [' + p['familia'] + ']' if p.get('familia') else ''}"
             for p in pads) or "nenhum controle"
-        ttk.Label(fr, text=f"Pads: {txt_pads}",
+        ttk.Label(fr, text=f"Pads: {txt_pads}", wraplength=460,
+                  justify="left",
                   font=("Segoe UI", 11)).pack(anchor="w")
         lst = tk.Listbox(fr, selectmode="single", width=52, height=8,
                          bg="#0b0d12", fg=TXT, selectbackground=ACC,
                          font=("Segoe UI", 11))
         lst.pack(fill="both", expand=True, pady=(8, 0))
+        _com_rolagem(lst)
 
         def redesenhar():
             try:
@@ -2299,6 +2326,7 @@ class App:
                             bg="#0b0d12", fg=TXT, selectbackground=ACC,
                             font=("Segoe UI", 11))
             lb.pack(fill="both", expand=True, padx=12, pady=12)
+            _com_rolagem(lb)
             for t in tipos:
                 lb.insert("end", f"{t} — {core.NOMES_TIPO[t]}")
 

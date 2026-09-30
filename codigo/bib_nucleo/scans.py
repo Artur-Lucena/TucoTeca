@@ -1326,10 +1326,17 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
     avisos: list[str] = []
     vistos = {chave_dedup(r["titulo"], r["executable_path"], r["launch_options"])
               for r in con.execute(
-                  "SELECT titulo, executable_path, launch_options FROM jogos").fetchall()}
+                  "SELECT titulo, executable_path, launch_options, origem FROM jogos").fetchall()}
     # mesmo exe+lançamento com título diferente também é duplicata
     # (título de scan muda: "Hades2" virou "Hades 2" no exe do "Hades II")
     vistos_exe = {(t[1], t[2]) for t in vistos}
+    # ROMs: o emulador muda por SO (azahar.exe × AppImage), então o par
+    # (título, ROM) dedupa sozinho, sem o exe
+    vistos_rom = set()
+    for r in con.execute(
+            "SELECT titulo, launch_options, origem FROM jogos").fetchall():
+        if (r["origem"] or "").startswith("rom-") and (r["launch_options"] or "").strip():
+            vistos_rom.add(chave_dedup(r["titulo"], "", r["launch_options"]))
 
     def _ignorar(motivo: str):
         nonlocal ignorados
@@ -1406,6 +1413,11 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
             if chave in vistos or (chave[1] and (chave[1], chave[2]) in vistos_exe):
                 ignorados += 1
                 continue
+            if ((j.get("origem") or "").startswith("rom-")
+                    and (j.get("launch_options") or "").strip()
+                    and chave_dedup(titulo, "", j.get("launch_options") or "") in vistos_rom):
+                ignorados += 1
+                continue
             cur = con.execute(
                    """INSERT OR IGNORE INTO jogos
                    (titulo, executable_path, exe_win, exe_linux, exe_mac, wine_prefix, launch_options,
@@ -1436,6 +1448,9 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
             else:
                 vistos.add(chave)
                 vistos_exe.add((chave[1], chave[2]))
+                if ((j.get("origem") or "").startswith("rom-")
+                        and (j.get("launch_options") or "").strip()):
+                    vistos_rom.add(chave_dedup(titulo, "", j.get("launch_options") or ""))
             prov_rom = provedor_por_origem(j.get("origem") or "")
             if cur.rowcount and prov_rom is not None:
                 try:  # capa automática: ícone de dentro da própria ROM

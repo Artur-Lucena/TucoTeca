@@ -31,6 +31,17 @@ def afirmar(cond, msg=""):
         raise AssertionError(msg or "afirmação falhou")
 
 
+def azahar_fake(emu):
+    """Binário falso do Azahar que o SO atual detecta (exe no Win, AppImage no Linux)."""
+    from pathlib import Path as _P
+    emu = _P(emu)
+    if os.name == "nt":
+        (emu / "azahar.exe").write_bytes(b"MZ" + b"0" * 64)
+    else:
+        (emu / "azahar.AppImage").write_bytes(b"\x7fELF" + b"0" * 64)
+    return emu
+
+
 def isolar(raiz: Path):
     raiz = raiz.resolve()
     for sub in ("dados", "emu/user", "roms", "appdata", "programdata", "home"):
