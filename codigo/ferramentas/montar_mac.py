@@ -29,9 +29,9 @@ MAC_CACHE = AQUI / ".cache" / "mac"
 
 # Arquivos oficiais p/ Mac (Intel+ARM, velho+novo). Tudo verificado nas
 # fontes em 28/09/2026: python.org/downloads/macos + APIs GitHub
-# (azahar-emu/azahar, citron-neo/emulator, TASEmulators/desmume).
+# (azahar-emu/azahar, TASEmulators/desmume).
 MAC_ARQS = (
-    # sha: GitHub digest (azahar/citron) ou pin local do baixado (python,
+    # sha: GitHub digest (azahar) ou pin local do baixado (python,
     # desmume sem digest no release) — qualquer troca futura quebra alto.
     ("python-3.14.7-macos11.pkg",  # novo (mesma série do Montar Win)
      "https://www.python.org/ftp/python/3.14.7/python-3.14.7-macos11.pkg",
@@ -51,11 +51,6 @@ MAC_ARQS = (
      "azahar-macos-universal-2126.1.1.zip",
      90_000_000,
      "46839e22772b75f76fc3021a5aed07c2fedb52cfa434f43030e48c3514a8aa1a"),
-    ("Citron-macOS-nightly-0237a9b88.dmg",
-     "https://github.com/citron-neo/emulator/releases/download/2026-04-27/"
-     "Citron-macOS-nightly-0237a9b88.dmg",
-     50_000_000,
-     "4813ad4bbc72387643def021e28a03f677dc420c87b8e66b35f1b212ec79a2d9"),
     ("desmume-0.9.13-macOS.dmg",
      "https://github.com/TASEmulators/desmume/releases/download/"
      "release_0_9_13/desmume-0.9.13-macOS.dmg",
@@ -157,9 +152,6 @@ montar_dmg() { # $1=dmg $2=destino $3=versao-arq $4=versao
 deszipar "$AQUI"/azahar-macos-universal-*.zip "$HUB/emuladores/Azahar" \
   versao-azahar.txt 2126.1.2 || falha "Azahar não instalou."
 mkdir -p "$HUB/emuladores/Azahar/user"
-montar_dmg "$AQUI"/Citron-macOS-*.dmg "$HUB/emuladores/Citron" \
-  versao-citron.txt 2026-04-27 || echo "[aviso] Citron não instalou (use o botão ⬇ do app)."
-mkdir -p "$HUB/emuladores/Citron/user"
 montar_dmg "$AQUI"/desmume-*.dmg "$HUB/emuladores/DeSmuME" \
   desmume-versao.txt release_0_9_13 || echo "[aviso] DeSmuME não instalou (use o botão ⬇ do app)."
 
@@ -177,8 +169,8 @@ INSTALAÇÃO (tudo offline, nesta pasta):
 1. Duplo-clique em Instalar-Mac.command (1ª vez: clique direito > Abrir).
 2. Ele pede o Python oficial se faltar (pkg incluído: python-3.14.7;
    tem o 3.10.11 p/ macs mais velhos — troque o nome no instalador).
-3. Emuladores oficiais inclusos: Azahar 2126.1.2 (3DS), Citron
-   (Switch, nightly 2026-04-27), DeSmuME 0.9.13 (NDS).
+3. Emuladores oficiais inclusos: Azahar 2126.1.2 (3DS),
+   DeSmuME 0.9.13 (NDS).
 4. A coleção fica em ~/Applications/TucoTeca/tucoteca/dados.
 
 ATUALIZAR DEPOIS: botão ⬇ dentro do app (baixa build oficial sozinho).
@@ -222,7 +214,7 @@ def montar_base_mac(trab: Path | None = None) -> tuple[Path, dict]:
 
 MAC_NAVIO = ("python-3.14.7-macos11.pkg", "python-3.10.11-macos11.pkg",
                "azahar-macos-universal-2126.1.2.zip",
-               "Citron-macOS-nightly-0237a9b88.dmg", "desmume-0.9.13-macOS.dmg")
+               "desmume-0.9.13-macOS.dmg")
 
 
 def empacotar_mac(build: Path, data: str, leve: bool = False) -> tuple[Path, Path]:

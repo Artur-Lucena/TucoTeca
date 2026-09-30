@@ -347,11 +347,8 @@ def slugify(s: str) -> str:
 # Extensões de ROM por provider (aqui p/ scans e emuladores usarem sem ciclo).
 ROM_EXTS_3DS = {".cci", ".cxi", ".3ds", ".3dsx", ".elf", ".app", ".axf"}
 
-# Nintendo Switch (Citron 2026-04-27): dumps e homebrew suportados pelo Hub.
-ROM_EXTS_SWITCH = {".nsp", ".xci", ".nca", ".nro", ".nso"}
-
 # Áudio por jogo (OST futura): só formatos que o Hub vai baixar/guardar.
 MUSICA_EXTS = {".mp3", ".ogg", ".m4a", ".flac", ".wav"}
 
 __all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'MAC_ROOT', 'eh_mac', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'MODS_DIR', 'MUSICAS_DIR', 'TEXTURAS_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'win_para_mac', 'mac_para_win', 'linux_para_mac', 'mac_para_linux', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
- 'ROM_EXTS_3DS', 'ROM_EXTS_SWITCH', 'MUSICA_EXTS']
+ 'ROM_EXTS_3DS', 'MUSICA_EXTS']

@@ -178,7 +178,7 @@ def _aplicar(stage: Path, dest: Path, tag: str, links: bool = False) -> dict:
 def _extrair_app_mac(pacote: Path, stage: Path) -> str:
     """Extrai *.app de .zip/.dmg p/ stage. Retorna o nome do .app.
 
-    macOS: Azahar vem em .zip, Citron/DeSmuME em .dmg (hdiutil). Valida
+    macOS: Azahar vem em .zip, DeSmuME em .dmg (hdiutil). Valida
     que Contents/MacOS tem binário real (≥ 1 MB). Só roda em darwin.
     """
     tmp = stage / ".mac"

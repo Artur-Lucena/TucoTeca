@@ -48,7 +48,6 @@ setlocal
 set BIBLIOTECA_HOME=%~dp0dados
 set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
-set BIBLIOTECA_CITRON_DIR=%~dp0emuladores\\Citron
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
 set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
 start "BibliotecaHub" "%~dp0python\\pythonw.exe" "%~dp0app\\app_win.py"
@@ -59,7 +58,6 @@ setlocal
 set BIBLIOTECA_HOME=%~dp0dados
 set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
-set BIBLIOTECA_CITRON_DIR=%~dp0emuladores\\Citron
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
 set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
 "%~dp0python\\python.exe" "%~dp0app\\app_win.py" %*
@@ -246,80 +244,6 @@ def garantir_gpl() -> Path:
 
 
 DESMUME_URL = "https://github.com/TASEmulators/desmume"
-
-CITRON_URL = "https://github.com/citron-neo/emulator"
-
-
-def citron_instalado_dir() -> Path:
-    """De onde copiar o Citron (instalação real; nunca o bundle)."""
-    env = (os.environ.get("BIBLIOTECA_EMULADOR_SWITCH") or "").strip()
-    if env and Path(env).is_file():
-        return Path(env).parent
-    for cand in (Path("D:/Games/Emuladores/Citron"),
-                 Path("/run/media/tuco/Games/Games/Emuladores/Citron")):
-        if list(cand.glob("citron*.exe")) or list(cand.glob("citron*.AppImage")):
-            return cand
-    raise SystemExit("Citron instalado não achado (instale com o botão ⬇ primeiro).")
-
-
-def incluir_citron(dest_base: Path) -> str:
-    """Copia o Citron instalado p/ emuladores/Citron. Retorna a versão."""
-    src = citron_instalado_dir()
-    dst = dest_base / "emuladores" / "Citron"
-    if dst.exists():
-        shutil.rmtree(dst)
-    dst.mkdir(parents=True)
-    for item in sorted(src.iterdir()):
-        if item.name == "user":
-            continue  # user/ tem chaves (prod.keys) e firmware: pessoais
-        if item.suffix.lower() in (".bak", ".log"):
-            continue
-        if item.is_dir():
-            shutil.copytree(item, dst / item.name)
-        else:
-            shutil.copy2(item, dst / item.name)
-    (dst / "user").mkdir(exist_ok=True)  # Citron cria o resto no 1º boot
-    ver = ""
-    varq = src / "versao-citron.txt"
-    if varq.is_file():
-        try:
-            ver = varq.read_text(encoding="utf-8", errors="ignore").strip()
-        except OSError:
-            pass
-    (dst / "FONTE.txt").write_text(
-        "Citron \u2014 emulador de Nintendo Switch (terceiros, sem modifica\u00e7\u00e3o).\n"
-        f"Vers\u00e3o empacotada: {ver or 'desconhecida'}\n"
-        f"Fonte: {CITRON_URL} (c\u00f3digo-fonte e releases oficiais)\n"
-        "Licen\u00e7a: GPL-3.0 (texto em COPYING.txt).\n"
-        "\n"
-        "NÃO acompanham: chaves (user/keys/prod.keys) nem firmware\n"
-        "(user/nand/system) — dumps pessoais e intransferíveis do SEU Switch.\n",
-        encoding="utf-8")
-    try:
-        req = urllib.request.Request(
-            "https://www.gnu.org/licenses/gpl-3.0.txt",
-            headers={"User-Agent": "biblioteca-hub"})
-        with urllib.request.urlopen(req, timeout=60) as r, \
-                open(dst / "COPYING.txt", "wb") as f:
-            shutil.copyfileobj(r, f, 1024 * 64)
-    except Exception as e:
-        raise SystemExit(f"sem a GPL-3.0 não dá p/ redistribuir: {e}")
-    mb = sum(f.stat().st_size for f in dst.rglob("*") if f.is_file()) / 1048576
-    print(f"[ok] Citron {ver or '?'} embutido ({mb:.0f} MB, sem user/)")
-    return ver
-
-
-def desmume_instalado_dir() -> Path:
-    """De onde copiar o DeSmuME (instalação real; nunca o bundle)."""
-    env = (os.environ.get("BIBLIOTECA_EMULADOR_NDS") or "").strip()
-    if env and Path(env).is_file():
-        return Path(env).parent
-    for cand in (Path("D:/Games/Emuladores/DeSmuME"),
-                 Path("/run/media/tuco/Games/Games/Emuladores/DeSmuME")):
-        if (cand / "desmume.exe").is_file() or list(cand.glob("desmume*.AppImage")):
-            return cand
-    raise SystemExit("DeSmuME instalado não achado (instale com o botão ⬇ primeiro).")
-
 
 def incluir_desmume(dest_base: Path) -> str:
     """Copia o DeSmuME instalado p/ emuladores/DeSmuME. Retorna a versão."""
@@ -549,22 +473,17 @@ def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
     (BUILD / "README-PORTATIL.txt").write_text(LEIAME_PORTATIL, encoding="utf-8")
     for sub in ("dados", "dados/backups", "dados/capas", "dados/presets", "dados/sessoes"):
         (BUILD / sub).mkdir(parents=True, exist_ok=True)
-    azahar_ver = desmume_ver = citron_ver = ""
+    azahar_ver = desmume_ver = ""
     if not sem_azahar:
         azahar_ver = incluir_azahar(BUILD)
         desmume_ver = incluir_desmume(BUILD)
-        try:
-            citron_ver = incluir_citron(BUILD)
-        except SystemExit as e:
-            print(f"[aviso] sem Citron no pacote: {e}")
     else:
         print("[aviso] pacote magro, sem emulador (--sem-azahar)")
     (BUILD / "VERSAO.txt").write_text(
-        f"TucoTeca — build {datetime.date.today():%Y-%m-%d}\n"
-        f"Python embutido: {versao}\n"
-        f"Azahar: {azahar_ver or 'ausente (--sem-azahar)'}\n"
-        f"DeSmuME: {desmume_ver or 'ausente (--sem-azahar)'}\n"
-        f"Citron: {citron_ver or 'ausente (não instalado aqui)'}\n",
+        "TucoTeca — build " + datetime.date.today().strftime("%Y-%m-%d") + "\n"
+        + "Python embutido: " + versao + "\n"
+        + "Azahar: " + (azahar_ver or "ausente (--sem-azahar)") + "\n"
+        + "DeSmuME: " + (desmume_ver or "ausente (--sem-azahar)") + "\n",
         encoding="utf-8")
 
     # prova real: o python embutido importa tkinter e monta a UI oculta
@@ -633,7 +552,7 @@ def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
 
     podar_dieta(BUILD)
     versoes = {"python": versao, "serie_tk": serie, "azahar": azahar_ver,
-               "desmume": desmume_ver, "citron": citron_ver,
+               "desmume": desmume_ver,
                "data": datetime.date.today().strftime("%Y%m%d"),
                "magro": sem_azahar}
     return BUILD, versoes

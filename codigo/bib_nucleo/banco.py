@@ -48,7 +48,6 @@ CREATE TABLE IF NOT EXISTS jogos (
     game_code TEXT DEFAULT '',
     regiao TEXT DEFAULT '',
     azahar_preset TEXT DEFAULT '',
-    citron_preset TEXT DEFAULT '',
     uuid TEXT DEFAULT '',
     etiquetas TEXT DEFAULT '',
     save_path TEXT DEFAULT '',
@@ -64,7 +63,7 @@ CREATE TABLE IF NOT EXISTS jogos (
 # Migração de bancos antigos: v1 (sem capa/confianca), v2 (sem exe por SO),
 # v3 (sem game_code/regiao), v4 (sem azahar_preset), v5 (sem uuid),
 # v6 (sem etiquetas), v7 (sem save_path), v8 (sem exe_mac),
-# v9 (sem azahar_mods), v10 (sem azahar_mods_off), v11 (sem citron_preset),
+# v9 (sem azahar_mods), v10 (sem azahar_mods_off), v11 (REMOVIDA: era citron_preset),
 # v12 (sem tabela musicas — catálogo de áudio do selfhost).
 MIGRACOES = (
     "ALTER TABLE jogos ADD COLUMN capa TEXT DEFAULT ''",
@@ -77,7 +76,6 @@ MIGRACOES = (
     "ALTER TABLE jogos ADD COLUMN game_code TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN regiao TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN azahar_preset TEXT DEFAULT ''",
-    "ALTER TABLE jogos ADD COLUMN citron_preset TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN uuid TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN etiquetas TEXT DEFAULT ''",
     "ALTER TABLE jogos ADD COLUMN save_path TEXT DEFAULT ''",
@@ -88,7 +86,7 @@ CAMPOS_EDITAVEIS = ("titulo", "executable_path", "exe_win", "exe_linux",
                     "exe_mac",
                     "wine_prefix", "launch_options", "status", "nota", "favorito",
                     "horas", "observacoes", "shop", "object_id", "origem",
-                    "game_code", "regiao", "azahar_preset", "citron_preset", "etiquetas",
+                    "game_code", "regiao", "azahar_preset", "etiquetas",
                     "save_path", "azahar_mods", "azahar_mods_off")
 
 
@@ -145,14 +143,12 @@ def etiquetas_de(j: dict | None) -> list[str]:
 
 
 def plataforma_de_origem(origem: str) -> str:
-    """PC/3DS/NDS/Switch a partir da origem (sem consultar o registro)."""
+    """PC/3DS/NDS a partir da origem (sem consultar o registro)."""
     o = (origem or "").strip().lower()
     if o == "rom-3ds":
         return "3DS"
     if o == "rom-nds":
         return "NDS"
-    if o == "rom-switch":
-        return "Switch"
     return "PC"
 
 
@@ -170,8 +166,6 @@ def plataforma_jogo(j: dict | None) -> str:
                 return "3DS"
             if re.search(r"\bNDS\b|Nintendo DS", sist):
                 return "NDS"
-            if re.search(r"Switch", sist):
-                return "Switch"
     except Exception:
         pass
     return plataforma_de_origem(origem)
@@ -203,7 +197,7 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
     cols = ["id", "titulo", "executable_path", "exe_win", "exe_linux", "exe_mac", "wine_prefix",
             "launch_options", "status", "nota", "favorito", "horas", "ultima_execucao",
             "observacoes", "origem", "shop", "object_id", "game_code", "regiao",
-            "azahar_preset", "citron_preset", "uuid", "etiquetas", "save_path", "azahar_mods", "azahar_mods_off",
+            "azahar_preset", "uuid", "etiquetas", "save_path", "azahar_mods", "azahar_mods_off",
             "capa", "confianca", "criado_em", "atualizado_em"]
     todos = ", ".join(cols)
     con.executescript(f"""
@@ -228,7 +222,6 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
             game_code TEXT DEFAULT '',
             regiao TEXT DEFAULT '',
             azahar_preset TEXT DEFAULT '',
-            citron_preset TEXT DEFAULT '',
             uuid TEXT DEFAULT '',
             etiquetas TEXT DEFAULT '',
             save_path TEXT DEFAULT '',
@@ -292,6 +285,17 @@ def _garantir_tabela_musicas(con: sqlite3.Connection) -> None:
     con.execute(SCHEMA_MUSICAS)
 
 
+def _garantir_sem_citron(con: sqlite3.Connection) -> None:
+    """v13: remove a coluna citron_preset (fim do Switch). Idempotente."""
+    try:
+        cols = {r["name"] for r in con.execute("PRAGMA table_info(jogos)")}
+    except sqlite3.OperationalError:
+        return
+    if "citron_preset" in cols:
+        con.execute("ALTER TABLE jogos DROP COLUMN citron_preset")
+        con.commit()
+
+
 def get_db(db_path: Path) -> sqlite3.Connection:
     db_path = Path(db_path)
     if str(db_path.parent) and not db_path.parent.exists():
@@ -315,6 +319,7 @@ def get_db(db_path: Path) -> sqlite3.Connection:
             con.execute(sql)
     _garantir_unique_triplo(con, db_path)
     _garantir_uuid(con)
+    _garantir_sem_citron(con)
     _garantir_tabela_musicas(con)
     con.commit()
     return con
@@ -363,8 +368,7 @@ def validar_dados(dados: dict, parcial: bool = False) -> dict:
         limpo["titulo"] = titulo
     if "executable_path" in dados or not parcial:
         limpo["executable_path"] = _desaspas(_txt(dados.get("executable_path")))
-    for campo in ("exe_win", "exe_linux", "exe_mac", "game_code", "regiao", "azahar_preset",
-                    "citron_preset"):
+    for campo in ("exe_win", "exe_linux", "exe_mac", "game_code", "regiao", "azahar_preset"):
         if campo in dados or not parcial:
             v = _txt(dados.get(campo))
             limpo[campo] = _desaspas(v) if campo.startswith("exe_") else v
@@ -542,16 +546,15 @@ def criar_jogo(con: sqlite3.Connection, dados: dict) -> dict:
         cur = con.execute(
             """INSERT INTO jogos (titulo, executable_path, exe_win, exe_linux, exe_mac, wine_prefix,
                launch_options, status, nota, favorito, horas, observacoes, origem, shop,
-               object_id, game_code, regiao, azahar_preset, citron_preset, uuid, etiquetas, save_path, azahar_mods,
+               object_id, game_code, regiao, azahar_preset, uuid, etiquetas, save_path, azahar_mods,
                azahar_mods_off, criado_em, atualizado_em)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
              (limpo["titulo"], limpo["executable_path"], limpo["exe_win"],
               limpo["exe_linux"], limpo["exe_mac"], limpo["wine_prefix"],
                limpo["launch_options"], limpo["status"], limpo["nota"],
                limpo["favorito"], limpo["horas"], limpo["observacoes"],
                limpo["origem"], limpo["shop"], limpo["object_id"],
                limpo["game_code"], limpo["regiao"], limpo["azahar_preset"],
-               limpo["citron_preset"],
                limpo["uuid"], limpo["etiquetas"], limpo["save_path"], limpo["azahar_mods"],
                limpo["azahar_mods_off"], agora, agora),
         )
@@ -571,14 +574,14 @@ def atualizar_jogo(con: sqlite3.Connection, gid: int, dados: dict) -> dict:
         """UPDATE jogos SET titulo=?, executable_path=?, exe_win=?, exe_linux=?, exe_mac=?,
            wine_prefix=?, launch_options=?, status=?, nota=?, favorito=?, horas=?,
            observacoes=?, shop=?, object_id=?, origem=?, game_code=?, regiao=?,
-           azahar_preset=?, citron_preset=?, etiquetas=?, save_path=?, azahar_mods=?, azahar_mods_off=?,
+           azahar_preset=?, etiquetas=?, save_path=?, azahar_mods=?, azahar_mods_off=?,
            atualizado_em=? WHERE id=?""",
         (limpo["titulo"], limpo["executable_path"], limpo["exe_win"],
          limpo["exe_linux"], limpo["exe_mac"], limpo["wine_prefix"], limpo["launch_options"],
          limpo["status"], limpo["nota"], limpo["favorito"],
          limpo["horas"], limpo["observacoes"], limpo["shop"], limpo["object_id"],
          limpo["origem"], limpo["game_code"], limpo["regiao"],
-         limpo["azahar_preset"], limpo["citron_preset"], limpo["etiquetas"], limpo["save_path"], limpo["azahar_mods"],
+         limpo["azahar_preset"], limpo["etiquetas"], limpo["save_path"], limpo["azahar_mods"],
          limpo["azahar_mods_off"], agora_iso(), gid),
     )
     con.commit()

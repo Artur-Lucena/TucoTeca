@@ -61,7 +61,7 @@ ol{margin:8px 0}li{margin:4px 0}.nota{color:#666;font-size:.9em}
 <h2>🍎 Mac (experimental)<span class="badge" id="b-mac" hidden>este computador</span></h2>
 <ol><li>Abra a pasta <b>mac</b> (Python + 3 emuladores já dentro, offline)</li>
 <li>Duplo-clique em <b>Instalar-Mac.command</b> (1ª vez: clique direito > Abrir)</li></ol>
-<p class="nota">Ainda não testado num Mac real. Inclui Azahar (3DS), Citron (Switch) e DeSmuME (NDS).</p>
+<p class="nota">Ainda não testado num Mac real. Inclui Azahar (3DS) e DeSmuME (NDS).</p>
 </div>
 <p class="nota">Prefere portátil sem instalar? O .zip clássico de Windows continua saindo do montar_portatil.py.</p>
 <script>
@@ -85,8 +85,8 @@ COMO INSTALAR
     mac/      Instalar-Mac.command   (experimental, precisa Python 3.10+)
 
 O QUE VAI EM CADA UM
-- Windows: Python embutido + Azahar + DeSmuME (+Citron, se montado junto).
-- Linux: app + Azahar (AppImage). DeSmuME/Citron: pacote do sistema.
+- Windows: Python embutido + Azahar + DeSmuME.
+- Linux: app + Azahar (AppImage). DeSmuME: pacote do sistema.
 - Mac (Fase 0): só o app; emuladores ficam p/ depois.
 """
 

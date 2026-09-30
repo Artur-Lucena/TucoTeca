@@ -12,7 +12,7 @@ Teclas (lista): ↑/↓ ou j/k navegar · PgUp/PgDn · / buscar · f status ·
   a adicionar · e editar · d excluir ·
   I importar (arquivo, pasta ou disco — ROM liga no emu sozinha) ·
   b backup · U saves 3DS · E exportar JSON · P pacote portátil · S registrar sessão manual ·
-  A atualizar Azahar · G atualizar DeSmuME · C atualizar Citron · r recarregar · q sair
+  A atualizar Azahar · G atualizar DeSmuME · r recarregar · q sair
 Preview: Espaço marca/desmarca · PgUp/PgDn · i importa marcados · q volta
 
 Horas automáticas: ao jogar, o tempo do processo é somado sozinho
@@ -195,12 +195,8 @@ class Tui:
                       self.cor["head"] | self.abold)
             az = core.azahar_status()
             azg = "🎮✓" if az["instalado"] and az["chaves"] else ("🎮!" if az["instalado"] else "🎮✗")
-            ndsg = "NDS✓" if core.default_emu_nds() else "NDS✗"
-            swg = "SW✓" if core.default_emu_switch() else "SW✗"
-            prov_txt = f" prov={self.filtro_prov}" if self.filtro_prov else ""
-            plat_txt = f" plat={self.filtro_plat}" if self.filtro_plat else ""
-            tags_txt = f" tags={','.join(self.filtro_tags)}" if self.filtro_tags else ""
-            filtro = f"busca='{self.q}' status={self.statuses[self.si] or 'todos'} fav={'sim' if self.fav else 'não'}{prov_txt}{plat_txt}{tags_txt} {azg} {ndsg} {swg}"
+            ndsg = ("NDS✓" if core.default_emu_nds() else "NDS✗")
+            filtro = f"busca='{self.q}' status={self.statuses[self.si] or 'todos'} fav={'sim' if self.fav else 'não'}{prov_txt}{plat_txt}{tags_txt} {azg} {ndsg}"
             s.addnstr(1, 0, f"{filtro} — {len(self.jogos)} jogo(s)", larg, self.cor["mut"])
             area = rows - 4
             if self.cur < self.top:
@@ -1017,7 +1013,7 @@ class Tui:
                 self._prev_disco()
 
     def menu_backup(self):
-        opcoes = ["Backup do banco", "Backup saves 3DS", "Backup saves Switch", "Exportar JSON",
+        opcoes = ["Backup do banco", "Backup saves 3DS", "Exportar JSON",
                   "Exportar pacote", "Importar pacote", "Voltar"]
         while True:
             idx = self.escolher("Backup e saves", opcoes)
@@ -1028,8 +1024,6 @@ class Tui:
                 self.backup()
             elif escolha == "Backup saves 3DS":
                 self.backup_saves()
-            elif escolha == "Backup saves Switch":
-                self.backup_saves_switch()
             elif escolha == "Exportar JSON":
                 self.exportar_json()
             elif escolha == "Exportar pacote":
@@ -1048,16 +1042,14 @@ class Tui:
             self.registrar_sessao_manual()
 
     def menu_emuladores(self):
-        opcoes = ["Atualizar Azahar", "Atualizar DeSmuME", "Atualizar Citron", "Voltar"]
+        opcoes = ["Atualizar Azahar", "Atualizar DeSmuME", "Voltar"]
         while True:
             idx = self.escolher("Emuladores", opcoes)
             if idx is None or opcoes[idx] == "Voltar":
                 return
             if opcoes[idx] == "Atualizar Azahar":
                 self.atualizar_azahar()
-            elif opcoes[idx] == "Atualizar Citron":
-                self.atualizar_citron()
-            else:
+            elif opcoes[idx] == "Atualizar DeSmuME":
                 self.atualizar_desmume()
 
     def _aplicar_sessoes(self):
@@ -1107,8 +1099,6 @@ class Tui:
                                              j["launch_options"] if j else ""),
             "azahar_preset": self.perguntar("Preset Azahar p/ ROMs 3DS (vazio=nenhum): ",
                                             (j.get("azahar_preset") if j else "") or ""),
-            "citron_preset": self.perguntar("Preset Citron p/ ROMs Switch (vazio=nenhum): ",
-                                            (j.get("citron_preset") if j else "") or ""),
             "wine_prefix": self.perguntar("Wine prefix (Linux): ",
                                           j["wine_prefix"] if j else ""),
             "etiquetas": self.perguntar("Etiquetas (vírgula, ex.: rpg, souls-like): ",
@@ -1132,7 +1122,6 @@ class Tui:
                 "favorito": (vals["favorito"] or "").strip().lower() in ("s", "sim", "y"),
                 "launch_options": (vals["launch_options"] or "").strip(),
                 "azahar_preset": (vals["azahar_preset"] or "").strip(),
-                "citron_preset": (vals["citron_preset"] or "").strip(),
                 "wine_prefix": (vals["wine_prefix"] or "").strip(),
                 "etiquetas": (vals["etiquetas"] or "").strip(),
                 "save_path": (vals["save_path"] or "").strip(),
@@ -1143,8 +1132,7 @@ class Tui:
             return None
 
     def _avisar_preset(self, dados: dict) -> None:
-        pres = [(dados.get("azahar_preset") or "").strip(),
-                (dados.get("citron_preset") or "").strip()]
+        pres = [(dados.get("azahar_preset") or "").strip()]
         pres = [p for p in pres if p]
         if not pres:
             return
@@ -1368,17 +1356,6 @@ class Tui:
         else:
             self.msg = f"Saves: {res.get('erro')}"
 
-    def backup_saves_switch(self):
-        try:
-            res = core.backup_saves_citron()
-        except Exception as e:
-            self.msg = f"Falha: {e}"
-            return
-        if res.get("ok"):
-            self.msg = f"Saves Switch ok: {res['arquivos']} arquivo(s)"
-        else:
-            self.msg = f"Saves Switch: {res.get('erro')}"
-
     def exportar_json(self):
         dest = self.perguntar("Exportar para (caminho .json): ")
         if not dest:
@@ -1460,9 +1437,6 @@ class Tui:
 
     def atualizar_desmume(self):
         self.atualizar_emu("desmume")
-
-    def atualizar_citron(self):
-        self.atualizar_emu("citron")
 
     def atualizar_emu(self, chave: str):
         try:

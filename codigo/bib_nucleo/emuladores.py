@@ -18,7 +18,7 @@ import zipfile
 from pathlib import Path
 
 from bib_nucleo.base import (BACKUP_DIR, LINUX_ROOT, MAC_ROOT, PRESETS_DIR, ROM_EXTS_3DS,
-                               ROM_EXTS_SWITCH, WIN_ROOT, eh_mac, existe_aqui_ou_traduzido,
+                               WIN_ROOT, eh_mac, existe_aqui_ou_traduzido,
                                resolver_exe, slugify, traduzir_para_atual)
 from bib_nucleo.banco import contar_por_origem
 
@@ -36,7 +36,7 @@ def _app_macos(pasta: Path) -> str:
 
     Ordem: nome exato do .app > prefixo do nome > maior arquivo (helpers
     tipo *-room nunca vencem um binário da família). Qualquer emulador
-    (Azahar, Citron, DeSmuME) resolve pelo mesmo caminho.
+    (Azahar, DeSmuME) resolve pelo mesmo caminho.
     """
     try:
         if not pasta.is_dir():
@@ -390,258 +390,6 @@ def _prov_desmume() -> dict:
     }
 
 # --------------------------------------------------------------------------
-# Citron (Nintendo Switch): provider nº 3, mesma integração do Azahar
-#
-# Versão pinada: 2026-04-27 (Latest, build 0237a9b88). Launcher externo
-# (BYOB, GPL-safe): nenhum src/ do Citron é copiado; o Hub só baixa o
-# binário oficial, detecta user/ portátil e lança a ROM via subprocesso.
-# Metadados internos v1 = nome do arquivo (NCA/XCI exigem prod.keys).
-# --------------------------------------------------------------------------
-
-CITRON_API_LATEST = "https://api.github.com/repos/citron-neo/emulator/releases/latest"
-
-CITRON_VERSAO_ARQ = "versao-citron.txt"
-
-
-def citron_dir_override() -> Path | None:
-    env = (os.environ.get("BIBLIOTECA_CITRON_DIR") or "").strip()
-    if env:
-        return Path(env)
-    return None
-
-
-def _citron_dir() -> Path:
-    ov = citron_dir_override()
-    if ov is not None:
-        return ov  # bundle: atualiza o emulador dentro do pacote
-    if os.name == "nt":
-        return Path(WIN_ROOT) / "Games/Emuladores/Citron"
-    if eh_mac():
-        return Path(MAC_ROOT) / "Games/Emuladores/Citron"
-    return Path(LINUX_ROOT) / "Games/Emuladores/Citron"
-
-
-
-
-
-def default_emu_switch() -> str:
-    """Caminho do Citron (BIBLIOTECA_EMULADOR_SWITCH > DIR > padrão)."""
-    env = os.environ.get("BIBLIOTECA_EMULADOR_SWITCH")
-    if env:
-        return env
-    ov = citron_dir_override()
-    if ov is not None:
-        if eh_mac():
-            return _app_macos(ov)
-        if os.name == "nt":
-            for pat in ("citron*.exe",):
-                alvos = sorted(ov.glob(pat))
-                if alvos:
-                    return str(alvos[0])
-            return ""
-        return _appimage_na_pasta(ov, "citron")
-    if eh_mac():
-        return _app_macos(Path(MAC_ROOT) / "Games/Emuladores/Citron")
-    if os.name == "nt":
-        pasta = Path(WIN_ROOT) / "Games/Emuladores/Citron"
-        if pasta.is_dir():
-            alvos = sorted(pasta.glob("citron*.exe"))
-            if alvos:
-                return str(alvos[0])
-        return ""
-    pasta = Path(LINUX_ROOT) / "Games/Emuladores/Citron"
-    return _appimage_na_pasta(pasta, "citron")
-
-
-def citron_user_dir(exe: str = "") -> str:
-    """Pasta user do Citron (portátil ao lado do exe vence; é o default
-    do Citron desde 2026-03-27 e casa com dados/saves/ do Hub)."""
-    exe = exe or default_emu_switch()
-    if exe:
-        port = Path(exe).parent / "user"
-        if port.is_dir():
-            return str(port)
-        # macOS .app: user/ fica ao lado do bundle, não dentro de MacOS/
-        if eh_mac():
-            for cima in (Path(exe).parent.parent.parent, Path(exe).parent.parent):
-                port = cima / "user"
-                if port.is_dir():
-                    return str(port)
-    if os.name == "nt":
-        base = Path(os.environ.get("APPDATA", "")) / "Citron"
-    elif eh_mac():
-        base = Path.home() / "Library" / "Application Support" / "Citron"
-    else:
-        base = Path.home() / ".local/share/citron-emu"
-    return str(base) if base.is_dir() else ""
-
-
-def citron_status() -> dict:
-    """Saúde do Citron sem abrir nada: instalado, user dir, config, chaves, fw."""
-    exe = default_emu_switch()
-    st = {"instalado": bool(exe), "exe": exe, "user_dir": "",
-          "configurado": False, "chaves": False, "firmware": False,
-          "versao_local": citron_versao_local()}
-    if not exe:
-        return st
-    ud = citron_user_dir(exe)
-    st["user_dir"] = ud
-    if ud:
-        base = Path(ud)
-        st["configurado"] = (base / "config" / "qt-config.ini").is_file()
-        st["chaves"] = (base / "keys" / "prod.keys").is_file()
-        st["firmware"] = (base / "nand" / "system" / "Contents" / "registered").is_dir()
-    return st
-
-
-def citron_versao_local() -> str:
-    arq = _citron_dir() / CITRON_VERSAO_ARQ
-    try:
-        if arq.is_file():
-            return arq.read_text(encoding="utf-8").strip()
-    except OSError:
-        pass
-    return ""
-
-
-def _citron_arch() -> str:
-    """'aarch64' ou 'x86_64' (p/ escolher o AppImage)."""
-    import platform
-    try:
-        m = (platform.machine() or "").lower()
-    except Exception:
-        m = ""
-    if m in ("aarch64", "arm64"):
-        return "aarch64"
-    return "x86_64"
-
-
-def citron_release_info(timeout: int = 25) -> dict:
-    """{'tag','nome','size','sha256','url'} do asset deste SO, ou {'erro':...}.
-
-    Win: msvc default (BIBLIOTECA_CITRON_ASSET=clangtron troca).
-    Linux: x86_64 default (V3 ou aarch64 via env/arch).
-    macOS: .dmg (instalação manual: arrastar Citron.app).
-    """
-    if os.name == "nt":
-        want = "clangtron" if (os.environ.get("BIBLIOTECA_CITRON_ASSET") or "").strip().lower() == "clangtron" else "msvc"
-
-        def casa(n: str) -> bool:
-            return n.startswith("Citron-windows-nightly-") and n.endswith(f"-x64-{want}.zip")
-    elif eh_mac():
-        def casa(n: str) -> bool:  # noqa: E306
-            return "macos" in n.lower() and n.endswith(".dmg")
-    else:
-        arch = _citron_arch()
-        if arch == "aarch64":
-            sufixo = "linux-aarch64.AppImage"
-        elif (os.environ.get("BIBLIOTECA_CITRON_V3") or "").strip() == "1":
-            sufixo = "linux-x86_64_v3.AppImage"
-        else:
-            sufixo = "linux-x86_64.AppImage"
-
-        def casa(n: str, _s=sufixo) -> bool:  # noqa: E306
-            return n.endswith(_s)
-    try:
-        with urllib.request.urlopen(CITRON_API_LATEST, timeout=timeout) as r:
-            rel = json.loads(r.read().decode("utf-8"))
-    except Exception as e:
-        return {"erro": f"falha de rede: {type(e).__name__}: {e}"}
-    tag = (rel.get("tag_name") or "").strip()
-    for a in rel.get("assets", []):
-        nome = a.get("name") or ""
-        if casa(nome):
-            digest = a.get("digest") or ""
-            sha = digest.split(":", 1)[1].strip() if ":" in digest else ""
-            return {"tag": tag, "nome": nome, "size": a.get("size") or 0,
-                    "sha256": sha, "url": a.get("browser_download_url") or ""}
-    return {"erro": "asset deste SO não encontrado no release"}
-
-
-def citron_instalar(info: dict, progresso=None) -> dict:
-    """Baixa e instala o Citron (transacional, como Azahar).
-
-    Win/Linux/Mac (.dmg via hdiutil): automático.
-    """
-    from bib_nucleo.atualizacao import instalar
-    if eh_mac():
-        return instalar(info, _citron_dir(), progresso, plataforma="darwin",
-                        versao_nome=CITRON_VERSAO_ARQ)
-    if os.name == "nt":
-        return instalar(info, _citron_dir(), progresso, exe_nomes=("citron*.exe",),
-                        deps=(), versao_nome=CITRON_VERSAO_ARQ)
-    return instalar(info, _citron_dir(), progresso, versao_nome=CITRON_VERSAO_ARQ,
-                    appimage_nome="citron.AppImage")
-
-
-def citron_config_atual() -> Path | None:
-    ud = citron_user_dir()
-    if ud:
-        cfgdir = Path(ud) / "config"
-        cfg = cfgdir / "qt-config.ini"
-        if cfg.is_file():
-            return cfg
-        try:
-            alts = sorted(p for p in cfgdir.glob("*.ini") if p.is_file())
-        except OSError:
-            alts = []
-        if alts:
-            return alts[0]
-    return None
-
-
-def citron_flags() -> list[str]:
-    """Flags extras ao bootar ROM Switch (padrão -f fullscreen; vazio desliga)."""
-    return shlex.split(os.environ.get("BIBLIOTECA_CITRON_FLAGS", "-f"),
-                       posix=(os.name != "nt"))
-
-
-def ler_metadados_switch(caminho: str) -> dict:
-    """Metadados Switch v1: {} (título vem do nome do arquivo).
-
-    NCA/XCI/NSP exigem prod.keys + descriptografia PFS0/NCA — fora do
-    escopo stdlib do Hub. Com as chaves no user/, o Citron exibe o
-    título sozinho na 1ª execução.
-    """
-    return {}
-
-
-def _icone_switch_none(caminho: str, alvo_px: int = 144) -> bytes | None:
-    """Switch não tem ícone stdlib (ver ler_metadados_switch): capa via Steam/manual."""
-    return None
-
-
-def _prov_citron() -> dict:
-    return {
-        "chave": "citron",
-        "nome": "Citron",
-        "sistemas": ("Nintendo Switch",),
-        "origens": ("rom-switch",),
-        "origem": "rom-switch",
-        "exe": default_emu_switch,          # () -> str
-        "user_dir": citron_user_dir,        # (exe="") -> str
-        "saves_subs": ("nand/user/save", "sdmc"),
-        "pacote_subs": ("nand/user/save", "sdmc"),
-        "rom_exts": ROM_EXTS_SWITCH,
-        "flags": citron_flags,              # () -> list[str]
-        "aplicar_preset": lambda nome: aplicar_preset(nome, "citron"),
-        "release_info": citron_release_info,
-        "versao_local": citron_versao_local,
-        "instalar": citron_instalar,
-        "ler_metadados": ler_metadados_switch,
-        "icone": _icone_switch_none,
-        "dica_instalacao": ("Citron não encontrado — instale em "
-                            "Games/Emuladores/Citron (Win: citron*.exe, "
-                            "Linux: citron*.AppImage, Mac: Citron.app) "
-                            "ou defina BIBLIOTECA_EMULADOR_SWITCH."),
-    }
-
-
-def _campo_preset(chave: str) -> str:
-    """Coluna de preset do provider (citron tem a sua; o resto usa a legada)."""
-    return "citron_preset" if chave == "citron" else "azahar_preset"
-
-# --------------------------------------------------------------------------
 # Execução de jogos (Windows + Linux)
 # --------------------------------------------------------------------------
 
@@ -879,14 +627,13 @@ def procurar_rom(nome_arquivo: str, roots: list[str] | None = None,
     Só leitura, com teto. Compara case-insensitive pelo nome do arquivo.
     """
     from bib_nucleo.scans import (SKIP_DIRS, default_roms_nds_roots,
-                                   default_roms_roots, default_roms_switch_roots,
-                                   default_scan_roots)
+                                   default_roms_roots, default_scan_roots)
     alvo = (nome_arquivo or "").strip().lower()
     if not alvo:
         return []
     if roots is None:
         vistas: list[str] = []
-        for r in default_roms_roots() + default_roms_nds_roots() + default_roms_switch_roots() + default_scan_roots():
+        for r in default_roms_roots() + default_roms_nds_roots() + default_scan_roots():
             if r not in vistas:
                 vistas.append(r)
         roots = vistas
@@ -1089,8 +836,7 @@ def _prov_azahar() -> dict:
 
 def provedores() -> dict:
     """chave -> spec. Construído sob demanda (as funções existem no import)."""
-    return {"azahar": _prov_azahar(), "desmume": _prov_desmume(),
-            "citron": _prov_citron()}
+    return {"azahar": _prov_azahar(), "desmume": _prov_desmume()}
 
 
 def provedor_por_origem(origem: str) -> dict | None:
@@ -1261,8 +1007,6 @@ def salvar_preset_de_atual(nome: str, chave: str = "azahar") -> dict:
 def config_atual_emu(chave: str) -> Path | None:
     if chave == "desmume":
         return desmume_config_atual()
-    if chave == "citron":
-        return citron_config_atual()
     return azahar_config_atual()
 
 
@@ -1770,8 +1514,8 @@ def preparar_lancamento(jogo: dict) -> dict:
         return {"preset_aplicado": None, "mods_aplicados": [], "aviso": None}
     avisos: list[str] = []
     aplicado = None
-    campo = _campo_preset(prov.get("chave") or "")
-    nome = (jogo.get(campo) or jogo.get("azahar_preset") or "").strip()
+    campo = "azahar_preset"
+    nome = (jogo.get(campo) or "").strip()
     if nome:
         r = prov["aplicar_preset"](nome)
         if r.get("ok"):
@@ -1799,14 +1543,6 @@ def preparar_lancamento(jogo: dict) -> dict:
                                   "custom textures — troque p/ hd2x.")
         except Exception:
             pass
-    if (launch and prov.get("chave") == "citron"
-            and provedor_por_extensao(Path(launch).suffix) is not None):
-        if not citron_tem_chaves():
-            avisos.append("Citron sem user/keys/prod.keys — dumps NSP/XCI não abrem. "
-                          "Faça o dump das chaves do seu Switch para user/keys/.")
-        elif not citron_tem_firmware():
-            avisos.append("Citron sem firmware em user/nand/system — alguns jogos "
-                          "não abrem. Instale o firmware do seu Switch.")
     return {"preset_aplicado": aplicado, "mods_aplicados": mods_ok,
             "aviso": " ".join(avisos) or None}
 
@@ -1832,20 +1568,5 @@ def azahar_tem_chaves() -> bool:
     ud = azahar_user_dir()
     return bool(ud) and (Path(ud) / "sysdata" / "aes_keys.txt").is_file()
 
-
-def backup_saves_citron(manter: int = 10) -> dict:
-    """Zipa nand/user/save/ + sdmc/ do Citron em backups/. Retorna dict (sempre)."""
-    return backup_saves_emu("citron", manter)
-
-
-def citron_tem_chaves() -> bool:
-    ud = citron_user_dir()
-    return bool(ud) and (Path(ud) / "keys" / "prod.keys").is_file()
-
-
-def citron_tem_firmware() -> bool:
-    ud = citron_user_dir()
-    return bool(ud) and (Path(ud) / "nand" / "system" / "Contents" / "registered").is_dir()
-
-__all__ = ['azahar_dir_override', 'default_emu_3ds', 'desmume_dir_override', 'desmume_dir', 'default_emu_nds', 'desmume_user_dir', 'desmume_versao_local', 'desmume_release_info', 'desmume_instalar', 'desmume_config_atual', 'desmume_flags', 'citron_dir_override', 'default_emu_switch', 'citron_user_dir', 'citron_status', 'CITRON_API_LATEST', 'CITRON_VERSAO_ARQ', 'citron_versao_local', 'citron_release_info', 'citron_instalar', 'citron_config_atual', 'citron_flags', 'ler_metadados_switch', 'citron_tem_chaves', 'citron_tem_firmware', 'backup_saves_citron', 'config_atual_emu', 'presets_prov_dir', 'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', 'azahar_versao_local', 'azahar_release_info', 'azahar_instalar', 'executar_elevado', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', 'executar_monitorado', 'iniciar_sessao_manual', 'listar_sessoes_pendentes', 'encerrar_sessao_manual', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'listar_presets', 'azahar_config_atual', 'salvar_preset_de_atual', 'aplicar_preset', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves',
+__all__ = ['azahar_dir_override', 'default_emu_3ds', 'desmume_dir_override', 'desmume_dir', 'default_emu_nds', 'desmume_user_dir', 'desmume_versao_local', 'desmume_release_info', 'desmume_instalar', 'desmume_config_atual', 'desmume_flags', 'config_atual_emu', 'presets_prov_dir', 'azahar_user_dir', 'azahar_status', 'AZAHAR_API_LATEST', 'AZAHAR_VERSAO_ARQ', 'azahar_versao_local', 'azahar_release_info', 'azahar_instalar', 'executar_elevado', 'executar_jogo_dict', 'diagnosticar_exe', 'diagnosticar_rom', 'procurar_rom', 'azahar_flags', 'LIMIAR_SESSAO_S', 'executar_monitorado', 'iniciar_sessao_manual', 'listar_sessoes_pendentes', 'encerrar_sessao_manual', 'provedores', 'provedor_por_origem', 'provedor_por_extensao', 'provedor_nome', 'jogos_do_provedor', 'provedores_resumo', 'montar_launch_rom', 'backup_saves_emu', 'backup_saves_azahar', 'presets_dir', 'listar_presets', 'azahar_config_atual', 'salvar_preset_de_atual', 'aplicar_preset', 'preparar_lancamento', 'rom_parece_criptografada', 'azahar_tem_chaves',
  'title_id_da_rom', 'mods_lib_dir', 'mods_titulo_dir', 'remover_link', 'listar_mods', 'remover_mod', 'azahar_mods_dir', 'mods_ativos', 'aplicar_mods', 'importar_mod']

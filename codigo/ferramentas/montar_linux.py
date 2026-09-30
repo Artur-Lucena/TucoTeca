@@ -9,7 +9,7 @@ Monta o instalador Linux: tucoteca-setup-<data>.run (auto-extraível,
 A árvore Linux é montada AQUI no Windows (só cópia de arquivos) e o
 payload é o mesmo .tar.xz dos instaladores (LZMA2 stdlib). O stub .run
 é shell POSIX: pergunta a pasta, checa python3+tk, extrai com tar -xJ,
-cria o .desktop e o desinstalador. DeSmuME/Citron no Linux = pacote do
+cria o .desktop e o desinstalador. DeSmuME no Linux = pacote do
 sistema ou AppImage próprio (o ⬇ do app resolve depois); o bundle leva
 o que estiver instalado aqui.
 """
@@ -37,7 +37,6 @@ HUB="$(dirname "$(readlink -f "$0")")"
 export BIBLIOTECA_HOME="$HUB/dados"
 export BIBLIOTECA_AZAHAR_DIR="$HUB/emuladores/Azahar"
 export BIBLIOTECA_DESMUME_DIR="$HUB/emuladores/DeSmuME"
-export BIBLIOTECA_CITRON_DIR="$HUB/emuladores/Citron"
 if [ "$1" = "--gui" ]; then
   exec python3 "$HUB/app/app_win.py" "$@"
 fi
@@ -217,7 +216,7 @@ def montar_base_linux(trab: Path | None = None) -> tuple[Path, dict]:
     (base / "VERSAO.txt").write_text(
         f"TucoTeca Linux — build {data}\n"
         f"Azahar: {azahar_ver or 'ausente (use o ⬇ do app)'}\n"
-        "DeSmuME/Citron: pacote do sistema ou AppImage próprio\n",
+        "DeSmuME: pacote do sistema ou AppImage próprio\n",
         encoding="utf-8")
     podar_dieta(base)
     return base, {"azahar": azahar_ver, "data": data}

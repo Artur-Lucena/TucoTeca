@@ -14,7 +14,7 @@ from bib_nucleo.banco import (CAPA_EXTS, criar_musica, get_db,
                                 salvar_capa_bytes)
 from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, DEFAULT_DB, MUSICAS_DIR,
                                agora_iso, garantir_dirs)
-from bib_nucleo.emuladores import (azahar_versao_local, citron_versao_local,
+from bib_nucleo.emuladores import (azahar_versao_local,
                                      presets_dir, presets_prov_dir, provedores)
 from bib_nucleo.scans import importar_lista
 
@@ -151,7 +151,6 @@ def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
             "exportado_em": dados["exportado_em"], "jogos": len(dados["jogos"]),
             "musicas": len(dados.get("musicas") or []),
             "inclui_saves": com_saves, "azahar_versao": azahar_versao_local(),
-            "citron_versao": citron_versao_local(),
             "provedores": sorted(provedores())}
     manifesto = {}
     for j in dados["jogos"]:

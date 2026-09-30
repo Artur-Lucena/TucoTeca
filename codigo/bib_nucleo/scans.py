@@ -19,7 +19,7 @@ from bib_nucleo.base import (LINUX_ROOT, WIN_ROOT, agora_iso,
                              existe_aqui_ou_traduzido, slugify, traduzir_para_atual,
                              win_para_linux)
 from bib_nucleo.emuladores import (default_emu_3ds, default_emu_nds,
-                                     default_emu_switch, provedores,
+                                     provedores,
                                      provedor_por_extensao, provedor_por_origem)
 
 
@@ -768,18 +768,6 @@ def default_roms_nds_roots() -> list[str]:
     return [f"{base}/Games/Roms", f"{base}/Games/Roms/NDS", f"{base}/Games/Roms NDs"]
 
 
-def default_roms_switch_roots() -> list[str]:
-    env = os.environ.get("BIBLIOTECA_ROMS_SWITCH_ROOTS")
-    if env:
-        return [r for r in re.split(r"[;\n]+", env) if r.strip()]
-    if os.name == "nt":
-        base = WIN_ROOT.rstrip("\\")
-        return [f"{base}\\Games\\Roms", f"{base}\\Games\\Roms\\Switch",
-                f"{base}\\Games\\Roms Switch"]
-    base = LINUX_ROOT.rstrip("/")
-    return [f"{base}/Games/Roms", f"{base}/Games/Roms/Switch", f"{base}/Games/Roms Switch"]
-
-
 def preview_roms(roots: list[str] | None = None,
                  emu_exe: str | None = None, prov_chave: str = "azahar"
                  ) -> tuple[list[str], list[dict], dict, str]:
@@ -787,15 +775,11 @@ def preview_roms(roots: list[str] | None = None,
     if roots is None:
         if prov_chave == "azahar":
             roots = default_roms_roots()
-        elif prov_chave == "citron":
-            roots = default_roms_switch_roots()
         else:
             roots = default_roms_nds_roots()
     if emu_exe is None:
         if prov_chave == "azahar":
             emu = default_emu_3ds()
-        elif prov_chave == "citron":
-            emu = default_emu_switch()
         else:
             emu = default_emu_nds()
     else:
@@ -866,19 +850,18 @@ def preview_pasta(roots: list[str] | None = None) -> tuple[list[str], list[dict]
     """
     if not roots:
         vistas: list[str] = []
-        for r in default_scan_roots() + default_roms_roots() + default_roms_nds_roots() + default_roms_switch_roots():
+        for r in default_scan_roots() + default_roms_roots() + default_roms_nds_roots():
             if r not in vistas:
                 vistas.append(r)
         roots = vistas
     roots_u, itens_disco, info_d = preview_scan(roots)
     _r, itens_rom, info_r, emu = preview_roms(roots, None)
     _r, itens_nds, info_n, emu_nds = preview_roms(roots, None, "desmume")
-    _r, itens_sw, info_s, emu_sw = preview_roms(roots, None, "citron")
-    itens = sorted(fundir_duplicados(itens_disco + itens_rom + itens_nds + itens_sw),
+    itens = sorted(fundir_duplicados(itens_disco + itens_rom + itens_nds),
                    key=lambda j: j["titulo"].lower())
-    info = {"vistos": info_d["vistos"] + info_r["vistos"] + info_n["vistos"] + info_s["vistos"],
-            "truncado": info_d["truncado"] or info_r["truncado"] or info_n["truncado"] or info_s["truncado"],
-            "raizes": info_d["raizes"], "emu": emu, "emu_nds": emu_nds, "emu_switch": emu_sw}
+    info = {"vistos": info_d["vistos"] + info_r["vistos"] + info_n["vistos"],
+            "truncado": info_d["truncado"] or info_r["truncado"] or info_n["truncado"],
+            "raizes": info_d["raizes"], "emu": emu, "emu_nds": emu_nds}
     return roots_u, itens, info
 
 
@@ -1393,14 +1376,13 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                 etiq_alvo = alvo["etiquetas"] if "etiquetas" in alvo.keys() else ""
                 con.execute(
                     """UPDATE jogos SET horas=?, ultima_execucao=?, status=?, nota=?,
-                       favorito=?, observacoes=?, azahar_preset=?, citron_preset=?, etiquetas=?, atualizado_em=? WHERE id=?""",
+                       favorito=?, observacoes=?, azahar_preset=?, etiquetas=?, atualizado_em=? WHERE id=?""",
                     (horas if "horas" in j else alvo["horas"], ultima,
                      j.get("status") if j.get("status") in STATUS_VALIDOS else alvo["status"],
                      nota if "nota" in j else alvo["nota"],
                      int(bool(j.get("favorito"))) if "favorito" in j else alvo["favorito"],
                      j.get("observacoes", alvo["observacoes"]),
                      j.get("azahar_preset", alvo["azahar_preset"]),
-                     j.get("citron_preset", alvo["citron_preset"] if "citron_preset" in alvo.keys() else ""),
                      normalizar_etiquetas(j["etiquetas"]) if "etiquetas" in j else etiq_alvo,
                      j.get("atualizado_em") or agora, alvo["id"]),
                 )
@@ -1422,9 +1404,9 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                    """INSERT OR IGNORE INTO jogos
                    (titulo, executable_path, exe_win, exe_linux, exe_mac, wine_prefix, launch_options,
                     status, nota, favorito, horas, ultima_execucao, observacoes, origem, shop, object_id,
-                    game_code, regiao, azahar_preset, citron_preset, uuid, etiquetas, azahar_mods, azahar_mods_off,
+                    game_code, regiao, azahar_preset, uuid, etiquetas, azahar_mods, azahar_mods_off,
                     confianca, criado_em, atualizado_em)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (titulo, (j.get("executable_path") or "").strip(),
                  (j.get("exe_win") or "").strip(), (j.get("exe_linux") or "").strip(),
                  (j.get("exe_mac") or "").strip(),
@@ -1436,7 +1418,6 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                  j.get("origem") or "manual", (j.get("shop") or ""),
                  (j.get("object_id") or ""), (j.get("game_code") or "").strip(),
                  (j.get("regiao") or "").strip(), (j.get("azahar_preset") or "").strip(),
-                 (j.get("citron_preset") or "").strip(),
                   uid, normalizar_etiquetas(j.get("etiquetas") or ""),
                   _mods_seguro(j.get("azahar_mods")),
                   1 if j.get("azahar_mods_off") else 0,
