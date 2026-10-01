@@ -992,7 +992,7 @@ class Tui:
                 self.msg = "Filtros limpos."
 
     def menu_importar(self):
-        opcoes = ["Arquivo (exe, ROM, JSON, .zip)", "Pasta", "Disco (Hydra/lojas)",
+        opcoes = ["Arquivo (exe, ROM, JSON, .zip, repack)", "Pasta", "Disco (Hydra/lojas)",
                   "Voltar"]
         while True:
             idx = self.escolher("Importar", opcoes)
@@ -1000,7 +1000,7 @@ class Tui:
                 return
             escolha = opcoes[idx]
             if escolha.startswith("Arquivo"):
-                arq = self.perguntar("Arquivo (exe, ROM, JSON, .zip): ")
+                arq = self.perguntar("Arquivo (exe, ROM, JSON, .zip, repack): ")
                 if arq:
                     self._importar_arquivo(arq.strip())
             elif escolha == "Pasta":
@@ -1321,6 +1321,27 @@ class Tui:
             self.importar_json(arq)
         elif tipo == "pacote":
             self.importar_pacote(arq)
+        elif tipo == "arquivo-jogo":
+            self._backup_pre_import()
+            con = self._con()
+            try:
+                res = core.importar_repack(con, arq)
+            except Exception as e:
+                res = {"ok": False, "erro": f"{type(e).__name__}: {e}"}
+            finally:
+                con.close()
+            if not res.get("ok"):
+                detalhe = res["erro"]
+                if res.get("precisa_instalar"):
+                    detalhe += " (rode o setup na pasta e importe a pasta.)"
+                self.msg = detalhe
+            elif res.get("novos"):
+                self.msg = f"'{res['titulo']}' ✓ em {res['pasta']}"
+                if res.get("capa_pendente"):
+                    self.msg += " (sem capa: ajuste na GUI)."
+            else:
+                self.msg = "Já estava na biblioteca (nada novo)."
+            self.recarregar()
         elif tipo in ("rom", "jogo"):
             if ana.get("aviso") and not self.confirmar(f"{ana['aviso']} Importar?"):
                 return
@@ -1377,8 +1398,11 @@ class Tui:
             if not arq:
                 return
             arq = arq.strip()
-        if arq.lower().endswith(".zip"):
+        if arq.lower().endswith(".zip") and core.eh_pacote_hub(arq):
             self.importar_pacote(arq)
+            return
+        if arq.lower().endswith(".zip"):
+            self._importar_arquivo(arq)
             return
         try:
             dados = json.loads(Path(arq).read_text(encoding="utf-8"))

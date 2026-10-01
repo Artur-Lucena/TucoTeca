@@ -123,6 +123,37 @@ def teste_dialogo_emulador_autodetect():
         root.destroy()
 
 
+def teste_resolver_jogo_cli():
+    import tempfile
+    import app_win
+    tmp = Path(tempfile.mkdtemp(prefix="suite-dj-"))
+    con = core.get_db(tmp / "j.db")
+    try:
+        a = core.criar_jogo(con, {"titulo": "Megabonk", "executable_path": "",
+                                  "status": "backlog"})
+        core.criar_jogo(con, {"titulo": "Megabonk 2", "executable_path": "",
+                              "status": "backlog"})
+        afirmar(app_win.resolver_jogo_cli(con, str(a["id"]))["id"] == a["id"])
+        afirmar(app_win.resolver_jogo_cli(con, "megabonk")["id"] == a["id"])
+        try:
+            app_win.resolver_jogo_cli(con, "megabonk 2 x")
+            afirmar(False, "devia levantar")
+        except LookupError:
+            pass
+        try:
+            app_win.resolver_jogo_cli(con, "mega")
+            afirmar(False, "ambíguo devia levantar")
+        except LookupError as e:
+            afirmar("ambíguo" in str(e), e)
+        try:
+            app_win.resolver_jogo_cli(con, "   ")
+            afirmar(False, "vazio devia levantar")
+        except LookupError:
+            pass
+    finally:
+        con.close()
+
+
 def teste_dialogo_secoes_escuras():
     try:
         import tkinter as tk

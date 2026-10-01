@@ -1796,8 +1796,9 @@ class App:
         dlg.grab_set()
         ttk.Label(dlg, wraplength=420, justify="left", text=(
             "Escolha uma PASTA (varre jogos de PC + ROMs de uma vez), um "
-            "ARQUIVO (exe, ROM, JSON ou pacote .zip) ou LEIA DO DISCO "
+            "ARQUIVO (exe, ROM, JSON, pacote .zip ou repack .rar/.7z/.iso) ou LEIA DO DISCO "
             "(Hydra + Steam + Epic + GOG + Riot + programas instalados).\n"
+            "Repack extrai p/ Piratas, organiza, acha o exe e importa sozinho; "
             "ROMs são ligadas no emulador sozinhas; sem emulador, importam "
             "mesmo assim e o play orienta.")).pack(anchor="w", padx=14, pady=12)
 
@@ -1813,7 +1814,8 @@ class App:
                 title="Arquivo para importar", parent=dlg,
                 filetypes=[("Suportados",
                             "*.exe *.lnk *.bat *.cmd *.3ds *.3dsx *.cci *.cxi "
-                            "*.elf *.app *.axf *.nds *.dsi *.json *.zip"),
+                            "*.elf *.app *.axf *.nds *.dsi *.json *.zip *.rar *.7z *.iso"),
+                           ("Repacks", "*.zip *.rar *.7z *.iso"),
                            ("Executáveis", "*.exe *.lnk *.bat *.cmd"),
                            ("ROMs 3DS", "*.3ds *.3dsx *.cci *.cxi *.elf *.app *.axf"),
                            ("ROMs NDS", "*.nds *.dsi"),
@@ -1898,6 +1900,8 @@ class App:
             self.importar_json(arq)
         elif tipo == "pacote":
             self.importar_pacote(arq)
+        elif tipo == "arquivo-jogo":
+            self._importar_repack(arq)
         elif tipo in ("rom", "jogo"):
             if ana.get("aviso") and not messagebox.askyesno("Importar", f"{ana['aviso']}\n\nImportar mesmo assim?"):
                 return
@@ -1915,6 +1919,70 @@ class App:
                 messagebox.showinfo("Importar", "Já estava na biblioteca (nada novo).")
         else:
             messagebox.showwarning("Importar", ana["detalhe"] or "não suportado.")
+
+    def _importar_repack(self, arq: str):
+        prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
+        prog.title("Importar repack")
+        prog.transient(self.root)
+        ttk.Label(prog, text="Extraindo p/ Piratas e importando...").pack(
+            padx=24, pady=24)
+        prog.update()
+
+        def trabalho():
+            def na_ui(fn):
+                try:
+                    self.root.after(0, fn)
+                except tk.TclError:
+                    pass  # janela fechada no meio
+
+            def falhou(msg):
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    return
+                messagebox.showerror("Importar repack", msg)
+                core.log_erro("importar-repack", msg)
+
+            con = None
+            try:
+                con = self._con()
+                self._backup_pre_import()
+                res = core.importar_repack(con, arq)
+            except Exception as e:
+                msg_erro = f"{type(e).__name__}: {e}"
+                na_ui(lambda m=msg_erro: falhou(m))
+                return
+            finally:
+                try:
+                    if con is not None:
+                        con.close()
+                except Exception:
+                    pass
+
+            def pronto(res=res):
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    return
+                if not res.get("ok"):
+                    detalhe = res["erro"]
+                    if res.get("precisa_instalar"):
+                        detalhe += "\n(rode o setup dentro da pasta e importe a pasta.)"
+                    messagebox.showwarning("Importar repack", detalhe)
+                    return
+                self.sel = None
+                self.recarregar()
+                detalhe = f"'{res['titulo']}' ✓\n{res['exe']}"
+                if res.get("avisos"):
+                    detalhe += "\n" + " ".join(res["avisos"])
+                if res.get("capa_pendente"):
+                    detalhe += "\nSem capa: ajuste no diálogo do jogo."
+                if not res.get("apagou_arquivo"):
+                    detalhe += "\n(archive original mantido — apague à mão.)"
+                messagebox.showinfo("Importar repack", detalhe)
+            na_ui(pronto)
+        threading.Thread(target=self._thread_segura(trabalho, prog, "Importar repack"), daemon=True).start()
 
     # -- preview / importação
     def _dlg_prev(self, titulo: str, sub: str, itens: list[dict]):
@@ -2654,6 +2722,85 @@ class App:
         threading.Thread(target=self._thread_segura(trabalho, prog, "Pacote"), daemon=True).start()
 
 
+def resolver_jogo_cli(con, busca: str) -> dict:
+    """Acha 1 jogo por id ou título (exato vence parcial). Sem Tk.
+
+    Levanta LookupError se zero ou ambíguo. Para `tucoteca --jogar`.
+    """
+    chave = (busca or "").strip()
+    if not chave:
+        raise LookupError("informe o id ou parte do título.")
+    if chave.isdigit():
+        row = con.execute("SELECT * FROM jogos WHERE id=?",
+                          (int(chave),)).fetchone()
+        if row is None:
+            raise LookupError(f"jogo id {chave} não encontrado.")
+        return core.row_to_dict(row)
+    nsa = chave.lower()
+    todos = [core.row_to_dict(r)
+             for r in con.execute("SELECT * FROM jogos").fetchall()]
+    exatos = [j for j in todos if (j.get("titulo") or "").lower() == nsa]
+    if len(exatos) == 1:
+        return exatos[0]
+    parciais = [j for j in todos if nsa in (j.get("titulo") or "").lower()]
+    if len(parciais) == 1:
+        return parciais[0]
+    if not parciais:
+        raise LookupError(f"nenhum jogo bate com '{chave}'.")
+    nomes = ", ".join(f"{j['id']}:{j['titulo']}" for j in parciais[:8])
+    raise LookupError(f"'{chave}' é ambíguo: {nomes}.")
+
+
+def main_jogar(args) -> int:
+    """`--jogar BUSCA`: abre o jogo sem a janela (p/ atalhos do Desktop)."""
+    import threading
+    import time
+    con = core.get_db(Path(args.db))
+    try:
+        try:
+            j = resolver_jogo_cli(con, args.jogar)
+        except (LookupError, ValueError) as e:
+            print(f"[erro] {e}")
+            return 2
+        prep = core.preparar_lancamento(j)
+        if prep.get("aviso"):
+            print(f"[aviso] {prep['aviso']}")
+        pronto: dict = {}
+        feito = threading.Event()
+
+        def ao_fim(sessao, rastreado, _gid=j["id"]):
+            pronto["sessao"] = sessao
+            pronto["rastreado"] = rastreado
+            feito.set()
+
+        res = core.executar_monitorado(j, ao_fim=ao_fim)
+        if not res.get("ok"):
+            print(f"[erro] {res.get('erro', 'falha')}")
+            return 1
+        if res.get("rastreado"):
+            core.marcar_execucao(con, j["id"])
+            feito.wait()
+            ok, msg = App._registrar_sessao(
+                con, j["id"], float(pronto.get("sessao") or 0.0))
+            print(f"[ok] Executando ({res.get('modo')}) — {msg}")
+            return 0
+        try:
+            core.iniciar_sessao_manual(j["id"], j.get("titulo") or "")
+        except Exception:
+            pass
+        print("[ok] Executando — ao terminar use o Hub (⏱ Registrar sessão).")
+        return 0
+    finally:
+        try:
+            con.close()
+        except Exception:
+            pass
+        try:
+            core.liberar_lock()
+        except Exception:
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="TucoTeca — app Windows (tkinter)")
     ap.add_argument("--db", default=str(core.DEFAULT_DB))
@@ -2661,6 +2808,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="monta a UI oculta, recarrega e sai")
     ap.add_argument("--ignorar-lock", action="store_true",
                     help="abre mesmo com lock de outra instância (após crash)")
+    ap.add_argument("--jogar", default=None, metavar="BUSCA",
+                    help="abre o jogo (id ou título) sem a janela")
     args = ap.parse_args(argv)
     core.garantir_dirs()
     lk = core.adquirir_lock(ignorar=args.ignorar_lock)
@@ -2676,6 +2825,10 @@ def main(argv: list[str] | None = None) -> int:
     import atexit
     atexit.register(core.liberar_lock)
     core.get_db(Path(args.db)).close()
+    if args.jogar:
+        core.liberar_lock()
+        atexit.unregister(core.liberar_lock)
+        return main_jogar(args)
     root = tk.Tk()
     _titulo_escuro(root)
     app = App(root, Path(args.db))
