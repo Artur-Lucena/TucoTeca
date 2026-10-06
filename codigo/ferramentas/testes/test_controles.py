@@ -304,3 +304,26 @@ def teste_listar_controles_nao_quebra():
     afirmar(isinstance(lst, list), lst)
     for c in lst:
         afirmar({"nome", "familia"} <= set(c), c)
+
+
+def teste_parse_devices_js_realista():
+    from bib_nucleo import controles as C
+    amostra = (
+        'I: Bus=0019 Vendor=0000 Product=0001 Version=0000\n'
+        'N: Name="Power Button"\n'
+        'H: Handlers=kbd event0 \n'
+        '\n'
+        'I: Bus=0003 Vendor=045e Product=028e Version=0114\n'
+        'N: Name="Microsoft X-Box 360 pad"\n'
+        'H: Handlers=event5 js0 \n'
+        '\n'
+        'I: Bus=0003 Vendor=057e Product=2009 Version=0114\n'
+        'N: Name="Nintendo Switch Pro"\n'
+        'H: Handlers=event6 js1 '
+    )
+    lst = C._parse_devices(amostra)
+    afirmar(len(lst) == 2, lst)
+    afirmar(lst[0]["nome"] == "Microsoft X-Box 360 pad"
+            and lst[0]["familia"] == "xbox360", lst)
+    afirmar(lst[1]["familia"] == "switchpro", lst)
+    afirmar(C._parse_devices("") == [])

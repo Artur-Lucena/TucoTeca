@@ -196,6 +196,10 @@ class Tui:
             az = core.azahar_status()
             azg = "🎮✓" if az["instalado"] and az["chaves"] else ("🎮!" if az["instalado"] else "🎮✗")
             ndsg = ("NDS✓" if core.default_emu_nds() else "NDS✗")
+            prov_txt = f" prov={self.filtro_prov or 'todos'}"
+            plat_txt = f" plat={self.filtro_plat or 'todas'}"
+            tags = getattr(self, "filtro_tags", []) or []
+            tags_txt = f" tags={','.join(tags)}" if tags else ""
             filtro = f"busca='{self.q}' status={self.statuses[self.si] or 'todos'} fav={'sim' if self.fav else 'não'}{prov_txt}{plat_txt}{tags_txt} {azg} {ndsg}"
             s.addnstr(1, 0, f"{filtro} — {len(self.jogos)} jogo(s)", larg, self.cor["mut"])
             area = rows - 4
@@ -967,7 +971,7 @@ class Tui:
                 self.recarregar()
                 self.msg = f"Filtro prov: {self.filtro_prov or 'todos'}."
             elif escolha.startswith("Plataforma:"):
-                plats = [None, "PC", "3DS", "NDS", "Switch"]
+                plats = [None, "PC", "3DS", "NDS"]
                 i = plats.index(self.filtro_plat) if self.filtro_plat in plats else 0
                 self.filtro_plat = plats[(i + 1) % len(plats)]
                 self.cur = 0

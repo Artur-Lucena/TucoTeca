@@ -73,12 +73,54 @@ def eh_pacote_hub(caminho: str | os.PathLike) -> bool:
         return False
 
 
+def _dentro(base: Path, alvo: Path) -> bool:
+    """`alvo` resolvido fica dentro de `base`? (anti traversal/symlink)."""
+    try:
+        braiz = base.resolve()
+        return alvo.resolve() == braiz or braiz in alvo.resolve().parents
+    except OSError:
+        return False
+
+
+def _iter_reais(base: Path):
+    """Arquivos reais da árvore (não desce em symlink, ignora links)."""
+    raiz = Path(base)
+    for pasta, dirs, arqs in os.walk(raiz, followlinks=False):
+        dirs[:] = [d for d in dirs
+                   if not Path(pasta, d).is_symlink()
+                   and d.lower() != ".hub-lixo"]
+        for nome in arqs:
+            p = Path(pasta, nome)
+            try:
+                if p.is_symlink() or not p.is_file():
+                    continue
+            except OSError:
+                continue
+            if _dentro(raiz, p):
+                yield p
+
+
+def _so_dentro(destino: Path) -> bool:
+    """Tudo extraído (incl. links) contido em `destino`?"""
+    raiz = Path(destino)
+    try:
+        for pasta, dirs, arqs in os.walk(raiz, followlinks=False):
+            for nome in (*dirs, *arqs):
+                if not _dentro(raiz, Path(pasta, nome)):
+                    return False
+    except OSError:
+        return False
+    return True
+
+
 def extrair_arquivo(origem: str | os.PathLike, destino: Path) -> dict:
     """Extrai p/ `destino` (cria). .zip via stdlib; resto via 7z.
 
-    Nuncaexecuta nada extraído; zip com traversal é rejeitado.
+    Nunca executa nada extraído; traversal/symlink p/ fora é rejeitado
+    (zip validado antes, 7z verificado depois de extrair).
     """
     src = Path(origem)
+    destino = Path(destino)
     if not src.is_file():
         return {"ok": False, "erro": "arquivo não encontrado."}
     try:
@@ -91,12 +133,20 @@ def extrair_arquivo(origem: str | os.PathLike, destino: Path) -> dict:
                 for i in z.infolist():
                     partes = Path(i.filename.replace("\\", "/")).parts
                     if (not partes or ".." in partes
-                            or i.filename.startswith(("/", "\\"))):
+                            or i.filename.startswith(("/", "\\"))
+                            or any(":" in p for p in partes)):
+                        try:
+                            destino.rmdir()  # só criamos: vazio, sem dono
+                        except OSError:
+                            pass
                         return {"ok": False,
                                 "erro": "zip com caminho inválido."}
                 z.extractall(destino)
         except (OSError, zipfile.BadZipFile) as e:
             return {"ok": False, "erro": f"zip inválido: {e}"}
+        if not _so_dentro(destino):
+            shutil.rmtree(destino, ignore_errors=True)
+            return {"ok": False, "erro": "zip com link p/ fora."}
         return {"ok": True, "destino": str(destino)}
     exe7z = ferramenta_7z()
     if exe7z is None:
@@ -111,6 +161,10 @@ def extrair_arquivo(origem: str | os.PathLike, destino: Path) -> dict:
     if r.returncode != 0:
         detalhe = (r.stderr or r.stdout or "")[-300:]
         return {"ok": False, "erro": f"extrator falhou: {detalhe}"}
+    if not _so_dentro(destino):
+        shutil.rmtree(destino, ignore_errors=True)
+        return {"ok": False,
+                "erro": "archive com caminho/link p/ fora da pasta."}
     return {"ok": True, "destino": str(destino)}
 
 
@@ -139,37 +193,32 @@ def organizar_extraido(raiz: Path) -> dict:
         else:
             break
     removidos = 0
-    try:
-        for p in sorted(pasta.rglob("*")):
-            if p.is_symlink() or not p.is_file():
-                continue
-            if _LIXO_NOMES.match(p.name):
-                try:
-                    p.unlink()
-                    removidos += 1
-                except OSError:
-                    pass
-    except OSError:
-        pass
+    for p in sorted(_iter_reais(pasta)):
+        if _LIXO_NOMES.match(p.name):
+            try:
+                p.unlink()
+                removidos += 1
+            except OSError:
+                pass
     if removidos:
         avisos.append(f"{removidos} sobra(s) apagada(s).")
     # _CommonRedist duplicado da raiz: mantém os mais fundos
-    try:
-        redists = [d for d in pasta.rglob("*")
-                   if d.is_dir() and not d.is_symlink()
-                   and d.name.lower() == "_commonredist"]
-    except OSError:
-        redists = []
+    redists = []
+    for _pasta, _dirs, _ in os.walk(pasta, followlinks=False):
+        _dirs[:] = [d for d in _dirs
+                    if not Path(_pasta, d).is_symlink()]
+        for d in _dirs:
+            if d.lower() == "_commonredist":
+                redists.append(Path(_pasta, d))
     if len(redists) > 1:
         fundo = max(len(d.relative_to(pasta).parts) for d in redists)
         for d in redists:
-            if len(d.relative_to(pasta).parts) < fundo:
+            if len(d.relative_to(pasta).parts) < fundo and _dentro(pasta, d):
                 try:
                     shutil.rmtree(d, ignore_errors=True)
                     avisos.append("_CommonRedist duplicado da raiz apagado.")
                 except OSError:
                     pass
-                break
     return {"pasta": str(pasta), "avisos": avisos}
 
 
@@ -217,8 +266,8 @@ def achar_exe(pasta: str | os.PathLike) -> dict:
     base = Path(pasta)
     cands: list[tuple[float, Path]] = []
     try:
-        arquivos = [p for p in base.rglob("*.exe")
-                    if p.is_file() and not p.is_symlink()]
+        arquivos = [p for p in _iter_reais(base)
+                     if p.suffix.lower() == ".exe"]
     except OSError as e:
         return {"ok": False, "erro": f"falha ao varrer: {e}"}
     for exe in arquivos:
@@ -241,19 +290,18 @@ def achar_exe(pasta: str | os.PathLike) -> dict:
             "candidatos": len(cands)}
 
 
-def _apagar_setups_redundantes(pasta: Path) -> int:
-    """Apaga `setup_*` quando já há exe jogável. Retorna quantos."""
+def _quarentenar_setups(pasta: Path) -> int:
+    """Move `setup_*.exe` p/ `.hub-lixo/` (reversível). Retorna quantos."""
+    dest = Path(pasta) / ".hub-lixo"
     n = 0
-    try:
-        alvos = [p for p in pasta.rglob("*")
-                 if p.is_file() and not p.is_symlink()
-                 and _SETUP_RE.search(p.name)
-                 and p.suffix.lower() == ".exe"]
-    except OSError:
-        return 0
-    for p in alvos:
+    for p in _iter_reais(pasta):
+        if not (_SETUP_RE.search(p.name) and p.suffix.lower() == ".exe"):
+            continue
         try:
-            p.unlink()
+            if not _dentro(pasta, p):
+                continue
+            dest.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(p), str(dest / p.name))
             n += 1
         except OSError:
             pass
@@ -299,7 +347,7 @@ def importar_repack(con: sqlite3.Connection, arquivo: str | os.PathLike,
                     "pasta": str(pasta),
                     "precisa_instalar": bool(ach.get("precisa_instalar")),
                     "avisos": org["avisos"]}
-        apagados = _apagar_setups_redundantes(pasta)
+        apagados = _quarentenar_setups(pasta)
         exe = Path(ach["exe"])
         titulo = _titulo_de_exe(exe)
         pasta_limpo = _titulo_pasta(pasta)
@@ -332,7 +380,7 @@ def importar_repack(con: sqlite3.Connection, arquivo: str | os.PathLike,
                "capa_pendente": bool(res.get("novos")) and not capa_auto,
                "capa_auto": capa_auto,
                "apagou_arquivo": apagou_arq,
-               "setups_apagados": apagados,
+               "setups_quarentena": apagados,
                "avisos": org["avisos"]}
         if capa_auto:
             out["avisos"] = [*org["avisos"], "capa Steam automática ✓"]

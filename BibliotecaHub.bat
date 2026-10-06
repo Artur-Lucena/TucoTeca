@@ -1,6 +1,6 @@
 @echo off
 rem Biblioteca Hub — duplo-clique para abrir (usa o Python do sistema).
-rem Portatil pronto p/ levar: dist\BibliotecaHub-portatil-*.zip
+rem Portatil pronto p/ levar: dist\tucoteca-portatil-*.zip
 setlocal
 set BIBLIOTECA_HOME=%~dp0
 set PYW=

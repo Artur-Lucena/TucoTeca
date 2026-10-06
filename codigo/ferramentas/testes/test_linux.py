@@ -211,6 +211,46 @@ def teste_menu_controles_volta():
     afirmar(app.msg == "" or isinstance(app.msg, str), app.msg)
 
 
+def teste_desenhar_tela_principal():
+    """Regressão: desenhar() desenhava NameError (filtro) e a tela ia em branco."""
+    import sys
+    import tempfile
+    from pathlib import Path
+    sys.path.insert(0, str(Path("codigo/frontends").resolve()))
+    import app_tui as tui
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    con = core.get_db(db)
+    try:
+        core.criar_jogo(con, {"titulo": "LX Tela", "executable_path": "",
+                              "status": "backlog"})
+    finally:
+        con.close()
+
+    class ScrRec:
+        def __init__(self):
+            self.cells = {}
+        def getmaxyx(self):
+            return (24, 150)
+        def addnstr(self, y, x, s, n, a=0):
+            self.cells[(y, x)] = s[:n]
+        def erase(self):
+            self.cells.clear()
+        def refresh(self):
+            pass
+        def getch(self):
+            return ord("q")
+
+    _tui_fake(db, [])  # instala FakeCurses no módulo app_tui
+    scr = ScrRec()
+    app = tui.Tui(scr, db)
+    app.desenhar()
+    texto = "\n".join(v for _, v in sorted(scr.cells.items()))
+    afirmar("TucoTeca" in texto, texto[:200])
+    afirmar("busca=" in texto and "prov=" in texto, texto[:300])
+    afirmar("LX Tela" in texto, texto[:500])
+
+
 def teste_escolher_rola_lista_longa():
     import tempfile
     from pathlib import Path

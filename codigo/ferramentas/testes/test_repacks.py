@@ -137,7 +137,9 @@ def teste_repack_import_ponta_a_ponta():
         afirmar(r["novos"] == 1 and r["titulo"] == "Cool Game", r)
         afirmar(Path(r["exe"]).is_file(), r)
         afirmar(not arq.exists(), "archive devia ser apagado")
-        afirmar(r["apagou_arquivo"] and r["setups_apagados"] == 1, r)
+        afirmar(r["apagou_arquivo"] and r["setups_quarentena"] == 1, r)
+        quar = Path(r["pasta"]) / ".hub-lixo" / "setup_coolgame.exe"
+        afirmar(quar.is_file(), "setup devia ir p/ quarentena, não sumir")
         afirmar(r["capa_pendente"] is True, r)
         jogos = core.listar_jogos(con, q="Cool Game")
         afirmar(len(jogos) == 1 and jogos[0]["origem"] == "repack", jogos)
@@ -216,6 +218,33 @@ def teste_repack_appid_casa_nome_exato():
         afirmar(S._appid_steam_por_titulo("cool game") == "")
     finally:
         urllib.request.urlopen = orig
+
+
+def teste_repack_symlink_nao_vaza():
+    from bib_nucleo import repacks as RP
+    tmp = Path(tempfile.mkdtemp(prefix="suite-rp-"))
+    arq = tmp / "evil.zip"
+    with zipfile.ZipFile(arq, "w") as zh:
+        zh.writestr("jogo/jogo.exe", b"MZ")
+        zh.writestr("C:/evil.exe", b"x")
+    r = RP.extrair_arquivo(arq, tmp / "out")
+    afirmar(not r.get("ok"), r)
+    afirmar(not (tmp / "out").exists(), "destino devia ser limpo")
+    base = tmp / "arm"
+    (base / "sub").mkdir(parents=True)
+    (base / "sub" / "jogo.exe").write_bytes(b"MZ")
+    try:
+        (base / "link.exe").symlink_to(base / "sub" / "jogo.exe")
+    except OSError:
+        return  # sem privilégio p/ symlink: pula
+    ach = RP.achar_exe(base)
+    afirmar(ach.get("ok") and ach["candidatos"] == 1, ach)
+    real = tmp / "fora.exe"
+    real.write_bytes(b"MZ")
+    (base / "ext.exe").symlink_to(real)
+    ach = RP.achar_exe(base)
+    afirmar(ach.get("ok") and ach["candidatos"] == 1
+            and "ext.exe" not in ach["exe"], ach)
 
 
 def teste_repack_7z_ausente_orienta():

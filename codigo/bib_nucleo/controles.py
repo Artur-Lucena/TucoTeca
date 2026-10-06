@@ -577,7 +577,7 @@ def listar_controles() -> list[dict]:
 
 
 def _familia_por_nome(nome: str, xinput: bool) -> str:
-    n = (nome or "").lower()
+    n = (nome or "").lower().replace("-", "")
     if any(k in n for k in ("dualsense", "ps5", "playstation 5")):
         return "dualsense"
     if any(k in n for k in ("dualshock", "ps4", "playstation 4", "sony")):
@@ -655,27 +655,45 @@ def _listar_win() -> list[dict]:
     return out
 
 
+def _eh_js(token: str) -> bool:
+    """Token de joystick em Handlers (`js0`, `js1`…; `js` nu por tolerância)."""
+    return token == "js" or (token.startswith("js") and token[2:].isdigit())
+
+
+def _parse_devices(texto: str) -> list[dict]:
+    """Nomes com joystick em /proc/bus/input/devices (puro, testável)."""
+    out = []
+    nome, tem_js = "", False
+
+    def descarrega():
+        nonlocal nome, tem_js
+        if nome and tem_js:
+            out.append({"indice": len(out), "nome": nome, "botoes": 0,
+                        "eixos": 0, "xinput": False,
+                        "familia": _familia_por_nome(nome, False)})
+        nome, tem_js = "", False
+
+    for linha in (texto or "").splitlines():
+        if linha.startswith("N: Name="):
+            descarrega()
+            nome = linha.split("=", 1)[1].strip().strip('"')
+        elif linha.startswith("H: Handlers=") and any(
+                _eh_js(t) for t in linha.split()):
+            tem_js = True
+        elif not linha.strip():
+            descarrega()
+    descarrega()
+    return out
+
+
 def _listar_linux() -> list[dict]:
     """Nomes de joypads via /proc (sem polling: exige evdev)."""
-    out = []
     try:
         texto = Path("/proc/bus/input/devices").read_text(encoding="utf-8",
                                                            errors="ignore")
     except OSError:
         return []
-    nome, tem_js = "", False
-    for linha in texto.splitlines():
-        if linha.startswith("N: Name="):
-            nome = linha.split("=", 1)[1].strip().strip('"')
-            tem_js = False
-        elif linha.startswith("H: Handlers=") and "js" in linha.split():
-            tem_js = True
-        elif not linha.strip() and nome and tem_js:
-            out.append({"indice": len(out), "nome": nome, "botoes": 0,
-                        "eixos": 0, "xinput": False,
-                        "familia": _familia_por_nome(nome, False)})
-            nome, tem_js = "", False
-    return out
+    return _parse_devices(texto)
 
 
 # --------------------------------------------------------------------------
@@ -766,4 +784,4 @@ __all__ = ['GUIDS', 'NOMES_TIPO', 'MAPAS', 'BOTOES_3DS', 'DPAD',
            'ler_perfil_atual', 'fotografar_perfil', 'listar_presets_controle',
            'aplicar_preset_controle', 'salvar_mapa_gerado', 'ler_estado_xinput',
            'XINPUT_NOMES', 'XINPUT_PARA_SDL', 'xinput_para_sdl',
-           'resumir_estado', 'capturar']
+            'resumir_estado']

@@ -6,7 +6,7 @@
 ; Clássico: wizard, atalho no Menu Iniciar (+Desktop opcional), desinstalador
 ; em Adicionar/Remover. Sem admin (instala em %LOCALAPPDATA%\TucoTeca).
 ; Compressão interna LZMA2/ultra — o .exe final É o pacote (100% offline:
-; Python embutido + Azahar + DeSmuME + Citron + app).
+; Python embutido + Azahar + DeSmuME + app).
 ; Dados do usuário (dados\) nunca são apagados na desinstalação.
 
 #define AppNome "TucoTeca"

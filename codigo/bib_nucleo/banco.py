@@ -200,6 +200,41 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
             "azahar_preset", "uuid", "etiquetas", "save_path", "azahar_mods", "azahar_mods_off",
             "capa", "confianca", "criado_em", "atualizado_em"]
     todos = ", ".join(cols)
+    # banco legado sem UNIQUE: funde triplos repetidos (soma horas, preserva
+    # texto) em vez de abortar a migração no meio e órfã jogos_nova
+    try:
+        dups = con.execute(
+            "SELECT titulo, executable_path, launch_options FROM jogos"
+            " GROUP BY titulo, executable_path, launch_options"
+            " HAVING COUNT(*) > 1").fetchall()
+    except sqlite3.OperationalError:
+        dups = []
+    for _t, _e, _l in [tuple(r) for r in dups]:
+        ids = [r["id"] for r in con.execute(
+            "SELECT id FROM jogos WHERE titulo IS ? AND executable_path IS ?"
+            " AND launch_options IS ? ORDER BY id", (_t, _e, _l)).fetchall()]
+        if len(ids) < 2:
+            continue
+        fica, sai = ids[0], ids[1:]
+        agg = con.execute(
+            "SELECT COALESCE(SUM(horas), 0), MAX(ultima_execucao),"
+            " MAX(nota), MAX(favorito) FROM jogos WHERE id IN (%s)"
+            % ",".join("?" * len(ids)), ids).fetchone()
+        obs = con.execute(
+            "SELECT observacoes FROM jogos WHERE id IN (%s)"
+            " AND observacoes IS NOT NULL AND observacoes <> ''"
+            " ORDER BY id LIMIT 1" % ",".join("?" * len(ids)),
+            ids).fetchone()
+        con.execute("UPDATE jogos SET horas=?, ultima_execucao=?, nota=?,"
+                    " favorito=?, observacoes=COALESCE(observacoes, '') WHERE id=?",
+                    (agg[0], agg[1], agg[2], agg[3] or 0, fica))
+        if obs and obs[0]:
+            con.execute("UPDATE jogos SET observacoes=? WHERE id=?",
+                        (obs[0], fica))
+        con.execute("DELETE FROM jogos WHERE id IN (%s)"
+                    % ",".join("?" * len(sai)), sai)
+    if dups:
+        con.commit()
     con.executescript(f"""
         CREATE TABLE jogos_nova (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -258,8 +293,22 @@ def _garantir_uuid(con: sqlite3.Connection) -> None:
             novo = uuid_mod.uuid4().hex
         vistos.add(novo)
         con.execute("UPDATE jogos SET uuid=? WHERE id=?", (novo, gid))
+    # uuid duplicado herdado quebraria o índice único: preserva o menor id
+    mexeu = bool(vazios)
+    for (dup,) in con.execute(
+            "SELECT uuid FROM jogos WHERE uuid IS NOT NULL AND uuid<>''"
+            " GROUP BY uuid HAVING COUNT(*) > 1").fetchall():
+        ids = [r["id"] for r in con.execute(
+            "SELECT id FROM jogos WHERE uuid=? ORDER BY id", (dup,)).fetchall()]
+        for gid in ids[1:]:
+            novo = uuid_mod.uuid4().hex
+            while novo in vistos:
+                novo = uuid_mod.uuid4().hex
+            vistos.add(novo)
+            con.execute("UPDATE jogos SET uuid=? WHERE id=?", (novo, gid))
+            mexeu = True
     con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_jogos_uuid ON jogos(uuid)")
-    if vazios:
+    if mexeu:
         con.commit()
 
 
@@ -308,11 +357,14 @@ def get_db(db_path: Path) -> sqlite3.Connection:
     colunas = {r['name'] for r in con.execute('PRAGMA table_info(jogos)')} if existe else set()
     faltantes = [sql for sql in MIGRACOES if sql.split()[5] not in colunas]
     if existe and faltantes:
-        backup_dir = db_path.parent / "backups"
-        backup_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-        with sqlite3.connect(str(backup_dir / f"pre-migracao-{stamp}.db")) as dst:
-            con.backup(dst)
+        try:
+            backup_dir = db_path.parent / "backups"
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+            with sqlite3.connect(str(backup_dir / f"pre-migracao-{stamp}.db")) as dst:
+                con.backup(dst)
+        except (OSError, sqlite3.Error):
+            pass  # best-effort: disco cheio não pode impedir abrir o banco
     con.executescript(SCHEMA)
     if existe:
         for sql in faltantes:
@@ -570,21 +622,24 @@ def atualizar_jogo(con: sqlite3.Connection, gid: int, dados: dict) -> dict:
         raise LookupError("jogo não encontrado")
     atual = dict(row)
     limpo = validar_dados({**{c: atual.get(c) for c in CAMPOS_EDITAVEIS}, **dados})
-    con.execute(
-        """UPDATE jogos SET titulo=?, executable_path=?, exe_win=?, exe_linux=?, exe_mac=?,
-           wine_prefix=?, launch_options=?, status=?, nota=?, favorito=?, horas=?,
-           observacoes=?, shop=?, object_id=?, origem=?, game_code=?, regiao=?,
-           azahar_preset=?, etiquetas=?, save_path=?, azahar_mods=?, azahar_mods_off=?,
-           atualizado_em=? WHERE id=?""",
-        (limpo["titulo"], limpo["executable_path"], limpo["exe_win"],
-         limpo["exe_linux"], limpo["exe_mac"], limpo["wine_prefix"], limpo["launch_options"],
-         limpo["status"], limpo["nota"], limpo["favorito"],
-         limpo["horas"], limpo["observacoes"], limpo["shop"], limpo["object_id"],
-         limpo["origem"], limpo["game_code"], limpo["regiao"],
-         limpo["azahar_preset"], limpo["etiquetas"], limpo["save_path"], limpo["azahar_mods"],
-         limpo["azahar_mods_off"], agora_iso(), gid),
-    )
-    con.commit()
+    try:
+        con.execute(
+            """UPDATE jogos SET titulo=?, executable_path=?, exe_win=?, exe_linux=?, exe_mac=?,
+               wine_prefix=?, launch_options=?, status=?, nota=?, favorito=?, horas=?,
+               observacoes=?, shop=?, object_id=?, origem=?, game_code=?, regiao=?,
+               azahar_preset=?, etiquetas=?, save_path=?, azahar_mods=?, azahar_mods_off=?,
+               atualizado_em=? WHERE id=?""",
+            (limpo["titulo"], limpo["executable_path"], limpo["exe_win"],
+             limpo["exe_linux"], limpo["exe_mac"], limpo["wine_prefix"], limpo["launch_options"],
+             limpo["status"], limpo["nota"], limpo["favorito"],
+             limpo["horas"], limpo["observacoes"], limpo["shop"], limpo["object_id"],
+             limpo["origem"], limpo["game_code"], limpo["regiao"],
+             limpo["azahar_preset"], limpo["etiquetas"], limpo["save_path"], limpo["azahar_mods"],
+             limpo["azahar_mods_off"], agora_iso(), gid),
+        )
+        con.commit()
+    except sqlite3.IntegrityError:
+        raise ValueError("jogo já cadastrado (mesmo título + executável)")
     return row_to_dict(con.execute("SELECT * FROM jogos WHERE id=?", (gid,)).fetchone())
 
 
@@ -656,7 +711,11 @@ def excluir_musica(con: sqlite3.Connection, mid: int) -> None:
     con.commit()
     if row["musica_path"]:
         try:
-            Path(row["musica_path"]).unlink()
+            from bib_nucleo.base import MUSICAS_DIR
+            alvo = Path(row["musica_path"])
+            raiz = MUSICAS_DIR.resolve()
+            if alvo.resolve() == raiz or raiz in alvo.resolve().parents:
+                alvo.unlink()
         except OSError:
             pass
 

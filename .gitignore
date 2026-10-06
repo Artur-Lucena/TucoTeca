@@ -1,13 +1,19 @@
 # Banco e dados do usuário — nunca versionar (ficam na máquina)
 dados/
+*.db
+*.db-journal
+*.sqlite3
 # Histórico local de arquivo único (arquivo, não entrega)
 codigo/historico/
 # Caches e temporários
 __pycache__/
 *.py[cod]
+.pytest_cache/
 Desktop.ini
 Thumbs.db
 *~
+*.bak
+*.tmp
 .vscode/
 # Saída do portátil (ferramentas/montar_portatil.py) — artefato, não fonte
 dist/

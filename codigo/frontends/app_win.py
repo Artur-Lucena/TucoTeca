@@ -2850,8 +2850,7 @@ def main(argv: list[str] | None = None) -> int:
     atexit.register(core.liberar_lock)
     core.get_db(Path(args.db)).close()
     if args.jogar:
-        core.liberar_lock()
-        atexit.unregister(core.liberar_lock)
+        # mantém o lock adquirido acima durante o jogo (main_jogar libera)
         return main_jogar(args)
     root = tk.Tk()
     _titulo_escuro(root)
