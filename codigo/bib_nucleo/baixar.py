@@ -29,7 +29,8 @@ _COL_URI = "Track URI"
 __all__ = ['primeiro_artista', 'ler_csv_exportify', 'localizar_ytdlp',
            'erro_sem_ytdlp', 'consulta_busca', 'casar_video', 'baixar_faixa',
            'localizar_ffmpeg', 'erro_sem_ffmpeg', 'converter_faixa',
-           'importar_fila_pronta']
+           'importar_fila_pronta', 'dir_ferramentas', 'ffmpeg_pronto',
+           'ytdlp_pronto', 'instalar_ffmpeg', 'instalar_ytdlp']
 
 
 def primeiro_artista(campo: str) -> str:
@@ -88,10 +89,15 @@ def ler_csv_exportify(caminho: str | os.PathLike) -> dict:
 # --------------------------------------------------------------------------
 
 def localizar_ytdlp() -> str:
-    """Binário yt-dlp: env `BIBLIOTECA_YTDLP` → PATH → `''` (ausente)."""
+    """Binário yt-dlp: env → `Games/ferramentas` → PATH → `''`."""
     env = (os.environ.get(YTDLP_ENV) or "").strip()
     if env and Path(env).is_file():
         return env
+    fer = dir_ferramentas()
+    if fer is not None:
+        cand = fer / "yt-dlp.exe"
+        if cand.is_file():
+            return str(cand)
     achado = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
     return achado or ""
 
@@ -214,14 +220,151 @@ def baixar_faixa(con, did: int, ytdlp: str = "", destino=None,
 
 
 # --------------------------------------------------------------------------
+# Dependências de áudio: o Hub baixa ffmpeg/yt-dlp sozinho (molde 7z)
+# --------------------------------------------------------------------------
+
+FFMPEG_URL = ("https://www.gyan.dev/ffmpeg/builds/"
+              "ffmpeg-release-essentials.zip")
+YTDLP_URL = ("https://github.com/yt-dlp/yt-dlp/releases/latest/download/"
+             "yt-dlp.exe")
+FFMPEG_ZIP_MIN = 40_000_000
+YTDLP_EXE_MIN = 10_000_000
+
+
+def dir_ferramentas():
+    """`Games/ferramentas/` no Windows (casa do 7z); None fora dele."""
+    if os.name != "nt":
+        return None
+    from bib_nucleo.base import WIN_ROOT
+    return Path(f"{str(WIN_ROOT).rstrip(chr(92))}\\Games\\ferramentas")
+
+
+def ffmpeg_pronto() -> str:
+    """Caminho do ffmpeg válido ou `''` (molde `azahar_status`)."""
+    cand = localizar_ffmpeg()
+    try:
+        if cand and Path(cand).is_file() and Path(cand).stat().st_size > 1_000_000:
+            return cand
+    except OSError:
+        pass
+    return ""
+
+
+def ytdlp_pronto() -> str:
+    cand = localizar_ytdlp()
+    try:
+        if cand and Path(cand).is_file() and Path(cand).stat().st_size > 1_000_000:
+            return cand
+    except OSError:
+        pass
+    return ""
+
+
+def _baixar_bin(url: str, minimo: int, progresso=None,
+                timeout: int = 60) -> bytes:
+    """Baixa binário oficial p/ memória (com teto anti-estouro)."""
+    import urllib.request
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        total = int(r.headers.get("Content-Length") or 0)
+        if total and total > 500_000_000:
+            raise ValueError("download grande demais (aborto)")
+        blocos: list[bytes] = []
+        feito = 0
+        while True:
+            parte = r.read(256 * 1024)
+            if not parte:
+                break
+            blocos.append(parte)
+            feito += len(parte)
+            if feito > 500_000_000:
+                raise ValueError("download grande demais (aborto)")
+            if progresso:
+                try:
+                    progresso(feito, total)
+                except Exception:
+                    pass
+    raw = b"".join(blocos)
+    if len(raw) < minimo:
+        raise ValueError(f"download curto ({len(raw)} B, esperado >{minimo})")
+    return raw
+
+
+def instalar_ffmpeg(destino=None, progresso=None) -> dict:
+    """Baixa o essentials oficial e planta `ffmpeg.exe` (só Windows)."""
+    fer = Path(destino) if destino else dir_ferramentas()
+    if fer is None:
+        return {"ok": False,
+                "erro": "fora do Windows, instale ffmpeg pelo gerenciador"
+                        " (apt/brew) ou aponte BIBLIOTECA_FFMPEG."}
+    try:
+        fer.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        return {"ok": False, "erro": f"pasta ferramentas: {e}"}
+    try:
+        raw = _baixar_bin(FFMPEG_URL, FFMPEG_ZIP_MIN, progresso=progresso)
+    except Exception as e:
+        return {"ok": False, "erro": f"download: {e}"}
+    import io
+    import zipfile
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            nomes = [i.filename for i in z.infolist()
+                     if i.filename.replace("\\", "/").lower().endswith(
+                         "/bin/ffmpeg.exe") and not i.is_dir()]
+            if not nomes:
+                return {"ok": False, "erro": "ffmpeg.exe ausente no pacote"}
+            exe = z.read(sorted(nomes, key=len)[0])
+    except Exception as e:
+        return {"ok": False, "erro": f"zip inválido: {e}"}
+    if exe[:2] != b"MZ":
+        return {"ok": False, "erro": "ffmpeg.exe inválido (sem MZ)"}
+    try:
+        (fer / "ffmpeg.exe").write_bytes(exe)
+    except OSError as e:
+        return {"ok": False, "erro": f"gravação: {e}"}
+    return {"ok": True, "path": str(fer / "ffmpeg.exe"),
+            "bytes": len(exe)}
+
+
+def instalar_ytdlp(destino=None, progresso=None) -> dict:
+    """Baixa o `yt-dlp.exe` oficial (só Windows)."""
+    fer = Path(destino) if destino else dir_ferramentas()
+    if fer is None:
+        return {"ok": False,
+                "erro": "fora do Windows, instale yt-dlp pelo gerenciador"
+                        " (pip/apt/brew) ou aponte BIBLIOTECA_YTDLP."}
+    try:
+        fer.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        return {"ok": False, "erro": f"pasta ferramentas: {e}"}
+    try:
+        exe = _baixar_bin(YTDLP_URL, YTDLP_EXE_MIN, progresso=progresso)
+    except Exception as e:
+        return {"ok": False, "erro": f"download: {e}"}
+    if exe[:2] != b"MZ":
+        return {"ok": False, "erro": "yt-dlp.exe inválido (sem MZ)"}
+    try:
+        (fer / "yt-dlp.exe").write_bytes(exe)
+    except OSError as e:
+        return {"ok": False, "erro": f"gravação: {e}"}
+    return {"ok": True, "path": str(fer / "yt-dlp.exe"), "bytes": len(exe)}
+
+
+# --------------------------------------------------------------------------
 # Fase C: mp3 via ffmpeg BYOB (sem ffmpeg: guarda nativo + avisa) + import
 # --------------------------------------------------------------------------
 
 def localizar_ffmpeg() -> str:
-    """Binário ffmpeg: env `BIBLIOTECA_FFMPEG` → PATH → `''` (ausente)."""
+    """Binário ffmpeg: env → `Games/ferramentas` → PATH → `''`."""
     env = (os.environ.get(FFMPEG_ENV) or "").strip()
     if env and Path(env).is_file():
         return env
+    fer = dir_ferramentas()
+    if fer is not None:
+        cand = fer / "ffmpeg.exe"
+        if cand.is_file():
+            return str(cand)
     achado = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
     return achado or ""
 

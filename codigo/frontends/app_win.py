@@ -868,7 +868,7 @@ class App:
             self.mus_sel = sel[0]
             self.mostrar_detalhe()
 
-    def tocar_musica_selecionada(self):
+    def tocar_musica_selecionada(self, oferecer=True):
         """Toca no player interno (segue com o jogo; externo em Externo…)."""
         if self.mus_modo == "fila":
             messagebox.showinfo("Fila", "Aqui é a fila de downloads (Fase B).")
@@ -883,8 +883,88 @@ class App:
         if r.get("ok"):
             self._aviso_barra(f"Tocando: {core.texto_musica(self.musicas[self.mus_sel])}")
             self._atualizar_transporte()
+        elif oferecer and "ffmpeg" in (r.get("erro") or "") \
+                and not core.ffmpeg_pronto():
+            self.instalar_deps_audio(
+                ("ffmpeg",),
+                ao_fim=lambda: self.tocar_musica_selecionada(oferecer=False))
         else:
             messagebox.showwarning("Músicas", r.get("erro", "falha"))
+
+    def instalar_deps_audio(self, so_falta=("ffmpeg", "ytdlp"), ao_fim=None):
+        """Baixa ffmpeg/yt-dlp oficiais em thread (molde ⬇ emuladores)."""
+        pend = []
+        if "ffmpeg" in so_falta and not core.ffmpeg_pronto():
+            pend.append(("ffmpeg", "ffmpeg (~80MB)"))
+        if "ytdlp" in so_falta and not core.ytdlp_pronto():
+            pend.append(("ytdlp", "yt-dlp (~30MB)"))
+        if not pend:
+            if ao_fim:
+                try:
+                    ao_fim()
+                except tk.TclError:
+                    pass
+            return
+        if not messagebox.askyesno(
+                "Dependências de áudio",
+                "Falta: " + ", ".join(p[1] for p in pend)
+                + ".\nBaixar do oficial agora?"):
+            return
+        prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
+        prog.title("Baixando dependências…")
+        prog.transient(self.root)
+        lbl = ttk.Label(prog, text="Preparando…")
+        lbl.pack(padx=24, pady=20)
+        try:
+            prog.update()
+        except tk.TclError:
+            return
+
+        def located(txt):
+            def _cb(feito, total):
+                try:
+                    mb = f"{feito/1048576:.0f}/{total/1048576:.0f}MB" \
+                        if total else f"{feito/1048576:.0f}MB"
+                    self._depois(lambda: lbl.configure(text=f"{txt}: {mb}"))
+                except tk.TclError:
+                    pass
+            return _cb
+
+        def trabalho(pend_fx=pend):
+            erros = []
+            for chave, _rot in pend_fx:
+                try:
+                    if chave == "ffmpeg":
+                        r = core.instalar_ffmpeg(progresso=located("ffmpeg"))
+                    else:
+                        r = core.instalar_ytdlp(progresso=located("yt-dlp"))
+                except Exception as e:
+                    r = {"ok": False, "erro": str(e)}
+                if not r.get("ok"):
+                    erros.append(f"{chave}: {r.get('erro')}")
+            self._depois(lambda: fim(erros))
+
+        def fim(erros):
+            try:
+                prog.destroy()
+            except tk.TclError:
+                pass
+            if erros:
+                messagebox.showwarning("Dependências de áudio",
+                                       "\n".join(erros[:3]))
+                return
+            if ao_fim:
+                try:
+                    ao_fim()
+                except tk.TclError:
+                    pass
+            else:
+                try:
+                    self._aviso_barra("Dependências de áudio ok ✓")
+                except tk.TclError:
+                    pass
+        threading.Thread(target=trabalho, daemon=True).start()
 
     def abrir_externo_musica(self):
         """Fallback: abre no player do SO (como era antes do interno)."""
@@ -1117,14 +1197,19 @@ class App:
             except tk.TclError:
                 pass
 
-    def baixar_fila(self):
+    def baixar_fila(self, oferecer=True):
         """Start Downloads do Harmoni: baixa pendentes em thread (Fase B)."""
         th = getattr(self, "_th_fila", None)
         if th is not None and th.is_alive():
             messagebox.showinfo("Baixar fila", "Download já em andamento.")
             return
         if not core.localizar_ytdlp():
-            messagebox.showwarning("Baixar fila", core.erro_sem_ytdlp())
+            if oferecer:
+                self.instalar_deps_audio(
+                    ("ytdlp",),
+                    ao_fim=lambda: self.baixar_fila(oferecer=False))
+            else:
+                messagebox.showwarning("Baixar fila", core.erro_sem_ytdlp())
             return
         con = self._con()
         try:
@@ -2763,6 +2848,16 @@ class App:
                             ("⬇ Atualizar DeSmuME", self.atualizar_desmume)):
             ttk.Button(fr_emu, text=rotulo, command=cmd).pack(
                 fill="x", padx=4, pady=3)
+        try:
+            ff_ok = "✓" if core.ffmpeg_pronto() else "✗"
+            yt_ok = "✓" if core.ytdlp_pronto() else "✗"
+        except Exception:
+            ff_ok = yt_ok = "?"
+        ttk.Label(fr_emu, text=f"áudio: ffmpeg {ff_ok} · yt-dlp {yt_ok}",
+                  style="Sec.TLabel").pack(anchor="w", padx=4)
+        ttk.Button(fr_emu, text="⬇ Dependências de áudio",
+                   command=lambda: self.instalar_deps_audio()).pack(
+                       fill="x", padx=4, pady=3)
         fr_mus = secao("Músicas")
         auto_capa = ("ligada" if core.capa_musica_auto() else "desligada")
         ttk.Label(fr_mus, text=f"capa automática: {auto_capa}"

@@ -235,6 +235,43 @@ def teste_baixar_faixa_mock():
         con.close()
 
 
+def _zip_ff(exe_bytes):
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("ffmpeg-9.0/bin/ffmpeg.exe", exe_bytes)
+    return buf.getvalue()
+
+
+def _urlopen_binario(dados_ou_erro):
+    import urllib.request
+    chamadas = []
+
+    class Resp:
+        def __init__(self, dados):
+            self._dados = dados
+            self.headers = {}
+        def read(self, n=-1):
+            if not self._dados:
+                return b""
+            out, self._dados = self._dados[:n], self._dados[n:]
+            return out
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    def falso(req, timeout=None):
+        chamadas.append(getattr(req, "full_url", ""))
+        if isinstance(dados_ou_erro, Exception):
+            raise dados_ou_erro
+        return Resp(bytes(dados_ou_erro))
+    velho = urllib.request.urlopen
+    urllib.request.urlopen = falso
+    return velho, chamadas
+
+
 def teste_baixar_converter_ffmpeg_mock():
     import os
     from bib_nucleo import baixar as BX
@@ -338,3 +375,97 @@ def teste_baixar_converter_sem_ffmpeg():
     finally:
         BX.localizar_ffmpeg = velho_loc
         con.close()
+
+
+def teste_baixar_instalar_ffmpeg_mock():
+    import urllib.request
+    from bib_nucleo import baixar as BX
+    tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
+    velho_min = BX.FFMPEG_ZIP_MIN
+    BX.FFMPEG_ZIP_MIN = 10
+    velho, chamadas = _urlopen_binario(_zip_ff(b"MZ" + b"0" * 3000))
+    try:
+        r = BX.instalar_ffmpeg(destino=tmp / "fer")
+        afirmar(r.get("ok") and (tmp / "fer" / "ffmpeg.exe").is_file(), r)
+        afirmar(chamadas and "gyan.dev" in chamadas[0], chamadas)
+    finally:
+        urllib.request.urlopen = velho
+        BX.FFMPEG_ZIP_MIN = velho_min
+    velho, _ch = _urlopen_binario(_zip_ff(b"sem-mz-aqui"))
+    BX.FFMPEG_ZIP_MIN = 10
+    try:
+        r = BX.instalar_ffmpeg(destino=tmp / "fer2")
+        afirmar(not r.get("ok") and "MZ" in r.get("erro", ""), r)
+    finally:
+        urllib.request.urlopen = velho
+        BX.FFMPEG_ZIP_MIN = velho_min
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("nada/util.txt", b"x")
+    velho, _ch = _urlopen_binario(buf.getvalue())
+    BX.FFMPEG_ZIP_MIN = 10
+    try:
+        r = BX.instalar_ffmpeg(destino=tmp / "fer3")
+        afirmar(not r.get("ok") and "ausente" in r.get("erro", ""), r)
+    finally:
+        urllib.request.urlopen = velho
+        BX.FFMPEG_ZIP_MIN = velho_min
+
+
+def teste_baixar_instalar_ytdlp_mock():
+    import urllib.request
+    from bib_nucleo import baixar as BX
+    tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
+    velho_min = BX.YTDLP_EXE_MIN
+    BX.YTDLP_EXE_MIN = 10
+    velho, chamadas = _urlopen_binario(b"MZ" + b"1" * 3000)
+    try:
+        r = BX.instalar_ytdlp(destino=tmp / "fer")
+        afirmar(r.get("ok") and (tmp / "fer" / "yt-dlp.exe").is_file(), r)
+        afirmar(chamadas and "yt-dlp" in chamadas[0], chamadas)
+    finally:
+        urllib.request.urlopen = velho
+        BX.YTDLP_EXE_MIN = velho_min
+    velho, _ch = _urlopen_binario(OSError("rede"))
+    BX.YTDLP_EXE_MIN = 10
+    try:
+        r = BX.instalar_ytdlp(destino=tmp / "fer2")
+        afirmar(not r.get("ok") and "download" in r.get("erro", ""), r)
+    finally:
+        urllib.request.urlopen = velho
+        BX.YTDLP_EXE_MIN = velho_min
+
+
+def teste_baixar_pronto_e_ferramentas():
+    import os
+    from bib_nucleo import baixar as BX
+    from bib_nucleo import base
+    tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
+    (tmp / "peq.exe").write_bytes(b"MZ")
+    afirmar(BX.ffmpeg_pronto() == "" or isinstance(BX.ffmpeg_pronto(), str))
+    velho_env = os.environ.get("BIBLIOTECA_FFMPEG")
+    os.environ["BIBLIOTECA_FFMPEG"] = str(tmp / "peq.exe")
+    try:
+        afirmar(BX.localizar_ffmpeg() == str(tmp / "peq.exe"))
+        afirmar(BX.ffmpeg_pronto() == "", "pequeno demais devia reprovar")
+    finally:
+        if velho_env is None:
+            os.environ.pop("BIBLIOTECA_FFMPEG", None)
+        else:
+            os.environ["BIBLIOTECA_FFMPEG"] = velho_env
+    if os.name == "nt":
+        fer = Path(str(base.WIN_ROOT).rstrip("\\/")) / "Games" / "ferramentas"
+        fer.mkdir(parents=True, exist_ok=True)
+        (fer / "yt-dlp.exe").write_bytes(b"MZ" + b"0" * 2_000_000)
+        velho_yt = os.environ.get("BIBLIOTECA_YTDLP")
+        os.environ.pop("BIBLIOTECA_YTDLP", None)
+        try:
+            afirmar(BX.localizar_ytdlp() == str(fer / "yt-dlp.exe"))
+            afirmar(BX.ytdlp_pronto() == str(fer / "yt-dlp.exe"))
+        finally:
+            if velho_yt is not None:
+                os.environ["BIBLIOTECA_YTDLP"] = velho_yt
+    else:
+        afirmar(BX.dir_ferramentas() is None)

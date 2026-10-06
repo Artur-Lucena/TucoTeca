@@ -801,7 +801,8 @@ class Tui:
                     n_fila = 0
                 opcoes = (rotulos + ["Buscar…", "Importar de pasta…",
                                      "Baixar de CSV…", f"Fila ({n_fila})…",
-                                     "Baixar capas…", "Voltar"])
+                                     "Baixar capas…", "Dependências de áudio…",
+                                     "Voltar"])
                 idx = self.escolher(titulo, opcoes)
                 if idx is None or opcoes[idx] == "Voltar":
                     self.recarregar()
@@ -865,6 +866,34 @@ class Tui:
                                 f" {res['pendentes']} pendente(s)")
                     if res["erros"]:
                         self.msg += f" — {res['erros'][0]}"
+                elif idx >= len(itens) and escolha == "Dependências de áudio…":
+                    ff_ok = bool(core.ffmpeg_pronto())
+                    yt_ok = bool(core.ytdlp_pronto())
+                    if ff_ok and yt_ok:
+                        self.msg = "ffmpeg ✓ · yt-dlp ✓"
+                        continue
+                    falta = " e ".join(
+                        x for x, ok in (("ffmpeg (~80MB)", ff_ok),
+                                        ("yt-dlp (~30MB)", yt_ok)) if not ok)
+                    conf = self.perguntar(f"Baixar {falta} do oficial? (s/n): ")
+                    if (conf or "").strip().lower() not in ("s", "sim"):
+                        continue
+                    msgs = []
+                    if not ff_ok:
+                        try:
+                            r = core.instalar_ffmpeg()
+                            msgs.append("ffmpeg ✓" if r.get("ok")
+                                        else f"ffmpeg: {r.get('erro')}")
+                        except Exception as e:
+                            msgs.append(f"ffmpeg: {e}")
+                    if not yt_ok:
+                        try:
+                            r = core.instalar_ytdlp()
+                            msgs.append("yt-dlp ✓" if r.get("ok")
+                                        else f"yt-dlp: {r.get('erro')}")
+                        except Exception as e:
+                            msgs.append(f"yt-dlp: {e}")
+                    self.msg = " · ".join(msgs)
                 else:
                     pos = idx
                     if 0 <= pos < len(itens):
