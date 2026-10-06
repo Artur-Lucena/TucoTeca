@@ -882,8 +882,8 @@ class Tui:
                 extra = (f" — {d.get('erro')}"
                          if est == "falha" and d.get("erro") else "")
                 rotulos.append(f"{base} [{est}]{extra}")
-            opcoes = rotulos + ["Baixar fila", "Limpar prontas/falhas",
-                                 "Voltar"]
+            opcoes = rotulos + ["Baixar fila", "Importar baixadas",
+                                 "Limpar prontas/falhas", "Voltar"]
             idx = self.escolher(f"Fila ({len(fila)})", opcoes)
             if idx is None or opcoes[idx] == "Voltar":
                 return
@@ -905,6 +905,17 @@ class Tui:
                         r = {"ok": False, "erro": str(e)}
                     ok += 1 if r.get("ok") else 0
                 self.msg = f"Baixadas {ok}/{len(alvos)} (Fase C importa)."
+                continue
+            if opcoes[idx] == "Importar baixadas":
+                try:
+                    res = core.importar_fila_pronta(con)
+                except Exception as e:
+                    self.msg = f"Falha: {e}"
+                    continue
+                self.msg = (f"{res['novas']} nova(s),"
+                            f" {res['ignorados']} ignorada(s)")
+                if res["erros"]:
+                    self.msg += f" — {res['erros'][0]}"
                 continue
             if opcoes[idx] == "Limpar prontas/falhas":
                 try:

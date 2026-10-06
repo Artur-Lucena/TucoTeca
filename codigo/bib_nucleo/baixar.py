@@ -27,7 +27,9 @@ _COL_URI = "Track URI"
 
 
 __all__ = ['primeiro_artista', 'ler_csv_exportify', 'localizar_ytdlp',
-           'erro_sem_ytdlp', 'consulta_busca', 'casar_video', 'baixar_faixa']
+           'erro_sem_ytdlp', 'consulta_busca', 'casar_video', 'baixar_faixa',
+           'localizar_ffmpeg', 'erro_sem_ffmpeg', 'converter_faixa',
+           'importar_fila_pronta']
 
 
 def primeiro_artista(campo: str) -> str:
@@ -209,3 +211,150 @@ def baixar_faixa(con, did: int, ytdlp: str = "", destino=None,
     B.marcar_download(con, did, "baixado", video_id=casa["video_id"],
                       musica_path=str(arq))
     return {"ok": True, "video_id": casa["video_id"], "path": str(arq)}
+
+
+# --------------------------------------------------------------------------
+# Fase C: mp3 via ffmpeg BYOB (sem ffmpeg: guarda nativo + avisa) + import
+# --------------------------------------------------------------------------
+
+def localizar_ffmpeg() -> str:
+    """Binário ffmpeg: env `BIBLIOTECA_FFMPEG` → PATH → `''` (ausente)."""
+    env = (os.environ.get(FFMPEG_ENV) or "").strip()
+    if env and Path(env).is_file():
+        return env
+    achado = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+    return achado or ""
+
+
+def erro_sem_ffmpeg() -> str:
+    return ("ffmpeg não encontrado. mp3 exige ffmpeg"
+            " (https://ffmpeg.org) ou aponte BIBLIOTECA_FFMPEG p/ o binário;"
+            " sem ele, o Hub guarda o áudio nativo (.m4a).")
+
+
+def _destino_musica(artista: str, titulo: str, ext: str):
+    """Caminho livre em `MUSICAS_DIR` (`slug` + `-n`, molde importar_musicas)."""
+    from bib_nucleo.base import MUSICAS_DIR, slugify
+    MUSICAS_DIR.mkdir(parents=True, exist_ok=True)
+    base = slugify(f"{artista}-{titulo}") or "faixa"
+    dest = MUSICAS_DIR / f"{base}{ext}"
+    n = 1
+    while dest.exists():
+        n += 1
+        dest = MUSICAS_DIR / f"{base}-{n}{ext}"
+    return dest
+
+
+def converter_faixa(con, did: int, ffmpeg: str = "") -> dict:
+    """Converte 1 `baixado` p/ `musicas/` e marca pronta. Nunca levanta.
+
+    Com ffmpeg: mp3 (ID3v2.3 com artista/título/álbum da fila). Sem ffmpeg:
+    copia o nativo se tocável (`MUSICA_EXTS`) + aviso; senão falha honesta.
+    """
+    from bib_nucleo import banco as B
+    from bib_nucleo.base import MUSICA_EXTS
+    row = con.execute("SELECT * FROM downloads WHERE id=?", (did,)).fetchone()
+    if not row:
+        return {"ok": False, "erro": "download não encontrado"}
+    d = dict(row)
+    if d.get("estado") != "baixado":
+        return {"ok": False, "erro": f"estado {d.get('estado')} não converte"}
+    src = Path(d.get("musica_path") or "")
+    if not src.is_file():
+        B.marcar_download(con, did, "falha", video_id=d.get("video_id") or "",
+                          erro="staging sumiu")
+        return {"ok": False, "erro": "staging sumiu"}
+    art, tit, alb = (d.get("artista") or "", d.get("titulo") or "",
+                     d.get("album") or "")
+    binario = (ffmpeg or "").strip() or localizar_ffmpeg()
+    if binario:
+        dest = _destino_musica(art, tit, ".mp3")
+        cmd = [binario, "-y", "-i", str(src), "-codec:a", "libmp3lame",
+               "-q:a", "2", "-id3v2_version", "3", "-metadata",
+               f"title={tit}", "-metadata", f"artist={art}", "-metadata",
+               f"album={alb}", str(dest)]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=900)
+        except (OSError, subprocess.SubprocessError) as e:
+            B.marcar_download(con, did, "falha", video_id=d.get("video_id") or "",
+                              erro=f"ffmpeg: {e}")
+            return {"ok": False, "erro": f"ffmpeg: {e}"}
+        if r.returncode != 0 or not dest.is_file():
+            detalhe = (r.stderr or "").strip().splitlines()
+            msg = detalhe[-1][:200] if detalhe else f"ffmpeg rc={r.returncode}"
+            try:
+                dest.unlink()
+            except OSError:
+                pass
+            B.marcar_download(con, did, "falha", video_id=d.get("video_id") or "",
+                              erro=msg)
+            return {"ok": False, "erro": msg}
+        aviso = ""
+    else:
+        if src.suffix.lower() not in MUSICA_EXTS:
+            msg = f"{src.suffix or 'sem ext'} sem ffmpeg: {erro_sem_ffmpeg()}"
+            B.marcar_download(con, did, "falha", video_id=d.get("video_id") or "",
+                              erro=msg[:300])
+            return {"ok": False, "erro": msg}
+        dest = _destino_musica(art, tit, src.suffix.lower())
+        try:
+            import shutil as _sh
+            _sh.copy2(str(src), str(dest))
+        except OSError as e:
+            B.marcar_download(con, did, "falha", video_id=d.get("video_id") or "",
+                              erro=f"cópia: {e}")
+            return {"ok": False, "erro": f"cópia: {e}"}
+        aviso = (f"nativo {dest.suffix} (sem ffmpeg; mp3 quando houver): "
+                 f"{erro_sem_ffmpeg()}")
+    from bib_nucleo.musicas import sha_arquivo
+    try:
+        sha = sha_arquivo(dest)
+        B.criar_musica(con, {"titulo": tit, "artista": art, "album": alb,
+                             "musica_path": str(dest), "musica_sha": sha,
+                             "origem": "csv"})
+    except ValueError as e:
+        try:
+            dest.unlink()
+        except OSError:
+            pass
+        B.marcar_download(con, did, "falha", video_id=d.get("video_id") or "",
+                          erro=str(e))
+        return {"ok": False, "erro": str(e)}
+    try:
+        src.unlink()
+    except OSError:
+        pass
+    B.marcar_download(con, did, "pronta", video_id=d.get("video_id") or "",
+                      musica_sha=sha, musica_path=str(dest))
+    out = {"ok": True, "path": str(dest), "sha": sha}
+    if aviso:
+        out["aviso"] = aviso
+    return out
+
+
+def importar_fila_pronta(con, ffmpeg: str = "") -> dict:
+    """Converte todas as `baixado` (Fase C em lote). Nunca levanta."""
+    from bib_nucleo import banco as B
+    novas = ignoradas = 0
+    erros: list[str] = []
+    avisos: list[str] = []
+    try:
+        alvos = [d["id"] for d in B.listar_downloads(con, estado="baixado")]
+    except Exception as e:
+        return {"novas": 0, "ignoradas": 0, "erros": [str(e)], "avisos": []}
+    for did in alvos:
+        try:
+            r = converter_faixa(con, did, ffmpeg=ffmpeg)
+        except Exception as e:
+            r = {"ok": False, "erro": str(e)}
+        if r.get("ok"):
+            novas += 1
+            if r.get("aviso") and len(avisos) < 5:
+                avisos.append(r["aviso"][:160])
+        else:
+            ignoradas += 1
+            if len(erros) < 20:
+                erros.append(f"#{did}: {r.get('erro')}")
+    return {"novas": novas, "ignoradas": ignoradas, "erros": erros,
+            "avisos": avisos}

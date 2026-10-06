@@ -910,8 +910,10 @@ class App:
                    command=self.baixar_csv).pack(side="left", padx=6)
         ttk.Button(fr_btn, text="⬇ Baixar fila",
                    command=self.baixar_fila).pack(side="left")
+        ttk.Button(fr_btn, text="Importar baixadas",
+                   command=self.importar_baixadas).pack(side="left", padx=6)
         ttk.Button(fr_btn, text="Limpar prontas/falhas",
-                   command=self.limpar_fila).pack(side="left", padx=6)
+                   command=self.limpar_fila).pack(side="left")
         lst = tk.Listbox(self.grade, selectmode="single", width=64, height=18,
                          bg="#0b0d12", fg=TXT, selectbackground=ACC,
                          font=("Segoe UI", 11))
@@ -1044,7 +1046,57 @@ class App:
             self.recarregar()
         except tk.TclError:
             pass
-        self._aviso_barra("Fila atualizada — prontas entram na Fase C.")
+        self._aviso_barra("Fila atualizada.")
+
+    def importar_baixadas(self):
+        """Fase C: converte `baixado` → `musicas/` em thread."""
+        th = getattr(self, "_th_fila", None)
+        if th is not None and th.is_alive():
+            messagebox.showinfo("Importar baixadas", "Operação em andamento.")
+            return
+        con = self._con()
+        try:
+            try:
+                n = len(core.listar_downloads(con, estado="baixado"))
+            except Exception as e:
+                messagebox.showwarning("Importar baixadas", f"falha: {e}")
+                return
+        finally:
+            con.close()
+        if not n:
+            messagebox.showinfo("Importar baixadas",
+                                "Nada baixado (⬇ Baixar fila primeiro).")
+            return
+        self._aviso_barra(f"Importando {n} faixa(s)…")
+
+        def trabalho():
+            c2 = self._con()
+            try:
+                res = core.importar_fila_pronta(c2)
+            except Exception as e:
+                res = {"novas": 0, "ignorados": 0, "erros": [str(e)],
+                       "avisos": []}
+            finally:
+                c2.close()
+            detalhe = f"{res['novas']} nova(s), {res['ignorados']} ignorada(s)"
+            if res["erros"]:
+                detalhe += f"\n{res['erros'][0]}"
+            if res.get("avisos"):
+                detalhe += f"\n{res['avisos'][0][:160]}"
+            self._depois(lambda: self._fim_importar(detalhe))
+
+        self._th_fila = threading.Thread(target=trabalho, daemon=True)
+        self._th_fila.start()
+
+    def _fim_importar(self, detalhe):
+        try:
+            self.recarregar()
+        except tk.TclError:
+            pass
+        try:
+            messagebox.showinfo("Importar baixadas", detalhe)
+        except tk.TclError:
+            pass
 
     def limpar_fila(self):
         """Clear Done do Harmoni: apaga prontas/falhas (CSV recria)."""

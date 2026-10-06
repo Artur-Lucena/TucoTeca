@@ -233,3 +233,108 @@ def teste_baixar_faixa_mock():
         BX.subprocess.run = velho_run
         BX.subprocess.Popen = velho_pop
         con.close()
+
+
+def teste_baixar_converter_ffmpeg_mock():
+    import os
+    from bib_nucleo import baixar as BX
+    tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
+    stage = tmp / "stage"
+    stage.mkdir()
+    con = core.get_db(tmp / "b.db")
+    velho_run, velho_loc = BX.subprocess.run, BX.localizar_ffmpeg
+    try:
+        (stage / "vid1.m4a").write_bytes(b"audio" * 500)
+        core.enfileirar_downloads(con, [{"titulo": "Bee", "artista": "Aaa",
+                                         "uri": "u1"}])
+        did = core.listar_downloads(con)[0]["id"]
+        core.marcar_download(con, did, "baixado", video_id="vid1",
+                             musica_path=str(stage / "vid1.m4a"))
+
+        def _ff(*a, **k):
+            dest = Path(a[0][-1])
+            dest.write_bytes(b"MP3convertido" * 100)
+            class R:
+                returncode = 0
+                stderr = ""
+            return R()
+        BX.subprocess.run = _ff
+        r = BX.converter_faixa(con, did, ffmpeg="ff-fake")
+        afirmar(r.get("ok") and r["path"].endswith(".mp3")
+                and "aviso" not in r, r)
+        afirmar(not (stage / "vid1.m4a").exists(), "staging devia sumir")
+        d = core.listar_downloads(con, estado="pronta")
+        afirmar(len(d) == 1 and d[0]["musica_sha"], d)
+        lst = core.listar_musicas(con, q="bee")
+        afirmar(len(lst) == 1 and lst[0]["artista"] == "Aaa", lst)
+        # ffmpeg quebrado vira falha (staging preservado p/ retry)
+        (stage / "vid2.m4a").write_bytes(b"audio" * 500)
+        core.enfileirar_downloads(con, [{"titulo": "Cee", "artista": "Dee",
+                                         "uri": "u2"}])
+        did2 = core.listar_downloads(con, estado="pendente")[0]["id"]
+        core.marcar_download(con, did2, "baixado", video_id="vid2",
+                             musica_path=str(stage / "vid2.m4a"))
+
+        def _ff_ruim(*a, **k):
+            class R:
+                returncode = 1
+                stderr = "ERROR: codec"
+            return R()
+        BX.subprocess.run = _ff_ruim
+        r = BX.converter_faixa(con, did2, ffmpeg="ff-fake")
+        afirmar(not r.get("ok") and "codec" in r.get("erro", ""), r)
+        afirmar((stage / "vid2.m4a").is_file(), "staging devia ficar")
+        afirmar(core.listar_downloads(con, estado="falha")[0]["id"] == did2)
+        # estado errado e id inexistente não levantam
+        afirmar(not BX.converter_faixa(con, did, ffmpeg="ff")["ok"])
+        afirmar(not BX.converter_faixa(con, 9999, ffmpeg="ff")["ok"])
+        # localizar_ffmpeg respeita o env
+        ff = tmp / "ffmpeg.exe"
+        ff.write_bytes(b"fake")
+        velho_env = os.environ.get("BIBLIOTECA_FFMPEG")
+        os.environ["BIBLIOTECA_FFMPEG"] = str(ff)
+        try:
+            afirmar(BX.localizar_ffmpeg() == str(ff))
+            afirmar("BIBLIOTECA_FFMPEG" in BX.erro_sem_ffmpeg())
+        finally:
+            if velho_env is None:
+                os.environ.pop("BIBLIOTECA_FFMPEG", None)
+            else:
+                os.environ["BIBLIOTECA_FFMPEG"] = velho_env
+    finally:
+        BX.subprocess.run = velho_run
+        BX.localizar_ffmpeg = velho_loc
+        con.close()
+
+
+def teste_baixar_converter_sem_ffmpeg():
+    from bib_nucleo import baixar as BX
+    tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
+    stage = tmp / "stage"
+    stage.mkdir()
+    con = core.get_db(tmp / "b.db")
+    velho_loc = BX.localizar_ffmpeg
+    BX.localizar_ffmpeg = lambda: ""
+    try:
+        (stage / "n1.m4a").write_bytes(b"audio" * 500)
+        (stage / "n2.webm").write_bytes(b"video" * 500)
+        core.enfileirar_downloads(con, [{"titulo": "Nat", "artista": "A",
+                                         "uri": "u1"}])
+        core.enfileirar_downloads(con, [{"titulo": "Web", "artista": "B",
+                                         "uri": "u2"}])
+        ids = [d["id"] for d in core.listar_downloads(con)]
+        core.marcar_download(con, ids[0], "baixado", video_id="n1",
+                             musica_path=str(stage / "n1.m4a"))
+        core.marcar_download(con, ids[1], "baixado", video_id="n2",
+                             musica_path=str(stage / "n2.webm"))
+        r = BX.importar_fila_pronta(con)
+        afirmar(r["novas"] == 1 and r["ignoradas"] == 1, r)
+        afirmar(r["avisos"] and "ffmpeg" in r["avisos"][0].lower(), r)
+        d = core.listar_downloads(con, estado="pronta")
+        afirmar(len(d) == 1 and d[0]["musica_path"].endswith(".m4a"), d)
+        f = core.listar_downloads(con, estado="falha")
+        afirmar(len(f) == 1 and "ffmpeg" in f[0]["erro"].lower(), f)
+        afirmar(core.listar_downloads(con, estado="baixado") == [])
+    finally:
+        BX.localizar_ffmpeg = velho_loc
+        con.close()
