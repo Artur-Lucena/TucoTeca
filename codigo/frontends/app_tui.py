@@ -1337,6 +1337,8 @@ class Tui:
                 self.msg = detalhe
             elif res.get("novos"):
                 self.msg = f"'{res['titulo']}' ✓ em {res['pasta']}"
+                if res.get("capa_auto"):
+                    self.msg += " + capa ✓"
                 if res.get("capa_pendente"):
                     self.msg += " (sem capa: ajuste na GUI)."
             else:

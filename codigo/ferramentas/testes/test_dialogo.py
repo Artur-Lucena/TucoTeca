@@ -154,6 +154,29 @@ def teste_resolver_jogo_cli():
         con.close()
 
 
+def teste_minimizar_restaurar_janela():
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
+    root, app = _app_oculto("d5.db")
+    if root is None:
+        print("(sem display: skip)")
+        return
+    try:
+        app._minimizar_janela()
+        root.update()
+        app._restaurar_janela()
+        root.update()
+        afirmar(root.winfo_exists(), "janela sumiu")
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass
+
+
 def teste_dialogo_secoes_escuras():
     try:
         import tkinter as tk

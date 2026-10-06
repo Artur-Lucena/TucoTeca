@@ -149,6 +149,75 @@ def teste_repack_import_ponta_a_ponta():
         con.close()
 
 
+def teste_repack_capa_automatica_padrao():
+    import urllib.request
+    from bib_nucleo import banco as B
+    from bib_nucleo import repacks as RP
+    from bib_nucleo import scans as S
+    tmp = Path(tempfile.mkdtemp(prefix="suite-rp-"))
+    arq = _repack_zip(tmp, "auto.zip")
+    con = core.get_db(tmp / "a.db")
+    orig_appid, orig_capa = S._appid_steam_por_titulo, S._capa_steam
+    orig_salvar = B.salvar_capa_bytes
+    S._appid_steam_por_titulo = lambda t, timeout=15: "123"
+    S._capa_steam = lambda a, timeout=15: b"x" * 2000
+    B.salvar_capa_bytes = lambda c, g, f, d: {"ok": True}
+    try:
+        r = RP.importar_repack(con, arq, destino_raiz=tmp / "pir")
+        afirmar(r.get("ok") and r["capa_auto"] and not r["capa_pendente"], r)
+        afirmar("capa Steam" in " ".join(r["avisos"]), r)
+    finally:
+        S._appid_steam_por_titulo, S._capa_steam = orig_appid, orig_capa
+        B.salvar_capa_bytes = orig_salvar
+        con.close()
+    con = core.get_db(tmp / "b.db")
+    S._appid_steam_por_titulo = lambda t, timeout=15: (_ for _ in ()).throw(
+        OSError("rede-x"))
+    try:
+        r = RP.importar_repack(con, _repack_zip(tmp, "off.zip"),
+                               destino_raiz=tmp / "pir2")
+        afirmar(r.get("ok") and r["capa_pendente"] and not r["capa_auto"], r)
+    finally:
+        S._appid_steam_por_titulo = orig_appid
+        con.close()
+
+
+def teste_repack_appid_casa_nome_exato():
+    import json as _json
+    import urllib.request
+    from bib_nucleo import scans as S
+
+    class _Resp:
+        def __init__(self, dados):
+            self._d = dados
+
+        def read(self):
+            return _json.dumps(self._d).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    payload = {"items": [{"id": 9, "name": "Outro Jogo"},
+                         {"id": 7, "name": "Cool Game"}]}
+    orig = urllib.request.urlopen
+    urllib.request.urlopen = lambda *a, **k: _Resp(payload)
+    try:
+        afirmar(S._appid_steam_por_titulo("cool game") == "7")
+        afirmar(S._appid_steam_por_titulo("jogo xx") == "")
+        afirmar(S._appid_steam_por_titulo("") == "")
+    finally:
+        urllib.request.urlopen = orig
+    urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(
+        OSError("rede-x"))
+    try:
+        afirmar(S._appid_steam_por_titulo("cool game") == "")
+    finally:
+        urllib.request.urlopen = orig
+
+
 def teste_repack_7z_ausente_orienta():
     from bib_nucleo import repacks as RP
     tmp = Path(tempfile.mkdtemp(prefix="suite-rp-"))

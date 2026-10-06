@@ -313,6 +313,13 @@ def importar_repack(con: sqlite3.Connection, arquivo: str | os.PathLike,
                         "shop": "", "object_id": "", "horas": 0.0,
                         "origem": "repack"})
         res = importar_lista(con, [item])
+        capa_auto = False
+        try:
+            got = B.listar_jogos(con, q=titulo)
+            if res.get("novos") and got and not got[0].get("capa"):
+                capa_auto = bool(_capa_automatica(con, got[0]["id"], titulo))
+        except Exception:
+            capa_auto = False
         try:
             src.unlink()
             apagou_arq = True
@@ -322,18 +329,35 @@ def importar_repack(con: sqlite3.Connection, arquivo: str | os.PathLike,
                "titulo": titulo, "novos": res.get("novos", 0),
                "ignorados": res.get("ignorados", 0),
                "erros": res.get("erros", []),
-               "capa_pendente": not bool(
-                   B.listar_jogos(con, q=titulo)[0].get("capa"))
-               if res.get("novos") else False,
+               "capa_pendente": bool(res.get("novos")) and not capa_auto,
+               "capa_auto": capa_auto,
                "apagou_arquivo": apagou_arq,
                "setups_apagados": apagados,
                "avisos": org["avisos"]}
+        if capa_auto:
+            out["avisos"] = [*org["avisos"], "capa Steam automática ✓"]
         if not res.get("novos"):
             out["capa_pendente"] = False
         return out
     except Exception as e:
         return {"ok": False, "erro": f"{type(e).__name__}: {e}",
                 "pasta": str(dest)}
+
+
+def _capa_automatica(con: sqlite3.Connection, gid: int, titulo: str) -> bool:
+    """Baixa capa Steam pelo título (padrão do import). Nunca levanta."""
+    from bib_nucleo.scans import _appid_steam_por_titulo, _capa_steam
+    try:
+        appid = _appid_steam_por_titulo(titulo)
+        if not appid:
+            return False
+        raw = _capa_steam(appid)
+        if not raw:
+            return False
+        from bib_nucleo.banco import salvar_capa_bytes
+        return bool(salvar_capa_bytes(con, gid, f"{appid}.jpg", raw).get("ok"))
+    except Exception:
+        return False
 
 
 __all__ = ['ARQUIVO_EXTS', 'pasta_piratas', 'ferramenta_7z', 'eh_pacote_hub',

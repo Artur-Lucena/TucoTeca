@@ -1306,6 +1306,37 @@ def _capa_steam(appid: str, timeout: int = 15) -> bytes | None:
     return raw if len(raw) >= 1024 else None
 
 
+def _appid_steam_por_titulo(titulo: str, timeout: int = 15) -> str:
+    """Acha o appid Steam pelo nome exato (normalizado). '' se nada.
+
+    Nunca levanta (rede falhou = sem capa automática, sem travar import).
+    """
+    import urllib.parse
+    import urllib.request
+    alvo = re.sub(r"\s+", " ", (titulo or "")).strip().lower()
+    if not alvo:
+        return ""
+    try:
+        q = urllib.parse.urlencode({"term": titulo.strip(), "l": "english",
+                                    "cc": "US"})
+        req = urllib.request.Request(
+            f"https://store.steampowered.com/api/storesearch/?{q}",
+            headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            dados = json.loads(r.read().decode("utf-8"))
+        for item in (dados.get("items") or []):
+            if not isinstance(item, dict):
+                continue
+            nome = re.sub(r"\s+", " ", str(item.get("name") or "")).strip()
+            if nome.lower() == alvo:
+                appid = str(item.get("id") or "").strip()
+                if appid.isdigit():
+                    return appid
+    except Exception:
+        pass
+    return ""
+
+
 def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
     """Importa jogos. Itens com uuid existente ATUALIZAM progresso (restore);
     sem uuid (scans) inserem. Retorna relatório (novos/atualizados/ignorados/erros)."""

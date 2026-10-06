@@ -978,6 +978,27 @@ class App:
         except (tk.TclError, AttributeError):
             pass
 
+    def _minimizar_janela(self) -> None:
+        """Some p/ trás do jogo. Nunca levanta."""
+        try:
+            self.root.iconify()
+        except tk.TclError:
+            pass
+
+    def _restaurar_janela(self) -> None:
+        """Volta à frente ao fim do jogo. Nunca levanta."""
+        try:
+            if not self.root.winfo_exists():
+                return
+            self.root.deiconify()
+            self.root.lift()
+            try:
+                self.root.focus_force()
+            except tk.TclError:
+                pass
+        except tk.TclError:
+            pass
+
     # -- ações
     def jogar(self):
         j = self.selecionado()
@@ -1003,6 +1024,7 @@ class App:
                         core.iniciar_sessao_manual(j["id"], j.get("titulo") or "")
                     except Exception:
                         pass
+                    self._minimizar_janela()
                     self._aviso_barra("Executando (UAC) — ao terminar use ⏱ Registrar sessão")
                 else:
                     messagebox.showerror("Jogar", res.get("erro", "falha"))
@@ -1012,6 +1034,7 @@ class App:
                     extra = "⏱ tempo será registrado"
                 else:
                     extra = "⏱ sem rastreio — sessão manual aberta; ao terminar use ⏱ Registrar sessão"
+                self._minimizar_janela()
                 self._aviso_barra(f"Executando ({res.get('modo')}) — {extra}")
             else:
                 messagebox.showerror("Jogar", res.get("erro", "falha"))
@@ -1111,6 +1134,7 @@ class App:
             ok, msg = self._registrar_sessao(con, gid, sessao)
         finally:
             con.close()
+        self._restaurar_janela()
         self.recarregar()
         if ok:
             self._aviso_barra(msg)
