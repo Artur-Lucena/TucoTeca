@@ -149,9 +149,11 @@ class MciBackend:
         from bib_nucleo.baixar import localizar_ffmpeg
         ff = localizar_ffmpeg()
         if not ff:
-            from bib_nucleo.baixar import erro_sem_ffmpeg
             return {"ok": False,
-                    "erro": f"mp3 interno exige ffmpeg. {erro_sem_ffmpeg()}"}
+                    "erro": ("mp3 interno exige ffmpeg"
+                             " (https://ffmpeg.org) ou aponte BIBLIOTECA_FFMPEG"
+                             " p/ o binário. Sem ele, use Externo… como"
+                             " alternativa.")}
         from bib_nucleo.base import CACHE_WAV_DIR
         from bib_nucleo.musicas import sha_arquivo
         try:

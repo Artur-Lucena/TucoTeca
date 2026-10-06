@@ -340,12 +340,17 @@ class App:
         self.btn_jogar.pack(fill="x", padx=16, pady=2)
         lin = ttk.Frame(det, style="Panel.TFrame")
         lin.pack(fill="x", padx=16, pady=2)
-        ttk.Button(lin, text="✏ Editar", command=self.dlg_editar).pack(
-            side="left", expand=True, fill="x", padx=(0, 2))
-        ttk.Button(lin, text="🗑 Excluir", command=self.excluir).pack(
-            side="left", expand=True, fill="x", padx=(2, 0))
-        ttk.Button(det, text="+ Adicionar jogo", command=self.dlg_novo).pack(
-            fill="x", padx=16, pady=(8, 2))
+        self.btn_det_editar = ttk.Button(lin, text="✏ Editar",
+                                         command=self.dlg_editar)
+        self.btn_det_editar.pack(side="left", expand=True, fill="x",
+                                 padx=(0, 2))
+        self.btn_det_excluir = ttk.Button(lin, text="🗑 Excluir",
+                                          command=self.excluir)
+        self.btn_det_excluir.pack(side="left", expand=True, fill="x",
+                                  padx=(2, 0))
+        self.btn_det_novo = ttk.Button(det, text="+ Adicionar jogo",
+                                       command=self.dlg_novo)
+        self.btn_det_novo.pack(fill="x", padx=16, pady=(8, 2))
         self.root.bind("<Control-n>", lambda _e: self.dlg_novo())
         self.root.bind("<Control-f>", lambda _e: self.ent_busca.focus_set())
         self.canvas.bind("<Return>", lambda _e: self.jogar())
@@ -838,7 +843,7 @@ class App:
         n = len(self.musicas)
         try:
             self.lbl_cont.configure(
-                text=f"{n} música(s) · player externo (segue com o jogo aberto)")
+                text=f"{n} música(s) · player interno (segue com o jogo aberto)")
         except tk.TclError:
             pass
         if n == 0:
@@ -879,9 +884,7 @@ class App:
             self._aviso_barra(f"Tocando: {core.texto_musica(self.musicas[self.mus_sel])}")
             self._atualizar_transporte()
         else:
-            messagebox.showwarning(
-                "Músicas",
-                f"{r.get('erro', 'falha')}\nTente Externo… como alternativa.")
+            messagebox.showwarning("Músicas", r.get("erro", "falha"))
 
     def abrir_externo_musica(self):
         """Fallback: abre no player do SO (como era antes do interno)."""
@@ -1394,8 +1397,28 @@ class App:
             return None
         return self.jogos[self.sel]
 
+    def _botoes_detalhe(self, modo: str) -> None:
+        """Ativa/desativa botões do detalhe por contexto.
+
+        jogo: tudo vale; musica: só TOCAR+Excluir (Editar/Novo é de jogo);
+        fila: tudo parado (é fila de download, não catálogo).
+        """
+        try:
+            estados = {"jogo": ("normal", "normal", "normal"),
+                       "musica": ("disabled", "normal", "disabled"),
+                       "fila": ("disabled", "disabled", "disabled")}[modo]
+        except KeyError:
+            return
+        for btn, est in zip((self.btn_det_editar, self.btn_det_excluir,
+                             self.btn_det_novo), estados):
+            try:
+                btn.configure(state=est)
+            except (tk.TclError, AttributeError):
+                pass
+
     def mostrar_detalhe(self):
         if self._em_musicas() and self.mus_modo == "fila":
+            self._botoes_detalhe("fila")
             try:
                 self.btn_jogar.configure(text="⬇ FILA", state="disabled")
             except tk.TclError:
@@ -1418,6 +1441,7 @@ class App:
                           subtitulo=d.get("estado") or "")
             return
         if self._em_musicas():
+            self._botoes_detalhe("musica")
             try:
                 self.btn_jogar.configure(text="▶  TOCAR", state="normal")
             except tk.TclError:
@@ -1462,6 +1486,7 @@ class App:
                 desenhar_tile(self.det_capa, "♪", 216, 280, grande=True,
                               subtitulo="música")
             return
+        self._botoes_detalhe("jogo")
         try:
             self.btn_jogar.configure(text="▶  JOGAR", state="normal")
         except tk.TclError:

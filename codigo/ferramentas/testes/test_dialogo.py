@@ -96,11 +96,21 @@ def teste_dialogo_aba_musicas():
         afirmar(lbs, "aba músicas sem lista embutida")
         afirmar(app.btn_jogar.cget("text") == "▶  TOCAR",
                 app.btn_jogar.cget("text"))
+        afirmar(str(app.btn_det_editar.cget("state")) == "disabled",
+                "Editar devia travar na aba")
+        afirmar(str(app.btn_det_novo.cget("state")) == "disabled",
+                "Novo jogo devia travar na aba")
+        afirmar(str(app.btn_det_excluir.cget("state")) == "normal",
+                "Excluir vale p/ música")
         app._ir_nav(0)
         root.update()
         afirmar(not app._em_musicas(), app.nav_idx)
         afirmar(app.btn_jogar.cget("text") == "▶  JOGAR",
                 app.btn_jogar.cget("text"))
+        afirmar(str(app.btn_det_editar.cget("state")) == "normal",
+                "Editar devia voltar nos jogos")
+        afirmar(str(app.btn_det_novo.cget("state")) == "normal",
+                "Novo jogo devia voltar nos jogos")
     finally:
         try:
             root.destroy()
@@ -142,6 +152,9 @@ def teste_dialogo_aba_fila():
         afirmar(lbs and lbs[0].size() == 2, lbs)
         afirmar(str(app.btn_jogar.cget("state")) == "disabled",
                 app.btn_jogar.cget("state"))
+        for b in (app.btn_det_editar, app.btn_det_excluir, app.btn_det_novo):
+            afirmar(str(b.cget("state")) == "disabled",
+                    "detalhe devia travar na fila")
         app.limpar_fila()  # pendentes ficam (Clear Done); marca e limpa
         root.update()
         afirmar(len(app.fila) == 2, app.fila)
