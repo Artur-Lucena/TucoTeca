@@ -165,6 +165,27 @@ def _tui_fake(db, teclas, cols=150):
     return tui.Tui(Scr(), db)
 
 
+def teste_menu_fila_volta():
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    con = core.get_db(db)
+    try:
+        core.enfileirar_downloads(con, [{"titulo": "Cotidiano",
+                                         "artista": "Chico Buarque",
+                                         "uri": "spotify:track:1"}])
+    finally:
+        con.close()
+    app = _tui_fake(db, [10, ord("j"), ord("j"), 10])
+    con = app._con()
+    try:
+        app.menu_fila(con)
+    finally:
+        con.close()
+    afirmar("pendente" in app.msg, app.msg)
+
+
 def teste_menu_principal_abre_e_cancela():
     import tempfile
     from pathlib import Path

@@ -173,6 +173,9 @@ class App:
         self.mus_sel: int | None = None
         self.mus_ids: list[int] = []
         self._mus_lista = None  # Listbox da aba Músicas (recriado a cada recarga)
+        self.mus_modo = "hub"  # "hub" catalogadas | "fila" downloads CSV
+        self.fila: list[dict] = []
+        self.fila_sel: int | None = None
         root.title("🎮 TucoTeca")
         root.geometry("1200x720")
         root.minsize(960, 600)
@@ -748,6 +751,8 @@ class App:
 
     # -- aba Músicas (lista embutida na grade; play externo segue com o jogo)
     def _recarregar_musicas(self):
+        if self.mus_modo == "fila":
+            return self._recarregar_fila()
         for w in self.grade.winfo_children():
             w.destroy()
         self.cards = []
@@ -776,6 +781,18 @@ class App:
                    command=self.importar_musicas).pack(side="left", padx=6)
         ttk.Button(fr_btn, text="🗑 Excluir",
                    command=self.excluir_musica_selecionada).pack(side="left")
+        ttk.Button(fr_btn, text="⬇ CSV…",
+                   command=self.baixar_csv).pack(side="left", padx=6)
+        try:
+            con2 = self._con()
+            try:
+                n_pend = len(core.listar_downloads(con2, estado="pendente"))
+            finally:
+                con2.close()
+        except Exception:
+            n_pend = 0
+        ttk.Button(fr_btn, text=f"Fila ({n_pend})",
+                   command=self._ir_fila).pack(side="left")
         lst = tk.Listbox(self.grade, selectmode="single", width=64, height=18,
                          bg="#0b0d12", fg=TXT, selectbackground=ACC,
                          font=("Segoe UI", 11))
@@ -826,6 +843,9 @@ class App:
 
     def tocar_musica_selecionada(self):
         """Toca no player do SO (processo independente: não para com o jogo)."""
+        if self.mus_modo == "fila":
+            messagebox.showinfo("Fila", "Aqui é a fila de downloads (Fase B).")
+            return
         if self.mus_sel is None or self.mus_sel >= len(self.musicas):
             messagebox.showinfo("Músicas", "Selecione uma música na lista.")
             return
@@ -837,6 +857,8 @@ class App:
             messagebox.showwarning("Músicas", r.get("erro", "falha"))
 
     def excluir_musica_selecionada(self):
+        if self.mus_modo == "fila":
+            return
         if self.mus_sel is None or self.mus_sel >= len(self.musicas):
             return
         m = self.musicas[self.mus_sel]
@@ -854,6 +876,135 @@ class App:
             con.close()
         self.mus_sel = None
         self.recarregar()
+
+    def _ir_fila(self):
+        self.mus_modo = "fila"
+        self.recarregar()
+
+    def _ir_musicas(self):
+        self.mus_modo = "hub"
+        self.recarregar()
+
+    def _recarregar_fila(self):
+        """Fila CSV → mp3 (contadores + limpar; download vem na Fase B)."""
+        for w in self.grade.winfo_children():
+            w.destroy()
+        self.cards = []
+        self._imgs_cards = []
+        self._mus_lista = None
+        con = self._con()
+        try:
+            try:
+                self.fila = core.listar_downloads(con)
+            except Exception:
+                self.fila = []
+        finally:
+            con.close()
+        if self.fila_sel is None or self.fila_sel >= len(self.fila):
+            self.fila_sel = 0 if self.fila else None
+        fr_btn = ttk.Frame(self.grade)
+        fr_btn.pack(side="bottom", fill="x", pady=(8, 0))
+        ttk.Button(fr_btn, text="⟵ Músicas",
+                   command=self._ir_musicas).pack(side="left")
+        ttk.Button(fr_btn, text="⬇ CSV…",
+                   command=self.baixar_csv).pack(side="left", padx=6)
+        ttk.Button(fr_btn, text="Limpar prontas/falhas",
+                   command=self.limpar_fila).pack(side="left")
+        lst = tk.Listbox(self.grade, selectmode="single", width=64, height=18,
+                         bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                         font=("Segoe UI", 11))
+        lst.pack(fill="both", expand=True)
+        _com_rolagem(lst)
+        for d in self.fila:
+            try:
+                rot = core.texto_musica(d)
+                est = d.get("estado") or ""
+                extra = (f" — {d.get('erro')}"
+                         if est == "falha" and d.get("erro") else "")
+                lst.insert("end", f"{rot} [{est}]{extra}")
+            except Exception:
+                continue
+        if self.fila_sel is not None:
+            try:
+                lst.selection_set(self.fila_sel)
+                lst.see(self.fila_sel)
+            except tk.TclError:
+                pass
+        lst.bind("<<ListboxSelect>>", self._ao_sel_fila)
+        self._mus_lista = lst
+        n = len(self.fila)
+        np_ = sum(1 for d in self.fila if d.get("estado") == "pendente")
+        nok = sum(1 for d in self.fila if d.get("estado") == "pronta")
+        nf = sum(1 for d in self.fila if d.get("estado") == "falha")
+        try:
+            self.lbl_cont.configure(
+                text=f"{n} na fila · {np_} pendente(s) · {nok} pronta(s)"
+                     f" · {nf} falha(s) (download: Fase B)")
+        except tk.TclError:
+            pass
+        if n == 0:
+            self.lbl_vazio.configure(text="Fila vazia — use ⬇ CSV… (Exportify)")
+            self.lbl_vazio.pack(anchor="w", padx=14)
+        else:
+            self.lbl_vazio.pack_forget()
+        self.mostrar_detalhe()
+
+    def _ao_sel_fila(self, _e=None):
+        try:
+            sel = self._mus_lista.curselection()
+        except (tk.TclError, AttributeError):
+            return
+        if sel:
+            self.fila_sel = sel[0]
+            self.mostrar_detalhe()
+
+    def baixar_csv(self):
+        """Exportify CSV → fila (dedup; download é Fase B)."""
+        arq = filedialog.askopenfilename(
+            title="CSV do Exportify (Spotify)",
+            parent=self.root,
+            filetypes=[("CSV", "*.csv"), ("todos", "*.*")])
+        if not arq:
+            return
+        parsed = core.ler_csv_exportify(arq)
+        if parsed["erros"] and not parsed["itens"]:
+            messagebox.showwarning("Baixar de CSV", parsed["erros"][0])
+            return
+        con = self._con()
+        try:
+            res = core.enfileirar_downloads(con, parsed["itens"])
+        finally:
+            con.close()
+        detalhe = f"{res['novos']} na fila, {res['ignorados']} ignorada(s)"
+        if parsed["ignorados"]:
+            detalhe += f" (+{parsed['ignorados']} sem título no CSV)"
+        if parsed["erros"]:
+            detalhe += f"\n{parsed['erros'][0]}"
+        messagebox.showinfo("Baixar de CSV", detalhe)
+        if self._em_musicas():
+            try:
+                self.recarregar()
+            except tk.TclError:
+                pass
+
+    def limpar_fila(self):
+        """Clear Done do Harmoni: apaga prontas/falhas (CSV recria)."""
+        con = self._con()
+        try:
+            try:
+                n = core.limpar_downloads(con)
+            except ValueError as e:
+                messagebox.showwarning("Fila", str(e))
+                return
+        finally:
+            con.close()
+        self.fila_sel = None
+        if self._em_musicas():
+            try:
+                self.recarregar()
+            except tk.TclError:
+                pass
+        self._aviso_barra(f"Fila limpa ({n} removida(s))")
 
     def _criar_card(self, j: dict) -> dict:
         fr = ttk.Frame(self.grade, style="Card.TFrame", cursor="hand2")
@@ -1011,9 +1162,31 @@ class App:
         return self.jogos[self.sel]
 
     def mostrar_detalhe(self):
+        if self._em_musicas() and self.mus_modo == "fila":
+            try:
+                self.btn_jogar.configure(text="⬇ FILA", state="disabled")
+            except tk.TclError:
+                pass
+            if self.fila_sel is None or self.fila_sel >= len(self.fila):
+                self.det_titulo.configure(text="Fila vazia")
+                self.det_meta.configure(text="")
+                self.det_exe.configure(text="")
+                desenhar_tile(self.det_capa, "⬇", 216, 280, grande=True)
+                return
+            d = self.fila[self.fila_sel]
+            self.det_titulo.configure(
+                text=core.texto_musica(d) or "Sem título")
+            meta = " · ".join(x for x in (d.get("estado"), d.get("artista"),
+                                          d.get("album")) if x)
+            self.det_meta.configure(text=meta)
+            self.det_exe.configure(
+                text=d.get("erro") or d.get("video_id") or d.get("uri") or "")
+            desenhar_tile(self.det_capa, "⬇", 216, 280, grande=True,
+                          subtitulo=d.get("estado") or "")
+            return
         if self._em_musicas():
             try:
-                self.btn_jogar.configure(text="▶  TOCAR")
+                self.btn_jogar.configure(text="▶  TOCAR", state="normal")
             except tk.TclError:
                 pass
             if self.mus_sel is None or self.mus_sel >= len(self.musicas):
@@ -1035,7 +1208,7 @@ class App:
                           subtitulo="música")
             return
         try:
-            self.btn_jogar.configure(text="▶  JOGAR")
+            self.btn_jogar.configure(text="▶  JOGAR", state="normal")
         except tk.TclError:
             pass
         if self.sel is None or self.sel >= len(self.jogos):

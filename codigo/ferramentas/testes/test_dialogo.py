@@ -114,6 +114,64 @@ def teste_dialogo_aba_musicas():
             pass
 
 
+def teste_dialogo_aba_fila():
+    """Fila na aba: entra, lista pendentes, limpa, volta ao hub."""
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
+    import app_win
+    root, app = _app_oculto("d6.db")
+    if root is None:
+        print("(sem display: skip)")
+        return
+    try:
+        con = app._con()
+        try:
+            core.enfileirar_downloads(con, [
+                {"titulo": "Cotidiano", "artista": "Chico Buarque",
+                 "uri": "spotify:track:1"},
+                {"titulo": "Flor de Lis", "artista": "Djavan",
+                 "uri": "spotify:track:2"}])
+        finally:
+            con.close()
+        idx = next(i for i, (rot, _s, _f) in enumerate(app_win.NAV)
+                   if rot.startswith("🎵"))
+        app._ir_nav(idx)
+        app._ir_fila()
+        root.update()
+        afirmar(app.mus_modo == "fila", app.mus_modo)
+        afirmar(len(app.fila) == 2, app.fila)
+        lbs = [w for w in app.grade.winfo_children()
+               if w.winfo_class() == "Listbox"]
+        afirmar(lbs and lbs[0].size() == 2, lbs)
+        afirmar(str(app.btn_jogar.cget("state")) == "disabled",
+                app.btn_jogar.cget("state"))
+        app.limpar_fila()  # pendentes ficam (Clear Done); marca e limpa
+        root.update()
+        afirmar(len(app.fila) == 2, app.fila)
+        con = app._con()
+        try:
+            for d in core.listar_downloads(con):
+                core.marcar_download(con, d["id"], "pronta")
+        finally:
+            con.close()
+        app.limpar_fila()
+        root.update()
+        afirmar(app.fila == [], app.fila)
+        app._ir_musicas()
+        root.update()
+        afirmar(app.mus_modo == "hub", app.mus_modo)
+        afirmar(str(app.btn_jogar.cget("state")) == "normal",
+                app.btn_jogar.cget("state"))
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass
+
+
 def _combos(dlg):
     out = []
 

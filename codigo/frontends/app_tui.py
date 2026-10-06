@@ -785,7 +785,13 @@ class Tui:
                 except Exception:
                     itens = []
                 rotulos = [core.texto_musica(m) for m in itens]
-                opcoes = rotulos + ["Buscar…", "Importar de pasta…", "Voltar"]
+                try:
+                    n_fila = len(core.listar_downloads(con))
+                except Exception:
+                    n_fila = 0
+                opcoes = (rotulos + ["Buscar…", "Importar de pasta…",
+                                     "Baixar de CSV…", f"Fila ({n_fila})…",
+                                     "Voltar"])
                 idx = self.escolher(f"Músicas ({len(itens)})", opcoes)
                 if idx is None or opcoes[idx] == "Voltar":
                     self.recarregar()
@@ -818,6 +824,27 @@ class Tui:
                     if res["erros"]:
                         detalhe += f" — {res['erros'][0]}"
                     self.msg = detalhe
+                elif escolha == "Baixar de CSV…":
+                    r = self.perguntar("CSV do Exportify: ")
+                    if r is None or not r.strip():
+                        continue
+                    try:
+                        parsed = core.ler_csv_exportify(r.strip())
+                    except Exception as e:
+                        self.msg = f"Falha: {e}"
+                        continue
+                    if parsed["erros"] and not parsed["itens"]:
+                        self.msg = f"Falha: {parsed['erros'][0]}"
+                        continue
+                    try:
+                        res = core.enfileirar_downloads(con, parsed["itens"])
+                    except Exception as e:
+                        self.msg = f"Falha: {e}"
+                        continue
+                    self.msg = (f"{res['novos']} na fila,"
+                                f" {res['ignorados']} ignorada(s)")
+                elif idx >= len(itens) and escolha.startswith("Fila ("):
+                    self.menu_fila(con)
                 else:
                     pos = idx
                     if 0 <= pos < len(itens):
@@ -840,6 +867,40 @@ class Tui:
                                     self.msg = f"Falha: {e}"
         finally:
             con.close()
+
+    def menu_fila(self, con):
+        """Fila CSV → mp3: estados + limpar (download vem na Fase B)."""
+        while True:
+            try:
+                fila = core.listar_downloads(con)
+            except Exception:
+                fila = []
+            rotulos = []
+            for d in fila:
+                base = core.texto_musica(d)
+                est = d.get("estado") or ""
+                extra = (f" — {d.get('erro')}"
+                         if est == "falha" and d.get("erro") else "")
+                rotulos.append(f"{base} [{est}]{extra}")
+            opcoes = rotulos + ["Limpar prontas/falhas", "Voltar"]
+            idx = self.escolher(f"Fila ({len(fila)})", opcoes)
+            if idx is None or opcoes[idx] == "Voltar":
+                return
+            if opcoes[idx] == "Limpar prontas/falhas":
+                try:
+                    n = core.limpar_downloads(con)
+                except ValueError as e:
+                    self.msg = f"Falha: {e}"
+                    continue
+                self.msg = f"Fila limpa ({n} removida(s))."
+                continue
+            pos = idx
+            if 0 <= pos < len(fila):
+                d = fila[pos]
+                det = " · ".join(x for x in (
+                    core.texto_musica(d), d.get("estado") or "",
+                    d.get("video_id") or "", d.get("erro") or "") if x)
+                self.msg = det
 
     def menu_controles(self):
         """Controles no Hub: listar, testar, fotografar, aplicar, gerar."""
