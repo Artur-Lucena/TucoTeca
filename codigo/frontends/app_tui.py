@@ -1225,7 +1225,7 @@ class Tui:
 
     def menu_importar(self):
         opcoes = ["Arquivo (exe, ROM, JSON, .zip, repack)", "Pasta", "Disco (Hydra/lojas)",
-                  "Voltar"]
+                  "Catálogo SteamRip", "Voltar"]
         while True:
             idx = self.escolher("Importar", opcoes)
             if idx is None or opcoes[idx] == "Voltar":
@@ -1243,6 +1243,61 @@ class Tui:
                 self._prev_pasta(roots)
             elif escolha.startswith("Disco"):
                 self._prev_disco()
+            elif escolha == "Catálogo SteamRip":
+                self.menu_steamrip()
+
+    def menu_steamrip(self):
+        """Catálogo SteamRip: buscar → hosts → Piratas/ → importar."""
+        r = self.perguntar("Buscar no SteamRip: ")
+        if r is None or not r.strip():
+            return
+        try:
+            res = core.buscar_steamrip(r.strip())
+        except Exception as e:
+            self.msg = f"Falha: {e}"
+            return
+        if res.get("erros"):
+            self.msg = f"Falha: {res['erros'][0]}"
+            return
+        itens = res.get("itens") or []
+        if not itens:
+            self.msg = "Nada encontrado."
+            return
+        idx = self.escolher(f"SteamRip ({len(itens)})",
+                            [i["titulo"] for i in itens] + ["Voltar"])
+        if idx is None or idx >= len(itens):
+            return
+        pg = itens[idx]
+        try:
+            det = core.detalhes_steamrip(pg["url"])
+        except ValueError as e:
+            self.msg = f"Falha: {e}"
+            return
+        except Exception as e:
+            self.msg = f"Falha: {e}"
+            return
+        hosts = det.get("hosts") or []
+        ops = ([h["nome"] for h in hosts]
+               + ["Automático", "Abrir página (URL)", "Voltar"])
+        h = self.escolher(pg["titulo"], ops)
+        if h is None or ops[h] == "Voltar":
+            return
+        if ops[h] == "Abrir página (URL)":
+            self.msg = f"Abra: {pg['url']}"
+            return
+        host = "" if ops[h] == "Automático" else hosts[h]["nome"]
+        self.msg = f"Baixando '{pg['titulo']}'…"
+        try:
+            res = core.baixar_steamrip(pg["url"], host=host)
+        except Exception as e:
+            self.msg = f"Falha: {e}"
+            return
+        if not res.get("ok"):
+            self.msg = f"Falha: {res.get('erro')}"
+            return
+        self.msg = f"Em Piratas/: {Path(res['path']).name}"
+        if self.confirmar("Importar para o Hub agora?"):
+            self._importar_arquivo(res["path"])
 
     def menu_backup(self):
         opcoes = ["Backup do banco", "Backup saves 3DS", "Exportar JSON",

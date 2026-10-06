@@ -156,6 +156,10 @@ def _tui_fake(db, teclas, cols=150):
         A_DIM = 0
         def curs_set(self, *a):
             pass
+        def echo(self, *a):
+            pass
+        def noecho(self, *a):
+            pass
         def has_colors(self):
             return False
         def color_pair(self, n):
@@ -243,6 +247,16 @@ def teste_menu_interno_transporte():
     app._vigiar_player()
     afirmar(app.player.atual()["titulo"] == "Y — B", app.player.atual())
     afirmar("Seguindo" in app.msg, app.msg)
+
+
+def teste_menu_steamrip_cancela():
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    app = _tui_fake(db, [27])
+    app.menu_steamrip()
+    afirmar(app.msg == "", app.msg)
 
 
 def teste_menu_principal_abre_e_cancela():

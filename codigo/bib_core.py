@@ -9,10 +9,12 @@ Para monkeypatch em testes, altere bib_nucleo.<modulo> (onde mora a função).
 """
 from __future__ import annotations
 
-from bib_nucleo import banco, base, baixar, cheats, controles, emuladores, musicas, pacotes, player, repacks, scans, texturas
+from bib_nucleo import banco, base, baixar, cheats, controles, emuladores, fontes, musicas, pacotes, player, repacks, scans, texturas
 from bib_nucleo.banco import *
 from bib_nucleo.base import *
 from bib_nucleo.baixar import *
+from bib_nucleo.fontes import *
+from bib_nucleo.fontes import *
 from bib_nucleo.player import *
 from bib_nucleo.cheats import *
 from bib_nucleo.controles import *
@@ -27,4 +29,4 @@ __all__ = sorted(set(base.__all__ + banco.__all__ + scans.__all__
                      + emuladores.__all__ + pacotes.__all__
                      + texturas.__all__ + cheats.__all__ + musicas.__all__
                      + controles.__all__ + repacks.__all__ + baixar.__all__
-                     + player.__all__))
+                     + player.__all__ + fontes.__all__))
