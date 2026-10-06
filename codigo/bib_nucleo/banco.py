@@ -373,6 +373,7 @@ def get_db(db_path: Path) -> sqlite3.Connection:
     _garantir_uuid(con)
     _garantir_sem_citron(con)
     _garantir_tabela_musicas(con)
+    _garantir_tabela_downloads(con)
     con.commit()
     return con
 
@@ -720,6 +721,139 @@ def excluir_musica(con: sqlite3.Connection, mid: int) -> None:
             pass
 
 
+# Downloads CSV → mp3 (fila tal qual o Harmoni): catálogo próprio v14
+# --------------------------------------------------------------------------
+
+ESTADOS_DOWNLOAD = ("pendente", "baixando", "pronta", "falha")
+
+SCHEMA_DOWNLOADS = """
+CREATE TABLE IF NOT EXISTS downloads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo TEXT NOT NULL,
+    artista TEXT DEFAULT '',
+    album TEXT DEFAULT '',
+    uri TEXT DEFAULT '',
+    estado TEXT DEFAULT 'pendente',
+    video_id TEXT DEFAULT '',
+    musica_sha TEXT DEFAULT '',
+    musica_path TEXT DEFAULT '',
+    erro TEXT DEFAULT '',
+    criado_em TEXT,
+    atualizado_em TEXT
+);
+"""
+
+
+def _garantir_tabela_downloads(con: sqlite3.Connection) -> None:
+    """v14: fila de downloads. Idempotente; preserva linhas."""
+    con.execute(SCHEMA_DOWNLOADS)
+
+
+def download_to_dict(r: sqlite3.Row) -> dict:
+    return dict(r)
+
+
+def _musica_ja_tem(con: sqlite3.Connection, titulo: str, artista: str) -> bool:
+    """A faixa já está no catálogo? (casa sem caixa, sem acento exigido)."""
+    t, a = titulo.strip().lower(), artista.strip().lower()
+    if not t:
+        return False
+    rows = con.execute("SELECT titulo, artista FROM musicas").fetchall()
+    return any((r["titulo"] or "").strip().lower() == t
+               and (r["artista"] or "").strip().lower() == a for r in rows)
+
+
+def enfileirar_downloads(con: sqlite3.Connection, itens: list[dict]) -> dict:
+    """Põe faixas do CSV na fila com dedup (uri, par, catálogo).
+
+    Ignora sem travar o lote: sem título, uri/par repetido ou faixa que o
+    Hub já tem. Retorna {'novos', 'ignorados', 'erros'}.
+    """
+    novos = ignorados = 0
+    erros: list[str] = []
+    vistos_uri = {r["uri"] for r in
+                  con.execute("SELECT uri FROM downloads").fetchall()}
+    vistos_par = {(r["artista"] or "").strip().lower()
+                  + "\x00" + (r["titulo"] or "").strip().lower()
+                  for r in con.execute(
+                      "SELECT artista, titulo FROM downloads").fetchall()}
+    agora = agora_iso()
+    for item in itens or []:
+        tit = _txt((item or {}).get("titulo"))
+        if not tit:
+            ignorados += 1
+            continue
+        art = _txt((item or {}).get("artista"))
+        uri = _txt((item or {}).get("uri"))
+        par = art.strip().lower() + "\x00" + tit.strip().lower()
+        if (uri and uri in vistos_uri) or par in vistos_par:
+            ignorados += 1
+            continue
+        try:
+            if _musica_ja_tem(con, tit, art):
+                ignorados += 1
+                continue
+        except sqlite3.Error:
+            pass
+        try:
+            con.execute(
+                """INSERT INTO downloads (titulo, artista, album, uri, estado,
+                   criado_em, atualizado_em) VALUES (?,?,?,?,?,?,?)""",
+                (tit, art, _txt((item or {}).get("album")), uri,
+                 "pendente", agora, agora))
+        except sqlite3.IntegrityError:
+            ignorados += 1
+            continue
+        if uri:
+            vistos_uri.add(uri)
+        vistos_par.add(par)
+        novos += 1
+    con.commit()
+    return {"novos": novos, "ignorados": ignorados, "erros": erros}
+
+
+def listar_downloads(con: sqlite3.Connection, estado: str = "") -> list[dict]:
+    if estado:
+        if estado not in ESTADOS_DOWNLOAD:
+            raise ValueError(f"estado inválido: {estado}")
+        rows = con.execute("SELECT * FROM downloads WHERE estado=? ORDER BY id",
+                           (estado,)).fetchall()
+    else:
+        rows = con.execute("SELECT * FROM downloads ORDER BY id").fetchall()
+    return [download_to_dict(r) for r in rows]
+
+
+def marcar_download(con: sqlite3.Connection, did: int, estado: str,
+                    video_id: str = "", erro: str = "",
+                    musica_sha: str = "", musica_path: str = "") -> dict:
+    """Avança a faixa na fila (Fases B/C preenchem o resto)."""
+    if estado not in ESTADOS_DOWNLOAD:
+        raise ValueError(f"estado inválido: {estado}")
+    row = con.execute("SELECT * FROM downloads WHERE id=?", (did,)).fetchone()
+    if not row:
+        raise LookupError("download não encontrado")
+    con.execute("UPDATE downloads SET estado=?, video_id=?, erro=?,"
+                " musica_sha=?, musica_path=?, atualizado_em=? WHERE id=?",
+                (estado, _txt(video_id), _txt(erro), _txt(musica_sha),
+                 _txt(musica_path), agora_iso(), did))
+    con.commit()
+    return download_to_dict(
+        con.execute("SELECT * FROM downloads WHERE id=?", (did,)).fetchone())
+
+
+def limpar_downloads(con: sqlite3.Connection,
+                     estados: tuple = ("pronta", "falha")) -> int:
+    """Apaga faixas terminadas da fila (Clear Done do Harmoni)."""
+    ruins = [e for e in estados if e not in ESTADOS_DOWNLOAD]
+    if ruins:
+        raise ValueError(f"estado inválido: {ruins}")
+    cur = con.execute(
+        "DELETE FROM downloads WHERE estado IN (%s)" % ",".join("?" * len(estados)),
+        tuple(estados))
+    con.commit()
+    return cur.rowcount
+
+
 CAPA_EXTS = {".png": "image/png", ".jpg": "image/jpeg",
              ".jpeg": "image/jpeg", ".webp": "image/webp"}
 
@@ -877,4 +1011,4 @@ def selo_confianca(j: dict) -> str:
         return ""
     return f" · ◎{conf:.2f}" if conf > 0 else ""
 
-__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'MODS_MAX_NOME', 'MODS_MAX_QTD', 'normalizar_mods', 'mods_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'SCHEMA_MUSICAS', 'musica_to_dict', 'criar_musica', 'listar_musicas', 'excluir_musica', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']
+__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'MODS_MAX_NOME', 'MODS_MAX_QTD', 'normalizar_mods', 'mods_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'SCHEMA_MUSICAS', 'musica_to_dict', 'criar_musica', 'listar_musicas', 'excluir_musica', 'ESTADOS_DOWNLOAD', 'SCHEMA_DOWNLOADS', 'download_to_dict', 'enfileirar_downloads', 'listar_downloads', 'marcar_download', 'limpar_downloads', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']
