@@ -1431,14 +1431,36 @@ class App:
             m = self.musicas[self.mus_sel]
             self.det_titulo.configure(text=core.texto_musica(m) or "Sem título")
             meta = " · ".join(x for x in (m.get("artista"), m.get("album")) if x)
+            if m.get("musica_capa"):
+                meta += " · 🖼" if meta else "🖼"
             self.det_meta.configure(text=meta)
             try:
                 base_nome = Path(m.get("musica_path") or "").name
             except (TypeError, ValueError):
                 base_nome = ""
             self.det_exe.configure(text=base_nome)
-            desenhar_tile(self.det_capa, "♪", 216, 280, grande=True,
-                          subtitulo="música")
+            self.det_capa.delete("all")
+            try:
+                alvo = core.caminho_capa(m.get("musica_capa") or "") \
+                    if m.get("musica_capa") else None
+            except Exception:
+                alvo = None
+            img = None
+            if alvo is not None:
+                try:
+                    img = carregar_miniatura(alvo, 216, 280)
+                except Exception:
+                    img = None
+            self._img_det = img
+            if img is not None:
+                try:
+                    self.det_capa.create_image(108, 140, image=img)
+                except tk.TclError:
+                    desenhar_tile(self.det_capa, "♪", 216, 280, grande=True,
+                                  subtitulo="música")
+            else:
+                desenhar_tile(self.det_capa, "♪", 216, 280, grande=True,
+                              subtitulo="música")
             return
         try:
             self.btn_jogar.configure(text="▶  JOGAR", state="normal")
@@ -2717,8 +2739,14 @@ class App:
             ttk.Button(fr_emu, text=rotulo, command=cmd).pack(
                 fill="x", padx=4, pady=3)
         fr_mus = secao("Músicas")
-        for rotulo, cmd in (("🎵 Músicas…", self._janela_musicas),
-                            ("📥 Importar músicas…", self.importar_musicas)):
+        auto_capa = ("ligada" if core.capa_musica_auto() else "desligada")
+        ttk.Label(fr_mus, text=f"capa automática: {auto_capa}"
+                               " (BIBLIOTECA_CAPA_MUSICA_AUTO)",
+                  style="Sec.TLabel").pack(anchor="w", padx=4)
+        for rotulo, cmd in (("🎵 Músicas…", lambda: self._ir_aba_config(dlg)),
+                            ("📥 Importar músicas…", self.importar_musicas),
+                            ("⬇ Baixar capas faltantes",
+                             self.baixar_capas_ui)):
             ttk.Button(fr_mus, text=rotulo, command=cmd).pack(
                 fill="x", padx=4, pady=3)
         fr_ctl = secao("Controles")
@@ -2726,6 +2754,56 @@ class App:
             ttk.Button(fr_ctl, text=rotulo, command=cmd).pack(
                 fill="x", padx=4, pady=3)
         ttk.Button(dlg, text="Fechar", command=dlg.destroy).pack(pady=14)
+
+    def _ir_aba_config(self, dlg):
+        """Config → aba 🎵 (a janela modal antiga virou a aba)."""
+        try:
+            dlg.destroy()
+        except tk.TclError:
+            pass
+        for i, (rot, _s, _f) in enumerate(NAV):
+            if rot.startswith("🎵"):
+                self._ir_nav(i)
+                return
+
+    def baixar_capas_ui(self):
+        """Arte dos álbuns faltantes em thread (rede falhou = pendente)."""
+        prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
+        prog.title("Baixando capas…")
+        prog.transient(self.root)
+        ttk.Label(prog, text="Consultando iTunes…").pack(padx=24, pady=20)
+        try:
+            prog.update()
+        except tk.TclError:
+            return
+
+        def trabalho():
+            con = self._con()
+            try:
+                res = core.baixar_capas_faltantes(con)
+            except Exception as e:
+                res = {"novas": 0, "pendentes": 0, "erros": [str(e)]}
+            finally:
+                con.close()
+
+            def fim(res=res):
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    pass
+                if self._em_musicas():
+                    try:
+                        self.recarregar()
+                    except tk.TclError:
+                        pass
+                detalhe = (f"{res['novas']} capa(s), "
+                           f"{res['pendentes']} pendente(s)")
+                if res["erros"]:
+                    detalhe += f"\n{res['erros'][0]}"
+                messagebox.showinfo("Capas", detalhe)
+            self._depois(fim)
+        threading.Thread(target=trabalho, daemon=True).start()
 
     def _depois(self, fn):
         try:
@@ -2788,84 +2866,6 @@ class App:
                 messagebox.showinfo("Músicas", detalhe)
             self._depois(fim)
         threading.Thread(target=trabalho, daemon=True).start()
-
-    def _janela_musicas(self):
-        win = tk.Toplevel(self.root)
-        _titulo_escuro(win)
-        win.title("Músicas")
-        win.transient(self.root)
-        win.grab_set()
-        win.minsize(480, 360)
-        fr = ttk.Frame(win, padding=12)
-        fr.pack(fill="both", expand=True)
-        lst = tk.Listbox(fr, selectmode="single", width=64, height=14,
-                         bg="#0b0d12", fg=TXT, selectbackground=ACC,
-                         font=("Segoe UI", 11))
-        lst.pack(fill="both", expand=True)
-        _com_rolagem(lst)
-        ids: list[int] = []
-
-        def redesenhar():
-            con = self._con()
-            try:
-                try:
-                    itens = core.listar_musicas(con)
-                except Exception:
-                    itens = []
-            finally:
-                con.close()
-            lst.delete(0, "end")
-            ids.clear()
-            for m in itens:
-                base = m["titulo"]
-                if m.get("artista"):
-                    base = f"{m['artista']} — {base}"
-                lst.insert("end", base)
-                ids.append(m["id"])
-
-        def tocar(_e=None):
-            sel = lst.curselection()
-            if not sel or sel[0] >= len(ids):
-                return
-            con = self._con()
-            try:
-                row = con.execute("SELECT musica_path FROM musicas WHERE id=?",
-                                  (ids[sel[0]],)).fetchone()
-                caminho = row["musica_path"] if row else ""
-            except Exception:
-                caminho = ""
-            finally:
-                con.close()
-            r = core.tocar_musica(caminho)
-            if not r.get("ok"):
-                messagebox.showwarning("Músicas", r.get("erro", "falha"))
-
-        def excluir():
-            sel = lst.curselection()
-            if not sel or sel[0] >= len(ids):
-                return
-            if not messagebox.askokcancel("Músicas", "Apagar do Hub (arquivo junto)?"):
-                return
-            con = self._con()
-            try:
-                core.excluir_musica(con, ids[sel[0]])
-            except (LookupError, ValueError) as e:
-                messagebox.showwarning("Músicas", str(e))
-                return
-            finally:
-                con.close()
-            redesenhar()
-
-        lst.bind("<Double-Button-1>", tocar)
-        redesenhar()
-        fr_btn = ttk.Frame(fr)
-        fr_btn.pack(fill="x", pady=(10, 0))
-        ttk.Button(fr_btn, text="Tocar", command=tocar).pack(side="left")
-        ttk.Button(fr_btn, text="Importar…",
-                   command=self.importar_musicas).pack(side="left", padx=6)
-        ttk.Button(fr_btn, text="Excluir", command=excluir).pack(side="left")
-        ttk.Button(fr_btn, text="Fechar",
-                   command=win.destroy).pack(side="right")
 
     # -- controles (configura no Hub, aplica no Azahar fechado)
     def _janela_controles(self):

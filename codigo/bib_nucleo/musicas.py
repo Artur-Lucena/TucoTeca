@@ -11,11 +11,14 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
+
+CAPA_MUSICA_ENV = "BIBLIOTECA_CAPA_MUSICA_AUTO"
 
 _TXT_FRAME = {"TIT2": "titulo", "TPE1": "artista", "TALB": "album"}
 
@@ -200,16 +203,22 @@ def varrer_pasta(pasta: str | os.PathLike) -> list[dict]:
 
 
 def importar_musicas(con: sqlite3.Connection,
-                     pasta: str | os.PathLike) -> dict:
+                     pasta: str | os.PathLike,
+                     capa_auto: bool | None = None) -> dict:
     """Copia p/ `dados/musicas/<slug>.<ext>` com dedup por sha.
 
     Falha de um arquivo vira item em `erros`, nunca aborta o lote.
+    `capa_auto`: tenta arte do álbum por faixa nova (None = env
+    `BIBLIOTECA_CAPA_MUSICA_AUTO`, default ligado; rede falhou = sem
+    capa, sem travar).
     """
     from bib_nucleo import banco as B
     from bib_nucleo.base import MUSICAS_DIR
     MUSICAS_DIR.mkdir(parents=True, exist_ok=True)
     novos = ignorados = 0
+    capas = 0
     erros: list[str] = []
+    auto = capa_musica_auto() if capa_auto is None else bool(capa_auto)
     vistos = {r["musica_sha"] for r in
               con.execute("SELECT musica_sha FROM musicas").fetchall()}
     for item in varrer_pasta(pasta):
@@ -230,12 +239,12 @@ def importar_musicas(con: sqlite3.Connection,
             ignorados += 1
             continue
         try:
-            B.criar_musica(con, {"titulo": item["titulo"],
-                                 "artista": item["artista"],
-                                 "album": item["album"],
-                                 "musica_path": str(dest),
-                                 "musica_sha": item["sha"],
-                                 "origem": "harmoni"})
+            nova = B.criar_musica(con, {"titulo": item["titulo"],
+                                        "artista": item["artista"],
+                                        "album": item["album"],
+                                        "musica_path": str(dest),
+                                        "musica_sha": item["sha"],
+                                        "origem": "harmoni"})
         except ValueError as e:
             try:
                 dest.unlink()
@@ -247,7 +256,14 @@ def importar_musicas(con: sqlite3.Connection,
             continue
         vistos.add(item["sha"])
         novos += 1
-    return {"novos": novos, "ignorados": ignorados, "erros": erros}
+        if auto:
+            try:
+                r = baixar_capa_album(con, nova["id"])
+                capas += 1 if r.get("ok") else 0
+            except Exception:
+                pass
+    return {"novos": novos, "ignorados": ignorados, "erros": erros,
+            "capas": capas}
 
 
 def tocar_musica(caminho: str) -> dict:
@@ -283,6 +299,106 @@ def tocar_musica(caminho: str) -> dict:
     return {"ok": True, "path": p}
 
 
+# --------------------------------------------------------------------------
+# Capas de álbum automáticas (iTunes Search, sem chave; molde _capa_steam)
+# --------------------------------------------------------------------------
+
+def capa_musica_auto() -> bool:
+    """Auto-capa no import? Env `BIBLIOTECA_CAPA_MUSICA_AUTO` (default ligado)."""
+    return (os.environ.get(CAPA_MUSICA_ENV, "1") or "").strip().lower() \
+        not in ("0", "off", "false", "nao", "não", "no")
+
+
+def capa_album_url(artista: str, album: str, titulo: str,
+                   timeout: int = 15) -> str:
+    """Artwork 600px do iTunes (1º resultado; `''` se offline). Nunca levanta."""
+    import urllib.parse
+    import urllib.request
+    art = re.sub(r"\s+", " ", (artista or "")).strip()
+    alb = re.sub(r"\s+", " ", (album or "")).strip()
+    tit = re.sub(r"\s+", " ", (titulo or "")).strip()
+    consultas = []
+    if art and alb:
+        consultas.append(f"{art} {alb}")
+    if art and tit:
+        consultas.append(f"{art} {tit}")
+    if not consultas:
+        return ""
+    try:
+        for q in consultas:
+            qs = urllib.parse.urlencode({"term": q, "media": "music",
+                                         "entity": "album", "limit": 5})
+            req = urllib.request.Request(
+                f"https://itunes.apple.com/search?{qs}",
+                headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                dados = json.loads(r.read(500_000).decode("utf-8"))
+            for item in (dados.get("results") or []):
+                if not isinstance(item, dict):
+                    continue
+                url = str(item.get("artworkUrl100") or "")
+                if url.startswith("http"):
+                    return re.sub(r"\d+x\d+bb", "600x600bb", url)
+    except Exception:
+        pass
+    return ""
+
+
+def baixar_capa_album(con: sqlite3.Connection, mid: int,
+                      timeout: int = 20) -> dict:
+    """Baixa a arte do álbum p/ 1 faixa. Falha de rede vira pendente."""
+    from bib_nucleo import banco as B
+    row = con.execute("SELECT * FROM musicas WHERE id=?", (mid,)).fetchone()
+    if not row:
+        return {"ok": False, "erro": "música não encontrada"}
+    d = dict(row)
+    atual = d.get("musica_capa") or ""
+    if atual:
+        from bib_nucleo.base import CAPAS_DIR
+        if (CAPAS_DIR / Path(atual).name).is_file():
+            return {"ok": True, "capa": atual, "cache": True}
+    try:
+        import urllib.request
+        url = capa_album_url(d.get("artista") or "", d.get("album") or "",
+                             d.get("titulo") or "", timeout=timeout)
+        if not url:
+            return {"ok": False, "capa_pendente": True,
+                    "erro": "sem arte/offline"}
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read(2_500_000)
+        if len(raw) < 1024:
+            return {"ok": False, "capa_pendente": True, "erro": "arte vazia"}
+        return B.salvar_capa_musica_bytes(con, mid, f"capa-{mid}.jpg", raw)
+    except Exception as e:
+        return {"ok": False, "capa_pendente": True, "erro": str(e)[:160]}
+
+
+def baixar_capas_faltantes(con: sqlite3.Connection, limite: int = 200) -> dict:
+    """Arte p/ todas as faixas sem capa (botões GUI/TUI). Nunca levanta rede."""
+    from bib_nucleo import banco as B
+    novas = pendentes = 0
+    erros: list[str] = []
+    try:
+        alvos = [m["id"] for m in B.listar_musicas(con)
+                 if not m.get("musica_capa")]
+    except Exception as e:
+        return {"novas": 0, "pendentes": 0, "erros": [str(e)]}
+    for mid in alvos[:max(0, limite)]:
+        try:
+            r = baixar_capa_album(con, mid)
+        except Exception as e:
+            r = {"ok": False, "erro": str(e)}
+        if r.get("ok"):
+            novas += 1
+        elif r.get("capa_pendente"):
+            pendentes += 1
+        elif len(erros) < 20:
+            erros.append(f"#{mid}: {r.get('erro')}")
+    return {"novas": novas, "pendentes": pendentes, "erros": erros}
+
+
 __all__ = ['harmoni_dir', 'sugestao_harmoni_dir', 'texto_musica',
-           'ler_tags', 'sha_arquivo', 'varrer_pasta',
+           'capa_musica_auto', 'capa_album_url', 'baixar_capa_album',
+           'baixar_capas_faltantes', 'ler_tags', 'sha_arquivo', 'varrer_pasta',
            'importar_musicas', 'tocar_musica']

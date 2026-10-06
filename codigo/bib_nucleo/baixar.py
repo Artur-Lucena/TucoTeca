@@ -245,11 +245,13 @@ def _destino_musica(artista: str, titulo: str, ext: str):
     return dest
 
 
-def converter_faixa(con, did: int, ffmpeg: str = "") -> dict:
+def converter_faixa(con, did: int, ffmpeg: str = "",
+                    capa_auto: bool | None = None) -> dict:
     """Converte 1 `baixado` p/ `musicas/` e marca pronta. Nunca levanta.
 
     Com ffmpeg: mp3 (ID3v2.3 com artista/título/álbum da fila). Sem ffmpeg:
     copia o nativo se tocável (`MUSICA_EXTS`) + aviso; senão falha honesta.
+    `capa_auto`: arte do álbum após importar (None = env, default ligado).
     """
     from bib_nucleo import banco as B
     from bib_nucleo.base import MUSICA_EXTS
@@ -307,12 +309,13 @@ def converter_faixa(con, did: int, ffmpeg: str = "") -> dict:
             return {"ok": False, "erro": f"cópia: {e}"}
         aviso = (f"nativo {dest.suffix} (sem ffmpeg; mp3 quando houver): "
                  f"{erro_sem_ffmpeg()}")
-    from bib_nucleo.musicas import sha_arquivo
+    from bib_nucleo.musicas import capa_musica_auto, sha_arquivo
+    auto = capa_musica_auto() if capa_auto is None else bool(capa_auto)
     try:
         sha = sha_arquivo(dest)
-        B.criar_musica(con, {"titulo": tit, "artista": art, "album": alb,
-                             "musica_path": str(dest), "musica_sha": sha,
-                             "origem": "csv"})
+        nova = B.criar_musica(con, {"titulo": tit, "artista": art, "album": alb,
+                                    "musica_path": str(dest),
+                                    "musica_sha": sha, "origem": "csv"})
     except ValueError as e:
         try:
             dest.unlink()
@@ -330,26 +333,38 @@ def converter_faixa(con, did: int, ffmpeg: str = "") -> dict:
     out = {"ok": True, "path": str(dest), "sha": sha}
     if aviso:
         out["aviso"] = aviso
+    if auto:
+        try:
+            from bib_nucleo.musicas import baixar_capa_album
+            rc = baixar_capa_album(con, nova["id"])
+            if rc.get("ok"):
+                out["capa"] = rc.get("capa")
+        except Exception:
+            pass
     return out
 
 
-def importar_fila_pronta(con, ffmpeg: str = "") -> dict:
+def importar_fila_pronta(con, ffmpeg: str = "",
+                         capa_auto: bool | None = None) -> dict:
     """Converte todas as `baixado` (Fase C em lote). Nunca levanta."""
     from bib_nucleo import banco as B
     novas = ignoradas = 0
+    capas = 0
     erros: list[str] = []
     avisos: list[str] = []
     try:
         alvos = [d["id"] for d in B.listar_downloads(con, estado="baixado")]
     except Exception as e:
-        return {"novas": 0, "ignoradas": 0, "erros": [str(e)], "avisos": []}
+        return {"novas": 0, "ignoradas": 0, "erros": [str(e)], "avisos": [],
+                "capas": 0}
     for did in alvos:
         try:
-            r = converter_faixa(con, did, ffmpeg=ffmpeg)
+            r = converter_faixa(con, did, ffmpeg=ffmpeg, capa_auto=capa_auto)
         except Exception as e:
             r = {"ok": False, "erro": str(e)}
         if r.get("ok"):
             novas += 1
+            capas += 1 if r.get("capa") else 0
             if r.get("aviso") and len(avisos) < 5:
                 avisos.append(r["aviso"][:160])
         else:
@@ -357,4 +372,4 @@ def importar_fila_pronta(con, ffmpeg: str = "") -> dict:
             if len(erros) < 20:
                 erros.append(f"#{did}: {r.get('erro')}")
     return {"novas": novas, "ignoradas": ignoradas, "erros": erros,
-            "avisos": avisos}
+            "avisos": avisos, "capas": capas}

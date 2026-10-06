@@ -48,25 +48,19 @@ def teste_dialogo_listas_tem_rolagem():
     except ModuleNotFoundError:
         print("(sem tkinter: skip)")
         return
+    import app_win
     root, app = _app_oculto("d4.db")
     if root is None:
         print("(sem display: skip)")
         return
     try:
-        app._janela_musicas()
+        idx = next(i for i, (rot, _s, _f) in enumerate(app_win.NAV)
+                   if rot.startswith("🎵"))
+        app._ir_nav(idx)  # aba (o modal antigo virou aba)
         root.update()
-        wins = [w for w in root.winfo_children()
-                if w.winfo_class() == "Toplevel"]
-        afirmar(wins, "janela músicas não abriu")
-        lbs = []
-
-        def walk(w):
-            for ch in w.winfo_children():
-                if ch.winfo_class() == "Listbox":
-                    lbs.append(ch)
-                walk(ch)
-        walk(wins[-1])
-        afirmar(lbs, "janela sem Listbox?")
+        lbs = [w for w in app.grade.winfo_children()
+               if w.winfo_class() == "Listbox"]
+        afirmar(lbs, "aba sem Listbox?")
         for lb in lbs:
             irmas = [ch for ch in lb.master.winfo_children()
                      if ch.winfo_class() == "TScrollbar"]

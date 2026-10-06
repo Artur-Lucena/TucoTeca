@@ -801,7 +801,7 @@ class Tui:
                     n_fila = 0
                 opcoes = (rotulos + ["Buscar…", "Importar de pasta…",
                                      "Baixar de CSV…", f"Fila ({n_fila})…",
-                                     "Voltar"])
+                                     "Baixar capas…", "Voltar"])
                 idx = self.escolher(titulo, opcoes)
                 if idx is None or opcoes[idx] == "Voltar":
                     self.recarregar()
@@ -855,6 +855,16 @@ class Tui:
                                 f" {res['ignorados']} ignorada(s)")
                 elif idx >= len(itens) and escolha.startswith("Fila ("):
                     self.menu_fila(con)
+                elif idx >= len(itens) and escolha == "Baixar capas…":
+                    try:
+                        res = core.baixar_capas_faltantes(con)
+                    except Exception as e:
+                        self.msg = f"Falha: {e}"
+                        continue
+                    self.msg = (f"{res['novas']} capa(s),"
+                                f" {res['pendentes']} pendente(s)")
+                    if res["erros"]:
+                        self.msg += f" — {res['erros'][0]}"
                 else:
                     pos = idx
                     if 0 <= pos < len(itens):

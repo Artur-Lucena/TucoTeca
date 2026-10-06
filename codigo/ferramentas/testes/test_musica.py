@@ -54,10 +54,11 @@ def teste_musica_import_dedup_crud():
     con = core.get_db(tmp / "m.db")
     try:
         cols = {r["name"] for r in con.execute("PRAGMA table_info(musicas)").fetchall()}
-        afirmar({"titulo", "musica_sha", "musica_path"} <= cols, sorted(cols))
-        r = MUS.importar_musicas(con, src)
-        afirmar(r == {"novos": 2, "ignorados": 0, "erros": []}, r)
-        r = MUS.importar_musicas(con, src)
+        afirmar({"titulo", "musica_sha", "musica_path", "musica_capa"} <= cols,
+                sorted(cols))
+        r = MUS.importar_musicas(con, src, capa_auto=False)
+        afirmar(r == {"novos": 2, "ignorados": 0, "erros": [], "capas": 0}, r)
+        r = MUS.importar_musicas(con, src, capa_auto=False)
         afirmar(r["novos"] == 0 and r["ignorados"] == 2, r)
         lst = core.listar_musicas(con)
         afirmar(len(lst) == 2, lst)
@@ -160,7 +161,7 @@ def teste_pacote_v4_musicas():
     _mp3(src, "A - B.mp3")
     con = core.get_db(tmp / "m.db")
     try:
-        MUS.importar_musicas(con, src)
+        MUS.importar_musicas(con, src, capa_auto=False)
     finally:
         con.close()
     dest = tmp / "p.zip"
@@ -177,5 +178,164 @@ def teste_pacote_v4_musicas():
         lst = core.listar_musicas(con2)
         afirmar(len(lst) == 1 and lst[0]["titulo"] == "Bee", lst)
         afirmar(Path(lst[0]["musica_path"]).is_file(), lst)
+    finally:
+        con2.close()
+
+
+def teste_musica_capa_auto_env():
+    from bib_nucleo import musicas as MUS
+    import os
+    afirmar(MUS.capa_musica_auto() is True)
+    velho = os.environ.get("BIBLIOTECA_CAPA_MUSICA_AUTO")
+    os.environ["BIBLIOTECA_CAPA_MUSICA_AUTO"] = "0"
+    try:
+        afirmar(MUS.capa_musica_auto() is False)
+    finally:
+        if velho is None:
+            os.environ.pop("BIBLIOTECA_CAPA_MUSICA_AUTO", None)
+        else:
+            os.environ["BIBLIOTECA_CAPA_MUSICA_AUTO"] = velho
+
+
+def _urlopen_mockado(respostas):
+    import urllib.request
+    chamadas = []
+
+    class Resp:
+        def __init__(self, dados):
+            self._dados = dados
+        def read(self, n=-1):
+            return self._dados if n < 0 else self._dados[:n]
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    def falso(req, timeout=None):
+        chamadas.append(getattr(req, "full_url", ""))
+        if not respostas:
+            raise AssertionError("rede além do roteiro")
+        item = respostas.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return Resp(item)
+    velho = urllib.request.urlopen
+    urllib.request.urlopen = falso
+    return velho, chamadas
+
+
+def teste_musica_capa_busca_e_baixa_mock():
+    import json
+    import urllib.request
+    from bib_nucleo import musicas as MUS
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))
+    src = tmp / "src"
+    src.mkdir()
+    _mp3(src, "A - B.mp3")
+    con = core.get_db(tmp / "m.db")
+    busca = json.dumps({"results": [
+        {"artworkUrl100": "https://example.com/a/100x100bb.jpg"}]}).encode()
+    velho, chamadas = _urlopen_mockado([busca, b"JPG" * 800, busca])
+    try:
+        MUS.importar_musicas(con, src, capa_auto=False)
+        mid = core.listar_musicas(con)[0]["id"]
+        r = MUS.baixar_capa_album(con, mid)
+        afirmar(r.get("ok") and r.get("capa", "").endswith(".jpg"), r)
+        row = core.listar_musicas(con)[0]
+        afirmar(row["musica_capa"] == r["capa"], row)
+        from bib_nucleo.base import CAPAS_DIR
+        afirmar((CAPAS_DIR / r["capa"]).is_file(), r)
+        n_antes = len(chamadas)
+        r = MUS.baixar_capa_album(con, mid)  # 2ª vez: cache, sem rede
+        afirmar(r.get("ok") and len(chamadas) == n_antes, (r, chamadas))
+        f = MUS.baixar_capas_faltantes(con)
+        afirmar(f == {"novas": 0, "pendentes": 0, "erros": []}, f)
+        url = MUS.capa_album_url("Aaa", "Al", "Bee")
+        afirmar(url == "https://example.com/a/600x600bb.jpg", url)
+        r = MUS.baixar_capa_album(con, 9999)
+        afirmar(not r.get("ok"), r)
+    finally:
+        urllib.request.urlopen = velho
+        con.close()
+
+
+def teste_musica_capa_rede_falha():
+    import urllib.request
+    from bib_nucleo import musicas as MUS
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))
+    src = tmp / "src"
+    src.mkdir()
+    _mp3(src, "A - B.mp3")
+    con = core.get_db(tmp / "m.db")
+    velho, _ch = _urlopen_mockado([urllib.request.URLError("offline"),
+                                   urllib.request.URLError("offline")])
+    try:
+        MUS.importar_musicas(con, src, capa_auto=False)
+        mid = core.listar_musicas(con)[0]["id"]
+        r = MUS.baixar_capa_album(con, mid)
+        afirmar(not r.get("ok") and r.get("capa_pendente"), r)
+        r = MUS.baixar_capas_faltantes(con)
+        afirmar(r["novas"] == 0 and r["pendentes"] == 1, r)
+    finally:
+        urllib.request.urlopen = velho
+        con.close()
+    afirmar(MUS.capa_album_url("", "", "") == "")  # sem consulta, sem rede
+
+
+def teste_musica_capa_v15_legado():
+    import sqlite3
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))
+    leg = tmp / "leg.db"
+    con = sqlite3.connect(str(leg))
+    con.execute("CREATE TABLE musicas (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                " titulo TEXT NOT NULL, artista TEXT DEFAULT '',"
+                " album TEXT DEFAULT '', musica_path TEXT DEFAULT '',"
+                " musica_sha TEXT DEFAULT '', origem TEXT DEFAULT 'harmoni',"
+                " criado_em TEXT, atualizado_em TEXT, UNIQUE(musica_sha))")
+    con.execute("INSERT INTO musicas (titulo, musica_sha) VALUES ('Velha', 's')")
+    con.commit()
+    con.close()
+    con = core.get_db(leg)
+    try:
+        cols = {r["name"] for r in con.execute("PRAGMA table_info(musicas)").fetchall()}
+        afirmar("musica_capa" in cols, sorted(cols))
+        lst = core.listar_musicas(con)
+        afirmar(len(lst) == 1 and lst[0]["titulo"] == "Velha", lst)
+    finally:
+        con.close()
+
+
+def teste_musica_capa_salvar_e_pacote():
+    from bib_nucleo import musicas as MUS
+    from bib_nucleo import pacotes as PAC
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))
+    src = tmp / "src"
+    src.mkdir()
+    _mp3(src, "A - B.mp3")
+    con = core.get_db(tmp / "m.db")
+    try:
+        MUS.importar_musicas(con, src, capa_auto=False)
+        mid = core.listar_musicas(con)[0]["id"]
+        r = core.salvar_capa_musica_bytes(con, mid, "arte.jpg", b"J" * 2048)
+        afirmar(r.get("ok") and r["capa"].startswith(f"mus-{mid}-"), r)
+        r = core.salvar_capa_musica_bytes(con, 9999, "a.jpg", b"J" * 2048)
+        afirmar(not r.get("ok"), r)
+        r = core.salvar_capa_musica_bytes(con, mid, "a.txt", b"J" * 2048)
+        afirmar(not r.get("ok"), r)
+    finally:
+        con.close()
+    dest = tmp / "p.zip"
+    r = PAC.exportar_pacote(dest, db_path=tmp / "m.db", incluir_saves=False)
+    afirmar(r.get("ok"), r)
+    nomes = [i.filename for i in zipfile.ZipFile(dest).infolist()]
+    afirmar(any(n.startswith("capas/mus-") for n in nomes), nomes)
+    r = PAC.importar_pacote(dest, db_path=tmp / "m2.db")
+    afirmar(r.get("ok") and r.get("musicas", 0) == 1, r)
+    con2 = core.get_db(tmp / "m2.db")
+    try:
+        lst = core.listar_musicas(con2)
+        afirmar(len(lst) == 1 and lst[0]["musica_capa"].startswith("mus-"), lst)
+        from bib_nucleo.base import CAPAS_DIR
+        afirmar((CAPAS_DIR / lst[0]["musica_capa"]).is_file(), lst)
     finally:
         con2.close()

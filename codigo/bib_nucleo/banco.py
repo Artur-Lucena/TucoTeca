@@ -320,6 +320,7 @@ CREATE TABLE IF NOT EXISTS musicas (
     album TEXT DEFAULT '',
     musica_path TEXT DEFAULT '',
     musica_sha TEXT DEFAULT '',
+    musica_capa TEXT DEFAULT '',
     origem TEXT DEFAULT 'harmoni',
     criado_em TEXT,
     atualizado_em TEXT,
@@ -332,6 +333,20 @@ def _garantir_tabela_musicas(con: sqlite3.Connection) -> None:
     """v12: catálogo de áudio. Idempotente; preserva linhas (sem backup:
     só cria tabela vazia quando ausente)."""
     con.execute(SCHEMA_MUSICAS)
+    _garantir_coluna_musica_capa(con)
+
+
+def _garantir_coluna_musica_capa(con: sqlite3.Connection) -> None:
+    """v15: `musica_capa` em bancos pré-capa (aditivo, sem backup)."""
+    try:
+        cols = {r["name"] for r in con.execute("PRAGMA table_info(musicas)")}
+    except sqlite3.Error:
+        return
+    if cols and "musica_capa" not in cols:
+        try:
+            con.execute("ALTER TABLE musicas ADD COLUMN musica_capa TEXT DEFAULT ''")
+        except sqlite3.Error:
+            pass
 
 
 def _garantir_sem_citron(con: sqlite3.Connection) -> None:
@@ -957,6 +972,39 @@ def salvar_capa_bytes(con: sqlite3.Connection, gid: int, filename: str, raw: byt
     return {"ok": True, "capa": nome}
 
 
+def salvar_capa_musica_bytes(con: sqlite3.Connection, mid: int,
+                             filename: str, raw: bytes) -> dict:
+    """Guarda arte do álbum (`mus-<id>-<slug>.jpg`) e grava `musica_capa`."""
+    ext = Path(filename or "").suffix.lower()
+    if ext not in CAPA_EXTS:
+        return {"ok": False, "erro": f"extensão inválida. Use: {sorted(CAPA_EXTS)}"}
+    row = con.execute("SELECT * FROM musicas WHERE id=?", (mid,)).fetchone()
+    if not row:
+        return {"ok": False, "erro": "música não encontrada"}
+    raw, ext = _normalizar_capa(raw, ext)
+    if len(raw) > 2_000_000:
+        return {"ok": False, "erro": "capa maior que 2 MB"}
+    CAPAS_DIR.mkdir(parents=True, exist_ok=True)
+    stem = Path(filename).stem
+    while stem.startswith(f"mus-{mid}-"):
+        stem = stem[len(f"mus-{mid}-"):] or "capa"
+    nome = f"mus-{mid}-{slugify(stem)}{ext}"
+    try:
+        (CAPAS_DIR / nome).write_bytes(raw)
+    except OSError as e:
+        return {"ok": False, "erro": f"falha ao gravar: {e}"}
+    antiga = (row["musica_capa"] if "musica_capa" in row.keys() else "") or ""
+    if antiga and antiga != nome:
+        try:
+            (CAPAS_DIR / Path(antiga).name).unlink()
+        except OSError:
+            pass
+    con.execute("UPDATE musicas SET musica_capa=?, atualizado_em=? WHERE id=?",
+                (nome, agora_iso(), mid))
+    con.commit()
+    return {"ok": True, "capa": nome}
+
+
 def caminho_capa(nome: str) -> Path | None:
     """Resolve um nome de capa dentro de CAPAS_DIR (anti path-traversal)."""
     alvo = (CAPAS_DIR / Path(nome or "").name).resolve()
@@ -1011,4 +1059,4 @@ def selo_confianca(j: dict) -> str:
         return ""
     return f" · ◎{conf:.2f}" if conf > 0 else ""
 
-__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'MODS_MAX_NOME', 'MODS_MAX_QTD', 'normalizar_mods', 'mods_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'SCHEMA_MUSICAS', 'musica_to_dict', 'criar_musica', 'listar_musicas', 'excluir_musica', 'ESTADOS_DOWNLOAD', 'SCHEMA_DOWNLOADS', 'download_to_dict', 'enfileirar_downloads', 'listar_downloads', 'marcar_download', 'limpar_downloads', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']
+__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'MODS_MAX_NOME', 'MODS_MAX_QTD', 'normalizar_mods', 'mods_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'SCHEMA_MUSICAS', 'musica_to_dict', 'criar_musica', 'listar_musicas', 'excluir_musica', 'salvar_capa_musica_bytes', 'ESTADOS_DOWNLOAD', 'SCHEMA_DOWNLOADS', 'download_to_dict', 'enfileirar_downloads', 'listar_downloads', 'marcar_download', 'limpar_downloads', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']

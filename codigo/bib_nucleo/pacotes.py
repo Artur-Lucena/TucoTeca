@@ -156,6 +156,9 @@ def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
     for j in dados["jogos"]:
         if j.get("capa") and j.get("uuid"):
             manifesto[Path(j["capa"]).name] = j["uuid"]
+    for m in dados.get("musicas") or []:
+        if isinstance(m, dict) and m.get("musica_capa") and m.get("musica_sha"):
+            manifesto[Path(m["musica_capa"]).name] = f"mus:{m['musica_sha']}"
     n = 0
     try:
         with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as z:
@@ -372,6 +375,7 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
             if lista_mus:
                 from bib_nucleo.base import MUSICAS_DIR
                 MUSICAS_DIR.mkdir(parents=True, exist_ok=True)
+                mus_por_sha: dict[str, int] = {}
                 for m in lista_mus:
                     if not isinstance(m, dict):
                         musicas_ignoradas += 1
@@ -390,16 +394,33 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                                 continue
                         else:
                             dest.write_bytes(zf.read(membro))
-                        criar_musica(con, {
+                        nova = criar_musica(con, {
                             "titulo": m.get("titulo") or Path(membro).stem,
                             "artista": m.get("artista") or "",
                             "album": m.get("album") or "",
                             "musica_path": str(dest),
                             "musica_sha": sha,
                             "origem": m.get("origem") or "pacote"})
+                        mus_por_sha[sha] = nova["id"]
                         musicas += 1
                     except (OSError, ValueError):
                         musicas_ignoradas += 1
+                from bib_nucleo.banco import salvar_capa_musica_bytes
+                for arq, ident in manifesto.items():
+                    if not (isinstance(ident, str) and ident.startswith("mus:")):
+                        continue
+                    mid = mus_por_sha.get(ident[4:])
+                    if mid is None or cats.get(f"capas/{Path(arq).name}") != "capa":
+                        continue
+                    try:
+                        raw = zf.read(f"capas/{Path(arq).name}")
+                    except KeyError:
+                        continue
+                    r = salvar_capa_musica_bytes(con, mid, Path(arq).name, raw)
+                    if r.get("ok"):
+                        capas += 1
+                    else:
+                        res["erros"].append(f"Capa {arq}: {r['erro']}")
         finally:
             con.close()
     return {"ok": True, "novos": res["novos"], "atualizados": res["atualizados"],

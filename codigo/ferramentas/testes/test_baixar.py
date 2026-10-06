@@ -259,7 +259,7 @@ def teste_baixar_converter_ffmpeg_mock():
                 stderr = ""
             return R()
         BX.subprocess.run = _ff
-        r = BX.converter_faixa(con, did, ffmpeg="ff-fake")
+        r = BX.converter_faixa(con, did, ffmpeg="ff-fake", capa_auto=False)
         afirmar(r.get("ok") and r["path"].endswith(".mp3")
                 and "aviso" not in r, r)
         afirmar(not (stage / "vid1.m4a").exists(), "staging devia sumir")
@@ -281,7 +281,7 @@ def teste_baixar_converter_ffmpeg_mock():
                 stderr = "ERROR: codec"
             return R()
         BX.subprocess.run = _ff_ruim
-        r = BX.converter_faixa(con, did2, ffmpeg="ff-fake")
+        r = BX.converter_faixa(con, did2, ffmpeg="ff-fake", capa_auto=False)
         afirmar(not r.get("ok") and "codec" in r.get("erro", ""), r)
         afirmar((stage / "vid2.m4a").is_file(), "staging devia ficar")
         afirmar(core.listar_downloads(con, estado="falha")[0]["id"] == did2)
@@ -327,7 +327,7 @@ def teste_baixar_converter_sem_ffmpeg():
                              musica_path=str(stage / "n1.m4a"))
         core.marcar_download(con, ids[1], "baixado", video_id="n2",
                              musica_path=str(stage / "n2.webm"))
-        r = BX.importar_fila_pronta(con)
+        r = BX.importar_fila_pronta(con, capa_auto=False)
         afirmar(r["novas"] == 1 and r["ignoradas"] == 1, r)
         afirmar(r["avisos"] and "ffmpeg" in r["avisos"][0].lower(), r)
         d = core.listar_downloads(con, estado="pronta")
