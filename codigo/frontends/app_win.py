@@ -44,7 +44,8 @@ STATUS_CORES = {"backlog": MUT, "jogando": "#7aa2ff", "zerado": OK_C,
 NAV = [("📚 Biblioteca", "", False),
        ("▶ Jogando", "jogando", False),
        ("✓ Zerados", "zerado", False),
-       ("★ Favoritos", "", True)]
+       ("★ Favoritos", "", True),
+       ("🎵 Músicas", "", False)]
 
 _MINI_CACHE: dict = {}
 
@@ -168,6 +169,10 @@ class App:
         self.cards: list[dict] = []  # {frame, jogo}
         self._imgs_cards: list = []  # retém miniaturas da grade
         self._img_det = None  # retém a capa do painel de detalhes
+        self.musicas: list[dict] = []
+        self.mus_sel: int | None = None
+        self.mus_ids: list[int] = []
+        self._mus_lista = None  # Listbox da aba Músicas (recriado a cada recarga)
         root.title("🎮 TucoTeca")
         root.geometry("1200x720")
         root.minsize(960, 600)
@@ -320,8 +325,10 @@ class App:
                                  background=PANEL, wraplength=240,
                                  justify="left", font=("Segoe UI", 8))
         self.det_exe.pack(anchor="w", padx=16, pady=(0, 8))
-        ttk.Button(det, text="▶  JOGAR", style="Accent.TButton",
-                   command=self.jogar).pack(fill="x", padx=16, pady=2)
+        self.btn_jogar = ttk.Button(det, text="▶  JOGAR",
+                                      style="Accent.TButton",
+                                      command=self.jogar)
+        self.btn_jogar.pack(fill="x", padx=16, pady=2)
         lin = ttk.Frame(det, style="Panel.TFrame")
         lin.pack(fill="x", padx=16, pady=2)
         ttk.Button(lin, text="✏ Editar", command=self.dlg_editar).pack(
@@ -652,7 +659,16 @@ class App:
         threading.Thread(target=self._thread_segura(
             trabalho, prog, "Usuário jogador"), daemon=True).start()
 
+    def _em_musicas(self) -> bool:
+        """Aba Músicas ativa? (mesma janela e banco dos jogos)."""
+        try:
+            return NAV[self.nav_idx][0].startswith("🎵")
+        except (IndexError, AttributeError):
+            return False
+
     def recarregar(self):
+        if self._em_musicas():
+            return self._recarregar_musicas()
         _rot, status, fav = NAV[self.nav_idx]
         try:
             tag_txt = self.var_tagfiltro.get().strip()
@@ -729,6 +745,115 @@ class App:
             self.lbl_vazio.pack(anchor="w", padx=14)
         else:
             self.lbl_vazio.pack_forget()
+
+    # -- aba Músicas (lista embutida na grade; play externo segue com o jogo)
+    def _recarregar_musicas(self):
+        for w in self.grade.winfo_children():
+            w.destroy()
+        self.cards = []
+        self._imgs_cards = []
+        self._mus_lista = None
+        try:
+            q = self.var_q.get().strip()
+        except (tk.TclError, AttributeError):
+            q = ""
+        con = self._con()
+        try:
+            try:
+                self.musicas = core.listar_musicas(con, q=q)
+            except Exception:
+                self.musicas = []
+        finally:
+            con.close()
+        self.mus_ids = [m["id"] for m in self.musicas]
+        if self.mus_sel is None or self.mus_sel >= len(self.musicas):
+            self.mus_sel = 0 if self.musicas else None
+        fr_btn = ttk.Frame(self.grade)
+        fr_btn.pack(side="bottom", fill="x", pady=(8, 0))
+        ttk.Button(fr_btn, text="▶ Tocar",
+                   command=self.tocar_musica_selecionada).pack(side="left")
+        ttk.Button(fr_btn, text="📥 Importar…",
+                   command=self.importar_musicas).pack(side="left", padx=6)
+        ttk.Button(fr_btn, text="🗑 Excluir",
+                   command=self.excluir_musica_selecionada).pack(side="left")
+        lst = tk.Listbox(self.grade, selectmode="single", width=64, height=18,
+                         bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                         font=("Segoe UI", 11))
+        lst.pack(fill="both", expand=True)
+        _com_rolagem(lst)
+        for m in self.musicas:
+            try:
+                lst.insert("end", core.texto_musica(m))
+            except Exception:
+                continue
+        if self.mus_sel is not None:
+            try:
+                lst.selection_set(self.mus_sel)
+                lst.see(self.mus_sel)
+            except tk.TclError:
+                pass
+        lst.bind("<<ListboxSelect>>", self._ao_sel_musica)
+        lst.bind("<Double-Button-1>",
+                 lambda _e: self.tocar_musica_selecionada())
+        self._mus_lista = lst
+        n = len(self.musicas)
+        try:
+            self.lbl_cont.configure(
+                text=f"{n} música(s) · player externo (segue com o jogo aberto)")
+        except tk.TclError:
+            pass
+        if n == 0:
+            try:
+                sugest = core.sugestao_harmoni_dir()
+            except Exception:
+                sugest = ""
+            dica = (f"Nada aqui — use 📥 Importar… (Harmoni: {sugest})"
+                    if sugest else "Nada aqui — use 📥 Importar…")
+            self.lbl_vazio.configure(text=dica)
+            self.lbl_vazio.pack(anchor="w", padx=14)
+        else:
+            self.lbl_vazio.pack_forget()
+        self.mostrar_detalhe()
+
+    def _ao_sel_musica(self, _e=None):
+        try:
+            sel = self._mus_lista.curselection()
+        except (tk.TclError, AttributeError):
+            return
+        if sel:
+            self.mus_sel = sel[0]
+            self.mostrar_detalhe()
+
+    def tocar_musica_selecionada(self):
+        """Toca no player do SO (processo independente: não para com o jogo)."""
+        if self.mus_sel is None or self.mus_sel >= len(self.musicas):
+            messagebox.showinfo("Músicas", "Selecione uma música na lista.")
+            return
+        m = self.musicas[self.mus_sel]
+        r = core.tocar_musica(m.get("musica_path") or "")
+        if r.get("ok"):
+            self._aviso_barra(f"Tocando: {core.texto_musica(m)}")
+        else:
+            messagebox.showwarning("Músicas", r.get("erro", "falha"))
+
+    def excluir_musica_selecionada(self):
+        if self.mus_sel is None or self.mus_sel >= len(self.musicas):
+            return
+        m = self.musicas[self.mus_sel]
+        if not messagebox.askokcancel(
+                "Músicas",
+                f"Apagar '{core.texto_musica(m)}' do Hub (arquivo junto)?"):
+            return
+        con = self._con()
+        try:
+            core.excluir_musica(con, m["id"])
+        except (LookupError, ValueError) as e:
+            messagebox.showwarning("Músicas", str(e))
+            return
+        finally:
+            con.close()
+        self.mus_sel = None
+        self.recarregar()
 
     def _criar_card(self, j: dict) -> dict:
         fr = ttk.Frame(self.grade, style="Card.TFrame", cursor="hand2")
@@ -886,6 +1011,33 @@ class App:
         return self.jogos[self.sel]
 
     def mostrar_detalhe(self):
+        if self._em_musicas():
+            try:
+                self.btn_jogar.configure(text="▶  TOCAR")
+            except tk.TclError:
+                pass
+            if self.mus_sel is None or self.mus_sel >= len(self.musicas):
+                self.det_titulo.configure(text="Nenhuma música")
+                self.det_meta.configure(text="")
+                self.det_exe.configure(text="")
+                desenhar_tile(self.det_capa, "♪", 216, 280, grande=True)
+                return
+            m = self.musicas[self.mus_sel]
+            self.det_titulo.configure(text=core.texto_musica(m) or "Sem título")
+            meta = " · ".join(x for x in (m.get("artista"), m.get("album")) if x)
+            self.det_meta.configure(text=meta)
+            try:
+                base_nome = Path(m.get("musica_path") or "").name
+            except (TypeError, ValueError):
+                base_nome = ""
+            self.det_exe.configure(text=base_nome)
+            desenhar_tile(self.det_capa, "♪", 216, 280, grande=True,
+                          subtitulo="música")
+            return
+        try:
+            self.btn_jogar.configure(text="▶  JOGAR")
+        except tk.TclError:
+            pass
         if self.sel is None or self.sel >= len(self.jogos):
             self.det_titulo.configure(text="Nenhum jogo")
             self.det_meta.configure(text="")
@@ -1001,6 +1153,9 @@ class App:
 
     # -- ações
     def jogar(self):
+        if self._em_musicas():
+            self.tocar_musica_selecionada()
+            return
         j = self.selecionado()
         if not j:
             return
@@ -1150,6 +1305,9 @@ class App:
         return True, f"+{r['somado']}h registradas (total {r['total']}h)."
 
     def excluir(self):
+        if self._em_musicas():
+            self.excluir_musica_selecionada()
+            return
         j = self.selecionado()
         if not j:
             return
@@ -1169,6 +1327,8 @@ class App:
         self._dlg_jogo(None)
 
     def dlg_editar(self):
+        if self._em_musicas():
+            return
         j = self.selecionado()
         if j:
             self._dlg_jogo(j)
@@ -2169,9 +2329,20 @@ class App:
 
     # -- músicas (selfhost de áudio; play no player do SO por ação explícita)
     def importar_musicas(self):
-        pasta = filedialog.askdirectory(
-            title="Pasta do Harmoni (music/) ou qualquer pasta de áudio",
-            parent=self.root)
+        try:
+            sugest = (str(core.harmoni_dir() or "")
+                      or str(core.sugestao_harmoni_dir() or ""))
+        except Exception:
+            sugest = ""
+        try:
+            pasta = filedialog.askdirectory(
+                title="Pasta do Harmoni (music/) ou qualquer pasta de áudio",
+                parent=self.root,
+                initialdir=sugest or None)
+        except tk.TclError:
+            pasta = filedialog.askdirectory(
+                title="Pasta do Harmoni (music/) ou qualquer pasta de áudio",
+                parent=self.root)
         if not pasta:
             return
         prog = tk.Toplevel(self.root)
@@ -2198,6 +2369,11 @@ class App:
                     prog.destroy()
                 except tk.TclError:
                     pass
+                if self._em_musicas():
+                    try:
+                        self.recarregar()
+                    except tk.TclError:
+                        pass
                 detalhe = f"{res['novos']} nova(s), {res['ignorados']} ignorada(s)"
                 if res["erros"]:
                     detalhe += f"\n{res['erros'][0]}"

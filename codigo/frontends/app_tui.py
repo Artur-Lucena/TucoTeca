@@ -784,8 +784,7 @@ class Tui:
                     itens = core.listar_musicas(con, q=q)
                 except Exception:
                     itens = []
-                rotulos = [f"{m['artista']} — {m['titulo']}" if m.get("artista")
-                           else m["titulo"] for m in itens]
+                rotulos = [core.texto_musica(m) for m in itens]
                 opcoes = rotulos + ["Buscar…", "Importar de pasta…", "Voltar"]
                 idx = self.escolher(f"Músicas ({len(itens)})", opcoes)
                 if idx is None or opcoes[idx] == "Voltar":
@@ -799,7 +798,8 @@ class Tui:
                 elif escolha == "Importar de pasta…":
                     sugest = ""
                     try:
-                        sugest = str(core.harmoni_dir() or "")
+                        sugest = (str(core.harmoni_dir() or "")
+                                  or str(core.sugestao_harmoni_dir() or ""))
                     except Exception:
                         pass
                     r = self.perguntar("Pasta de áudio"
@@ -825,7 +825,8 @@ class Tui:
                                             ["Tocar", "Excluir", "Voltar"])
                         if sub == 0:
                             r = core.tocar_musica(itens[pos].get("musica_path") or "")
-                            self.msg = ("Tocando no player do SO ✓"
+                            self.msg = (f"Tocando '{rotulos[pos]}' no player ✓"
+                                        " (segue com o jogo aberto)"
                                         if r.get("ok")
                                         else f"Falha: {r.get('erro')}")
                         elif sub == 1:

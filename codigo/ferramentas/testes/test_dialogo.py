@@ -78,6 +78,42 @@ def teste_dialogo_listas_tem_rolagem():
             pass
 
 
+def teste_dialogo_aba_musicas():
+    """Aba 🎵 Músicas: entra, lista embutida na grade, volta sem quebrar."""
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
+    import app_win
+    root, app = _app_oculto("d5.db")
+    if root is None:
+        print("(sem display: skip)")
+        return
+    try:
+        idx = next(i for i, (rot, _s, _f) in enumerate(app_win.NAV)
+                   if rot.startswith("🎵"))
+        app._ir_nav(idx)
+        root.update()
+        afirmar(app._em_musicas(), app.nav_idx)
+        afirmar(app.cards == [], app.cards)
+        lbs = [w for w in app.grade.winfo_children()
+               if w.winfo_class() == "Listbox"]
+        afirmar(lbs, "aba músicas sem lista embutida")
+        afirmar(app.btn_jogar.cget("text") == "▶  TOCAR",
+                app.btn_jogar.cget("text"))
+        app._ir_nav(0)
+        root.update()
+        afirmar(not app._em_musicas(), app.nav_idx)
+        afirmar(app.btn_jogar.cget("text") == "▶  JOGAR",
+                app.btn_jogar.cget("text"))
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass
+
+
 def _combos(dlg):
     out = []
 

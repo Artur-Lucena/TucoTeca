@@ -33,6 +33,30 @@ def harmoni_dir() -> Path | None:
     return None
 
 
+def sugestao_harmoni_dir() -> str:
+    """Caminho provável do `music/` do Harmoni, exista ou não (p/ diálogo).
+
+    `harmoni_dir()` só devolve o que existe; este sugere onde procurar
+    (guia de onboarding quando a pasta ainda não foi baixada).
+    """
+    env = (os.environ.get("BIBLIOTECA_MUSICA_DIR") or "").strip()
+    if env:
+        return env
+    if os.name == "nt":
+        base = Path(os.environ.get("USERPROFILE", ""))
+        if str(base).strip():
+            return str(base / "Downloads" / "Harmoni-Windows" / "music")
+    return ""
+
+
+def texto_musica(m: dict | None) -> str:
+    """Rótulo único da faixa (`Artista — Título` ou só `Título`). GUI+TUI."""
+    m = m or {}
+    tit = str(m.get("titulo") or "").strip()
+    art = str(m.get("artista") or "").strip()
+    return f"{art} — {tit}" if art else tit
+
+
 def _syncsafe(b: bytes) -> int:
     n = 0
     for x in b:
@@ -259,5 +283,6 @@ def tocar_musica(caminho: str) -> dict:
     return {"ok": True, "path": p}
 
 
-__all__ = ['harmoni_dir', 'ler_tags', 'sha_arquivo', 'varrer_pasta',
+__all__ = ['harmoni_dir', 'sugestao_harmoni_dir', 'texto_musica',
+           'ler_tags', 'sha_arquivo', 'varrer_pasta',
            'importar_musicas', 'tocar_musica']

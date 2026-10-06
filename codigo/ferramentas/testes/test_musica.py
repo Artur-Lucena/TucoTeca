@@ -124,6 +124,20 @@ def teste_musica_tracks_json_e_migracao_v12():
         con.close()
 
 
+def teste_musica_helpers_texto_e_sugestao():
+    from bib_nucleo import musicas as MUS
+    afirmar(MUS.texto_musica({"titulo": "Bee", "artista": "Aaa"}) == "Aaa — Bee")
+    afirmar(MUS.texto_musica({"titulo": "Solo", "artista": ""}) == "Solo")
+    afirmar(MUS.texto_musica({}) == "")
+    afirmar(MUS.harmoni_dir() is None)  # sandbox sem music/ (onboarding)
+    s = MUS.sugestao_harmoni_dir()
+    afirmar(isinstance(s, str), s)
+    if os.name == "nt":
+        afirmar(s.endswith("music"), s)
+    else:
+        afirmar(s == "", s)
+
+
 def teste_musica_tracks_json_invalido():
     from bib_nucleo import musicas as MUS
     tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))
