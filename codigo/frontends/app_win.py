@@ -176,6 +176,8 @@ class App:
         self.mus_modo = "hub"  # "hub" catalogadas | "fila" downloads CSV
         self.fila: list[dict] = []
         self.fila_sel: int | None = None
+        self.player = core.Player()  # interno (MCI no Win); externo é fallback
+        self._btn_play = None  # ▶/⏸ da aba (texto acompanha o estado)
         root.title("🎮 TucoTeca")
         root.geometry("1200x720")
         root.minsize(960, 600)
@@ -183,6 +185,10 @@ class App:
         self._estilo()
         self._montar()
         self.recarregar()
+        try:
+            self.root.after(1000, self._vigiar_musica)
+        except tk.TclError:
+            pass
 
     # -- construção
     def _estilo(self):
@@ -793,6 +799,22 @@ class App:
             n_pend = 0
         ttk.Button(fr_btn, text=f"Fila ({n_pend})",
                    command=self._ir_fila).pack(side="left")
+        fr_trans = ttk.Frame(self.grade)
+        fr_trans.pack(side="bottom", fill="x", pady=(6, 0))
+        ttk.Button(fr_trans, text="⏮", width=4,
+                   command=self.mus_anterior).pack(side="left")
+        self._btn_play = ttk.Button(fr_trans, text="▶", width=4,
+                                    command=self.mus_alternar)
+        self._btn_play.pack(side="left", padx=3)
+        ttk.Button(fr_trans, text="⏹", width=4,
+                   command=self.mus_parar).pack(side="left")
+        ttk.Button(fr_trans, text="⏭", width=4,
+                   command=self.mus_proxima).pack(side="left", padx=(3, 0))
+        ttk.Button(fr_trans, text="Externo…",
+                   command=self.abrir_externo_musica).pack(side="left", padx=6)
+        self.lbl_agora = ttk.Label(fr_trans, text="♪ parado",
+                                   style="Mut.TLabel")
+        self.lbl_agora.pack(side="left", padx=6)
         lst = tk.Listbox(self.grade, selectmode="single", width=64, height=18,
                          bg="#0b0d12", fg=TXT, selectbackground=ACC,
                          font=("Segoe UI", 11))
@@ -842,19 +864,111 @@ class App:
             self.mostrar_detalhe()
 
     def tocar_musica_selecionada(self):
-        """Toca no player do SO (processo independente: não para com o jogo)."""
+        """Toca no player interno (segue com o jogo; externo em Externo…)."""
         if self.mus_modo == "fila":
             messagebox.showinfo("Fila", "Aqui é a fila de downloads (Fase B).")
             return
         if self.mus_sel is None or self.mus_sel >= len(self.musicas):
             messagebox.showinfo("Músicas", "Selecione uma música na lista.")
             return
+        faixas = [{"path": m.get("musica_path") or "",
+                   "titulo": core.texto_musica(m)} for m in self.musicas]
+        self.player.carregar(faixas, inicio=self.mus_sel)
+        r = self.player.tocar()
+        if r.get("ok"):
+            self._aviso_barra(f"Tocando: {core.texto_musica(self.musicas[self.mus_sel])}")
+            self._atualizar_transporte()
+        else:
+            messagebox.showwarning(
+                "Músicas",
+                f"{r.get('erro', 'falha')}\nTente Externo… como alternativa.")
+
+    def abrir_externo_musica(self):
+        """Fallback: abre no player do SO (como era antes do interno)."""
+        if self.mus_modo == "fila" or self.mus_sel is None \
+                or self.mus_sel >= len(self.musicas):
+            return
         m = self.musicas[self.mus_sel]
         r = core.tocar_musica(m.get("musica_path") or "")
         if r.get("ok"):
-            self._aviso_barra(f"Tocando: {core.texto_musica(m)}")
+            self._aviso_barra(f"Tocando (externo): {core.texto_musica(m)}")
         else:
             messagebox.showwarning("Músicas", r.get("erro", "falha"))
+
+    def mus_alternar(self):
+        r = self.player.alternar()
+        if not r.get("ok") and self.player.estado == "parado":
+            self.tocar_musica_selecionada()
+            return
+        if not r.get("ok"):
+            messagebox.showwarning("Músicas", r.get("erro", "falha"))
+        self._atualizar_transporte()
+
+    def mus_parar(self):
+        self.player.parar()
+        self._atualizar_transporte()
+
+    def mus_proxima(self):
+        r = self.player.proxima()
+        if not r.get("ok"):
+            self._atualizar_transporte()
+            return
+        self.mus_sel = self.player.idx
+        try:
+            self._mus_lista.selection_clear(0, "end")
+            self._mus_lista.selection_set(self.mus_sel)
+            self._mus_lista.see(self.mus_sel)
+        except (tk.TclError, AttributeError):
+            pass
+        self.mostrar_detalhe()
+        self._atualizar_transporte()
+
+    def mus_anterior(self):
+        r = self.player.anterior()
+        if not r.get("ok"):
+            return
+        self.mus_sel = self.player.idx
+        try:
+            self._mus_lista.selection_clear(0, "end")
+            self._mus_lista.selection_set(self.mus_sel)
+            self._mus_lista.see(self.mus_sel)
+        except (tk.TclError, AttributeError):
+            pass
+        self.mostrar_detalhe()
+        self._atualizar_transporte()
+
+    def _atualizar_transporte(self):
+        try:
+            btn = self._btn_play
+            lbl = self.lbl_agora
+        except AttributeError:
+            return
+        try:
+            if btn is not None and btn.winfo_exists():
+                btn.configure(text="⏸" if self.player.estado == "tocando"
+                              else "▶")
+            if lbl is not None and lbl.winfo_exists():
+                at = self.player.atual()
+                lbl.configure(text=f"♪ {at['titulo']}"
+                                  f" ({at['estado']})" if at
+                              and self.player.estado != "parado"
+                              else "♪ parado")
+        except tk.TclError:
+            pass
+
+    def _vigiar_musica(self):
+        """Poll 1s: faixa acabou → próxima (auto-avançar); reagenda sempre."""
+        try:
+            if self.player.terminou():
+                self.mus_proxima()
+            else:
+                self._atualizar_transporte()
+        except Exception:
+            pass
+        try:
+            self.root.after(1000, self._vigiar_musica)
+        except tk.TclError:
+            pass
 
     def excluir_musica_selecionada(self):
         if self.mus_modo == "fila":
@@ -866,6 +980,12 @@ class App:
                 "Músicas",
                 f"Apagar '{core.texto_musica(m)}' do Hub (arquivo junto)?"):
             return
+        tocando = ""
+        try:
+            at = self.player.atual()
+            tocando = (at or {}).get("path") or ""
+        except Exception:
+            pass
         con = self._con()
         try:
             core.excluir_musica(con, m["id"])
@@ -875,6 +995,8 @@ class App:
         finally:
             con.close()
         self.mus_sel = None
+        if tocando and tocando == (m.get("musica_path") or ""):
+            self.player.parar()
         self.recarregar()
 
     def _ir_fila(self):

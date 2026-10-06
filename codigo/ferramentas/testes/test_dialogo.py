@@ -172,6 +172,67 @@ def teste_dialogo_aba_fila():
             pass
 
 
+def teste_dialogo_transporte_interno():
+    """Transporte interno na aba: toca/pausa/próxima sem popup e sem áudio."""
+    try:
+        import tkinter as tk
+    except ModuleNotFoundError:
+        print("(sem tkinter: skip)")
+        return
+    import app_win
+    root, app = _app_oculto("d7.db")
+    if root is None:
+        print("(sem display: skip)")
+        return
+    try:
+        class FB:
+            def open(self, p):
+                return {"ok": True} if p else {"ok": False, "erro": "x"}
+            def play(self):
+                return {"ok": True}
+            def pause(self):
+                return {"ok": True}
+            def resume(self):
+                return {"ok": True}
+            def stop(self):
+                pass
+            def vivo(self):
+                return True
+            def pos_ms(self):
+                return 1
+            def dur_ms(self):
+                return 9
+            def close(self):
+                pass
+        app.player = core.Player(FB())
+        idx = next(i for i, (rot, _s, _f) in enumerate(app_win.NAV)
+                   if rot.startswith("🎵"))
+        app._ir_nav(idx)
+        root.update()
+        app.musicas = [{"id": 1, "titulo": "A", "artista": "X", "album": "",
+                        "musica_path": "a.mp3"}]
+        app.mus_ids = [1]
+        app.mus_sel = 0
+        app.tocar_musica_selecionada()
+        root.update()
+        afirmar(app.player.estado == "tocando", app.player.estado)
+        afirmar("X" in app.lbl_agora.cget("text"), app.lbl_agora.cget("text"))
+        afirmar(app._btn_play.cget("text") == "⏸", app._btn_play.cget("text"))
+        app.mus_alternar()
+        afirmar(app.player.estado == "pausado", app.player.estado)
+        app.mus_alternar()
+        afirmar(app.player.estado == "tocando", app.player.estado)
+        app.mus_proxima()  # só 1 faixa: para no fim
+        afirmar(app.player.estado == "parado", app.player.estado)
+        app.mus_parar()
+        afirmar(app.player.estado == "parado", app.player.estado)
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass
+
+
 def _combos(dlg):
     out = []
 

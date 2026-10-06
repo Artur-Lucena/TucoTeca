@@ -186,6 +186,65 @@ def teste_menu_fila_volta():
     afirmar("pendente" in app.msg, app.msg)
 
 
+def teste_menu_interno_transporte():
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    app = _tui_fake(db, [27])
+
+    class FB:
+        def __init__(self, vive=10**9):
+            self.vive = vive
+            self.n = 0
+            self.off = True
+        def open(self, p):
+            self.n = 0
+            self.off = True
+            return {"ok": True}
+        def play(self):
+            self.off = False
+            return {"ok": True}
+        def pause(self):
+            self.off = True
+            return {"ok": True}
+        def resume(self):
+            self.off = False
+            return {"ok": True}
+        def stop(self):
+            self.off = True
+        def vivo(self):
+            if self.off:
+                return False
+            self.n += 1
+            return self.n <= self.vive
+        def pos_ms(self):
+            return 0
+        def dur_ms(self):
+            return 1
+        def close(self):
+            self.off = True
+
+    app.player = core.Player(FB())
+    itens = [{"musica_path": "a.mp3", "titulo": "A", "artista": "X"},
+             {"musica_path": "b.mp3", "titulo": "B", "artista": "Y"}]
+    r = app._tocar_interno(itens, 0)
+    afirmar(r.get("ok") and app.player.estado == "tocando", (r, app.player.estado))
+    r = app._alternar_interno()
+    afirmar(r.get("ok") and app.player.estado == "pausado", (r, app.player.estado))
+    r = app._proxima_interno()
+    afirmar(r.get("ok") and r.get("titulo") == "Y — B", r)
+    app._parar_interno()
+    afirmar(app.player.estado == "parado", app.player.estado)
+    # faixa que acaba sozinha avança sem travar
+    app.player = core.Player(FB(vive=0))
+    app._tocar_interno(itens, 0)
+    afirmar(app.player.terminou(), "devia ter terminado")
+    app._vigiar_player()
+    afirmar(app.player.atual()["titulo"] == "Y — B", app.player.atual())
+    afirmar("Seguindo" in app.msg, app.msg)
+
+
 def teste_menu_principal_abre_e_cancela():
     import tempfile
     from pathlib import Path

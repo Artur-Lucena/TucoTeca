@@ -53,6 +53,7 @@ class Tui:
         self.filtro_plat: str | None = None
         self.msg = ""
         self.msg_final = ""
+        self.player = None  # interno, criado no 1º Tocar (externo é fallback)
         self.sessoes_pendentes = SimpleQueue()  # fila entre vigia e UI
         self._cores()
         self.recarregar()
@@ -780,10 +781,19 @@ class Tui:
         try:
             q = ""
             while True:
+                self._vigiar_player()
                 try:
                     itens = core.listar_musicas(con, q=q)
                 except Exception:
                     itens = []
+                rotulos = [core.texto_musica(m) for m in itens]
+                try:
+                    at = self.player.atual() if self.player else None
+                except Exception:
+                    at = None
+                titulo = f"Músicas ({len(itens)})"
+                if at and (self.player.estado if self.player else "") != "parado":
+                    titulo += f" · ♪ {at.get('titulo') or ''}"
                 rotulos = [core.texto_musica(m) for m in itens]
                 try:
                     n_fila = len(core.listar_downloads(con))
@@ -792,7 +802,7 @@ class Tui:
                 opcoes = (rotulos + ["Buscar…", "Importar de pasta…",
                                      "Baixar de CSV…", f"Fila ({n_fila})…",
                                      "Voltar"])
-                idx = self.escolher(f"Músicas ({len(itens)})", opcoes)
+                idx = self.escolher(titulo, opcoes)
                 if idx is None or opcoes[idx] == "Voltar":
                     self.recarregar()
                     return
@@ -848,15 +858,35 @@ class Tui:
                 else:
                     pos = idx
                     if 0 <= pos < len(itens):
-                        sub = self.escolher(rotulos[pos],
-                                            ["Tocar", "Excluir", "Voltar"])
+                        sub = self.escolher(
+                            rotulos[pos],
+                            ["Tocar", "Pausar/Continuar", "Próxima", "Parar",
+                             "Abrir externo", "Excluir", "Voltar"])
                         if sub == 0:
+                            r = self._tocar_interno(itens, pos)
+                            self.msg = (f"Tocando '{rotulos[pos]}' ✓"
+                                        if r.get("ok")
+                                        else f"Falha: {r.get('erro')}")
+                        elif sub == 1:
+                            r = self._alternar_interno()
+                            self.msg = (f"{r.get('estado', 'ok')} ✓"
+                                        if r.get("ok")
+                                        else f"Falha: {r.get('erro')}")
+                        elif sub == 2:
+                            r = self._proxima_interno()
+                            self.msg = (f"Tocando '{r.get('titulo')}' ✓"
+                                        if r.get("ok")
+                                        else "Fim da fila.")
+                        elif sub == 3:
+                            self._parar_interno()
+                            self.msg = "Parado."
+                        elif sub == 4:
                             r = core.tocar_musica(itens[pos].get("musica_path") or "")
                             self.msg = (f"Tocando '{rotulos[pos]}' no player ✓"
                                         " (segue com o jogo aberto)"
                                         if r.get("ok")
                                         else f"Falha: {r.get('erro')}")
-                        elif sub == 1:
+                        elif sub == 5:
                             conf = self.perguntar(
                                 f"Apagar '{rotulos[pos]}' do Hub? (s/n): ")
                             if (conf or "").strip().lower() in ("s", "sim"):
@@ -865,8 +895,74 @@ class Tui:
                                     self.msg = "Música apagada."
                                 except (LookupError, ValueError) as e:
                                     self.msg = f"Falha: {e}"
+                                    continue
+                                try:
+                                    at = self.player.atual() \
+                                        if self.player else None
+                                    if at and at.get("path") == (
+                                            itens[pos].get("musica_path")
+                                            or ""):
+                                        self._parar_interno()
+                                except Exception:
+                                    pass
         finally:
             con.close()
+
+    def _player_tui(self):
+        """Player interno preguiçoso (cria no 1º uso)."""
+        if self.player is None:
+            self.player = core.Player()
+        return self.player
+
+    def _tocar_interno(self, itens, pos) -> dict:
+        try:
+            pl = self._player_tui()
+            pl.carregar([{"path": m.get("musica_path") or "",
+                          "titulo": core.texto_musica(m)} for m in itens],
+                        inicio=pos)
+            return pl.tocar()
+        except Exception as e:
+            return {"ok": False, "erro": str(e)}
+
+    def _alternar_interno(self) -> dict:
+        try:
+            pl = self._player_tui()
+            r = pl.alternar()
+            if not r.get("ok") and pl.estado == "parado":
+                return {"ok": False, "erro": "nada tocando (Tocar primeiro)"}
+            r["estado"] = pl.estado
+            return r
+        except Exception as e:
+            return {"ok": False, "erro": str(e)}
+
+    def _proxima_interno(self) -> dict:
+        try:
+            pl = self._player_tui()
+            r = pl.proxima()
+            if r.get("ok"):
+                at = pl.atual() or {}
+                return {"ok": True, "titulo": at.get("titulo") or ""}
+            return r
+        except Exception as e:
+            return {"ok": False, "erro": str(e)}
+
+    def _parar_interno(self) -> None:
+        try:
+            if self.player is not None:
+                self.player.parar()
+        except Exception:
+            pass
+
+    def _vigiar_player(self) -> None:
+        """Faixa acabou → próxima sozinha (auto-avançar, sem travar o TUI)."""
+        try:
+            if self.player is not None and self.player.terminou():
+                r = self.player.proxima()
+                at = self.player.atual() if r.get("ok") else None
+                self.msg = (f"Seguindo: {at.get('titulo')}" if at
+                            else "Fim da fila.")
+        except Exception:
+            pass
 
     def menu_fila(self, con):
         """Fila CSV → mp3: estados + limpar (download vem na Fase B)."""
