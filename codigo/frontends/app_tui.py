@@ -882,10 +882,30 @@ class Tui:
                 extra = (f" — {d.get('erro')}"
                          if est == "falha" and d.get("erro") else "")
                 rotulos.append(f"{base} [{est}]{extra}")
-            opcoes = rotulos + ["Limpar prontas/falhas", "Voltar"]
+            opcoes = rotulos + ["Baixar fila", "Limpar prontas/falhas",
+                                 "Voltar"]
             idx = self.escolher(f"Fila ({len(fila)})", opcoes)
             if idx is None or opcoes[idx] == "Voltar":
                 return
+            if opcoes[idx] == "Baixar fila":
+                if not core.localizar_ytdlp():
+                    self.msg = core.erro_sem_ytdlp()
+                    continue
+                alvos = [d for d in fila
+                         if d.get("estado") in ("pendente", "falha")]
+                if not alvos:
+                    self.msg = "Nada pendente."
+                    continue
+                ok = 0
+                for d in alvos:
+                    self.msg = f"Baixando {core.texto_musica(d)}…"
+                    try:
+                        r = core.baixar_faixa(con, d["id"])
+                    except Exception as e:
+                        r = {"ok": False, "erro": str(e)}
+                    ok += 1 if r.get("ok") else 0
+                self.msg = f"Baixadas {ok}/{len(alvos)} (Fase C importa)."
+                continue
             if opcoes[idx] == "Limpar prontas/falhas":
                 try:
                     n = core.limpar_downloads(con)

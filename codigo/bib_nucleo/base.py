@@ -80,6 +80,10 @@ MODS_DIR = DADOS_DIR / "mods"
 # de emulador — módulo próprio futuro reutiliza o padrão atualizacao.instalar.
 MUSICAS_DIR = DADOS_DIR / "musicas"
 
+# Rascunhos brutos da fila CSV → mp3 (Fase B baixa aqui; Fase C importa
+# p/ `musicas/`). Fora do git, do scanner (SKIP) e dos pacotes.
+BAIXAR_DIR = DADOS_DIR / "baixados"
+
 # Texturas HD por jogo (Azahar custom textures): texturas/<title-id>/ com PNGs.
 # Toggle por rename (<tid> ativo, <tid>.off desligado — sem privilégio, sem
 # cópia, vale nos 3 SOs). Fora do git, do scanner e dos instaladores
@@ -97,6 +101,7 @@ def garantir_dirs() -> None:
     SAVES_DIR.mkdir(parents=True, exist_ok=True)
     MODS_DIR.mkdir(parents=True, exist_ok=True)
     MUSICAS_DIR.mkdir(parents=True, exist_ok=True)
+    BAIXAR_DIR.mkdir(parents=True, exist_ok=True)
     TEXTURAS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -350,5 +355,5 @@ ROM_EXTS_3DS = {".cci", ".cxi", ".3ds", ".3dsx", ".elf", ".app", ".axf"}
 # Áudio por jogo (OST futura): só formatos que o Hub vai baixar/guardar.
 MUSICA_EXTS = {".mp3", ".ogg", ".m4a", ".flac", ".wav"}
 
-__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'MAC_ROOT', 'eh_mac', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'MODS_DIR', 'MUSICAS_DIR', 'TEXTURAS_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'win_para_mac', 'mac_para_win', 'linux_para_mac', 'mac_para_linux', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
+__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'MAC_ROOT', 'eh_mac', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'MODS_DIR', 'MUSICAS_DIR', 'BAIXAR_DIR', 'TEXTURAS_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'win_para_mac', 'mac_para_win', 'linux_para_mac', 'mac_para_linux', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
  'ROM_EXTS_3DS', 'MUSICA_EXTS']

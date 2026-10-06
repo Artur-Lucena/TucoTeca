@@ -177,7 +177,7 @@ def teste_menu_fila_volta():
                                          "uri": "spotify:track:1"}])
     finally:
         con.close()
-    app = _tui_fake(db, [10, ord("j"), ord("j"), 10])
+    app = _tui_fake(db, [10, ord("j"), ord("j"), ord("j"), 10])
     con = app._con()
     try:
         app.menu_fila(con)

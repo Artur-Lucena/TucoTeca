@@ -110,3 +110,126 @@ def teste_baixar_v14_idempotente():
         afirmar(core.listar_downloads(con) == [])
     finally:
         con.close()
+
+
+def teste_baixar_localizar_e_consulta():
+    import os
+    from bib_nucleo import baixar as BX
+    afirmar(BX.consulta_busca("Chico", "Cotidiano") == "ytsearch1:Chico - Cotidiano")
+    afirmar(BX.consulta_busca("", "Solo") == "ytsearch1:Solo")
+    afirmar(BX.consulta_busca("", "") == "")
+    afirmar("BIBLIOTECA_YTDLP" in BX.erro_sem_ytdlp())
+    tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
+    falso = tmp / "yt-dlp.exe"
+    falso.write_bytes(b"fake")
+    velho = os.environ.get("BIBLIOTECA_YTDLP")
+    os.environ["BIBLIOTECA_YTDLP"] = str(falso)
+    try:
+        afirmar(BX.localizar_ytdlp() == str(falso))
+    finally:
+        if velho is None:
+            os.environ.pop("BIBLIOTECA_YTDLP", None)
+        else:
+            os.environ["BIBLIOTECA_YTDLP"] = velho
+
+
+def teste_baixar_casar_video_mock():
+    from bib_nucleo import baixar as BX
+
+    class R:
+        def __init__(self, rc=0, out="", err=""):
+            self.returncode = rc
+            self.stdout = out
+            self.stderr = err
+
+    velho = BX.subprocess.run
+    try:
+        BX.subprocess.run = lambda *a, **k: R(0, "abc123\tTitulo X\n")
+        c = BX.casar_video("yt", "Chico", "Cotidiano")
+        afirmar(c == {"video_id": "abc123", "video_titulo": "Titulo X"}, c)
+        BX.subprocess.run = lambda *a, **k: R(1, "", "ERROR: nada")
+        try:
+            BX.casar_video("yt", "Chico", "Cotidiano")
+            afirmar(False, "devia levantar")
+        except ValueError:
+            pass
+        BX.subprocess.run = lambda *a, **k: R(0, "sem-tab-aqui\n")
+        try:
+            BX.casar_video("yt", "Chico", "Cotidiano")
+            afirmar(False, "devia levantar")
+        except ValueError:
+            pass
+
+        def _boom(*a, **k):
+            raise OSError("sem exec")
+        BX.subprocess.run = _boom
+        try:
+            BX.casar_video("yt", "Chico", "Cotidiano")
+            afirmar(False, "devia levantar")
+        except ValueError:
+            pass
+        try:
+            BX.casar_video("yt", "", "")
+            afirmar(False, "devia levantar")
+        except ValueError:
+            pass
+    finally:
+        BX.subprocess.run = velho
+
+
+def teste_baixar_faixa_mock():
+    from bib_nucleo import baixar as BX
+
+    class R:
+        def __init__(self, rc=0, out="", err=""):
+            self.returncode = rc
+            self.stdout = out
+            self.stderr = err
+
+    class P:
+        def __init__(self, rc=0):
+            self.stdout = ["[download]  45.0% of 3MiB\n",
+                           "[download] 100.0% done\n"]
+            self._rc = rc
+        def wait(self, timeout=None):
+            return self._rc
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
+    stage = tmp / "stage"
+    stage.mkdir()
+    con = core.get_db(tmp / "b.db")
+    velho_run, velho_pop = BX.subprocess.run, BX.subprocess.Popen
+    try:
+        core.enfileirar_downloads(con, [{"titulo": "Cotidiano",
+                                         "artista": "Chico",
+                                         "uri": "spotify:track:1"}])
+        core.enfileirar_downloads(con, [{"titulo": "Ruim",
+                                         "artista": "X",
+                                         "uri": "spotify:track:2"}])
+        did = core.listar_downloads(con)[0]["id"]
+        did2 = core.listar_downloads(con)[1]["id"]
+        (stage / "abc123.m4a").write_bytes(b"audio" * 100)
+        vistos = []
+        BX.subprocess.run = lambda *a, **k: R(0, "abc123\tTitulo X\n")
+        BX.subprocess.Popen = lambda *a, **k: P(0)
+        r = BX.baixar_faixa(con, did, ytdlp="yt-fake", destino=stage,
+                            progresso=lambda i, p: vistos.append(p))
+        afirmar(r.get("ok") and r.get("video_id") == "abc123", r)
+        afirmar(vistos and vistos[-1] == 100.0, vistos)
+        d = core.listar_downloads(con, estado="baixado")
+        afirmar(len(d) == 1 and d[0]["musica_path"].endswith("abc123.m4a"), d)
+        # rc != 0 vira falha com video_id guardado
+        BX.subprocess.Popen = lambda *a, **k: P(1)
+        r = BX.baixar_faixa(con, did2, ytdlp="yt-fake", destino=stage)
+        afirmar(not r.get("ok"), r)
+        d = core.listar_downloads(con, estado="falha")
+        afirmar(len(d) == 1 and d[0]["video_id"] == "abc123", d)
+        # estado final não baixa de novo; id inexistente não levanta
+        r = BX.baixar_faixa(con, did, ytdlp="yt-fake", destino=stage)
+        afirmar(not r.get("ok"), r)
+        r = BX.baixar_faixa(con, 9999, ytdlp="yt-fake", destino=stage)
+        afirmar(not r.get("ok"), r)
+    finally:
+        BX.subprocess.run = velho_run
+        BX.subprocess.Popen = velho_pop
+        con.close()

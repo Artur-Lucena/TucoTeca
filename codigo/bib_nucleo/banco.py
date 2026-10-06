@@ -724,7 +724,7 @@ def excluir_musica(con: sqlite3.Connection, mid: int) -> None:
 # Downloads CSV → mp3 (fila tal qual o Harmoni): catálogo próprio v14
 # --------------------------------------------------------------------------
 
-ESTADOS_DOWNLOAD = ("pendente", "baixando", "pronta", "falha")
+ESTADOS_DOWNLOAD = ("pendente", "baixando", "baixado", "pronta", "falha")
 
 SCHEMA_DOWNLOADS = """
 CREATE TABLE IF NOT EXISTS downloads (

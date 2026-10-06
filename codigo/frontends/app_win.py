@@ -908,8 +908,10 @@ class App:
                    command=self._ir_musicas).pack(side="left")
         ttk.Button(fr_btn, text="⬇ CSV…",
                    command=self.baixar_csv).pack(side="left", padx=6)
+        ttk.Button(fr_btn, text="⬇ Baixar fila",
+                   command=self.baixar_fila).pack(side="left")
         ttk.Button(fr_btn, text="Limpar prontas/falhas",
-                   command=self.limpar_fila).pack(side="left")
+                   command=self.limpar_fila).pack(side="left", padx=6)
         lst = tk.Listbox(self.grade, selectmode="single", width=64, height=18,
                          bg="#0b0d12", fg=TXT, selectbackground=ACC,
                          font=("Segoe UI", 11))
@@ -934,12 +936,13 @@ class App:
         self._mus_lista = lst
         n = len(self.fila)
         np_ = sum(1 for d in self.fila if d.get("estado") == "pendente")
+        nbx = sum(1 for d in self.fila if d.get("estado") == "baixado")
         nok = sum(1 for d in self.fila if d.get("estado") == "pronta")
         nf = sum(1 for d in self.fila if d.get("estado") == "falha")
         try:
             self.lbl_cont.configure(
-                text=f"{n} na fila · {np_} pendente(s) · {nok} pronta(s)"
-                     f" · {nf} falha(s) (download: Fase B)")
+                text=f"{n} na fila · {np_} pendente(s) · {nbx} baixada(s)"
+                     f" · {nok} pronta(s) · {nf} falha(s)")
         except tk.TclError:
             pass
         if n == 0:
@@ -986,6 +989,62 @@ class App:
                 self.recarregar()
             except tk.TclError:
                 pass
+
+    def baixar_fila(self):
+        """Start Downloads do Harmoni: baixa pendentes em thread (Fase B)."""
+        th = getattr(self, "_th_fila", None)
+        if th is not None and th.is_alive():
+            messagebox.showinfo("Baixar fila", "Download já em andamento.")
+            return
+        if not core.localizar_ytdlp():
+            messagebox.showwarning("Baixar fila", core.erro_sem_ytdlp())
+            return
+        con = self._con()
+        try:
+            try:
+                ids = [d["id"] for d in core.listar_downloads(con)
+                       if d.get("estado") in ("pendente", "falha")]
+            except Exception as e:
+                messagebox.showwarning("Baixar fila", f"falha: {e}")
+                return
+        finally:
+            con.close()
+        if not ids:
+            messagebox.showinfo("Baixar fila", "Nada pendente.")
+            return
+        self._aviso_barra(f"Baixando {len(ids)} faixa(s)…")
+
+        def trabalho(ids_fx=ids):
+            for did in ids_fx:
+                c2 = self._con()
+                try:
+                    core.baixar_faixa(c2, did, progresso=self._prog_fila)
+                except Exception as e:
+                    try:
+                        core.marcar_download(c2, did, "falha",
+                                             erro=str(e)[:200])
+                    except Exception:
+                        pass
+                finally:
+                    c2.close()
+            self._depois(self._fim_fila)
+
+        self._th_fila = threading.Thread(target=trabalho, daemon=True)
+        self._th_fila.start()
+
+    def _prog_fila(self, did, pct):
+        try:
+            self._depois(
+                lambda: self._aviso_barra(f"Baixando #{did}: {pct:.0f}%"))
+        except tk.TclError:
+            pass
+
+    def _fim_fila(self):
+        try:
+            self.recarregar()
+        except tk.TclError:
+            pass
+        self._aviso_barra("Fila atualizada — prontas entram na Fase C.")
 
     def limpar_fila(self):
         """Clear Done do Harmoni: apaga prontas/falhas (CSV recria)."""
