@@ -220,9 +220,16 @@ def teste_dialogo_transporte_interno():
                         "musica_path": "a.mp3"}]
         app.mus_ids = [1]
         app.mus_sel = 0
-        app.tocar_musica_selecionada()
+        app.tocar_musica_selecionada()  # async: decode em thread
+        import time as _t
+        fim = _t.monotonic() + 5
+        while app.player.estado != "tocando" and _t.monotonic() < fim:
+            root.update()
+            _t.sleep(0.05)
         root.update()
         afirmar(app.player.estado == "tocando", app.player.estado)
+        app._atualizar_transporte()  # sync: evita race do after(0)
+        root.update()
         afirmar("X" in app.lbl_agora.cget("text"), app.lbl_agora.cget("text"))
         afirmar(app._btn_play.cget("text") == "⏸", app._btn_play.cget("text"))
         app.mus_alternar()

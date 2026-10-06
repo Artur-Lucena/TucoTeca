@@ -178,6 +178,7 @@ class App:
         self.fila_sel: int | None = None
         self.player = core.Player()  # interno (MCI no Win); externo é fallback
         self._btn_play = None  # ▶/⏸ da aba (texto acompanha o estado)
+        self._mus_token = 0  # troca de faixa: thread velha perde (sem freeze)
         root.title("🎮 TucoTeca")
         root.geometry("1200x720")
         root.minsize(960, 600)
@@ -263,7 +264,8 @@ class App:
         ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
         ttk.Label(side, text="IMPORTAR", style="Panel.TLabel",
                   font=("Segoe UI", 10, "bold"), foreground=MUT).pack(anchor="w", padx=12)
-        for rotulo, cmd in (("📥 Importar…", self.importar_unificado),):
+        for rotulo, cmd in (("📥 Importar…", self.importar_unificado),
+                            ("⬇ SteamRip…", self.dlg_steamrip)):
             ttk.Button(side, text=rotulo, style="Side.TButton",
                        command=cmd).pack(fill="x", padx=8, pady=1)
         ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
@@ -869,27 +871,77 @@ class App:
             self.mostrar_detalhe()
 
     def tocar_musica_selecionada(self, oferecer=True):
-        """Toca no player interno (segue com o jogo; externo em Externo…)."""
+        """Toca no player interno (segue com o jogo; externo em Externo…).
+
+        Decode+hash rodam em thread (a troca não congela a UI); token
+        descarta thread velha se trocar de novo antes de terminar.
+        """
         if self.mus_modo == "fila":
             messagebox.showinfo("Fila", "Aqui é a fila de downloads (Fase B).")
             return
         if self.mus_sel is None or self.mus_sel >= len(self.musicas):
             messagebox.showinfo("Músicas", "Selecione uma música na lista.")
             return
+        self._tocar_faixa_async(self.mus_sel, oferecer=oferecer)
+
+    def _tocar_faixa_async(self, idx: int, oferecer=True, avisar=True):
         faixas = [{"path": m.get("musica_path") or "",
                    "titulo": core.texto_musica(m)} for m in self.musicas]
-        self.player.carregar(faixas, inicio=self.mus_sel)
-        r = self.player.tocar()
+        if not (0 <= idx < len(faixas)) or not faixas[idx]["path"]:
+            messagebox.showinfo("Músicas", "Selecione uma música na lista.")
+            return
+        try:
+            self.player.parar()  # corte imediato (MCI stop é ms)
+        except Exception:
+            pass
+        self._mus_token += 1
+        meu = self._mus_token
+        rotulo = faixas[idx]["titulo"]
+        self._aviso_barra(f"Carregando: {rotulo}…")
+        self.mus_sel = idx
+        try:
+            self._mus_lista.selection_clear(0, "end")
+            self._mus_lista.selection_set(idx)
+            self._mus_lista.see(idx)
+        except (tk.TclError, AttributeError):
+            pass
+        self.mostrar_detalhe()
+        self._atualizar_transporte()
+
+        def trabalho():
+            self.player.carregar(faixas, inicio=idx)
+            try:
+                r = self.player.tocar()
+            except Exception as e:
+                r = {"ok": False, "erro": str(e)}
+            self._depois(lambda: self._pos_tocar(meu, r, oferecer, avisar))
+
+        threading.Thread(target=trabalho, daemon=True).start()
+
+    def _pos_tocar(self, meu: int, r: dict, oferecer: bool, avisar: bool):
+        if meu != self._mus_token:
+            try:
+                self.player.parar()  # thread velha não sequestra a nova
+            except Exception:
+                pass
+            return
         if r.get("ok"):
-            self._aviso_barra(f"Tocando: {core.texto_musica(self.musicas[self.mus_sel])}")
-            self._atualizar_transporte()
+            at = self.player.atual() or {}
+            self._aviso_barra(f"Tocando: {at.get('titulo') or ''}")
         elif oferecer and "ffmpeg" in (r.get("erro") or "") \
                 and not core.ffmpeg_pronto():
             self.instalar_deps_audio(
                 ("ffmpeg",),
-                ao_fim=lambda: self.tocar_musica_selecionada(oferecer=False))
+                ao_fim=lambda: self._tocar_faixa_async(self.mus_sel,
+                                                      oferecer=False))
+        elif avisar:
+            try:
+                messagebox.showwarning("Músicas", r.get("erro", "falha"))
+            except tk.TclError:
+                pass
         else:
-            messagebox.showwarning("Músicas", r.get("erro", "falha"))
+            self._aviso_barra(f"Falha: {r.get('erro', 'falha')}"[:120])
+        self._atualizar_transporte()
 
     def instalar_deps_audio(self, so_falta=("ffmpeg", "ytdlp"), ao_fim=None):
         """Baixa ffmpeg/yt-dlp oficiais em thread (molde ⬇ emuladores)."""
@@ -992,33 +1044,22 @@ class App:
         self._atualizar_transporte()
 
     def mus_proxima(self):
-        r = self.player.proxima()
-        if not r.get("ok"):
+        base = self.player.idx
+        if base is None or not (0 <= base < len(self.musicas)):
+            base = self.mus_sel if self.mus_sel is not None else -1
+        idx = base + 1
+        if idx >= len(self.musicas):
+            self.player.parar()
             self._atualizar_transporte()
             return
-        self.mus_sel = self.player.idx
-        try:
-            self._mus_lista.selection_clear(0, "end")
-            self._mus_lista.selection_set(self.mus_sel)
-            self._mus_lista.see(self.mus_sel)
-        except (tk.TclError, AttributeError):
-            pass
-        self.mostrar_detalhe()
-        self._atualizar_transporte()
+        self._tocar_faixa_async(idx, oferecer=False, avisar=False)
 
     def mus_anterior(self):
-        r = self.player.anterior()
-        if not r.get("ok"):
-            return
-        self.mus_sel = self.player.idx
-        try:
-            self._mus_lista.selection_clear(0, "end")
-            self._mus_lista.selection_set(self.mus_sel)
-            self._mus_lista.see(self.mus_sel)
-        except (tk.TclError, AttributeError):
-            pass
-        self.mostrar_detalhe()
-        self._atualizar_transporte()
+        base = self.player.idx
+        if base is None or not (0 <= base < len(self.musicas)):
+            base = (self.mus_sel or 0) + 1
+        self._tocar_faixa_async(max(0, base - 1), oferecer=False,
+                                avisar=False)
 
     def _atualizar_transporte(self):
         try:
@@ -1307,6 +1348,187 @@ class App:
             messagebox.showinfo("Importar baixadas", detalhe)
         except tk.TclError:
             pass
+
+    # -- catálogo SteamRip (buscar → hosts → Piratas/ → importar repack)
+    def dlg_steamrip(self):
+        win = tk.Toplevel(self.root)
+        _titulo_escuro(win)
+        win.title("Catálogo SteamRip")
+        win.transient(self.root)
+        win.minsize(560, 460)
+        fr = ttk.Frame(win, padding=12)
+        fr.pack(fill="both", expand=True)
+        topo = ttk.Frame(fr)
+        topo.pack(fill="x")
+        var_q = tk.StringVar()
+        ent = ttk.Entry(topo, textvariable=var_q, width=40)
+        ent.pack(side="left", fill="x", expand=True)
+        ent.bind("<Return>", lambda _e: buscar())
+        resultados: list[dict] = []
+        hosts: list[dict] = []
+        self._sr_ultimo = getattr(self, "_sr_ultimo", "")
+        lst_r = tk.Listbox(fr, selectmode="single", width=70, height=9,
+                           bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                           font=("Segoe UI", 11))
+        lst_r.pack(fill="both", expand=True, pady=(8, 0))
+        _com_rolagem(lst_r)
+        ttk.Label(fr, text="Hosts da página:", style="Mut.TLabel").pack(
+            anchor="w", pady=(8, 0))
+        lst_h = tk.Listbox(fr, selectmode="single", width=70, height=4,
+                           bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                           font=("Segoe UI", 10))
+        lst_h.pack(fill="x")
+        lbl = ttk.Label(fr, text="Busque um jogo.", style="Mut.TLabel")
+        lbl.pack(anchor="w", pady=(8, 0))
+        fr_btn = ttk.Frame(fr)
+        fr_btn.pack(fill="x", pady=(8, 0))
+        ttk.Button(fr_btn, text="Buscar", command=lambda: buscar()).pack(
+            side="left")
+        ttk.Button(fr_btn, text="⬇ Baixar p/ Piratas",
+                   command=lambda: baixar()).pack(side="left", padx=6)
+        ttk.Button(fr_btn, text="Abrir página",
+                   command=lambda: abrir()).pack(side="left")
+        ttk.Button(fr_btn, text="Importar último",
+                   command=lambda: importar_ultimo()).pack(side="left",
+                                                           padx=6)
+        ttk.Button(fr_btn, text="Fechar",
+                   command=win.destroy).pack(side="right")
+
+        def estado(txt):
+            self._depois(lambda: lbl.configure(text=txt))
+
+        def buscar(q=None):
+            termo = (q if q is not None else var_q.get()).strip()
+            if not termo:
+                return
+            estado(f"Buscando '{termo}'…")
+
+            def trabalho(termo_fx=termo):
+                try:
+                    res = core.buscar_steamrip(termo_fx)
+                except Exception as e:
+                    res = {"itens": [], "erros": [str(e)]}
+                self._depois(lambda: fim_busca(res, termo_fx))
+
+            threading.Thread(target=trabalho, daemon=True).start()
+
+        def fim_busca(res, termo):
+            resultados.clear()
+            resultados.extend(res.get("itens") or [])
+            hosts.clear()
+            lst_r.delete(0, "end")
+            lst_h.delete(0, "end")
+            for it in resultados:
+                lst_r.insert("end", it["titulo"])
+            if res.get("erros"):
+                estado(f"Falha: {res['erros'][0]}")
+            else:
+                estado(f"{len(resultados)} resultado(s) p/ '{termo}'.")
+
+        def pagina_sel():
+            sel = lst_r.curselection()
+            if not sel or sel[0] >= len(resultados):
+                return None
+            return resultados[sel[0]]
+
+        def ver_hosts(_e=None):
+            pg = pagina_sel()
+            hosts.clear()
+            lst_h.delete(0, "end")
+            if not pg:
+                return
+            try:
+                det = core.detalhes_steamrip(pg["url"])
+            except ValueError as e:
+                estado(f"Falha: {e}")
+                return
+            except Exception as e:
+                estado(f"Falha: {e}")
+                return
+            hosts.extend(det.get("hosts") or [])
+            for h in hosts:
+                lst_h.insert("end", f"{h['nome']} — {h['url'][:70]}")
+            estado(f"{pg['titulo']}: {len(hosts)} host(s).")
+
+        def host_sel():
+            sel = lst_h.curselection()
+            if sel and sel[0] < len(hosts):
+                return hosts[sel[0]]["nome"]
+            return ""
+
+        def baixar():
+            pg = pagina_sel()
+            if not pg:
+                messagebox.showinfo("SteamRip", "Escolha um resultado.")
+                return
+            estado(f"Baixando '{pg['titulo']}'…")
+
+            def trabalho(pg_fx=pg, host_fx=host_sel()):
+                try:
+                    res = core.baixar_steamrip(
+                        pg_fx["url"], host=host_fx,
+                        progresso=lambda f, t: estado(
+                            f"Baixando: {f/1048576:.0f}/"
+                            f"{t/1048576:.0f}MB" if t
+                            else f"Baixando: {f/1048576:.0f}MB"))
+                except Exception as e:
+                    res = {"ok": False, "erro": str(e)}
+                self._depois(lambda: fim_baixar(res))
+
+            threading.Thread(target=trabalho, daemon=True).start()
+
+        def fim_baixar(res):
+            if not res.get("ok"):
+                estado(f"Falha: {res.get('erro', 'falha')}")
+                messagebox.showwarning("SteamRip", res.get("erro", "falha"))
+                return
+            self._sr_ultimo = res["path"]
+            estado(f"Em Piratas/: {Path(res['path']).name}")
+            if messagebox.askyesno("SteamRip",
+                                   "Baixado. Importar para o Hub agora?"):
+                importar_ultimo()
+
+        def abrir():
+            pg = pagina_sel()
+            if not pg:
+                return
+            try:
+                import webbrowser
+                webbrowser.open(pg["url"])
+            except Exception as e:
+                messagebox.showwarning("SteamRip", f"falha: {e}")
+
+        def importar_ultimo():
+            arq = getattr(self, "_sr_ultimo", "")
+            if not arq or not Path(arq).is_file():
+                messagebox.showinfo("SteamRip", "Nada baixado ainda.")
+                return
+            estado("Importando…")
+
+            def trabalho(arq_fx=arq):
+                con = self._con()
+                try:
+                    res = core.importar_repack(con, arq_fx)
+                except Exception as e:
+                    res = {"ok": False, "erro": str(e)}
+                finally:
+                    con.close()
+                self._depois(lambda: fim_imp(res))
+
+            threading.Thread(target=trabalho, daemon=True).start()
+
+        def fim_imp(res):
+            if res.get("ok"):
+                self.recarregar()
+                estado("Importado ✓")
+                messagebox.showinfo("SteamRip", "Jogo importado ✓")
+            else:
+                estado(f"Falha: {res.get('erro', 'falha')}")
+                messagebox.showwarning("SteamRip", res.get("erro", "falha"))
+
+        lst_r.bind("<<ListboxSelect>>", ver_hosts)
+        lst_r.bind("<Double-Button-1>", lambda _e: baixar())
+        ent.focus_set()
 
     def limpar_fila(self):
         """Clear Done do Harmoni: apaga prontas/falhas (CSV recria)."""

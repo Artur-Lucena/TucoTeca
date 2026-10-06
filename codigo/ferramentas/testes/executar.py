@@ -145,7 +145,11 @@ def main():
             print(f"{'PASS' if r.returncode == 0 else 'FAIL'} {arq.stem}.{nome}")
             if r.returncode:
                 falhas += 1
-                print(r.stdout + r.stderr)
+                try:
+                    print(r.stdout + r.stderr)
+                except UnicodeEncodeError:
+                    sys.stdout.buffer.write(
+                        (r.stdout + r.stderr).encode("utf-8", "replace"))
     print(f"\n{total - falhas}/{total} testes aprovados (sandbox por teste).")
     return int(bool(falhas))
 
