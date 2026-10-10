@@ -59,7 +59,7 @@ ol{margin:8px 0}li{margin:4px 0}.nota{color:#666;font-size:.9em}
 </div>
 <div class="card" id="c-mac">
 <h2>🍎 Mac (experimental)<span class="badge" id="b-mac" hidden>este computador</span></h2>
-<ol><li>Abra a pasta <b>mac</b> (Python + 3 emuladores já dentro, offline)</li>
+<ol><li>Abra a pasta <b>mac</b> (pacote completo: Python + Azahar + DeSmuME)</li>
 <li>Duplo-clique em <b>Instalar-Mac.command</b> (1ª vez: clique direito > Abrir)</li></ol>
 <p class="nota">Ainda não testado num Mac real. Inclui Azahar (3DS) e DeSmuME (NDS).</p>
 </div>
@@ -87,7 +87,7 @@ COMO INSTALAR
 O QUE VAI EM CADA UM
 - Windows: Python embutido + Azahar + DeSmuME.
 - Linux: app + Azahar (AppImage). DeSmuME: pacote do sistema.
-- Mac (Fase 0): só o app; emuladores ficam p/ depois.
+- Mac: app e, no pacote completo, Python + Azahar + DeSmuME (experimental).
 """
 
 

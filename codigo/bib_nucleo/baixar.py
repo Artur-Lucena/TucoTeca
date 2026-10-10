@@ -15,6 +15,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from bib_nucleo.arquivos import gravar_atomico
+
 YTDLP_ENV = "BIBLIOTECA_YTDLP"
 FFMPEG_ENV = "BIBLIOTECA_FFMPEG"  # Fase C usa; nome centralizado aqui
 
@@ -90,16 +92,17 @@ def ler_csv_exportify(caminho: str | os.PathLike) -> dict:
 
 def localizar_ytdlp() -> str:
     """Binário yt-dlp: env → `Games/ferramentas` → PATH → `''`."""
-    env = (os.environ.get(YTDLP_ENV) or "").strip()
-    if env and Path(env).is_file():
-        return env
-    fer = dir_ferramentas()
-    if fer is not None:
-        cand = fer / "yt-dlp.exe"
-        if cand.is_file():
-            return str(cand)
-    achado = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
-    return achado or ""
+    from bib_nucleo.ferramentas import localizar_ferramenta
+    return localizar_ferramenta("ytdlp", legado=dir_ferramentas())
+
+
+def _args_js() -> list[str]:
+    from bib_nucleo.ferramentas import localizar_ferramenta
+    qjs = localizar_ferramenta("quickjs")
+    if qjs:
+        return ["--js-runtimes", "quickjs:" + qjs]
+    deno = localizar_ferramenta("deno")
+    return ["--js-runtimes", "deno:" + deno] if deno else []
 
 
 def erro_sem_ytdlp() -> str:
@@ -120,10 +123,11 @@ def casar_video(ytdlp: str, artista: str, titulo: str) -> dict:
     q = consulta_busca(artista, titulo)
     if not q:
         raise ValueError("faixa sem título")
+    from bib_nucleo.ferramentas import comando_externo
     try:
         r = subprocess.run(
-            [ytdlp, q, "--print", "%(id)s\t%(title)s", "--no-playlist",
-             "--quiet", "--socket-timeout", "20"],
+            [*comando_externo(ytdlp), q, "--print", "%(id)s\t%(title)s", "--no-playlist",
+             "--quiet", "--socket-timeout", "20", *_args_js()],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=120)
     except (OSError, subprocess.SubprocessError) as e:
@@ -174,10 +178,11 @@ def baixar_faixa(con, did: int, ytdlp: str = "", destino=None,
         B.marcar_download(con, did, "falha", video_id=casa["video_id"],
                           erro=f"staging: {e}")
         return {"ok": False, "erro": f"staging: {e}"}
-    cmd = [binario, f"https://www.youtube.com/watch?v={casa['video_id']}",
+    from bib_nucleo.ferramentas import comando_externo
+    cmd = [*comando_externo(binario), f"https://www.youtube.com/watch?v={casa['video_id']}",
            "-o", str(base / "%(id)s.%(ext)s"), "--no-playlist", "--quiet",
            "--progress", "--newline", "--socket-timeout", "20",
-           "-f", "bestaudio/best"]
+           "-f", "bestaudio/best", *_args_js()]
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True,
@@ -203,7 +208,10 @@ def baixar_faixa(con, did: int, ytdlp: str = "", destino=None,
         B.marcar_download(con, did, "falha", video_id=casa["video_id"],
                           erro=f"yt-dlp rc={rc}")
         return {"ok": False, "erro": f"yt-dlp rc={rc}"}
-    achados = sorted(base.glob(f"{casa['video_id']}.*"))
+    achados = sorted(p for p in base.glob(f"{casa['video_id']}.*")
+                     if p.is_file() and p.suffix.lower() in
+                     (".mp3", ".m4a", ".ogg", ".opus", ".flac", ".wav", ".webm", ".mp4")
+                     and p.stat().st_size > 0)
     if not achados:
         B.marcar_download(con, did, "falha", video_id=casa["video_id"],
                           erro="arquivo sumiu")
@@ -233,8 +241,12 @@ YTDLP_EXE_MIN = 10_000_000
 
 def dir_ferramentas():
     """`Games/ferramentas/` no Windows (casa do 7z); None fora dele."""
-    if os.name != "nt":
+    from bib_nucleo.base import eh_mac
+    if eh_mac() or os.name != "nt":
         return None
+    from bib_nucleo.ferramentas import pasta_ferramentas, runtime_portatil
+    if runtime_portatil():
+        return pasta_ferramentas()
     from bib_nucleo.base import WIN_ROOT
     return Path(f"{str(WIN_ROOT).rstrip(chr(92))}\\Games\\ferramentas")
 
@@ -243,7 +255,7 @@ def ffmpeg_pronto() -> str:
     """Caminho do ffmpeg válido ou `''` (molde `azahar_status`)."""
     cand = localizar_ffmpeg()
     try:
-        if cand and Path(cand).is_file() and Path(cand).stat().st_size > 1_000_000:
+        if _bin_pronto(cand):
             return cand
     except OSError:
         pass
@@ -253,11 +265,20 @@ def ffmpeg_pronto() -> str:
 def ytdlp_pronto() -> str:
     cand = localizar_ytdlp()
     try:
-        if cand and Path(cand).is_file() and Path(cand).stat().st_size > 1_000_000:
+        if _bin_pronto(cand):
             return cand
     except OSError:
         pass
     return ""
+
+
+def _bin_pronto(cand: str) -> bool:
+    from bib_nucleo.base import eh_mac
+    if not cand or not Path(cand).is_file():
+        return False
+    if eh_mac() or os.name != "nt":
+        return os.access(cand, os.X_OK)
+    return Path(cand).stat().st_size > 1_000_000
 
 
 def _baixar_bin(url: str, minimo: int, progresso=None,
@@ -285,6 +306,8 @@ def _baixar_bin(url: str, minimo: int, progresso=None,
                 except Exception:
                     pass
     raw = b"".join(blocos)
+    if total and feito != total:
+        raise ValueError(f"download incompleto ({feito}/{total} B)")
     if len(raw) < minimo:
         raise ValueError(f"download curto ({len(raw)} B, esperado >{minimo})")
     return raw
@@ -320,7 +343,7 @@ def instalar_ffmpeg(destino=None, progresso=None) -> dict:
     if exe[:2] != b"MZ":
         return {"ok": False, "erro": "ffmpeg.exe inválido (sem MZ)"}
     try:
-        (fer / "ffmpeg.exe").write_bytes(exe)
+        gravar_atomico(fer / "ffmpeg.exe", exe)
     except OSError as e:
         return {"ok": False, "erro": f"gravação: {e}"}
     return {"ok": True, "path": str(fer / "ffmpeg.exe"),
@@ -345,7 +368,7 @@ def instalar_ytdlp(destino=None, progresso=None) -> dict:
     if exe[:2] != b"MZ":
         return {"ok": False, "erro": "yt-dlp.exe inválido (sem MZ)"}
     try:
-        (fer / "yt-dlp.exe").write_bytes(exe)
+        gravar_atomico(fer / "yt-dlp.exe", exe)
     except OSError as e:
         return {"ok": False, "erro": f"gravação: {e}"}
     return {"ok": True, "path": str(fer / "yt-dlp.exe"), "bytes": len(exe)}
@@ -357,16 +380,8 @@ def instalar_ytdlp(destino=None, progresso=None) -> dict:
 
 def localizar_ffmpeg() -> str:
     """Binário ffmpeg: env → `Games/ferramentas` → PATH → `''`."""
-    env = (os.environ.get(FFMPEG_ENV) or "").strip()
-    if env and Path(env).is_file():
-        return env
-    fer = dir_ferramentas()
-    if fer is not None:
-        cand = fer / "ffmpeg.exe"
-        if cand.is_file():
-            return str(cand)
-    achado = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
-    return achado or ""
+    from bib_nucleo.ferramentas import localizar_ferramenta
+    return localizar_ferramenta("ffmpeg", legado=dir_ferramentas())
 
 
 def erro_sem_ffmpeg() -> str:
@@ -444,8 +459,7 @@ def converter_faixa(con, did: int, ffmpeg: str = "",
             return {"ok": False, "erro": msg}
         dest = _destino_musica(art, tit, src.suffix.lower())
         try:
-            import shutil as _sh
-            _sh.copy2(str(src), str(dest))
+            shutil.copy2(str(src), str(dest))
         except OSError as e:
             B.marcar_download(con, did, "falha", video_id=d.get("video_id") or "",
                               erro=f"cópia: {e}")

@@ -249,6 +249,32 @@ def teste_menu_interno_transporte():
     afirmar("Seguindo" in app.msg, app.msg)
 
 
+def teste_menu_fitgirl_cancela_e_abre():
+    import tempfile
+    from pathlib import Path
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
+    db = tmp / "m.db"
+    app = _tui_fake(db, [27])
+    app.menu_fitgirl()
+    afirmar(app.msg == "", app.msg)
+    import webbrowser
+    velho = webbrowser.open
+    webbrowser.open = lambda url: True
+    try:
+        app = _tui_fake(db, [ord("x")])
+        app.perguntar = lambda *a, **k: "x"
+        import bib_core as core
+        velho_buscar = core.buscar_fitgirl
+        core.buscar_fitgirl = lambda *a, **k: {"itens": [], "erros": []}
+        try:
+            app.menu_fitgirl()
+        finally:
+            core.buscar_fitgirl = velho_buscar
+        afirmar(app.msg == "Nada encontrado.", app.msg)
+    finally:
+        webbrowser.open = velho
+
+
 def teste_menu_steamrip_cancela():
     import tempfile
     from pathlib import Path
@@ -273,7 +299,7 @@ def teste_menu_principal_sair():
     from pathlib import Path
     tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
     db = tmp / "m.db"
-    teclas = [ord("j")] * 9 + [10]
+    teclas = [ord("j")] * 11 + [10]
     app = _tui_fake(db, teclas)
     afirmar(app.menu_principal() is True, "navegar até Sair + Enter deveria pedir saída")
 

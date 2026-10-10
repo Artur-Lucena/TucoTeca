@@ -166,8 +166,8 @@ def teste_remover_link_seguro():
 def _emu_fake(tmp):
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR") or str(Path(tmp) / "emu"))
     (emu / "user").mkdir(parents=True, exist_ok=True)
-    (emu / "azahar.exe").write_bytes(b"MZ" + b"0" * 64)
-    (emu / "azahar.AppImage").write_bytes(b"\x7fELF" + b"0" * 64)
+    from executar import azahar_fake
+    azahar_fake(emu)
     return emu
 
 
@@ -372,3 +372,41 @@ def teste_tui_menu_mods_sem_tid():
     app = _tui_fake(db, [])
     app.menu_mods(j)
     afirmar("title ID" in (app.msg or ""), app.msg)
+
+
+def teste_mod_cache_e_colisao_com_arquivo_local():
+    from unittest.mock import patch
+    from bib_nucleo import emuladores as EMU
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mods-"))
+    _emu_fake(tmp)
+    rom = _rom_fake(tmp)
+    src = _mod_dir(tmp, "Cache")
+    afirmar(EMU.importar_mod(str(src), TID, "Cache")["ok"])
+    jogo = {"origem": "rom-3ds", "launch_options": str(rom), "azahar_mods": ["Cache"]}
+    EMU.aplicar_mods(jogo)
+    with patch.object(EMU.shutil, "copy2", side_effect=AssertionError("recopiou cache")):
+        r = EMU.aplicar_mods(jogo)
+        afirmar(r["aplicados"] == ["Cache"] and not r["aviso"], r)
+    biblioteca = EMU.mods_lib_dir() / TID / "Cache"
+    (biblioteca / "code.ips").write_bytes(b"PATCH-NOVO")
+    EMU.aplicar_mods(jogo)
+    pasta = Path(EMU.azahar_mods_dir()) / TID
+    afirmar((pasta / "code.ips").read_bytes() == b"PATCH-NOVO", "ignorou alteração de fonte")
+    EMU.aplicar_mods({**jogo, "azahar_mods": []})
+    (pasta / "code.ips").write_bytes(b"PATCH-DO-USUARIO")
+    r = EMU.aplicar_mods(jogo)
+    afirmar(r["aviso"] and (pasta / "code.ips").read_bytes() == b"PATCH-DO-USUARIO", r)
+    EMU.aplicar_mods({**jogo, "azahar_mods": []})
+    afirmar((pasta / "code.ips").read_bytes() == b"PATCH-DO-USUARIO")
+
+
+def teste_mod_tid_invalido_nao_escreve():
+    from bib_nucleo import emuladores as EMU
+    for tid in ("..", "../../fora", "", "G" * 16):
+        afirmar(EMU.listar_mods(tid) == [])
+        afirmar(not EMU.remover_mod(tid, "x")["ok"])
+        try:
+            EMU.mods_titulo_dir(tid)
+            afirmar(False, "aceitou title ID inválido")
+        except ValueError:
+            pass

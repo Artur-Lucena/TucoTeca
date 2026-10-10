@@ -20,7 +20,10 @@ import signal as _signal
 import subprocess
 import sys
 import time
+import wave
 from pathlib import Path
+
+from bib_nucleo.arquivos import destino_temporario
 
 
 def _eh_nt() -> bool:
@@ -121,6 +124,16 @@ class MciBackend:
         return f"HUBMUS{MciBackend._seq}"
 
     def open(self, path: str) -> dict:
+        """Prepara e abre sincronicamente (TUI); a GUI separa as duas etapas."""
+        r = self.preparar(path)
+        if not r.get("ok"):
+            return r
+        return self.open_preparado(r["alvo"])
+
+    def preparar(self, path: str) -> dict:
+        """Hash/conversão em segundo plano, sem abrir ou controlar o MCI."""
+        if not _eh_nt():
+            return {"ok": False, "erro": "MCI é só Windows"}
         r = self._rotear(path)
         if not r.get("ok"):
             return r
@@ -129,13 +142,27 @@ class MciBackend:
             rc = self._decodificar(r["ffmpeg"], path, alvo)
             if not rc.get("ok"):
                 return rc
+        return {"ok": True, "alvo": alvo}
+
+    def open_preparado(self, alvo: str) -> dict:
+        """Abre WAV na thread que fará play/pause/status/close.
+
+        Aliases MCI pertencem à thread de abertura. Consultá-los em outra
+        thread dá erro 263 (nome de dispositivo inválido), não fim da faixa.
+        """
         if not _eh_nt():
             return {"ok": False, "erro": "MCI é só Windows"}
+        if not alvo or not Path(alvo).is_file():
+            return {"ok": False, "erro": "arquivo não encontrado."}
         self.close()
         self.alias = self._novo_alias()
         erro = self._cmd(f'open "{alvo}" type waveaudio alias {self.alias}')
         if erro:
             self.alias = ""
+            return {"ok": False, "erro": erro}
+        erro = self._cmd(f"set {self.alias} time format milliseconds")
+        if erro:
+            self.close()
             return {"ok": False, "erro": erro}
         self._aberto = alvo
         return {"ok": True}
@@ -167,25 +194,31 @@ class MciBackend:
 
     def _decodificar(self, ffmpeg: str, src: str, dest: str) -> dict:
         """mp3/m4a → wav (pula se o cache já existe)."""
-        if Path(dest).is_file():
+        if self._wav_valido(Path(dest)):
             return {"ok": True}
         try:
-            r = subprocess.run(
-                [ffmpeg, "-y", "-v", "error", "-i", str(src),
-                 "-ac", "2", "-ar", "44100", "-f", "wav", str(dest)],
-                capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=600)
-        except (OSError, subprocess.SubprocessError) as e:
+            with destino_temporario(dest) as tmp:
+                r = subprocess.run(
+                    [ffmpeg, "-y", "-v", "error", "-i", str(src),
+                     "-ac", "2", "-ar", "44100", "-f", "wav", str(tmp)],
+                    capture_output=True, text=True, encoding="utf-8",
+                    errors="replace", timeout=600)
+                if r.returncode != 0 or not self._wav_valido(tmp):
+                    detalhe = (r.stderr or "").strip().splitlines()
+                    raise ValueError(detalhe[-1][:200] if detalhe else
+                                     f"ffmpeg rc={r.returncode} ou WAV incompleto")
+        except (OSError, ValueError, subprocess.SubprocessError) as e:
             return {"ok": False, "erro": f"ffmpeg: {e}"}
-        if r.returncode != 0 or not Path(dest).is_file():
-            detalhe = (r.stderr or "").strip().splitlines()
-            msg = detalhe[-1][:200] if detalhe else f"ffmpeg rc={r.returncode}"
-            try:
-                Path(dest).unlink()
-            except OSError:
-                pass
-            return {"ok": False, "erro": msg}
         return {"ok": True}
+
+    @staticmethod
+    def _wav_valido(path: Path) -> bool:
+        try:
+            with wave.open(str(path), "rb") as wav:
+                tamanho = wav.getnframes() * wav.getsampwidth() * wav.getnchannels()
+                return tamanho > 0 and path.stat().st_size >= tamanho + 44
+        except (OSError, EOFError, wave.Error):
+            return False
 
     def _podar_cache(self) -> None:
         """LRU: apaga wavs antigos até caber no teto (nunca levanta)."""
@@ -246,8 +279,17 @@ class MciBackend:
             except Exception:
                 pass
 
-    def vivo(self) -> bool:
-        return self._modo() in ("playing", "paused")
+    def vivo(self) -> bool | None:
+        modo = self._modo()
+        return modo in ("playing", "paused") if modo else None
+
+    def terminou(self) -> bool:
+        """Fim natural confirmado: stopped e posição no final do áudio."""
+        if self._modo() != "stopped":
+            return False
+        pos, dur = self.pos_ms(), self.dur_ms()
+        return (pos is not None and dur is not None and dur > 0
+                and pos >= dur - 50)
 
     def _posicao(self, o_que: str):
         if not self.alias:
@@ -367,6 +409,9 @@ class _ProcessoBackend:
     def vivo(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
 
+    def terminou(self) -> bool:
+        return self.proc is not None and self.proc.poll() == 0
+
     def pos_ms(self):
         if not self._aberto:
             return None
@@ -453,7 +498,7 @@ class Player:
 
     def carregar(self, faixas: list[dict], inicio: int = 0) -> None:
         self.parar()
-        self.fila = [f for f in (faixas or []) if f.get("path")]
+        self.fila = [dict(f, path=f.get("path") or "") for f in (faixas or [])]
         self.idx = inicio if 0 <= inicio < len(self.fila) else (
             0 if self.fila else None)
 
@@ -469,15 +514,34 @@ class Player:
             d["pos_ms"] = d["dur_ms"] = None
         return d
 
-    def _tocar_idx(self, i: int) -> dict:
+    def preparar(self, path: str) -> dict:
+        """Prepara arquivo sem alterar fila/estado ou abrir dispositivo de áudio."""
+        from bib_nucleo.musicas import resolver_musica
+        path = resolver_musica(path) or path
+        preparar = getattr(self.backend, "preparar", None)
+        if preparar is not None:
+            return preparar(path)
+        return {"ok": True, "alvo": path}
+
+    def tocar_preparado(self, i: int, preparado: dict) -> dict:
+        if not preparado.get("ok"):
+            return preparado
+        return self._tocar_idx(i, preparado=preparado)
+
+    def _tocar_idx(self, i: int, preparado: dict | None = None) -> dict:
         if not (0 <= i < len(self.fila)):
             return {"ok": False, "erro": "fora da fila"}
+        self.estado = "parado"
         self.backend.stop()
         try:
             self.backend.close()
         except Exception:
             pass
-        r = self.backend.open(self.fila[i]["path"])
+        if preparado is None:
+            r = self.backend.open(self.fila[i]["path"])
+        else:
+            abrir = getattr(self.backend, "open_preparado", self.backend.open)
+            r = abrir(preparado["alvo"])
         if not r.get("ok"):
             self.estado = "parado"
             return r
@@ -543,7 +607,10 @@ class Player:
         if self.estado != "tocando":
             return False
         try:
-            return not self.backend.vivo()
+            terminou = getattr(self.backend, "terminou", None)
+            if terminou is not None:
+                return terminou() is True
+            return self.backend.vivo() is False
         except Exception:
             return False
 

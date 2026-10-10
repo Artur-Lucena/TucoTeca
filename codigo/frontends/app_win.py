@@ -14,44 +14,43 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 import threading
 import tkinter as tk
+import traceback
 from pathlib import Path
+from queue import Empty, SimpleQueue
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import bib_core as core
+from aparencia import ACC, BG, CARD, HOVER as CARD_HOVER, LINE, MUT, PANEL, TXT
+from aparencia import BarraAcoes, PainelRolavel, aplicar_tema
+from despacho import DespachanteUi
 
-BG = "#0f1116"
-PANEL = "#16181f"
-CARD = "#1c1f27"
-CARD_HOVER = "#242834"
-LINE = "#2a2e39"
-TXT = "#e8eaf0"
-MUT = "#9aa0b2"
-ACC = "#7c5cff"
 OK_C = "#2ecc71"
 WARN_C = "#f39c12"
 BAD_C = "#e74c3c"
 
-CARD_W, CARD_H = 140, 196
+CARD_W, CARD_H = 156, 216
 STATUS_CORES = {"backlog": MUT, "jogando": "#7aa2ff", "zerado": OK_C,
                 "pausado": WARN_C, "abandonado": BAD_C}
 
-# (rótulo, filtro_status, só_favoritos)
+# (rótulo, reservado, reservado) — status/favorito filtram na barra única
 NAV = [("📚 Biblioteca", "", False),
-       ("▶ Jogando", "jogando", False),
-       ("✓ Zerados", "zerado", False),
-       ("★ Favoritos", "", True),
-       ("🎵 Músicas", "", False)]
+       ("🎵 Músicas", "", False),
+       ("☆ Desejos", "", False),
+       ("⬇ Downloads", "", False)]
+STATUS_FILTROS = ("Todos", "backlog", "jogando", "zerado", "pausado",
+                  "abandonado")
 
 _MINI_CACHE: dict = {}
 
 
 def carregar_miniatura(caminho: Path, largura: int = CARD_W,
-                       altura: int = CARD_H) -> tk.PhotoImage | None:
+                       altura: int = CARD_H, master=None) -> tk.PhotoImage | None:
     """PhotoImage reduzido da capa, ou None (vira tile).
 
     Tenta Pillow (jpg/webp/png/gif) quando instalado; senão, PhotoImage
@@ -60,7 +59,9 @@ def carregar_miniatura(caminho: Path, largura: int = CARD_W,
     """
     try:
         st = Path(caminho).stat()
-        chave = (str(caminho), st.st_mtime_ns, st.st_size, largura, altura)
+        root = master or tk._default_root
+        chave = (id(root.tk) if root is not None else None,
+                 str(caminho), st.st_mtime_ns, st.st_size, largura, altura)
     except OSError:
         return None
     if chave in _MINI_CACHE:
@@ -72,7 +73,7 @@ def carregar_miniatura(caminho: Path, largura: int = CARD_W,
         pil = Image.open(caminho)
         pil.load()
         pil.thumbnail((largura, altura), Image.LANCZOS)
-        img = ImageTk.PhotoImage(pil)
+        img = ImageTk.PhotoImage(pil, master=root)
         _MINI_CACHE[chave] = img
         if len(_MINI_CACHE) > 300:
             _MINI_CACHE.pop(next(iter(_MINI_CACHE)))
@@ -85,7 +86,7 @@ def carregar_miniatura(caminho: Path, largura: int = CARD_W,
     if Path(caminho).suffix.lower() not in (".png", ".gif"):
         return None
     try:
-        base = tk.PhotoImage(file=str(caminho))
+        base = tk.PhotoImage(master=root, file=str(caminho))
     except tk.TclError:
         return None
     try:
@@ -109,7 +110,11 @@ def _titulo_escuro(janela) -> None:
             return
         import ctypes
         valor = ctypes.c_int(1)
-        hwnd = ctypes.c_void_p(janela.winfo_id())
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.GetParent.argtypes = [ctypes.c_void_p]
+        user32.GetParent.restype = ctypes.c_void_p
+        interno = janela.winfo_id()
+        hwnd = ctypes.c_void_p(user32.GetParent(interno) or interno)
         for attr in (20, 19):  # 20 = Win11/20H1+; 19 = builds antigas
             try:
                 if ctypes.windll.dwmapi.DwmSetWindowAttribute(
@@ -122,35 +127,116 @@ def _titulo_escuro(janela) -> None:
         pass
 
 
-def _com_rolagem(lst: tk.Listbox) -> tk.Listbox:
-    """Acopla Scrollbar vertical num Listbox já empacotado. Nunca levanta."""
+def _com_rolagem(lst):
+    """Acopla Scrollbar vertical num Listbox/Treeview já empacotado."""
     try:
-        bar = ttk.Scrollbar(lst.master, orient="vertical", command=lst.yview)
-        bar.pack(side="right", fill="y")
+        bar = ttk.Scrollbar(lst.master, orient="vertical", command=lst.yview,
+                            style="Lista.Vertical.TScrollbar")
+        bar.pack(side="right", fill="y", before=lst)
+        lst.pack_configure(side="left")
         lst.configure(yscrollcommand=bar.set)
     except (tk.TclError, AttributeError):
         pass
     return lst
 
 
+def _nova_grade_tv(mae, colunas=("Item", "Detalhe")) -> ttk.Treeview:
+    """Lista moderna das abas (Treeview zebrada, 2 colunas)."""
+    area = ttk.Frame(mae)
+    area.pack(fill="both", expand=True)
+    tv = ttk.Treeview(area, columns=list(colunas), show="headings",
+                      height=14, selectmode="browse", style="Lista.Treeview")
+    for j, col in enumerate(colunas):
+        tv.heading(col, text=col)
+        tv.column(col, width=(300 if j == 0 else 160), minwidth=40,
+                  stretch=True, anchor="w")
+    tv.tag_configure("par", background=BG)
+    tv.tag_configure("impar", background=PANEL)
+
+    def dimensionar(e):
+        largura = max(80, e.width - 4)
+        for j, col in enumerate(colunas):
+            tv.column(col, width=int(largura * (0.62 if j == 0 else 0.38)))
+
+    tv.bind("<Configure>", dimensionar)
+    return tv
+
+
+def _tv_por(tv: ttk.Treeview, linhas) -> None:
+    """Preenche [(col0, col1)] com zebra. Linha ruim é pulada."""
+    for i, par in enumerate(linhas):
+        try:
+            a, b = par
+            tv.insert("", "end", iid=str(i), values=(str(a), str(b)),
+                      tags=("par" if i % 2 else "impar",))
+        except Exception:
+            continue
+
+
+def _tv_sel(tv) -> int | None:
+    """Índice selecionado ou None. Nunca levanta."""
+    try:
+        sel = tv.selection()
+    except (tk.TclError, AttributeError):
+        return None
+    if not sel:
+        return None
+    try:
+        return int(sel[0])
+    except (TypeError, ValueError):
+        return None
+
+
+def _tv_marcar(tv, idx) -> None:
+    """Seleciona e mostra a linha. Nunca levanta."""
+    if idx is None:
+        return
+    try:
+        tv.selection_set(str(idx))
+        tv.see(str(idx))
+    except tk.TclError:
+        pass
+
+
 def desenhar_tile(cv: tk.Canvas, titulo: str, w: int, h: int,
                    selecionado: bool = False, grande: bool = False,
                    subtitulo: str = ""):
-    """Tile estilo Hydra quando não há capa: inicial do título em destaque."""
+    """Capa local de reserva, com monograma e gradiente discreto."""
     cv.delete("all")
     borda = ACC if selecionado else LINE
-    cv.create_rectangle(2, 2, w - 2, h - 2, fill=CARD,
-                        outline=borda, width=3 if selecionado else 1)
-    cv.create_rectangle(2, 2, w - 2, 7, fill=borda, outline="")
+    for y in range(0, h, 4):
+        t = y / max(1, h)
+        cor = "#%02x%02x%02x" % (int(40 - 12 * t), int(47 - 13 * t), int(73 - 30 * t))
+        cv.create_rectangle(0, y, w, y + 4, fill=cor, outline="")
+    cv.create_oval(w * 0.12, h * 0.16, w * 0.88, h * 0.73, outline="#45405e", width=1)
+    cv.create_rectangle(1, 1, w - 1, h - 1, outline=borda, width=2)
     inicial = (titulo.strip()[:1] or "?").upper()
-    cv.create_text(w // 2, h // 2 - (16 if grande else 10), text=inicial,
-                   fill=ACC if selecionado else TXT,
-                   font=("Segoe UI", 68 if grande else 48, "bold"))
+    cor = ACC if selecionado else "#c6baff"
+    cx, cy = w / 2, h * 0.44
+    if titulo == "⬇":
+        cv.create_line(cx, cy - 30, cx, cy + 20, fill=cor, width=5)
+        cv.create_line(cx - 17, cy + 5, cx, cy + 22, cx + 17, cy + 5, fill=cor, width=5)
+        cv.create_line(cx - 24, cy + 34, cx + 24, cy + 34, fill=cor, width=4)
+    elif titulo == "☆":
+        pontos = []
+        for i in range(10):
+            raio = 34 if i % 2 == 0 else 15
+            angulo = math.pi * i / 5 - math.pi / 2
+            pontos.extend((cx + raio * math.cos(angulo), cy + raio * math.sin(angulo)))
+        cv.create_polygon(*pontos, fill="", outline=cor, width=3)
+    elif titulo == "♪":
+        cv.create_line(cx + 8, cy - 28, cx + 8, cy + 18, fill=cor, width=4)
+        cv.create_line(cx + 8, cy - 28, cx + 27, cy - 20, fill=cor, width=5)
+        cv.create_oval(cx - 12, cy + 10, cx + 9, cy + 25, fill=cor, outline="")
+    else:
+        cv.create_text(cx, cy, text=inicial, fill=cor,
+                       font=("Segoe UI", 56 if grande else 42, "bold"))
     base_y = h - (30 if grande else 22)
     if subtitulo:
         cv.create_text(w // 2, base_y - (16 if grande else 13), text=subtitulo,
                        fill=ACC, font=("Segoe UI", 10 if grande else 9, "bold"))
-    cv.create_text(w // 2, base_y, text="sem capa",
+    caption = {"⬇": "Download", "♪": "Música local", "☆": "Lista de desejos"}.get(titulo, "sem capa")
+    cv.create_text(w // 2, base_y, text=caption,
                    fill=MUT, font=("Segoe UI", 9 if grande else 8))
 
 
@@ -165,10 +251,18 @@ class App:
         self.prov_btns: dict[str, ttk.Button] = {}
         self.filtro_plat: str | None = None  # PC/3DS/NDS (derivado da origem)
         self.plat_btns: dict[str, ttk.Button] = {}
+        self.filtro_status: str = ""  # "" = todos; senão um de STATUS_VALIDOS
+        self.so_fav: bool = False
         self._deb = None
         self.cards: list[dict] = []  # {frame, jogo}
         self._imgs_cards: list = []  # retém miniaturas da grade
         self._img_det = None  # retém a capa do painel de detalhes
+        self.desejos: list[dict] = []
+        self.des_sel: int | None = None
+        self._des_lista = None  # Listbox da aba Desejos (recriado a cada recarga)
+        self.dls: list[dict] = []
+        self.dl_sel: int | None = None
+        self._dl_lista = None  # Listbox da aba Downloads (recriado a cada recarga)
         self.musicas: list[dict] = []
         self.mus_sel: int | None = None
         self.mus_ids: list[int] = []
@@ -178,16 +272,29 @@ class App:
         self.fila_sel: int | None = None
         self.player = core.Player()  # interno (MCI no Win); externo é fallback
         self._btn_play = None  # ▶/⏸ da aba (texto acompanha o estado)
-        self._mus_token = 0  # troca de faixa: thread velha perde (sem freeze)
-        root.title("🎮 TucoTeca")
-        root.geometry("1200x720")
-        root.minsize(960, 600)
+        self._mus_token = 0  # resultados antigos nunca alteram o player atual
+        self._mus_resultados = SimpleQueue()
+        self._mus_preparo_lock = threading.Lock()
+        self._mus_carregando = ""
+        self._mus_fechado = False
+        self._dl_ocupado = False
+        self._dl_timer = None
+        self._dl_snapshot = {"torrents": [], "erros": []}
+        self._despacho = DespachanteUi(root, ao_erro=self._erro_callback)
+        root.title("TucoTeca")
+        root.geometry(f"{min(1280, root.winfo_screenwidth() - 80)}x"
+                      f"{min(800, root.winfo_screenheight() - 100)}")
+        root.minsize(860, 560)
         root.configure(bg=BG)
         self._estilo()
         self._montar()
         self.recarregar()
+        self.root.after_idle(lambda: _titulo_escuro(self.root))
+        self.root.bind("<Destroy>", self._fechar_player, add="+")
         try:
-            self.root.after(1000, self._vigiar_musica)
+            self._mus_poll = self.root.after(50, self._processar_mus_resultados)
+            self._mus_vigia = self.root.after(1000, self._vigiar_musica)
+            self._dl_timer = self.root.after(3000, self._vigiar_downloads)
         except tk.TclError:
             pass
 
@@ -217,12 +324,46 @@ class App:
                      borderwidth=0, padding=8, anchor="w",
                      font=("Segoe UI", 11, "bold"))
         st.configure("TButton", background=CARD, foreground=TXT,
-                      borderwidth=1, padding=10, font=("Segoe UI", 11))
-        st.map("TButton", background=[("active", ACC)])
+                       borderwidth=1, padding=10, font=("Segoe UI", 11),
+                       relief="flat", focuscolor="")
+        st.map("TButton", background=[("active", ACC), ("pressed", "#5a3fd4")],
+               relief=[("pressed", "flat")])
         st.configure("Accent.TButton", background=ACC, foreground="white",
-                      borderwidth=0, padding=10, font=("Segoe UI", 13, "bold"))
+                       borderwidth=0, padding=10, font=("Segoe UI", 13, "bold"),
+                       relief="flat", focuscolor="")
+        st.map("Accent.TButton", background=[("active", "#8f6fff"),
+                                             ("pressed", "#5a3fd4")])
         st.configure("TEntry", fieldbackground="#0b0d12", foreground=TXT,
-                      borderwidth=1)
+                       borderwidth=1, relief="flat", insertcolor=ACC,
+                       padding=6)
+        st.map("TEntry", bordercolor=[("focus", ACC)],
+               fieldbackground=[("disabled", CARD)])
+        st.configure("TCombobox", fieldbackground="#0b0d12",
+                       background=CARD, foreground=TXT, arrowcolor=ACC,
+                       borderwidth=0, padding=6)
+        st.map("TCombobox", fieldbackground=[("readonly", "#0b0d12")],
+               foreground=[("readonly", TXT)])
+        st.configure("TSeparator", background=LINE)
+        st.configure("Lista.Treeview", background="#101218",
+                       fieldbackground="#101218", foreground=TXT,
+                       borderwidth=0, relief="flat", rowheight=28,
+                       font=("Segoe UI", 11), focuscolor="")
+        st.map("Lista.Treeview", background=[("selected", ACC)],
+               foreground=[("selected", "white")])
+        st.configure("Lista.Treeview.Heading", background=CARD,
+                       foreground=MUT, font=("Segoe UI", 10, "bold"),
+                       relief="flat", padding=6)
+        st.map("Lista.Treeview.Heading", background=[("active", CARD_HOVER)],
+               foreground=[("active", TXT)])
+        st.configure("Lista.Vertical.TScrollbar", background=CARD,
+                       troughcolor=BG, borderwidth=0, arrowsize=0)
+        st.map("Lista.Vertical.TScrollbar", background=[("active", ACC)])
+        st.configure("Down.Horizontal.TProgressbar", background=ACC,
+                       troughcolor=CARD, borderwidth=0, thickness=10)
+        st.configure("Star.TCheckbutton", background=BG, foreground=MUT,
+                       font=("Segoe UI", 13, "bold"), focuscolor="")
+        st.map("Star.TCheckbutton", foreground=[("active", TXT),
+                                                ("selected", "#ffd75e")])
         st.configure("Sec.TLabelframe", background=CARD, borderwidth=0, padding=12)
         st.configure("Sec.TLabelframe.Label", background=CARD, foreground=ACC,
                       font=("Segoe UI", 13, "bold"))
@@ -238,100 +379,178 @@ class App:
         st.map("Chip.TButton", background=[("active", CARD_HOVER)],
                foreground=[("active", TXT)])
         st.configure("ChipAct.TButton", background=ACC, foreground="white",
-                      borderwidth=0, padding=6, font=("Segoe UI", 10, "bold"))
+                       borderwidth=0, padding=6, font=("Segoe UI", 10, "bold"))
+        st.configure("Volume.Horizontal.TScale", background=PANEL,
+                      troughcolor=CARD)
+        st.configure("Volume.TButton", background=CARD, foreground=TXT,
+                       borderwidth=0, padding=(4, 5), font=("Segoe UI", 9))
+        aplicar_tema(self.root)
 
     def _montar(self):
+        self.root.columnconfigure(1, weight=1)
+        self.root.rowconfigure(0, weight=1)
         # sidebar
-        side = ttk.Frame(self.root, style="Panel.TFrame", width=200)
-        side.pack(side="left", fill="y")
+        side = ttk.Frame(self.root, style="Panel.TFrame", width=212)
+        side.grid(row=0, column=0, sticky="nsew")
         side.pack_propagate(False)
-        ttk.Label(side, text="🎮 TUCOTECA", style="Panel.TLabel",
-                  font=("Segoe UI", 13, "bold")).pack(anchor="w", padx=12, pady=(14, 8))
+        self.sidebar = side
+        self._montar_volume_pc(side)
+        ttk.Label(side, text="TUCOTECA", image=self.root._tuco_icone, compound="left",
+                  style="Panel.TLabel", font=("Segoe UI", 12, "bold")).pack(
+                      anchor="w", padx=10, pady=(10, 4))
+        nav_area = PainelRolavel(side)
+        nav_area.pack(fill="both", expand=True, pady=(6, 0))
+        self.nav_area = nav_area
+        nav = nav_area.corpo
         self.nav_btns: list[ttk.Button] = []
-        for i, (rotulo, _st, _fv) in enumerate(NAV):
-            b = ttk.Button(side, text=rotulo, style="Side.TButton",
+        self._maes: dict[str, dict] = {}
+        idx_mus = next(i for i, (rot, _s, _f) in enumerate(NAV)
+                       if rot.startswith("🎵"))
+        idx_des = next(i for i, (rot, _s, _f) in enumerate(NAV)
+                       if rot.startswith("☆"))
+        idx_dl = next(i for i, (rot, _s, _f) in enumerate(NAV)
+                      if rot.startswith("⬇ D"))
+        por_nav: dict[int, ttk.Button] = {}
+
+        def filha(mae, i, texto=None):
+            b = ttk.Button(mae["corpo"], text=texto or NAV[i][0],
+                           style="Side.TButton",
                            command=lambda i=i: self._ir_nav(i))
             b.pack(fill="x", padx=8, pady=1)
-            self.nav_btns.append(b)
-        ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
-        ttk.Label(side, text="PROVEDORES", style="Panel.TLabel",
-                  font=("Segoe UI", 10, "bold"), foreground=MUT).pack(anchor="w", padx=12)
+            por_nav[i] = b
+            return b
+
+        def item(texto, cmd):
+            """Filha direta da sidebar (mãe só se tem 2+ filhas)."""
+            b = ttk.Button(nav, text=texto, style="Side.TButton",
+                           command=cmd)
+            b.pack(fill="x", padx=8, pady=1)
+            return b
+
+        mae_bib = self._mae(nav, "📚 BIBLIOTECA")
+        filha(mae_bib, 0, "Todos os jogos")
         for chave in core.provedores():
-            b = ttk.Button(side, text=chave, style="Side.TButton",
+            b = ttk.Button(mae_bib["corpo"], text=chave, style="Side.TButton",
                            command=lambda c=chave: self._ir_prov(c))
             b.pack(fill="x", padx=8, pady=1)
             self.prov_btns[chave] = b
-        ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
-        ttk.Label(side, text="IMPORTAR", style="Panel.TLabel",
-                  font=("Segoe UI", 10, "bold"), foreground=MUT).pack(anchor="w", padx=12)
+        mae_mus = self._mae(nav, "🎵 MÚSICAS")
+        filha(mae_mus, idx_mus, "Minhas faixas")
+        self._btn_fila = ttk.Button(mae_mus["corpo"], text="⬇ Fila",
+                                    style="Side.TButton",
+                                    command=self._ir_fila_arvore)
+        self._btn_fila.pack(fill="x", padx=8, pady=1)
+        por_nav[idx_des] = item(NAV[idx_des][0],
+                                lambda i=idx_des: self._ir_nav(i))
+        por_nav[idx_dl] = item(NAV[idx_dl][0],
+                               lambda i=idx_dl: self._ir_nav(i))
+        mae_arq = self._mae(nav, "⬇ ARQUIVO")
         for rotulo, cmd in (("📥 Importar…", self.importar_unificado),
-                            ("⬇ SteamRip…", self.dlg_steamrip)):
-            ttk.Button(side, text=rotulo, style="Side.TButton",
+                            ("🧹 Sanear pasta…", self.sanear_pasta_ui),
+                            ("⬇ SteamRip…",
+                             lambda: self.dlg_catalogo("steamrip")),
+                            ("⬇ FitGirl…",
+                             lambda: self.dlg_catalogo("fitgirl"))):
+            ttk.Button(mae_arq["corpo"], text=rotulo, style="Side.TButton",
                        command=cmd).pack(fill="x", padx=8, pady=1)
-        ttk.Label(side, text="", style="Panel.TLabel").pack(pady=4)
-        ttk.Button(side, text="⚙ Configurações", style="Side.TButton",
-                   command=self.abrir_configuracoes).pack(fill="x", padx=8, pady=1)
+        item("⚙ Configurações", self.abrir_configuracoes)
+        self.nav_btns = [por_nav[i] for i in range(len(NAV))]
         self._pintar_nav()
 
         # coluna central
         centro = ttk.Frame(self.root)
-        centro.pack(side="left", fill="both", expand=True)
-        topo = ttk.Frame(centro)
-        topo.pack(fill="x", padx=12, pady=(12, 4))
-        self.var_q = tk.StringVar()
-        self.ent_busca = ttk.Entry(topo, textvariable=self.var_q, width=36)
-        self.ent_busca.pack(side="left")
-        self.ent_busca.bind("<KeyRelease>", self._ao_digitar)
-        ttk.Label(topo, text="  🔎 buscar", style="Mut.TLabel").pack(side="left")
-        self.btn_usuario = ttk.Button(topo, text="👤 —", style="Chip.TButton",
+        centro.grid(row=0, column=1, sticky="nsew")
+        self.centro = centro
+        cabecalho = ttk.Frame(centro)
+        cabecalho.pack(fill="x", padx=20, pady=(18, 10))
+        cabecalho.columnconfigure(0, weight=1)
+        self.btn_detalhes = ttk.Button(cabecalho, text="Detalhes", command=self._abrir_detalhe)
+        self.btn_detalhes.grid(row=0, column=2, padx=(6, 0))
+        self.btn_usuario = ttk.Button(cabecalho, text="👤 —", style="Chip.TButton",
                                       command=self.dlg_usuario)
-        self.btn_usuario.pack(side="right")
-        # linha de filtros: plataforma (PC/3DS/NDS) + etiqueta livre
-        ffilt = ttk.Frame(centro)
-        ffilt.pack(fill="x", padx=12, pady=(0, 2))
-        for plat in ("PC", "3DS", "NDS"):
-            b = ttk.Button(ffilt, text=plat, width=5, style="Chip.TButton",
+        self.btn_usuario.grid(row=0, column=1, padx=6)
+        self.lbl_secao = ttk.Label(cabecalho, text="Biblioteca", style="Title.TLabel")
+        self.lbl_secao.grid(row=0, column=0, sticky="w")
+        self.lbl_subtitulo = ttk.Label(cabecalho, style="Subtitle.TLabel")
+        self.lbl_subtitulo.grid(row=1, column=0, columnspan=3, sticky="w", pady=(2, 0))
+        # Busca expansível; filtros da biblioteca em uma área adaptável.
+        barra = ttk.Frame(centro)
+        barra.pack(fill="x", padx=20, pady=(0, 10))
+        lin1 = ttk.Frame(barra)
+        lin1.pack(fill="x")
+        self.btn_limpar = ttk.Button(lin1, text="Limpar", command=self._limpar_filtros)
+        self.btn_limpar.pack(side="right", padx=(6, 0))
+        ttk.Button(lin1, text="Buscar", command=self.recarregar).pack(side="right", padx=(6, 0))
+        self.var_q = tk.StringVar()
+        self.ent_busca = ttk.Entry(lin1, textvariable=self.var_q, width=20)
+        self.ent_busca.pack(side="left", fill="x", expand=True)
+        self.ent_busca.bind("<KeyRelease>", self._ao_digitar)
+        self.ent_busca.bind("<Return>", lambda _e: self.recarregar())
+        lin2 = ttk.Frame(barra)
+        lin2.pack(fill="x", pady=(8, 0))
+        self.filtros_area = lin2
+        self.var_statusfiltro = tk.StringVar(value="Todos")
+        self.cmb_statusfiltro = ttk.Combobox(
+            lin2, textvariable=self.var_statusfiltro, values=list(STATUS_FILTROS),
+            width=10, state="readonly", font=("Segoe UI", 10))
+        self.cmb_statusfiltro.grid(row=0, column=0, sticky="w", padx=(0, 6))
+        self.cmb_statusfiltro.bind("<<ComboboxSelected>>", self._ao_trocar_status)
+        self.var_sofav = tk.BooleanVar(value=False)
+        self.chk_sofav = ttk.Checkbutton(lin2, text="★", variable=self.var_sofav,
+                                        command=self._ao_trocar_fav,
+                                        style="Star.TCheckbutton")
+        self.chk_sofav.grid(row=0, column=1, padx=(0, 6))
+        for i, plat in enumerate(("PC", "3DS", "NDS")):
+            b = ttk.Button(lin2, text=plat, width=5, style="Chip.TButton",
                            command=lambda p=plat: self._ir_plat(p))
-            b.pack(side="left", padx=(0, 4))
+            b.grid(row=0, column=i + 2, sticky="w", padx=(0, 4))
             self.plat_btns[plat] = b
-        ttk.Label(ffilt, text="🏷", style="Mut.TLabel").pack(side="left", padx=(8, 2))
         self.var_tagfiltro = tk.StringVar(value="")
-        self.cmb_tagfiltro = ttk.Combobox(ffilt, textvariable=self.var_tagfiltro,
-                                          values=[], width=22, font=("Segoe UI", 10))
-        self.cmb_tagfiltro.pack(side="left")
+        ttk.Label(lin2, text="Etiquetas", style="Mut.TLabel").grid(
+            row=1, column=0, sticky="w", pady=(6, 0))
+        self.cmb_tagfiltro = ttk.Combobox(lin2, textvariable=self.var_tagfiltro,
+                                          values=[], width=14, font=("Segoe UI", 10))
+        self.cmb_tagfiltro.grid(row=1, column=1, columnspan=4, sticky="ew", pady=(6, 0))
+        lin2.columnconfigure(4, weight=1)
         self.cmb_tagfiltro.bind("<<ComboboxSelected>>", lambda _e: self.recarregar())
         self.cmb_tagfiltro.bind("<Return>", lambda _e: self.recarregar())
-        ttk.Button(ffilt, text="✕", width=3,
-                   command=self._limpar_filtros).pack(side="left", padx=(4, 0))
-        self.lbl_cont = ttk.Label(centro, text="", style="Mut.TLabel")
-        self.lbl_cont.pack(anchor="w", padx=14)
-        self.canvas = tk.Canvas(centro, bg=BG, highlightthickness=0)
-        self.vscroll = ttk.Scrollbar(centro, orient="vertical",
+        self.lbl_cont = ttk.Label(barra, text="", style="Mut.TLabel", wraplength=480)
+        self.lbl_cont.pack(anchor="w", pady=(8, 0))
+        self.lbl_vazio = ttk.Label(barra, text="", style="Mut.TLabel", wraplength=480)
+        conteudo = ttk.Frame(centro)
+        conteudo.pack(fill="both", expand=True, padx=20, pady=(0, 16))
+        self.canvas = tk.Canvas(conteudo, bg=BG, highlightthickness=0, width=1, height=1)
+        self.vscroll = ttk.Scrollbar(conteudo, orient="vertical",
                                      command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.vscroll.set)
         self.vscroll.pack(side="right", fill="y")
-        self.canvas.pack(side="left", fill="both", expand=True, padx=(12, 0), pady=6)
+        self.canvas.pack(side="left", fill="both", expand=True)
         self.grade = ttk.Frame(self.canvas)
         self._win_grade = self.canvas.create_window((0, 0), window=self.grade, anchor="nw")
         self.grade.bind("<Configure>", self._ao_mudar_grade)
         self.canvas.bind("<Configure>", self._ao_redimensionar)
         self.canvas.bind_all("<MouseWheel>", self._rodar, add="+")
-        self.lbl_vazio = ttk.Label(centro, text="", style="Mut.TLabel")
 
         # painel de detalhes
-        det = ttk.Frame(self.root, style="Panel.TFrame", width=272)
-        det.pack(side="right", fill="y")
-        det.pack_propagate(False)
+        self.det_painel = PainelRolavel(self.root, width=280)
+        self.det_painel.grid(row=0, column=2, sticky="nsew")
+        self.det_painel.pack_propagate(False)
+        self.det_janela = None
+        det = self.det_painel.corpo
+        ttk.Label(det, text="SELECIONADO", style="Panel.TLabel", foreground=MUT,
+                  font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=16, pady=(18, 0))
         self.det_capa = tk.Canvas(det, width=216, height=280, bg=PANEL,
                                   highlightthickness=2, highlightbackground=LINE)
         self.det_capa.pack(padx=16, pady=(16, 8))
-        self.det_titulo = ttk.Label(det, text="", style="Title.TLabel",
+        self.det_titulo = ttk.Label(det, text="", style="Panel.Title.TLabel",
                                     wraplength=240)
         self.det_titulo.pack(anchor="w", padx=16)
         self.det_meta = ttk.Label(det, text="", style="Mut.TLabel",
                                   background=PANEL, wraplength=240,
                                   justify="left")
         self.det_meta.pack(anchor="w", padx=16, pady=(4, 2))
+        self.det_progresso = ttk.Progressbar(det, maximum=100,
+                                             style="Down.Horizontal.TProgressbar")
         self.det_exe = ttk.Label(det, text="", style="Mut.TLabel",
                                  background=PANEL, wraplength=240,
                                  justify="left", font=("Segoe UI", 8))
@@ -357,11 +576,272 @@ class App:
         self.root.bind("<Control-f>", lambda _e: self.ent_busca.focus_set())
         self.canvas.bind("<Return>", lambda _e: self.jogar())
         self.canvas.bind("<Delete>", lambda _e: self.excluir())
+        self.root.bind("<Configure>", self._dimensionar_interface, add="+")
+        self._atualizar_contexto()
+
+    def _dimensionar_interface(self, e):
+        if e.widget is not self.root:
+            return
+        compacto = e.width < 1120
+        if compacto != getattr(self, "_compacto", None):
+            self._compacto = compacto
+            if compacto:
+                self.det_painel.grid_remove()
+                self.btn_detalhes.grid(row=0, column=2, padx=(6, 0))
+            else:
+                self._fechar_detalhe()
+                self.det_painel.grid(row=0, column=2, sticky="nsew")
+                self.btn_detalhes.grid_remove()
+        largura = max(180, self.centro.winfo_width() - 40)
+        self.lbl_cont.configure(wraplength=largura)
+        self.lbl_vazio.configure(wraplength=largura)
+
+    def _abrir_detalhe(self):
+        if not getattr(self, "_compacto", False):
+            return
+        if self.det_janela is not None:
+            self.det_janela.lift()
+            return
+        dlg = tk.Toplevel(self.root)
+        self.det_janela = dlg
+        dlg.title("Detalhes — TucoTeca")
+        dlg.transient(self.root)
+        dlg.geometry("300x650")
+        dlg.minsize(280, 400)
+        painel = PainelRolavel(dlg)
+        painel.pack(fill="both", expand=True)
+        fr = painel.corpo
+        cv = tk.Canvas(fr, width=216, height=280, background=PANEL, highlightthickness=0)
+        cv.pack(pady=16)
+        labels = [ttk.Label(fr, style=estilo, background=PANEL, wraplength=250,
+                            justify="left") for estilo in
+                  ("Panel.Title.TLabel", "Mut.TLabel", "Mut.TLabel")]
+        for lbl in labels:
+            lbl.pack(fill="x", padx=16, pady=4)
+        barra = BarraAcoes(fr, style="Panel.TFrame")
+        barra.pack(fill="x", padx=16, pady=12)
+        originais = (self.btn_jogar, self.btn_det_editar, self.btn_det_excluir, self.btn_det_novo)
+        botoes = [barra.adicionar(b.cget("text"), b.invoke) for b in originais]
+        self._det_replicas = (cv, labels, botoes)
+        dlg.protocol("WM_DELETE_WINDOW", self._fechar_detalhe)
+        self._replicar_detalhe()
+        _titulo_escuro(dlg)
+
+    def _fechar_detalhe(self):
+        if self.det_janela is not None:
+            self.det_janela.destroy()
+            self.det_janela = None
+
+    def _replicar_detalhe(self):
+        if self.det_janela is None or not self.det_janela.winfo_exists():
+            return
+        cv, labels, botoes = self._det_replicas
+        cv.delete("all")
+        for item in self.det_capa.find_all():
+            tipo = self.det_capa.type(item)
+            config = {k: v[-1] for k, v in self.det_capa.itemconfigure(item).items()}
+            getattr(cv, "create_" + tipo)(*self.det_capa.coords(item), **config)
+        for clone, origem in zip(labels, (self.det_titulo, self.det_meta, self.det_exe)):
+            clone.configure(text=origem.cget("text"))
+        for clone, origem in zip(botoes, (self.btn_jogar, self.btn_det_editar,
+                                        self.btn_det_excluir, self.btn_det_novo)):
+            clone.configure(text=origem.cget("text"), state=origem.cget("state"))
+
+    def _atualizar_contexto(self):
+        titulo = NAV[self.nav_idx][0].split(" ", 1)[-1]
+        if self._em_musicas() and self.mus_modo == "fila":
+            titulo = "Fila de músicas"
+        subtitulos = {"Biblioteca": "Sua coleção local, pronta para jogar.",
+                      "Músicas": "Suas faixas e o player, em um só lugar.",
+                      "Desejos": "Planeje os próximos jogos da sua coleção.",
+                      "Downloads": "Acompanhe os arquivos do qBittorrent.",
+                      "Fila de músicas": "Downloads, conversão e importação de áudio."}
+        self.lbl_secao.configure(text=titulo)
+        self.lbl_subtitulo.configure(text=subtitulos.get(titulo, ""))
+        biblioteca = not (self._em_musicas() or self._em_desejos() or self._em_downloads())
+        if biblioteca:
+            self.filtros_area.pack(fill="x", pady=(8, 0), before=self.lbl_cont)
+            self.vscroll.pack(side="right", fill="y", before=self.canvas)
+        else:
+            self.filtros_area.pack_forget()
+            self.vscroll.pack_forget()
+        self.canvas.itemconfigure(self._win_grade,
+                                  height=0 if biblioteca else max(1, self.canvas.winfo_height()))
+
+    def _mae(self, side, titulo: str) -> dict:
+        """Pasta mãe expansível da sidebar (filhas somem com pack_forget)."""
+        if not hasattr(self, "_maes"):
+            self._maes = {}
+        corpo = ttk.Frame(side, style="Panel.TFrame")
+        corpo.pack(fill="x", padx=0, pady=(6, 0))
+        aberto = self._maes.get(titulo, {}).get("aberto", True)
+        btn = ttk.Button(corpo, text="", style="Group.TButton")
+        btn.pack(fill="x", padx=8, pady=1)
+        filhas = ttk.Frame(corpo, style="Panel.TFrame")
+        filhas.pack(fill="x")
+        mae = {"btn": btn, "corpo": filhas, "titulo": titulo, "aberto": aberto}
+
+        def alternar():
+            mae["aberto"] = not mae["aberto"]
+            self._maes[titulo] = mae
+            self._pintar_mae(mae)
+
+        btn.configure(command=alternar)
+        self._maes[titulo] = mae
+        self._pintar_mae(mae)
+        return mae
+
+    def _pintar_mae(self, mae: dict) -> None:
+        try:
+            seta = "▼" if mae["aberto"] else "▶"
+            mae["btn"].configure(text=f"{seta} {mae['titulo']}")
+            if mae["aberto"]:
+                mae["corpo"].pack(fill="x")
+                for w in list(mae["corpo"].winfo_children()):
+                    if isinstance(w, ttk.Button) and str(w.cget("text")):
+                        w.pack(fill="x", padx=8, pady=1)
+            else:
+                for w in list(mae["corpo"].winfo_children()):
+                    if isinstance(w, ttk.Button) and w is not mae["btn"]:
+                        w.pack_forget()
+        except tk.TclError:
+            pass
+
+    def _ir_fila_arvore(self):
+        """Filha Fila: vai p/ Músicas e troca o modo (fora dela, só o modo)."""
+        if not self._em_musicas():
+            for i, (rot, _s, _f) in enumerate(NAV):
+                if rot.startswith("🎵"):
+                    self._ir_nav(i)
+                    break
+        self._ir_fila()
+
+    # -- volume geral do PC (persistente entre abas, separado do player)
+    def _montar_volume_pc(self, side):
+        if not core.volume_pc_disponivel():
+            return
+        self._vol_sincronizando = True
+        self._vol_arrastando = False
+        self._vol_fechado = False
+        self._vol_pendente = None
+        self._vol_poll = None
+        self.var_volume_pc = tk.DoubleVar(value=0)
+        self.var_volume_pct = tk.StringVar(value="—")
+        fr = ttk.Frame(side, style="Panel.TFrame")
+        fr.pack(side="bottom", fill="x", padx=10, pady=(8, 12))
+        cab = ttk.Frame(fr, style="Panel.TFrame")
+        cab.pack(fill="x")
+        ttk.Label(cab, text="VOLUME DO PC", style="Panel.TLabel",
+                  foreground=MUT, font=("Segoe UI", 9, "bold")).pack(side="left")
+        ttk.Label(cab, textvariable=self.var_volume_pct,
+                  style="Panel.TLabel").pack(side="right")
+        self.escala_volume_pc = ttk.Scale(
+            fr, from_=0, to=100, orient="horizontal",
+            variable=self.var_volume_pc, style="Volume.Horizontal.TScale",
+            command=self._volume_arrastar, state="disabled")
+        self.escala_volume_pc.pack(fill="x", pady=6)
+        self.escala_volume_pc.bind("<ButtonPress-1>", self._volume_iniciar_arrasto)
+        self.escala_volume_pc.bind("<ButtonRelease-1>", self._volume_fim_arrasto)
+        botoes = ttk.Frame(fr, style="Panel.TFrame")
+        botoes.pack(fill="x")
+        self.btn_volume_menos = ttk.Button(
+            botoes, text="−", width=3, state="disabled", style="Volume.TButton",
+            command=lambda: self._volume_ajustar(-5))
+        self.btn_volume_menos.pack(side="left")
+        self.btn_volume_mudo = ttk.Button(
+            botoes, text="Silenciar", width=9, state="disabled", style="Volume.TButton",
+            command=self._volume_alternar_mudo)
+        self.btn_volume_mudo.pack(side="left", fill="x", expand=True, padx=4)
+        self.btn_volume_mais = ttk.Button(
+            botoes, text="+", width=3, state="disabled", style="Volume.TButton",
+            command=lambda: self._volume_ajustar(5))
+        self.btn_volume_mais.pack(side="right")
+        self._vol_sincronizando = False
+        self.root.bind("<Destroy>", self._fechar_volume_pc, add="+")
+        self._vol_poll = self.root.after(0, self._sincronizar_volume_pc)
+
+    def _volume_iniciar_arrasto(self, _e=None):
+        self._vol_arrastando = True
+
+    def _volume_fim_arrasto(self, _e=None):
+        self._vol_arrastando = False
+
+    def _volume_mostrar(self, estado: dict, avisar=False):
+        if self._vol_fechado:
+            return
+        self._vol_sincronizando = True
+        try:
+            if estado.get("ok"):
+                self.var_volume_pc.set(estado["nivel"])
+                self.var_volume_pct.set(f"{round(estado['nivel'])}%")
+                self.btn_volume_mudo.configure(
+                    text="Ativar som" if estado["mudo"] else "Silenciar")
+                state = "normal"
+            else:
+                self.var_volume_pct.set("—")
+                self.btn_volume_mudo.configure(text="Sem saída")
+                state = "disabled"
+                if avisar:
+                    self._aviso_barra(estado.get("erro") or "Volume do PC indisponível")
+            for w in (self.escala_volume_pc, self.btn_volume_menos,
+                      self.btn_volume_mudo, self.btn_volume_mais):
+                w.configure(state=state)
+        finally:
+            self._vol_sincronizando = False
+
+    def _sincronizar_volume_pc(self):
+        if self._vol_fechado:
+            return
+        if not self._vol_arrastando and self._vol_pendente is None:
+            self._volume_mostrar(core.ler_volume_pc())
+        self._vol_poll = self.root.after(1000, self._sincronizar_volume_pc)
+
+    def _volume_cancelar_pendente(self):
+        if self._vol_pendente is not None:
+            self.root.after_cancel(self._vol_pendente)
+            self._vol_pendente = None
+
+    def _volume_arrastar(self, valor):
+        if self._vol_sincronizando or self._vol_fechado:
+            return
+        nivel = round(float(valor))
+        self.var_volume_pct.set(f"{nivel}%")
+        self._volume_cancelar_pendente()
+        self._vol_pendente = self.root.after(80, self._volume_aplicar, nivel)
+
+    def _volume_aplicar(self, nivel):
+        self._vol_pendente = None
+        if not self._vol_fechado:
+            self._volume_mostrar(
+                core.definir_volume_pc(nivel, mudo=False if nivel > 0 else None),
+                avisar=True)
+
+    def _volume_ajustar(self, delta):
+        self._volume_cancelar_pendente()
+        self._volume_mostrar(core.ajustar_volume_pc(delta), avisar=True)
+
+    def _volume_alternar_mudo(self):
+        self._volume_cancelar_pendente()
+        self._volume_mostrar(core.alternar_mudo_pc(), avisar=True)
+
+    def _fechar_volume_pc(self, evento):
+        if evento.widget is not self.root or self._vol_fechado:
+            return
+        self._vol_fechado = True
+        self._volume_cancelar_pendente()
+        if self._vol_poll is not None:
+            self.root.after_cancel(self._vol_poll)
 
     # -- navegação / grade
     def _pintar_nav(self):
         for i, b in enumerate(self.nav_btns):
             b.configure(style="SideAct.TButton" if i == self.nav_idx else "Side.TButton")
+        try:
+            fila_ativa = self._em_musicas() and self.mus_modo == "fila"
+            self._btn_fila.configure(
+                style="SideAct.TButton" if fila_ativa else "Side.TButton")
+        except (tk.TclError, AttributeError):
+            pass
         for chave, b in self.prov_btns.items():
             b.configure(style="SideAct.TButton" if chave == self.filtro_prov else "Side.TButton")
         for plat, b in self.plat_btns.items():
@@ -371,11 +851,21 @@ class App:
                 pass
 
     def _ir_nav(self, i: int):
+        try:
+            i = max(0, min(int(i), len(NAV) - 1))
+        except Exception:
+            i = 0
         self.nav_idx = i
         self._pintar_nav()
         self.recarregar()
+        try:
+            self.canvas.yview_moveto(0)
+        except (tk.TclError, AttributeError):
+            pass
 
     def _ir_prov(self, chave: str):
+        self.nav_idx = 0
+        self.var_q.set("")
         self.filtro_prov = None if self.filtro_prov == chave else chave
         self._pintar_nav()
         self.recarregar()
@@ -388,11 +878,40 @@ class App:
     def _limpar_filtros(self):
         self.filtro_plat = None
         self.filtro_prov = None
+        self.filtro_status = ""
+        self.so_fav = False
+        try:
+            self.var_q.set("")
+        except (tk.TclError, AttributeError):
+            pass
         try:
             self.var_tagfiltro.set("")
         except (tk.TclError, AttributeError):
             pass
+        try:
+            self.var_statusfiltro.set("Todos")
+        except (tk.TclError, AttributeError):
+            pass
+        try:
+            self.var_sofav.set(False)
+        except (tk.TclError, AttributeError):
+            pass
         self._pintar_nav()
+        self.recarregar()
+
+    def _ao_trocar_status(self, _e=None):
+        try:
+            txt = self.var_statusfiltro.get().strip()
+        except (tk.TclError, AttributeError):
+            txt = "Todos"
+        self.filtro_status = "" if txt == "Todos" else txt
+        self.recarregar()
+
+    def _ao_trocar_fav(self):
+        try:
+            self.so_fav = bool(self.var_sofav.get())
+        except (tk.TclError, AttributeError):
+            self.so_fav = False
         self.recarregar()
 
     def _ao_digitar(self, _e=None):
@@ -407,7 +926,8 @@ class App:
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def _ao_redimensionar(self, e):
-        self.canvas.itemconfig(self._win_grade, width=e.width)
+        lista = self._em_musicas() or self._em_desejos() or self._em_downloads()
+        self.canvas.itemconfig(self._win_grade, width=e.width, height=e.height if lista else 0)
         # coalesce: resize dispara Configure em rajada; reorganiza 1x por ciclo
         try:
             if getattr(self, "_reorg_pend", None):
@@ -420,6 +940,8 @@ class App:
             pass
 
     def _rodar(self, e):
+        if self._em_musicas() or self._em_desejos() or self._em_downloads():
+            return  # as tabelas controlam sua própria rolagem
         try:
             alvo = str(e.widget)
         except Exception:
@@ -442,7 +964,6 @@ class App:
         passo = CARD_W + 28
         if self.cards:
             try:
-                self.grade.update_idletasks()
                 mais_largo = max(c["frame"].winfo_reqwidth() for c in self.cards)
                 passo = max(passo, mais_largo + 28)
             except (tk.TclError, ValueError):
@@ -458,19 +979,8 @@ class App:
         cols = max(1, vp // self._largura_coluna())
         for i, c in enumerate(self.cards):
             c["frame"].grid(row=i // cols, column=i % cols, padx=14, pady=12)
-        # trava de segurança: a grade nunca estoura a viewport (cards têm
-        # larguras distintas; a estimativa pode errar para mais)
-        try:
-            for _ in range(10):
-                self.grade.update_idletasks()
-                if self.grade.winfo_reqwidth() <= vp or cols <= 1:
-                    break
-                cols -= 1
-                for i, c in enumerate(self.cards):
-                    c["frame"].grid(row=i // cols, column=i % cols,
-                                    padx=14, pady=12)
-        except tk.TclError:
-            pass
+        # Não chama update/update_idletasks aqui: Configure pode reentrar
+        # e deixar a reorganização antiga sobrescrever a largura nova.
 
     # -- dados
     def _con(self):
@@ -682,23 +1192,69 @@ class App:
         except (IndexError, AttributeError):
             return False
 
+    def _em_desejos(self) -> bool:
+        """Aba Desejos ativa? (wishlist Steam espelhada)."""
+        try:
+            return NAV[self.nav_idx][0].startswith("☆")
+        except (IndexError, AttributeError):
+            return False
+
+    def _em_downloads(self) -> bool:
+        """Aba Downloads ativa? (% dos torrents do qBittorrent)."""
+        try:
+            return NAV[self.nav_idx][0].startswith("⬇ D")
+        except (IndexError, AttributeError):
+            return False
+
     def recarregar(self):
+        if self._deb is not None:
+            self.root.after_cancel(self._deb)
+            self._deb = None
+        self.nav_idx = max(0, min(int(self.nav_idx), len(NAV) - 1))
+        self._atualizar_contexto()
+        if self._em_desejos():
+            return self._recarregar_desejos()
+        if self._em_downloads():
+            self._recarregar_downloads()
+            self._consultar_downloads()
+            return
         if self._em_musicas():
             return self._recarregar_musicas()
-        _rot, status, fav = NAV[self.nav_idx]
+        try:
+            self.nav_idx = max(0, min(int(self.nav_idx), len(NAV) - 1))
+        except Exception:
+            self.nav_idx = 0
+        status = (self.filtro_status or "").strip()
+        fav = bool(self.so_fav)
         try:
             tag_txt = self.var_tagfiltro.get().strip()
         except (tk.TclError, AttributeError):
             tag_txt = ""
         tags = [t.strip() for t in tag_txt.replace(";", ",").split(",") if t.strip()]
-        con = self._con()
         try:
-            self.jogos = core.listar_jogos(
-                con, q=self.var_q.get().strip(), status=status, favorito=fav,
-                etiquetas=tags or None,
-                plataformas=[self.filtro_plat] if self.filtro_plat else None)
+            busca = self.var_q.get().strip()
+        except (tk.TclError, AttributeError):
+            busca = ""
+        con = self._con()
+        erro_lista = ""
+        try:
+            try:
+                self.jogos = core.listar_jogos(
+                    con, q=busca, status=status, favorito=fav,
+                    etiquetas=tags or None,
+                    plataformas=[self.filtro_plat] if self.filtro_plat else None)
+            except Exception as e:
+                # filtro inválido nunca apaga a lista em silêncio: mostra tudo
+                try:
+                    self.jogos = core.listar_jogos(con)
+                except Exception:
+                    self.jogos = []
+                erro_lista = f"filtro falhou ({e}); mostrando tudo"
             if self.filtro_prov:
-                self.jogos = core.jogos_do_provedor(self.jogos, self.filtro_prov)
+                try:
+                    self.jogos = core.jogos_do_provedor(self.jogos, self.filtro_prov)
+                except Exception as e:
+                    erro_lista = f"filtro provider falhou ({e})"
             for r in core.provedores_resumo(con):
                 b = self.prov_btns.get(r["chave"])
                 if b is not None:
@@ -747,20 +1303,557 @@ class App:
                 extra += f" · backup há {int(idade)}d"
         except Exception:
             pass
+        if erro_lista:
+            extra += f" · {erro_lista}"
         self.lbl_cont.configure(text=f"{n} jogo(s) · {az_txt}{extra}")
         try:
             self._atualizar_chip_usuario()
         except Exception:
             pass
+        try:
+            busca_atual = self.var_q.get().strip()
+        except (tk.TclError, AttributeError):
+            busca_atual = ""
         if n == 0:
             if (self.filtro_plat or self.filtro_prov or tag_txt
-                    or self.var_q.get().strip()):
-                self.lbl_vazio.configure(text="Nada aqui — ajuste busca/filtros ou ✕ limpa tudo")
+                    or busca_atual or status or fav):
+                self.lbl_vazio.configure(text="Nada aqui — ajuste busca/filtros ou ✕ Limpar")
             else:
                 self.lbl_vazio.configure(text="Nada aqui — use 📥 Importar…")
             self.lbl_vazio.pack(anchor="w", padx=14)
         else:
             self.lbl_vazio.pack_forget()
+        try:
+            self.canvas.yview_moveto(0)
+        except (tk.TclError, AttributeError):
+            pass
+
+    # -- aba Desejos (wishlist Steam espelhada; download pelas fontes)
+    def _recarregar_desejos(self):
+        for w in self.grade.winfo_children():
+            w.destroy()
+        self.cards = []
+        self._imgs_cards = []
+        self._des_lista = None
+        try:
+            q = self.var_q.get().strip()
+        except (tk.TclError, AttributeError):
+            q = ""
+        con = self._con()
+        try:
+            try:
+                self.desejos = core.listar_desejos(con, q=q)
+            except Exception:
+                self.desejos = []
+        finally:
+            con.close()
+        if self.des_sel is None or self.des_sel >= len(self.desejos):
+            self.des_sel = 0 if self.desejos else None
+        fr_btn = BarraAcoes(self.grade)
+        fr_btn.pack(side="bottom", fill="x", pady=(8, 0))
+        fr_btn.adicionar("Sincronizar", self.sincronizar_desejos_ui)
+        fr_btn.adicionar("Adicionar…", self.adicionar_desejo_ui)
+        fr_btn.adicionar("Na Steam", self.abrir_wishlist_json_na_steam)
+        fr_btn.adicionar("Arquivo…", self.importar_desejos_arquivo_ui)
+        fr_btn.adicionar("Buscar download", self.buscar_desejo_download)
+        fr_btn.adicionar("Remover", self.excluir_desejo_selecionado)
+        lst = _nova_grade_tv(self.grade, ("Desejo", "Steam"))
+        lst.pack(fill="both", expand=True)
+        _com_rolagem(lst)
+        _tv_por(lst, [(d.get("titulo", "?"), f"appid {d.get('appid', '?')}")
+                      for d in self.desejos])
+        _tv_marcar(lst, self.des_sel)
+        lst.bind("<<TreeviewSelect>>", self._ao_sel_desejo)
+        lst.bind("<Double-Button-1>",
+                 lambda _e: self.buscar_desejo_download())
+        self._des_lista = lst
+        n = len(self.desejos)
+        try:
+            conta = core.steam_principal().get("persona") or "Steam"
+            self.lbl_cont.configure(text=f"{n} desejo(s) · wishlist {conta}")
+        except tk.TclError:
+            pass
+        if n == 0:
+            self.lbl_vazio.configure(
+                text="Vazio — ➕ Adicionar… busca o jogo na Steam.")
+            self.lbl_vazio.pack(anchor="w", padx=14)
+        else:
+            self.lbl_vazio.pack_forget()
+        self.mostrar_detalhe()
+
+    # -- aba Downloads (% dos torrents do qBittorrent; auto-import ao fechar)
+    def _recarregar_downloads(self):
+        for w in self.grade.winfo_children():
+            w.destroy()
+        self.cards = []
+        self._imgs_cards = []
+        self._dl_lista = None
+        try:
+            q = self.var_q.get().strip()
+        except (tk.TclError, AttributeError):
+            q = ""
+        leitura = self._dl_snapshot
+        self.dls = [t for t in leitura.get("torrents") or []
+                    if not q or q.lower() in t["nome"].lower()]
+        if self.dl_sel is None or self.dl_sel >= len(self.dls):
+            self.dl_sel = 0 if self.dls else None
+        fr_btn = BarraAcoes(self.grade)
+        fr_btn.pack(side="bottom", fill="x", pady=(8, 0))
+        fr_btn.adicionar("Atualizar", self.recarregar)
+        fr_btn.adicionar("Iniciar cliente", self.iniciar_cliente_dl)
+        fr_btn.adicionar("Pausar", lambda: self.controlar_dl("pausar"))
+        fr_btn.adicionar("Retomar", lambda: self.controlar_dl("retomar"))
+        fr_btn.adicionar("Verificar concluídos", self.verificar_concluidos_ui)
+        fr_btn.adicionar("Abrir pasta", self.abrir_pasta_dl)
+        lst = _nova_grade_tv(self.grade, ("Download", "Progresso"))
+        lst.pack(fill="both", expand=True)
+        _com_rolagem(lst)
+        linhas_dl = []
+        for t in self.dls:
+            try:
+                tam = (f"{core.formatar_tamanho(t['feito'])}/"
+                       f"{core.formatar_tamanho(t['total'])}")
+                marca = "✓ " if t["completo"] else ""
+                estimativa = "~" if t.get("fonte_progresso") == "estimativa" else ""
+                velocidade = f" · {core.formatar_tamanho(t['velocidade'])}/s" if t.get("velocidade") else ""
+                linhas_dl.append((f"{marca}{t['nome']}",
+                                  f"{estimativa}{t['pct']}% · {tam}{velocidade}"))
+            except Exception:
+                continue
+        _tv_por(lst, linhas_dl)
+        _tv_marcar(lst, self.dl_sel)
+        lst.bind("<<TreeviewSelect>>", self._ao_sel_dl)
+        lst.bind("<Double-Button-1>", lambda _e: self.abrir_pasta_dl())
+        self._dl_lista = lst
+        n = len(self.dls)
+        try:
+            api = leitura.get("fonte") == "api"
+            self.lbl_cont.configure(text=f"{n} torrent(s) · " + (
+                "qBittorrent conectado (API local)" if api else "histórico local do qBittorrent"))
+        except tk.TclError:
+            pass
+        if n == 0:
+            self.lbl_vazio.configure(
+                text="Vazio — baixe um magnet (FitGirl) com o qBittorrent.")
+            self.lbl_vazio.pack(anchor="w", padx=14)
+        else:
+            self.lbl_vazio.pack_forget()
+        self.mostrar_detalhe()
+
+    def iniciar_cliente_dl(self):
+        self._acao_qbit_ui(lambda: core.qbit_iniciar(), "Iniciar qBittorrent")
+
+    def controlar_dl(self, acao):
+        t = self._dl_sel_atual()
+        if t is None:
+            return
+        if t.get("fonte_progresso") != "api":
+            messagebox.showinfo("qBittorrent", "Este item pertence ao histórico local, não ao cliente conectado.")
+            return
+        self._acao_qbit_ui(lambda: core.qbit_controlar(t["hash"], acao), "qBittorrent")
+
+    def _acao_qbit_ui(self, acao, contexto):
+        def trabalho():
+            try:
+                res = acao()
+            except Exception as e:
+                res = {"ok": False, "erro": str(e)}
+
+            def fim():
+                if res.get("ok"):
+                    self.recarregar()
+                    self._aviso_barra(contexto + " ✓")
+                else:
+                    messagebox.showwarning(contexto, res.get("erro", "falha"))
+            self._depois(fim)
+        threading.Thread(target=trabalho, daemon=True).start()
+
+    def _vigiar_downloads(self):
+        if self._mus_fechado:
+            return
+        self._dl_timer = self.root.after(3000, self._vigiar_downloads)
+        if self._em_downloads():
+            self._consultar_downloads()
+
+    def _consultar_downloads(self):
+        if self._dl_ocupado or self._mus_fechado:
+            return
+        self._dl_ocupado = True
+
+        def trabalho():
+            try:
+                leitura = core.listar_torrents()
+            except Exception as e:
+                leitura = {"torrents": [], "erros": [str(e)]}
+
+            def fim():
+                self._dl_ocupado = False
+                if self._mus_fechado:
+                    return
+                if leitura.get("erros"):
+                    self._aviso_barra(leitura["erros"][0])
+                    return
+                mudou = leitura != self._dl_snapshot
+                self._dl_snapshot = leitura
+                if mudou and self._em_downloads():
+                    self._recarregar_downloads()
+            self._depois(fim)
+        threading.Thread(target=trabalho, daemon=True).start()
+
+    def _ao_sel_dl(self, _e=None):
+        i = _tv_sel(self._dl_lista)
+        if i is None:
+            return
+        self.dl_sel = i
+        self.mostrar_detalhe()
+
+    def _dl_sel_atual(self):
+        if not self._em_downloads() or self.dl_sel is None \
+                or self.dl_sel >= len(self.dls):
+            return None
+        return self.dls[self.dl_sel]
+
+    def abrir_pasta_dl(self):
+        t = self._dl_sel_atual()
+        if t is None or not t.get("save_path"):
+            messagebox.showinfo("Downloads", "Selecione um download na lista.")
+            return
+        try:
+            alvo = str(Path(t["save_path"]).parent) \
+                if Path(t["save_path"]).is_file() \
+                else str(Path(t["save_path"]))
+        except (TypeError, ValueError):
+            messagebox.showwarning("Downloads", "Pasta inválida.")
+            return
+        if os.name == "nt":
+            try:
+                os.startfile(alvo)
+            except OSError as e:
+                messagebox.showwarning("Downloads", f"falha: {e}")
+        else:
+            messagebox.showinfo("Downloads", alvo)
+
+    def verificar_concluidos_ui(self):
+        """Importa p/ o Hub todo torrent 100% (thread, com backup)."""
+        prontos = [t for t in self.dls if t.get("completo") and t.get("save_path")]
+        if not prontos:
+            messagebox.showinfo("Downloads", "Nada 100% ainda.")
+            return
+        prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
+        prog.title("Verificando concluídos…")
+        prog.transient(self.root)
+        ttk.Label(prog, text=f"Importando {len(prontos)} concluído(s)…").pack(
+            padx=24, pady=20)
+        try:
+            prog.update()
+        except tk.TclError:
+            return
+
+        def trabalho():
+            self._backup_pre_import()
+            con = self._con()
+            linhas = []
+            try:
+                for t in prontos:
+                    alvo = Path(t["save_path"])
+                    try:
+                        if alvo.is_file() and alvo.suffix.lower() in (
+                                ".rar", ".zip", ".7z", ".iso"):
+                            res = core.importar_repack(con, str(alvo))
+                            if res.get("ok"):
+                                linhas.append(f"'{res['titulo']}' ✓")
+                            elif res.get("precisa_instalar"):
+                                linhas.append(f"'{res.get('titulo', t['nome'])}': rode o setup")
+                            else:
+                                linhas.append(f"'{t['nome']}': {res.get('erro')}")
+                        elif alvo.is_dir():
+                            ach = core.achar_exe(alvo)
+                            if ach.get("precisa_instalar"):
+                                linhas.append(f"'{t['nome']}': instalador baixado; instale antes de importar")
+                                continue
+                            _roots_u, itens, _info = core.preview_pasta([str(alvo)])
+                            if not itens:
+                                linhas.append(f"'{t['nome']}': sem jogo/importável")
+                                continue
+                            res = core.importar_lista(con, itens)
+                            linhas.append(f"'{t['nome']}': +{res.get('novos', 0)}")
+                        else:
+                            linhas.append(f"'{t['nome']}': sumiu do disco")
+                    except Exception as e:
+                        linhas.append(f"'{t['nome']}': {e}")
+            finally:
+                try:
+                    con.close()
+                except Exception:
+                    pass
+
+            def fim(linhas=linhas):
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    pass
+                try:
+                    self.recarregar()
+                except tk.TclError:
+                    pass
+                messagebox.showinfo("Downloads", "\n".join(linhas[:12]))
+            self._depois(fim)
+
+        threading.Thread(target=self._thread_segura(
+            trabalho, prog, "Verificar concluídos"), daemon=True).start()
+
+    def _ao_sel_desejo(self, _e=None):
+        i = _tv_sel(self._des_lista)
+        if i is None:
+            return
+        self.des_sel = i
+        self.mostrar_detalhe()
+
+    def _desejo_sel(self):
+        if not self._em_desejos() or self.des_sel is None \
+                or self.des_sel >= len(self.desejos):
+            return None
+        return self.desejos[self.des_sel]
+
+    def sincronizar_desejos_ui(self):
+        """Lê a wishlist e espelha no Hub (thread, com backup).
+
+        Uma resposta indisponível ou parcial não substitui a lista local.
+        """
+        prog = tk.Toplevel(self.root)
+        _titulo_escuro(prog)
+        prog.title("Sincronizando desejos…")
+        prog.transient(self.root)
+        ttk.Label(prog, text="Lendo wishlist Steam…").pack(padx=24, pady=20)
+        try:
+            prog.update()
+        except tk.TclError:
+            return
+
+        def trabalho():
+            try:
+                conta = core.steam_principal()
+                if not conta:
+                    res = {"novos": 0, "atualizados": 0, "removidos": 0,
+                           "erros": ["conta Steam não achada neste PC"]}
+                else:
+                    leitura = core.ler_wishlist(conta["steamid"])
+                    if leitura["erros"]:
+                        res = {"novos": 0, "atualizados": 0, "removidos": 0,
+                               "erros": leitura["erros"]}
+                    else:
+                        self._backup_pre_import()
+                        con = self._con()
+                        try:
+                            res = core.sincronizar_desejos(con, leitura["itens"])
+                            res["erros"] = leitura["erros"]
+                        finally:
+                            con.close()
+            except Exception as e:
+                res = {"novos": 0, "atualizados": 0, "removidos": 0,
+                       "erros": [str(e)]}
+
+            def fim(res=res):
+                try:
+                    prog.destroy()
+                except tk.TclError:
+                    pass
+                if self._em_desejos():
+                    try:
+                        self.recarregar()
+                    except tk.TclError:
+                        pass
+                detalhe = (f"{res['novos']} novo(s), {res['atualizados']} "
+                           f"atualizado(s), {res['removidos']} removido(s)")
+                if res["erros"]:
+                    messagebox.showwarning("Desejos", "\n".join(res["erros"]))
+                else:
+                    messagebox.showinfo("Desejos", detalhe)
+            self._depois(lambda: fim())
+
+        threading.Thread(target=trabalho, daemon=True).start()
+
+    def adicionar_desejo_ui(self):
+        """➕ Adicionar: busca o título na loja pública e grava o escolhido."""
+        win = tk.Toplevel(self.root)
+        _titulo_escuro(win)
+        win.title("Adicionar desejo")
+        win.transient(self.root)
+        fr = ttk.Frame(win, padding=12)
+        fr.pack(fill="both", expand=True)
+        var = tk.StringVar()
+        ent = ttk.Entry(fr, textvariable=var, width=40)
+        ent.pack(fill="x")
+        lbl = ttk.Label(fr, text="Digite e busque.", style="Mut.TLabel")
+        lbl.pack(anchor="w", pady=(4, 6))
+        lst = tk.Listbox(fr, selectmode="single", width=52, height=8,
+                         bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                         font=("Segoe UI", 11))
+        lst.pack(fill="both", expand=True)
+        _com_rolagem(lst)
+        achados: list[dict] = []
+
+        def estado(txt):
+            self._depois(lambda: lbl.configure(text=txt))
+
+        def buscar():
+            termo = var.get().strip()
+            if not termo:
+                return
+            estado(f"Buscando '{termo}'…")
+
+            def trabalho(termo_fx=termo):
+                try:
+                    res = core.buscar_jogos_steam(termo_fx)
+                except Exception as e:
+                    res = {"itens": [], "erros": [str(e)]}
+
+                def fim(res=res):
+                    if not win.winfo_exists():
+                        return
+                    achados.clear()
+                    achados.extend(res.get("itens") or [])
+                    lst.delete(0, "end")
+                    for it in achados:
+                        lst.insert("end", it["titulo"])
+                    if res.get("erros"):
+                        estado(f"Falha: {res['erros'][0]}")
+                    else:
+                        estado(f"{len(achados)} resultado(s).")
+                self._depois(fim)
+            threading.Thread(target=trabalho, daemon=True).start()
+
+        def adicionar():
+            sel = lst.curselection()
+            if not sel or sel[0] >= len(achados):
+                messagebox.showinfo("Desejos", "Busque e escolha um jogo.")
+                return
+            it = achados[sel[0]]
+            con = self._con()
+            try:
+                self._backup_pre_import()
+                core.adicionar_desejo(con, it["appid"], it["titulo"])
+            except (ValueError, LookupError) as e:
+                messagebox.showwarning("Desejos", f"falha: {e}")
+                return
+            except Exception as e:
+                core.log_erro("adicionar-desejo", f"{type(e).__name__}: {e}")
+                messagebox.showwarning("Desejos", f"falha: {e}")
+                return
+            finally:
+                con.close()
+            win.destroy()
+            self.recarregar()
+            self._aviso_barra(f"Desejo '{it['titulo']}' ✓")
+
+        ent.bind("<Return>", lambda _e: buscar())
+        lin = ttk.Frame(fr)
+        lin.pack(fill="x", pady=(8, 0))
+        ttk.Button(lin, text="🔎 Buscar", command=buscar).pack(side="left")
+        ttk.Button(lin, text="➕ Adicionar",
+                   command=adicionar).pack(side="left", padx=6)
+        ttk.Button(lin, text="Fechar",
+                   command=win.destroy).pack(side="right")
+
+    def abrir_wishlist_json_na_steam(self):
+        """Abre tua wishlist no navegador (conferir) — importar é por ➕/📄."""
+        conta = core.steam_principal()
+        if not conta:
+            messagebox.showinfo(
+                "Desejos", "Conta Steam não achada neste PC.")
+            return
+        url = ("https://store.steampowered.com/wishlist/profiles/"
+               f"{conta['steamid']}/")
+        res = core.abrir_url(url)
+        if not res.get("ok"):
+            messagebox.showwarning(
+                "Desejos",
+                f"Navegador não abriu ({res.get('erro', 'falha')}).\n"
+                f"Cole no navegador logado:\n{url}")
+            return
+        messagebox.showinfo(
+            "Desejos",
+            "Confira a lista no navegador.\n"
+            "P/ trazer p/ cá: ➕ Adicionar… (busca na loja) ou\n"
+            "📄 Arquivo… (JSON do wishlistdata).")
+
+    def importar_desejos_arquivo_ui(self):
+        """Espelha wishlist de um wishlistdata/?p=N salvo (Steam pede login)."""
+        caminho = filedialog.askopenfilename(
+            title="Wishlist salva (JSON)",
+            filetypes=[("JSON", "*.json"), ("Todos", "*.*")])
+        if not caminho:
+            return
+        leitura = core.ler_wishlist_arquivo(caminho)
+        if leitura["erros"] and not leitura["itens"]:
+            messagebox.showerror("Desejos", leitura["erros"][0])
+            return
+        self._backup_pre_import()
+        con = self._con()
+        try:
+            res = core.sincronizar_desejos(con, leitura["itens"])
+        except Exception as e:
+            messagebox.showerror("Desejos", f"falha: {e}")
+            return
+        finally:
+            con.close()
+        self.recarregar()
+        messagebox.showinfo(
+            "Desejos",
+            f"{res['novos']} novo(s), {res['atualizados']} atualizado(s), "
+            f"{res['removidos']} removido(s)")
+
+    def excluir_desejo_selecionado(self):
+        d = self._desejo_sel()
+        if d is None:
+            return
+        if not messagebox.askokcancel(
+                "Desejos", f"Tirar '{d['titulo']}' da lista?"):
+            return
+        con = self._con()
+        try:
+            core.remover_desejo(con, d["id"])
+        except LookupError as e:
+            messagebox.showwarning("Desejos", str(e))
+            return
+        finally:
+            con.close()
+        self.des_sel = None
+        self.recarregar()
+
+    def buscar_desejo_download(self):
+        """Abre os catálogos já buscando o título do desejo."""
+        d = self._desejo_sel()
+        if d is None:
+            messagebox.showinfo("Desejos", "Selecione um desejo na lista.")
+            return
+        opcoes = tk.Toplevel(self.root)
+        _titulo_escuro(opcoes)
+        opcoes.title(f"Baixar: {d['titulo'][:40]}")
+        opcoes.transient(self.root)
+        ttk.Label(opcoes, text=f"Buscar '{d['titulo']}' onde?",
+                  wraplength=360).pack(padx=20, pady=(16, 8))
+        fr = ttk.Frame(opcoes)
+        fr.pack(pady=(0, 16))
+
+        def ir(fonte):
+            try:
+                opcoes.destroy()
+            except tk.TclError:
+                pass
+            self.dlg_catalogo(fonte, termo=d["titulo"])
+
+        ttk.Button(fr, text="SteamRip",
+                   command=lambda: ir("steamrip")).pack(side="left", padx=6)
+        ttk.Button(fr, text="FitGirl",
+                   command=lambda: ir("fitgirl")).pack(side="left", padx=6)
+        ttk.Button(fr, text="Steam",
+                   command=lambda: (opcoes.destroy(),
+                                    core.abrir_url(
+                                        f"https://store.steampowered.com/app/"
+                                        f"{d['appid']}/"))).pack(side="left",
+                                                                  padx=6)
 
     # -- aba Músicas (lista embutida na grade; play externo segue com o jogo)
     def _recarregar_musicas(self):
@@ -786,16 +1879,12 @@ class App:
         self.mus_ids = [m["id"] for m in self.musicas]
         if self.mus_sel is None or self.mus_sel >= len(self.musicas):
             self.mus_sel = 0 if self.musicas else None
-        fr_btn = ttk.Frame(self.grade)
+        fr_btn = BarraAcoes(self.grade)
         fr_btn.pack(side="bottom", fill="x", pady=(8, 0))
-        ttk.Button(fr_btn, text="▶ Tocar",
-                   command=self.tocar_musica_selecionada).pack(side="left")
-        ttk.Button(fr_btn, text="📥 Importar…",
-                   command=self.importar_musicas).pack(side="left", padx=6)
-        ttk.Button(fr_btn, text="🗑 Excluir",
-                   command=self.excluir_musica_selecionada).pack(side="left")
-        ttk.Button(fr_btn, text="⬇ CSV…",
-                   command=self.baixar_csv).pack(side="left", padx=6)
+        fr_btn.adicionar("Tocar", self.tocar_musica_selecionada)
+        fr_btn.adicionar("Importar…", self.importar_musicas)
+        fr_btn.adicionar("Excluir", self.excluir_musica_selecionada)
+        fr_btn.adicionar("CSV…", self.baixar_csv)
         try:
             con2 = self._con()
             try:
@@ -804,8 +1893,7 @@ class App:
                 con2.close()
         except Exception:
             n_pend = 0
-        ttk.Button(fr_btn, text=f"Fila ({n_pend})",
-                   command=self._ir_fila).pack(side="left")
+        fr_btn.adicionar(f"Fila ({n_pend})", self._ir_fila)
         fr_trans = ttk.Frame(self.grade)
         fr_trans.pack(side="bottom", fill="x", pady=(6, 0))
         ttk.Button(fr_trans, text="⏮", width=4,
@@ -822,23 +1910,19 @@ class App:
         self.lbl_agora = ttk.Label(fr_trans, text="♪ parado",
                                    style="Mut.TLabel")
         self.lbl_agora.pack(side="left", padx=6)
-        lst = tk.Listbox(self.grade, selectmode="single", width=64, height=18,
-                         bg="#0b0d12", fg=TXT, selectbackground=ACC,
-                         font=("Segoe UI", 11))
+        lst = _nova_grade_tv(self.grade, ("Música", "Artista · Álbum"))
         lst.pack(fill="both", expand=True)
         _com_rolagem(lst)
+        linhas_mus = []
         for m in self.musicas:
             try:
-                lst.insert("end", core.texto_musica(m))
+                linhas_mus.append((core.texto_musica(m), " · ".join(
+                    x for x in (m.get("artista"), m.get("album")) if x)))
             except Exception:
                 continue
-        if self.mus_sel is not None:
-            try:
-                lst.selection_set(self.mus_sel)
-                lst.see(self.mus_sel)
-            except tk.TclError:
-                pass
-        lst.bind("<<ListboxSelect>>", self._ao_sel_musica)
+        _tv_por(lst, linhas_mus)
+        _tv_marcar(lst, self.mus_sel)
+        lst.bind("<<TreeviewSelect>>", self._ao_sel_musica)
         lst.bind("<Double-Button-1>",
                  lambda _e: self.tocar_musica_selecionada())
         self._mus_lista = lst
@@ -860,15 +1944,14 @@ class App:
         else:
             self.lbl_vazio.pack_forget()
         self.mostrar_detalhe()
+        self._atualizar_transporte()
 
     def _ao_sel_musica(self, _e=None):
-        try:
-            sel = self._mus_lista.curselection()
-        except (tk.TclError, AttributeError):
+        i = _tv_sel(self._mus_lista)
+        if i is None:
             return
-        if sel:
-            self.mus_sel = sel[0]
-            self.mostrar_detalhe()
+        self.mus_sel = i
+        self.mostrar_detalhe()
 
     def tocar_musica_selecionada(self, oferecer=True):
         """Toca no player interno (segue com o jogo; externo em Externo…).
@@ -884,56 +1967,77 @@ class App:
             return
         self._tocar_faixa_async(self.mus_sel, oferecer=oferecer)
 
-    def _tocar_faixa_async(self, idx: int, oferecer=True, avisar=True):
-        faixas = [{"path": m.get("musica_path") or "",
-                   "titulo": core.texto_musica(m)} for m in self.musicas]
+    def _tocar_faixa_async(self, idx: int, oferecer=True, avisar=True,
+                         faixas=None):
+        if self._mus_fechado:
+            return
+        if faixas is None:
+            faixas = [{"id": m.get("id"), "path": m.get("musica_path") or "",
+                       "titulo": core.texto_musica(m)} for m in self.musicas]
+        faixas = [dict(f) for f in faixas]
         if not (0 <= idx < len(faixas)) or not faixas[idx]["path"]:
             messagebox.showinfo("Músicas", "Selecione uma música na lista.")
             return
-        try:
-            self.player.parar()  # corte imediato (MCI stop é ms)
-        except Exception:
-            pass
         self._mus_token += 1
         meu = self._mus_token
+        player = self.player
+        player.carregar(faixas, inicio=idx)  # controles MCI sempre na thread Tk
+        player.backend.close()
         rotulo = faixas[idx]["titulo"]
+        self._mus_carregando = rotulo
         self._aviso_barra(f"Carregando: {rotulo}…")
-        self.mus_sel = idx
-        try:
-            self._mus_lista.selection_clear(0, "end")
-            self._mus_lista.selection_set(idx)
-            self._mus_lista.see(idx)
-        except (tk.TclError, AttributeError):
-            pass
-        self.mostrar_detalhe()
+        self._selecionar_faixa_player()
         self._atualizar_transporte()
 
         def trabalho():
-            self.player.carregar(faixas, inicio=idx)
-            try:
-                r = self.player.tocar()
-            except Exception as e:
-                r = {"ok": False, "erro": str(e)}
-            self._depois(lambda: self._pos_tocar(meu, r, oferecer, avisar))
+            # Só hash/conversão aqui: nenhum comando MCI ou chamada Tk.
+            with self._mus_preparo_lock:
+                if meu != self._mus_token or self._mus_fechado:
+                    return
+                try:
+                    r = player.preparar(faixas[idx]["path"])
+                except Exception as e:
+                    r = {"ok": False, "erro": str(e)}
+            self._mus_resultados.put((meu, idx, r, oferecer, avisar))
 
         threading.Thread(target=trabalho, daemon=True).start()
 
-    def _pos_tocar(self, meu: int, r: dict, oferecer: bool, avisar: bool):
-        if meu != self._mus_token:
-            try:
-                self.player.parar()  # thread velha não sequestra a nova
-            except Exception:
-                pass
+    def _processar_mus_resultados(self):
+        """Entrega preparação à thread Tk, dona do dispositivo MCI."""
+        if self._mus_fechado:
             return
+        for _ in range(100):
+            try:
+                resultado = self._mus_resultados.get_nowait()
+            except Empty:
+                break
+            self._pos_tocar(*resultado)
+        if not self._mus_fechado:
+            self._mus_poll = self.root.after(50, self._processar_mus_resultados)
+
+    def _pos_tocar(self, meu: int, idx: int, r: dict,
+                   oferecer: bool, avisar: bool):
+        if meu != self._mus_token or self._mus_fechado:
+            return  # descarta o resultado, sem parar a faixa mais nova
+        self._mus_carregando = ""
+        if r.get("ok"):
+            try:
+                r = self.player.tocar_preparado(idx, r)
+            except Exception as e:
+                r = {"ok": False, "erro": str(e)}
         if r.get("ok"):
             at = self.player.atual() or {}
             self._aviso_barra(f"Tocando: {at.get('titulo') or ''}")
         elif oferecer and "ffmpeg" in (r.get("erro") or "") \
                 and not core.ffmpeg_pronto():
+            faixas = [dict(f) for f in self.player.fila]
+
+            def repetir():
+                if meu == self._mus_token and not self._mus_fechado:
+                    self._tocar_faixa_async(idx, oferecer=False, faixas=faixas)
+
             self.instalar_deps_audio(
-                ("ffmpeg",),
-                ao_fim=lambda: self._tocar_faixa_async(self.mus_sel,
-                                                      oferecer=False))
+                ("ffmpeg",), ao_fim=repetir)
         elif avisar:
             try:
                 messagebox.showwarning("Músicas", r.get("erro", "falha"))
@@ -1024,6 +2128,7 @@ class App:
                 or self.mus_sel >= len(self.musicas):
             return
         m = self.musicas[self.mus_sel]
+        self.mus_parar()
         r = core.tocar_musica(m.get("musica_path") or "")
         if r.get("ok"):
             self._aviso_barra(f"Tocando (externo): {core.texto_musica(m)}")
@@ -1031,35 +2136,63 @@ class App:
             messagebox.showwarning("Músicas", r.get("erro", "falha"))
 
     def mus_alternar(self):
-        r = self.player.alternar()
-        if not r.get("ok") and self.player.estado == "parado":
+        if self._mus_carregando:
+            return
+        if self.player.estado == "parado":
             self.tocar_musica_selecionada()
             return
+        r = self.player.alternar()
         if not r.get("ok"):
             messagebox.showwarning("Músicas", r.get("erro", "falha"))
         self._atualizar_transporte()
 
     def mus_parar(self):
+        self._mus_token += 1  # cancela também preparações ainda em andamento
+        self._mus_carregando = ""
         self.player.parar()
+        self.player.backend.close()
         self._atualizar_transporte()
 
     def mus_proxima(self):
-        base = self.player.idx
-        if base is None or not (0 <= base < len(self.musicas)):
+        faixas = self.player.fila or [
+            {"id": m.get("id"), "path": m.get("musica_path") or "",
+             "titulo": core.texto_musica(m)} for m in self.musicas]
+        base = self.player.idx if self.player.fila else None
+        if base is None:
             base = self.mus_sel if self.mus_sel is not None else -1
         idx = base + 1
-        if idx >= len(self.musicas):
-            self.player.parar()
-            self._atualizar_transporte()
+        if idx >= len(faixas):
+            self.mus_parar()
             return
-        self._tocar_faixa_async(idx, oferecer=False, avisar=False)
+        self._tocar_faixa_async(idx, oferecer=False, avisar=False, faixas=faixas)
 
     def mus_anterior(self):
-        base = self.player.idx
-        if base is None or not (0 <= base < len(self.musicas)):
-            base = (self.mus_sel or 0) + 1
-        self._tocar_faixa_async(max(0, base - 1), oferecer=False,
-                                avisar=False)
+        if not self.player.fila:
+            if self.musicas:
+                self._tocar_faixa_async(max(0, (self.mus_sel or 0) - 1),
+                                        oferecer=False, avisar=False)
+            return
+        self._tocar_faixa_async(max(0, (self.player.idx or 0) - 1),
+                                oferecer=False, avisar=False,
+                                faixas=self.player.fila)
+
+    def _selecionar_faixa_player(self):
+        """Sincroniza por identidade, mesmo após busca ou troca de aba."""
+        if not self._em_musicas() or self.mus_modo != "hub":
+            return
+        atual = self.player.atual() or {}
+        pos = next((i for i, m in enumerate(self.musicas)
+                    if (atual.get("id") is not None and m.get("id") == atual["id"])
+                    or (m.get("musica_path") and m["musica_path"] == atual.get("path"))),
+                   None)
+        if pos is None:
+            return
+        self.mus_sel = pos
+        try:
+            _tv_marcar(self._mus_lista, pos)
+        except (tk.TclError, AttributeError):
+            pass
+        self.mostrar_detalhe()
 
     def _atualizar_transporte(self):
         try:
@@ -1073,7 +2206,8 @@ class App:
                               else "▶")
             if lbl is not None and lbl.winfo_exists():
                 at = self.player.atual()
-                lbl.configure(text=f"♪ {at['titulo']}"
+                lbl.configure(text=f"Carregando: {self._mus_carregando}…"
+                              if self._mus_carregando else f"♪ {at['titulo']}"
                                   f" ({at['estado']})" if at
                               and self.player.estado != "parado"
                               else "♪ parado")
@@ -1082,17 +2216,35 @@ class App:
 
     def _vigiar_musica(self):
         """Poll 1s: faixa acabou → próxima (auto-avançar); reagenda sempre."""
+        if self._mus_fechado:
+            return
         try:
-            if self.player.terminou():
+            if not self._mus_carregando and self.player.terminou():
                 self.mus_proxima()
             else:
                 self._atualizar_transporte()
         except Exception:
             pass
         try:
-            self.root.after(1000, self._vigiar_musica)
+            self._mus_vigia = self.root.after(1000, self._vigiar_musica)
         except tk.TclError:
             pass
+
+    def _fechar_player(self, evento):
+        if evento.widget is not self.root or self._mus_fechado:
+            return
+        self._mus_fechado = True
+        if self._dl_timer is not None:
+            self.root.after_cancel(self._dl_timer)
+            self._dl_timer = None
+        self.mus_parar()
+        for chave in ("_mus_poll", "_mus_vigia"):
+            ident = getattr(self, chave, None)
+            if ident is not None:
+                try:
+                    self.root.after_cancel(ident)
+                except tk.TclError:
+                    pass
 
     def excluir_musica_selecionada(self):
         if self.mus_modo == "fila":
@@ -1120,15 +2272,17 @@ class App:
             con.close()
         self.mus_sel = None
         if tocando and tocando == (m.get("musica_path") or ""):
-            self.player.parar()
+            self.mus_parar()
         self.recarregar()
 
     def _ir_fila(self):
         self.mus_modo = "fila"
+        self._pintar_nav()
         self.recarregar()
 
     def _ir_musicas(self):
         self.mus_modo = "hub"
+        self._pintar_nav()
         self.recarregar()
 
     def _recarregar_fila(self):
@@ -1148,39 +2302,29 @@ class App:
             con.close()
         if self.fila_sel is None or self.fila_sel >= len(self.fila):
             self.fila_sel = 0 if self.fila else None
-        fr_btn = ttk.Frame(self.grade)
+        fr_btn = BarraAcoes(self.grade)
         fr_btn.pack(side="bottom", fill="x", pady=(8, 0))
-        ttk.Button(fr_btn, text="⟵ Músicas",
-                   command=self._ir_musicas).pack(side="left")
-        ttk.Button(fr_btn, text="⬇ CSV…",
-                   command=self.baixar_csv).pack(side="left", padx=6)
-        ttk.Button(fr_btn, text="⬇ Baixar fila",
-                   command=self.baixar_fila).pack(side="left")
-        ttk.Button(fr_btn, text="Importar baixadas",
-                   command=self.importar_baixadas).pack(side="left", padx=6)
-        ttk.Button(fr_btn, text="Limpar prontas/falhas",
-                   command=self.limpar_fila).pack(side="left")
-        lst = tk.Listbox(self.grade, selectmode="single", width=64, height=18,
-                         bg="#0b0d12", fg=TXT, selectbackground=ACC,
-                         font=("Segoe UI", 11))
+        fr_btn.adicionar("Músicas", self._ir_musicas)
+        fr_btn.adicionar("CSV…", self.baixar_csv)
+        fr_btn.adicionar("Baixar fila", self.baixar_fila)
+        fr_btn.adicionar("Importar baixadas", self.importar_baixadas)
+        fr_btn.adicionar("Limpar prontas/falhas", self.limpar_fila)
+        lst = _nova_grade_tv(self.grade, ("Faixa", "Estado"))
         lst.pack(fill="both", expand=True)
         _com_rolagem(lst)
+        linhas_fila = []
         for d in self.fila:
             try:
                 rot = core.texto_musica(d)
                 est = d.get("estado") or ""
                 extra = (f" — {d.get('erro')}"
                          if est == "falha" and d.get("erro") else "")
-                lst.insert("end", f"{rot} [{est}]{extra}")
+                linhas_fila.append((rot, f"{est}{extra}"))
             except Exception:
                 continue
-        if self.fila_sel is not None:
-            try:
-                lst.selection_set(self.fila_sel)
-                lst.see(self.fila_sel)
-            except tk.TclError:
-                pass
-        lst.bind("<<ListboxSelect>>", self._ao_sel_fila)
+        _tv_por(lst, linhas_fila)
+        _tv_marcar(lst, self.fila_sel)
+        lst.bind("<<TreeviewSelect>>", self._ao_sel_fila)
         self._mus_lista = lst
         n = len(self.fila)
         np_ = sum(1 for d in self.fila if d.get("estado") == "pendente")
@@ -1201,13 +2345,11 @@ class App:
         self.mostrar_detalhe()
 
     def _ao_sel_fila(self, _e=None):
-        try:
-            sel = self._mus_lista.curselection()
-        except (tk.TclError, AttributeError):
+        i = _tv_sel(self._mus_lista)
+        if i is None:
             return
-        if sel:
-            self.fila_sel = sel[0]
-            self.mostrar_detalhe()
+        self.fila_sel = i
+        self.mostrar_detalhe()
 
     def baixar_csv(self):
         """Exportify CSV → fila (dedup; download é Fase B)."""
@@ -1221,6 +2363,7 @@ class App:
         if parsed["erros"] and not parsed["itens"]:
             messagebox.showwarning("Baixar de CSV", parsed["erros"][0])
             return
+        self._backup_pre_import()
         con = self._con()
         try:
             res = core.enfileirar_downloads(con, parsed["itens"])
@@ -1269,17 +2412,23 @@ class App:
 
         def trabalho(ids_fx=ids):
             for did in ids_fx:
-                c2 = self._con()
+                c2 = None
                 try:
+                    c2 = self._con()
                     core.baixar_faixa(c2, did, progresso=self._prog_fila)
                 except Exception as e:
                     try:
-                        core.marcar_download(c2, did, "falha",
-                                             erro=str(e)[:200])
+                        if c2 is not None:
+                            core.marcar_download(c2, did, "falha",
+                                                 erro=str(e)[:200])
                     except Exception:
                         pass
                 finally:
-                    c2.close()
+                    try:
+                        if c2 is not None:
+                            c2.close()
+                    except Exception:
+                        pass
             self._depois(self._fim_fila)
 
         self._th_fila = threading.Thread(target=trabalho, daemon=True)
@@ -1321,15 +2470,21 @@ class App:
         self._aviso_barra(f"Importando {n} faixa(s)…")
 
         def trabalho():
-            c2 = self._con()
+            c2 = None
             try:
+                self._backup_pre_import()
+                c2 = self._con()
                 res = core.importar_fila_pronta(c2)
             except Exception as e:
-                res = {"novas": 0, "ignorados": 0, "erros": [str(e)],
+                res = {"novas": 0, "ignoradas": 0, "erros": [str(e)],
                        "avisos": []}
             finally:
-                c2.close()
-            detalhe = f"{res['novas']} nova(s), {res['ignorados']} ignorada(s)"
+                try:
+                    if c2 is not None:
+                        c2.close()
+                except Exception:
+                    pass
+            detalhe = f"{res['novas']} nova(s), {res['ignoradas']} ignorada(s)"
             if res["erros"]:
                 detalhe += f"\n{res['erros'][0]}"
             if res.get("avisos"):
@@ -1349,11 +2504,21 @@ class App:
         except tk.TclError:
             pass
 
-    # -- catálogo SteamRip (buscar → hosts → Piratas/ → importar repack)
-    def dlg_steamrip(self):
+    # -- catálogos (buscar → links → baixar/abrir → importar repack)
+    def dlg_catalogo(self, fonte="steamrip", termo=None):
+        fontes = {
+            "steamrip": {"titulo": "Catálogo SteamRip",
+                         "lista": "Hosts da página:",
+                         "buscar": core.buscar_steamrip},
+            "fitgirl": {"titulo": "Catálogo FitGirl",
+                        "lista": "Espelhos e magnets:",
+                        "buscar": core.buscar_fitgirl},
+        }
+        cfg = fontes.get(fonte) or fontes["steamrip"]
+        marca = "FitGirl" if fonte == "fitgirl" else "SteamRip"
         win = tk.Toplevel(self.root)
         _titulo_escuro(win)
-        win.title("Catálogo SteamRip")
+        win.title(cfg["titulo"])
         win.transient(self.root)
         win.minsize(560, 460)
         fr = ttk.Frame(win, padding=12)
@@ -1365,34 +2530,42 @@ class App:
         ent.pack(side="left", fill="x", expand=True)
         ent.bind("<Return>", lambda _e: buscar())
         resultados: list[dict] = []
-        hosts: list[dict] = []
+        links: list[dict] = []  # {tipo: host/espelho/magnet, nome, url}
+        consulta = {"busca": 0, "hosts": 0}
+        suprimir = {"evento": False}  # seleção programática não recarrega
         self._sr_ultimo = getattr(self, "_sr_ultimo", "")
-        lst_r = tk.Listbox(fr, selectmode="single", width=70, height=9,
+        area_r = ttk.Frame(fr)
+        area_r.pack(fill="both", expand=True, pady=(8, 0))
+        lst_r = tk.Listbox(area_r, selectmode="single", width=70, height=9,
                            bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                           exportselection=False,
                            font=("Segoe UI", 11))
-        lst_r.pack(fill="both", expand=True, pady=(8, 0))
+        lst_r.pack(fill="both", expand=True)
         _com_rolagem(lst_r)
-        ttk.Label(fr, text="Hosts da página:", style="Mut.TLabel").pack(
+        ttk.Label(fr, text=cfg["lista"], style="Mut.TLabel").pack(
             anchor="w", pady=(8, 0))
-        lst_h = tk.Listbox(fr, selectmode="single", width=70, height=4,
+        area_h = ttk.Frame(fr)
+        area_h.pack(fill="x")
+        lst_h = tk.Listbox(area_h, selectmode="single", width=70, height=4,
                            bg="#0b0d12", fg=TXT, selectbackground=ACC,
+                           exportselection=False,
                            font=("Segoe UI", 10))
         lst_h.pack(fill="x")
+        _com_rolagem(lst_h)
         lbl = ttk.Label(fr, text="Busque um jogo.", style="Mut.TLabel")
         lbl.pack(anchor="w", pady=(8, 0))
-        fr_btn = ttk.Frame(fr)
+        fr_btn = BarraAcoes(fr)
         fr_btn.pack(fill="x", pady=(8, 0))
-        ttk.Button(fr_btn, text="Buscar", command=lambda: buscar()).pack(
-            side="left")
-        ttk.Button(fr_btn, text="⬇ Baixar p/ Piratas",
-                   command=lambda: baixar()).pack(side="left", padx=6)
-        ttk.Button(fr_btn, text="Abrir página",
-                   command=lambda: abrir()).pack(side="left")
-        ttk.Button(fr_btn, text="Importar último",
-                   command=lambda: importar_ultimo()).pack(side="left",
-                                                           padx=6)
-        ttk.Button(fr_btn, text="Fechar",
-                   command=win.destroy).pack(side="right")
+        fr_btn.adicionar("Buscar", lambda: buscar())
+        if fonte == "fitgirl":
+            fr_btn.adicionar("Abrir selecionado", lambda: abrir_link())
+            fr_btn.adicionar("Abrir página", lambda: abrir())
+            fr_btn.adicionar("Importar arquivo…", lambda: importar_arquivo())
+        else:
+            fr_btn.adicionar("⬇ Baixar p/ Piratas", lambda: baixar())
+            fr_btn.adicionar("Abrir página", lambda: abrir())
+            fr_btn.adicionar("Importar último", lambda: importar_ultimo())
+        fr_btn.adicionar("Fechar", win.destroy)
 
         def estado(txt):
             self._depois(lambda: lbl.configure(text=txt))
@@ -1401,21 +2574,26 @@ class App:
             termo = (q if q is not None else var_q.get()).strip()
             if not termo:
                 return
+            consulta["busca"] += 1
+            consulta["hosts"] += 1
+            meu = consulta["busca"]
             estado(f"Buscando '{termo}'…")
 
             def trabalho(termo_fx=termo):
                 try:
-                    res = core.buscar_steamrip(termo_fx)
+                    res = cfg["buscar"](termo_fx)
                 except Exception as e:
                     res = {"itens": [], "erros": [str(e)]}
-                self._depois(lambda: fim_busca(res, termo_fx))
+                self._depois(lambda: fim_busca(res, termo_fx, meu))
 
             threading.Thread(target=trabalho, daemon=True).start()
 
-        def fim_busca(res, termo):
+        def fim_busca(res, termo, meu):
+            if not win.winfo_exists() or meu != consulta["busca"]:
+                return
             resultados.clear()
             resultados.extend(res.get("itens") or [])
-            hosts.clear()
+            links.clear()
             lst_r.delete(0, "end")
             lst_h.delete(0, "end")
             for it in resultados:
@@ -1424,6 +2602,13 @@ class App:
                 estado(f"Falha: {res['erros'][0]}")
             else:
                 estado(f"{len(resultados)} resultado(s) p/ '{termo}'.")
+                if resultados:
+                    suprimir["evento"] = True
+                    try:
+                        lst_r.selection_set(0)
+                    finally:
+                        suprimir["evento"] = False
+                    ver_links()
 
         def pagina_sel():
             sel = lst_r.curselection()
@@ -1431,35 +2616,80 @@ class App:
                 return None
             return resultados[sel[0]]
 
-        def ver_hosts(_e=None):
+        def ver_links(_e=None):
+            if suprimir["evento"]:
+                return
             pg = pagina_sel()
-            hosts.clear()
+            consulta["hosts"] += 1
+            meu = consulta["hosts"]
+            links.clear()
             lst_h.delete(0, "end")
             if not pg:
                 return
-            try:
-                det = core.detalhes_steamrip(pg["url"])
-            except ValueError as e:
-                estado(f"Falha: {e}")
-                return
-            except Exception as e:
-                estado(f"Falha: {e}")
-                return
-            hosts.extend(det.get("hosts") or [])
-            for h in hosts:
-                lst_h.insert("end", f"{h['nome']} — {h['url'][:70]}")
-            estado(f"{pg['titulo']}: {len(hosts)} host(s).")
+            estado("Consultando links…")
+
+            def trabalho(pg_fx=pg):
+                try:
+                    if fonte == "fitgirl":
+                        det = core.detalhes_fitgirl(pg_fx["url"])
+                    else:
+                        det = core.detalhes_steamrip(pg_fx["url"])
+                except Exception as e:
+                    det = {"erro": str(e)}
+
+                def fim():
+                    if not win.winfo_exists() or meu != consulta["hosts"]:
+                        return
+                    if det.get("erro"):
+                        estado(f"Falha: {det['erro']}")
+                        return
+                    if fonte == "fitgirl":
+                        for h in det.get("espelhos") or []:
+                            links.append({"tipo": "espelho", **h})
+                        for m in det.get("magnets") or []:
+                            links.append({"tipo": "magnet",
+                                          "nome": core.nome_magnet(m),
+                                          "url": m})
+                    else:
+                        for h in det.get("hosts") or []:
+                            links.append({"tipo": "host", **h})
+                    for e in links:
+                        if e["tipo"] == "magnet":
+                            lst_h.insert("end", f"🧲 {e['nome']}")
+                        else:
+                            lst_h.insert("end", f"{e['nome']} — {e['url'][:70]}")
+                    estado(f"{pg_fx['titulo']}: {len(links)} link(s) — "
+                           "clique escolhe o host, duplo-clique baixa.")
+                self._depois(fim)
+
+            threading.Thread(target=trabalho, daemon=True).start()
 
         def host_sel():
             sel = lst_h.curselection()
-            if sel and sel[0] < len(hosts):
-                return hosts[sel[0]]["nome"]
+            if sel and sel[0] < len(links) \
+                    and links[sel[0]]["tipo"] != "magnet":
+                return links[sel[0]]["nome"]
             return ""
+
+        def host_feedback(_e=None):
+            nome = host_sel()
+            if nome:
+                estado(f"via {nome} (duplo-clique baixa direto).")
+            elif links:
+                estado(f"{len(links)} link(s) — automático (todos).")
+            else:
+                estado("Sem links — busque e escolha um resultado.")
+
+        def link_sel():
+            sel = lst_h.curselection()
+            if sel and sel[0] < len(links):
+                return links[sel[0]]
+            return None
 
         def baixar():
             pg = pagina_sel()
             if not pg:
-                messagebox.showinfo("SteamRip", "Escolha um resultado.")
+                messagebox.showinfo(marca, "Escolha um resultado.")
                 return
             estado(f"Baixando '{pg['titulo']}'…")
 
@@ -1480,11 +2710,20 @@ class App:
         def fim_baixar(res):
             if not res.get("ok"):
                 estado(f"Falha: {res.get('erro', 'falha')}")
-                messagebox.showwarning("SteamRip", res.get("erro", "falha"))
+                if fonte == "steamrip" and messagebox.askyesno(
+                        marca, f"{res.get('erro', 'falha')}\n\n"
+                        "Links mortos no SteamRip. Tentar no FitGirl?"):
+                    try:
+                        termo_atual = var_q.get().strip()
+                    except tk.TclError:
+                        termo_atual = ""
+                    self.dlg_catalogo("fitgirl", termo_atual)
+                    return
+                messagebox.showwarning(marca, res.get("erro", "falha"))
                 return
             self._sr_ultimo = res["path"]
             estado(f"Em Piratas/: {Path(res['path']).name}")
-            if messagebox.askyesno("SteamRip",
+            if messagebox.askyesno(marca,
                                    "Baixado. Importar para o Hub agora?"):
                 importar_ultimo()
 
@@ -1492,27 +2731,57 @@ class App:
             pg = pagina_sel()
             if not pg:
                 return
-            try:
-                import webbrowser
-                webbrowser.open(pg["url"])
-            except Exception as e:
-                messagebox.showwarning("SteamRip", f"falha: {e}")
+            r = core.abrir_url(pg["url"])
+            if not r.get("ok"):
+                messagebox.showwarning(marca, r.get("erro", "falha"))
 
-        def importar_ultimo():
-            arq = getattr(self, "_sr_ultimo", "")
+        def abrir_link():
+            e = link_sel()
+            if not e:
+                messagebox.showinfo(marca, "Escolha um espelho ou magnet.")
+                return
+            r = core.abrir_url(e["url"])
+            if r.get("ok"):
+                estado(f"Aberto: {e['nome'][:60]}")
+            else:
+                messagebox.showwarning(marca, r.get("erro", "falha"))
+
+        def importar_arquivo():
+            try:
+                from bib_nucleo.repacks import pasta_piratas
+                ini = str(pasta_piratas())
+            except Exception:
+                ini = ""
+            arq = filedialog.askopenfilename(
+                title="Repack baixado (.rar/.zip/.7z/.iso)", parent=win,
+                initialdir=ini or None,
+                filetypes=[("Repacks", "*.rar *.zip *.7z *.iso"),
+                           ("Todos", "*.*")]) or ""
+            if arq:
+                importar_ultimo(arq)
+
+        def importar_ultimo(arq=None):
+            if arq is None:
+                arq = getattr(self, "_sr_ultimo", "")
             if not arq or not Path(arq).is_file():
-                messagebox.showinfo("SteamRip", "Nada baixado ainda.")
+                messagebox.showinfo(marca, "Nada baixado ainda.")
                 return
             estado("Importando…")
 
             def trabalho(arq_fx=arq):
-                con = self._con()
+                con = None
                 try:
+                    self._backup_pre_import()
+                    con = self._con()
                     res = core.importar_repack(con, arq_fx)
                 except Exception as e:
                     res = {"ok": False, "erro": str(e)}
                 finally:
-                    con.close()
+                    try:
+                        if con is not None:
+                            con.close()
+                    except Exception:
+                        pass
                 self._depois(lambda: fim_imp(res))
 
             threading.Thread(target=trabalho, daemon=True).start()
@@ -1521,14 +2790,23 @@ class App:
             if res.get("ok"):
                 self.recarregar()
                 estado("Importado ✓")
-                messagebox.showinfo("SteamRip", "Jogo importado ✓")
+                messagebox.showinfo(marca, "Jogo importado ✓")
             else:
                 estado(f"Falha: {res.get('erro', 'falha')}")
-                messagebox.showwarning("SteamRip", res.get("erro", "falha"))
+                messagebox.showwarning(marca, res.get("erro", "falha"))
 
-        lst_r.bind("<<ListboxSelect>>", ver_hosts)
-        lst_r.bind("<Double-Button-1>", lambda _e: baixar())
+        lst_r.bind("<<ListboxSelect>>", ver_links)
+        lst_h.bind("<<ListboxSelect>>", host_feedback)
+        if fonte == "fitgirl":
+            lst_r.bind("<Double-Button-1>", lambda _e: abrir())
+            lst_h.bind("<Double-Button-1>", lambda _e: abrir_link())
+        else:
+            lst_r.bind("<Double-Button-1>", lambda _e: baixar())
+            lst_h.bind("<Double-Button-1>", lambda _e: baixar())
         ent.focus_set()
+        if (termo or "").strip():
+            var_q.set(termo.strip())
+            buscar(termo.strip())
 
     def limpar_fila(self):
         """Clear Done do Harmoni: apaga prontas/falhas (CSV recria)."""
@@ -1555,10 +2833,11 @@ class App:
         if j.get("capa"):
             alvo = core.caminho_capa(j["capa"])
             if alvo is not None:
-                img = carregar_miniatura(alvo)
+                img = carregar_miniatura(alvo, master=self.root)
         if img is not None:
             self._imgs_cards.append(img)
-            lb = tk.Label(fr, image=img, bg=CARD, cursor="hand2",
+            lb = tk.Label(fr, image=img, width=CARD_W, height=CARD_H,
+                          bg=CARD, cursor="hand2",
                           highlightthickness=2, highlightbackground=CARD,
                           borderwidth=0)
             lb.pack(padx=6, pady=(6, 2))
@@ -1581,8 +2860,8 @@ class App:
         except Exception:
             plat = "PC"
         tags = list(j.get("etiquetas_lista") or [])
-        badge_plat = tk.Label(fr, text=plat, bg=ACC, fg="white",
-                              font=("Segoe UI", 9, "bold"), padx=6, pady=2,
+        badge_plat = tk.Label(fr, text=plat, bg="#352f52", fg="#d7ceff",
+                              font=("Segoe UI", 8, "bold"), padx=7, pady=3,
                               cursor="hand2")
         badge_plat.place(x=6, y=6)
         fr._badge_plat = badge_plat  # type: ignore[attr-defined]
@@ -1594,8 +2873,8 @@ class App:
             fr._badge_tags = badge_tags  # type: ignore[attr-defined]
         t = tk.Label(fr, text=f"{'★ ' if j['favorito'] else ''}{j['titulo']}",
                      bg=CARD, fg=TXT, wraplength=CARD_W + 8,
-                     font=("Segoe UI", 11, "bold"), cursor="hand2")
-        t.pack()
+                     font=("Segoe UI", 10, "bold"), cursor="hand2")
+        t.pack(fill="x", pady=(6, 4), padx=6)
         cor = STATUS_CORES.get(j["status"], MUT)
         try:
             horas_n = round(float(j["horas"] or 0), 2)
@@ -1630,6 +2909,9 @@ class App:
             m = getattr(fr, "_meta", None)
             imgw = getattr(fr, "_imgw", None)
             bg = CARD_HOVER if on else CARD
+            idx = self._indice_do_widget(fr)
+            fr.configure(style="Selected.Card.TFrame" if idx == self.sel else
+                         "Hover.Card.TFrame" if on else "Card.TFrame")
             if t is not None:
                 t.configure(bg=bg, foreground=ACC if on else TXT)
             if m is not None:
@@ -1680,7 +2962,7 @@ class App:
         for i, c in enumerate(self.cards):
             fr = c["frame"]
             sel = (i == self.sel)
-            fr.configure(style="Card.TFrame")
+            fr.configure(style="Selected.Card.TFrame" if sel else "Card.TFrame")
             imgw = getattr(fr, "_imgw", None)
             if isinstance(imgw, tk.Label):
                 try:
@@ -1708,12 +2990,16 @@ class App:
         """Ativa/desativa botões do detalhe por contexto.
 
         jogo: tudo vale; musica: só TOCAR+Excluir (Editar/Novo é de jogo);
-        fila: tudo parado (é fila de download, não catálogo).
+        fila: tudo parado (é fila de download, não catálogo);
+        desejo: só Buscar+Excluir (Editar/Novo é de jogo);
+        download: tudo parado (torrent externo; gerenciar no qBittorrent).
         """
         try:
             estados = {"jogo": ("normal", "normal", "normal"),
                        "musica": ("disabled", "normal", "disabled"),
-                       "fila": ("disabled", "disabled", "disabled")}[modo]
+                       "fila": ("disabled", "disabled", "disabled"),
+                       "desejo": ("disabled", "normal", "disabled"),
+                       "download": ("disabled", "disabled", "disabled")}[modo]
         except KeyError:
             return
         for btn, est in zip((self.btn_det_editar, self.btn_det_excluir,
@@ -1724,6 +3010,57 @@ class App:
                 pass
 
     def mostrar_detalhe(self):
+        self.det_progresso.pack_forget()
+        if self.det_janela is not None:
+            self.root.after_idle(self._replicar_detalhe)
+        if self._em_downloads():
+            self._botoes_detalhe("download")
+            try:
+                self.btn_jogar.configure(text="📂 PASTA", state="normal")
+            except tk.TclError:
+                pass
+            d = self._dl_sel_atual()
+            if d is None:
+                self.det_titulo.configure(text="Nenhum download")
+                self.det_meta.configure(text="")
+                self.det_exe.configure(text="")
+                desenhar_tile(self.det_capa, "⬇", 216, 280, grande=True)
+                return
+            tam = (f"{core.formatar_tamanho(d['feito'])}/"
+                   f"{core.formatar_tamanho(d['total'])}")
+            self.det_titulo.configure(text=d["nome"])
+            origem = "estimativa em disco" if d.get("fonte_progresso") == "estimativa" else "estado do cliente"
+            if d.get("fonte_progresso") == "api":
+                eta = d.get("eta", 0)
+                restante = f"{eta // 60} min" if 0 < eta < 8640000 else "sem previsão"
+                origem = f"{core.formatar_tamanho(d.get('velocidade', 0))}/s · {restante}\n{d.get('estado', '')}"
+            self.det_meta.configure(text=f"{d['pct']}% · {tam}\n{origem}")
+            self.det_exe.configure(text=d.get("save_path") or "")
+            self.det_progresso.configure(value=d["pct"])
+            self.det_progresso.pack(fill="x", padx=16, pady=8, before=self.det_exe)
+            desenhar_tile(self.det_capa, "⬇", 216, 280, grande=True,
+                          subtitulo=f"{d['pct']}%" if not d["completo"] else "✓")
+            return
+        if self._em_desejos():
+            self._botoes_detalhe("desejo")
+            try:
+                self.btn_jogar.configure(text="🔎 BUSCAR", state="normal")
+            except tk.TclError:
+                pass
+            d = self._desejo_sel()
+            if d is None:
+                self.det_titulo.configure(text="Nenhum desejo")
+                self.det_meta.configure(text="")
+                self.det_exe.configure(text="")
+                desenhar_tile(self.det_capa, "☆", 216, 280, grande=True)
+                return
+            self.det_titulo.configure(text=d["titulo"])
+            self.det_meta.configure(text=f"Steam appid {d['appid']}")
+            self.det_exe.configure(
+                text=f"https://store.steampowered.com/app/{d['appid']}/")
+            desenhar_tile(self.det_capa, "☆", 216, 280, grande=True,
+                          subtitulo="desejo")
+            return
         if self._em_musicas() and self.mus_modo == "fila":
             self._botoes_detalhe("fila")
             try:
@@ -1913,6 +3250,12 @@ class App:
 
     # -- ações
     def jogar(self):
+        if self._em_downloads():
+            self.abrir_pasta_dl()
+            return
+        if self._em_desejos():
+            self.buscar_desejo_download()
+            return
         if self._em_musicas():
             self.tocar_musica_selecionada()
             return
@@ -1937,8 +3280,8 @@ class App:
                     core.marcar_execucao(con, j["id"])
                     try:
                         core.iniciar_sessao_manual(j["id"], j.get("titulo") or "")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        core.log_erro("jogar", f"sessao manual nao abriu: {e}")
                     self._minimizar_janela()
                     self._aviso_barra("Executando (UAC) — ao terminar use ⏱ Registrar sessão")
                 else:
@@ -1979,7 +3322,7 @@ class App:
         if horas is None:
             return
         try:
-            res = core.encerrar_sessao_manual(alvo["_arquivo"], float(horas))
+            res = core.encerrar_sessao_manual(alvo["_arquivo"], float(horas), db_path=self.db_path)
         except Exception as e:
             messagebox.showerror("Sessão", f"falha: {e}")
             return
@@ -1988,14 +3331,6 @@ class App:
             messagebox.showinfo("Sessão", f"+{horas}h registradas ✓" if horas else "Sessão encerrada (sem horas).")
         else:
             messagebox.showerror("Sessão", res.get("erro", "falha"))
-
-    def _verificar_sessoes_pendentes(self):
-        """Compat: avisos agora vão na barra de status (ver recarregar)."""
-        return 0
-
-    def _verificar_backup_antigo(self, dias: int = 7):
-        """Compat: avisos agora vão na barra de status (ver recarregar)."""
-        return None
 
     def _resolver_antes_de_jogar(self, con, j):
         """Perguntar-antes: emulador trocado? ROM sumida? Devolve jogo (talvez
@@ -2065,6 +3400,11 @@ class App:
         return True, f"+{r['somado']}h registradas (total {r['total']}h)."
 
     def excluir(self):
+        if self._em_downloads():
+            return
+        if self._em_desejos():
+            self.excluir_desejo_selecionado()
+            return
         if self._em_musicas():
             self.excluir_musica_selecionada()
             return
@@ -2087,7 +3427,7 @@ class App:
         self._dlg_jogo(None)
 
     def dlg_editar(self):
-        if self._em_musicas():
+        if self._em_musicas() or self._em_desejos() or self._em_downloads():
             return
         j = self.selecionado()
         if j:
@@ -2197,11 +3537,6 @@ class App:
             cmb_preset.configure(values=vals)
 
         def _troca_prov(_e=None):
-            anterior = getattr(_troca_prov, "anterior", _prov_do_jogo(j))
-            preset_vals["azahar_preset"] = var_preset.get()
-            chave = _chave_sel()
-            var_preset.set(preset_vals["azahar_preset"])
-            _troca_prov.anterior = chave
             _recarrega_presets()
 
         cmb_prov.bind("<<ComboboxSelected>>", _troca_prov)
@@ -2214,7 +3549,7 @@ class App:
                 return
             nome = simpledialog.askstring(
                 "Preset",
-                f"Nome do preset (fotografa a config atual):",
+                "Nome do preset (fotografa a config atual):",
                 parent=dlg)
             if not nome:
                 return
@@ -2617,8 +3952,8 @@ class App:
             if ao_ok:
                 try:
                     ao_ok()
-                except Exception:
-                    pass
+                except Exception as e:
+                    core.log_erro("mods", f"ao_ok falhou: {e}")
             win.destroy()
 
         lst.bind("<Double-Button-1>", alternar)
@@ -2672,8 +4007,8 @@ class App:
             if ao_ok:
                 try:
                     ao_ok()
-                except Exception:
-                    pass
+                except Exception as e:
+                    core.log_erro("cheats", f"ao_ok falhou: {e}")
 
         def adicionar():
             nome = simpledialog.askstring(
@@ -2717,8 +4052,8 @@ class App:
             if ao_ok:
                 try:
                     ao_ok()
-                except Exception:
-                    pass
+                except Exception as e:
+                    core.log_erro("cheats", f"ao_ok falhou: {e}")
 
         lst.bind("<Double-Button-1>", alternar)
         redesenhar()
@@ -2780,28 +4115,61 @@ class App:
             ttk.Button(dlg, text=rotulo, command=cmd).pack(fill="x", padx=14, pady=3)
         ttk.Button(dlg, text="Cancelar", command=dlg.destroy).pack(pady=(3, 12))
 
+    def sanear_pasta_ui(self):
+        """Acha a pasta do jogo, limpa installers/sobras e oferece importar."""
+        pasta = filedialog.askdirectory(title="Pasta do jogo p/ sanear")
+        if not pasta:
+            return
+        prog = tk.Toplevel(self.root)
+        prog.title("Organizando pasta…")
+        prog.transient(self.root)
+        ttk.Label(prog, text="Localizando o jogo e verificando sobras…").pack(padx=24, pady=20)
+
+        def trabalho():
+            self._backup_pre_import()
+            res = core.sanear_pasta(pasta)
+
+            def fim():
+                if not prog.winfo_exists():
+                    return
+                prog.destroy()
+                if not res.get("ok"):
+                    messagebox.showwarning("Sanear", res.get("erro", "falha"))
+                    return
+                detalhe = f"Pasta: {res['pasta']}"
+                if res.get("avisos"):
+                    detalhe += "\n" + "\n".join(res["avisos"][:6])
+                if res.get("precisa_instalar"):
+                    messagebox.showinfo("Sanear", detalhe + "\nSó há instalador — rode o setup antes.")
+                    return
+                detalhe += f"\nExe: {Path(res['exe']).name}"
+                if messagebox.askyesno("Sanear", detalhe + "\n\nImportar para o Hub?"):
+                    self._importar_pasta(res["pasta"])
+            self._depois(fim)
+        threading.Thread(target=self._thread_segura(trabalho, prog, "Sanear"), daemon=True).start()
+
     def _importar_pasta(self, pasta: str):
         prog = tk.Toplevel(self.root)
         _titulo_escuro(prog)
         prog.title("Importar pasta")
         prog.transient(self.root)
         ttk.Label(prog, text="Varrendo pasta (só leitura)...").pack(padx=24, pady=24)
-        prog.update()
+        try:
+            prog.update()
+        except tk.TclError:
+            return
 
         def trabalho():
             def na_ui(fn):
-                try:
-                    self.root.after(0, fn)
-                except tk.TclError:
-                    pass  # janela fechada no meio do scan
+                self._depois(fn)
 
             def falhou(e):
+                core.log_erro("importar-pasta", str(e))
                 try:
                     prog.destroy()
                 except tk.TclError:
-                    return
+                    pass
                 messagebox.showerror("Importar pasta", f"falha na varredura: {e}")
-                core.log_erro("importar-pasta", str(e))
 
             try:
                 _roots_u, itens, info = core.preview_pasta([pasta])
@@ -2871,22 +4239,22 @@ class App:
         prog.transient(self.root)
         ttk.Label(prog, text="Extraindo p/ Piratas e importando...").pack(
             padx=24, pady=24)
-        prog.update()
+        try:
+            prog.update()
+        except tk.TclError:
+            return
 
         def trabalho():
             def na_ui(fn):
-                try:
-                    self.root.after(0, fn)
-                except tk.TclError:
-                    pass  # janela fechada no meio
+                self._depois(fn)
 
             def falhou(msg):
+                core.log_erro("importar-repack", msg)
                 try:
                     prog.destroy()
                 except tk.TclError:
-                    return
+                    pass
                 messagebox.showerror("Importar repack", msg)
-                core.log_erro("importar-repack", msg)
 
             con = None
             try:
@@ -2984,22 +4352,22 @@ class App:
         prog.transient(self.root)
         ttk.Label(prog, text="Lendo Hydra, lojas e programas (só leitura)...").pack(
             padx=24, pady=24)
-        prog.update()
+        try:
+            prog.update()
+        except tk.TclError:
+            return
 
         def trabalho():
             def na_ui(fn):
-                try:
-                    self.root.after(0, fn)
-                except tk.TclError:
-                    pass  # janela fechada no meio da leitura
+                self._depois(fn)
 
             def falhou(e):
+                core.log_erro("ler-do-disco", str(e))
                 try:
                     prog.destroy()
                 except tk.TclError:
-                    return
+                    pass
                 messagebox.showerror("Ler do disco", f"falha na leitura: {e}")
-                core.log_erro("ler-do-disco", str(e))
 
             try:
                 itens, info = core.ler_do_disco()
@@ -3121,13 +4489,18 @@ class App:
             return
 
         def trabalho():
-            con = self._con()
+            con = None
             try:
+                con = self._con()
                 res = core.baixar_capas_faltantes(con)
             except Exception as e:
                 res = {"novas": 0, "pendentes": 0, "erros": [str(e)]}
             finally:
-                con.close()
+                try:
+                    if con is not None:
+                        con.close()
+                except Exception:
+                    pass
 
             def fim(res=res):
                 try:
@@ -3148,10 +4521,14 @@ class App:
         threading.Thread(target=trabalho, daemon=True).start()
 
     def _depois(self, fn):
-        try:
-            self.root.after(0, fn)
-        except tk.TclError:
-            pass  # janela fechada
+        self._despacho.enviar(fn)
+
+    def _erro_callback(self, erro):
+        if isinstance(erro, tk.TclError):
+            return  # diálogo destruído antes de uma entrega pendente
+        detalhe = "".join(traceback.format_exception(type(erro), erro, erro.__traceback__))
+        core.log_erro("interface", detalhe)
+        self._aviso_barra(f"Erro interno: {type(erro).__name__} (veja dados/erros.log)")
 
     # -- músicas (selfhost de áudio; play no player do SO por ação explícita)
     def importar_musicas(self):
@@ -3182,13 +4559,19 @@ class App:
             return
 
         def trabalho(pasta_fx=pasta):
-            con = self._con()
+            con = None
             try:
+                self._backup_pre_import()
+                con = self._con()
                 res = core.importar_musicas(con, pasta_fx)
             except Exception as e:
                 res = {"novos": 0, "ignorados": 0, "erros": [str(e)]}
             finally:
-                con.close()
+                try:
+                    if con is not None:
+                        con.close()
+                except Exception:
+                    pass
 
             def fim(res=res):
                 try:
@@ -3549,7 +4932,7 @@ class App:
         except (OSError, ValueError) as e:
             messagebox.showerror("Importar", f"JSON inválido: {e}")
             return
-        lista = dados if isinstance(dados, list) else dados.get("jogos", [])
+        lista = dados if isinstance(dados, list) else dados.get("jogos") if isinstance(dados, dict) else None
         if not isinstance(lista, list):
             messagebox.showerror("Importar", "JSON deve ser lista ou {jogos:[...]}.")
             return
@@ -3575,20 +4958,21 @@ class App:
         prog.title("Pacote")
         prog.transient(self.root)
         ttk.Label(prog, text="Empacotando (só leitura)...").pack(padx=24, pady=24)
-        prog.update()
+        try:
+            prog.update()
+        except tk.TclError:
+            return
 
         def trabalho():
             def na_ui(fn):
-                try:
-                    self.root.after(0, fn)
-                except tk.TclError:
-                    pass
+                self._depois(fn)
 
             def _falhou(msg):
+                core.log_erro("pacote", msg)
                 try:
                     prog.destroy()
                 except tk.TclError:
-                    return
+                    pass
                 messagebox.showerror("Pacote", f"falha: {msg}")
 
             try:
@@ -3627,20 +5011,21 @@ class App:
         prog.title("Pacote")
         prog.transient(self.root)
         ttk.Label(prog, text="Restaurando pacote...").pack(padx=24, pady=24)
-        prog.update()
+        try:
+            prog.update()
+        except tk.TclError:
+            return
 
         def trabalho():
             def na_ui(fn):
-                try:
-                    self.root.after(0, fn)
-                except tk.TclError:
-                    pass
+                self._depois(fn)
 
             def _falhou(msg):
+                core.log_erro("pacote", msg)
                 try:
                     prog.destroy()
                 except tk.TclError:
-                    return
+                    pass
                 messagebox.showerror("Pacote", f"falha: {msg}")
 
             try:
@@ -3702,7 +5087,6 @@ def resolver_jogo_cli(con, busca: str) -> dict:
 def main_jogar(args) -> int:
     """`--jogar BUSCA`: abre o jogo sem a janela (p/ atalhos do Desktop)."""
     import threading
-    import time
     con = core.get_db(Path(args.db))
     try:
         try:

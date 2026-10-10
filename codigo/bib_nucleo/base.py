@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import datetime
+import json
 import os
 import re
+import socket
 import sys
+import time
 import unicodedata
 from pathlib import Path
 
@@ -35,6 +38,10 @@ def resolve_home() -> Path:
     env = os.environ.get("BIBLIOTECA_HOME")
     if env:
         return Path(env)
+    # Um pacote real sempre vence a instalação canônica do PC de build.
+    if (BASE_DIR / "manifesto-runtime.json").is_file() or (
+            (BASE_DIR / "app/bib_core.py").is_file() and (BASE_DIR / "python/python.exe").is_file()):
+        return BASE_DIR
     if os.name == "nt":
         cand = Path(WIN_ROOT) / REL_HOME
         if cand.is_dir():
@@ -75,9 +82,8 @@ WINE_PREFIXO = SAVES_DIR / "wine"
 # extraído e normalizado). O play materializa só os ativos via junction.
 MODS_DIR = DADOS_DIR / "mods"
 
-# Trilhas/OSTs por jogo (preparo p/ download MP3 futuro): musicas/<gid>-<slug>.<ext>.
-# Fora do git (dados/ ignorado), fora do scanner (SKIP_DIRS) e fora dos pacotes
-# de emulador — módulo próprio futuro reutiliza o padrão atualizacao.instalar.
+# Catálogo de áudio independente dos jogos; arquivos importados por conteúdo.
+# Fora do git e do scanner; áudio final viaja no pacote de coleção.
 MUSICAS_DIR = DADOS_DIR / "musicas"
 
 # Rascunhos brutos da fila CSV → mp3 (Fase B baixa aqui; Fase C importa
@@ -266,42 +272,89 @@ def lock_path() -> Path:
     return HOME_DIR / ".biblioteca.lock"
 
 
+def _processo_vivo(pid) -> bool | None:
+    try:
+        pid = int(pid)
+        if pid <= 0:
+            return None
+        if os.name == "nt":
+            import ctypes
+            from ctypes import wintypes
+            dll = ctypes.WinDLL("kernel32", use_last_error=True)
+            dll.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            dll.OpenProcess.restype = wintypes.HANDLE
+            dll.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+            dll.GetExitCodeProcess.restype = wintypes.BOOL
+            dll.CloseHandle.argtypes = [wintypes.HANDLE]
+            dll.CloseHandle.restype = wintypes.BOOL
+            handle = dll.OpenProcess(0x1000, False, pid)
+            if not handle:
+                return True if ctypes.get_last_error() == 5 else False
+            try:
+                codigo = wintypes.DWORD()
+                return codigo.value == 259 if dll.GetExitCodeProcess(handle, ctypes.byref(codigo)) else None
+            finally:
+                dll.CloseHandle(handle)
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+
+
 def adquirir_lock(ignorar: bool = False) -> dict:
     """Impede 2 instâncias (Win+Linux juntos corrompem o SQLite).
 
     Retorna {"ok": True} ou {"ok": False, "erro": ...}. Com ignorar=True,
     sobrescreve lock existente (uso: --ignorar-lock após crash).
-    Lock stale (>24h) é sobrescrito sozinho.
+    Criação exclusiva impede duas aberturas simultâneas. Lock antigo
+    (>24h) pode ser recuperado; PID vivo no mesmo host nunca expira.
     """
-    import json as _json
-    import socket as _socket
     lp = lock_path()
-    try:
-        lp.parent.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        pass
     info_atual = {"pid": os.getpid(),
-                  "host": _socket.gethostname(),
-                  "so": os.name,
+                  "host": socket.gethostname(),
+                  "so": sys.platform,
                   "inicio": agora_iso()}
     try:
-        if lp.is_file() and not ignorar:
+        lp.parent.mkdir(parents=True, exist_ok=True)
+        for _ in range(3):
             try:
-                antigo = _json.loads(lp.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                antigo = {}
-            try:
-                idade_h = (datetime.datetime.now().astimezone() -
-                           datetime.datetime.fromisoformat(str(antigo.get("inicio") or ""))).total_seconds() / 3600.0
-            except (ValueError, TypeError):
-                idade_h = 999.0
-            if idade_h < 24:
-                return {"ok": False, "lock": antigo,
-                        "erro": (f"Biblioteca já aberta em {antigo.get('host', '?')} "
-                                 f"(pid {antigo.get('pid', '?')}, desde {antigo.get('inicio', '?')}). "
-                                 "Feche lá primeiro ou use --ignorar-lock (após crash).")}
-        lp.write_text(_json.dumps(info_atual, ensure_ascii=False, indent=2), encoding="utf-8")
-        return {"ok": True, "lock": info_atual}
+                fd = os.open(lp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            except FileExistsError:
+                try:
+                    antigo = json.loads(lp.read_text(encoding="utf-8"))
+                    antigo = antigo if isinstance(antigo, dict) else {}
+                except (OSError, ValueError):
+                    antigo = {}
+                try:
+                    idade_h = (datetime.datetime.now().astimezone() -
+                               datetime.datetime.fromisoformat(str(antigo.get("inicio") or ""))).total_seconds() / 3600.0
+                except (ValueError, TypeError):
+                    # Pode ser o intervalo entre criação e gravação por outra instância.
+                    try:
+                        idade_h = (time.time() - lp.stat().st_mtime) / 3600.0
+                    except FileNotFoundError:
+                        continue
+                mesmo_host = antigo.get("host") == info_atual["host"]
+                mesmo_so = antigo.get("so") in (sys.platform, os.name)
+                vivo = mesmo_host and mesmo_so and _processo_vivo(antigo.get("pid")) is True
+                if not ignorar and (idade_h < 24 or vivo):
+                    return {"ok": False, "lock": antigo,
+                            "erro": (f"Biblioteca já aberta em {antigo.get('host', '?')} "
+                                     f"(pid {antigo.get('pid', '?')}, desde {antigo.get('inicio', '?')}). "
+                                     "Feche lá primeiro ou use --ignorar-lock (após crash).")}
+                try:
+                    lp.unlink()
+                except FileNotFoundError:
+                    pass
+                continue
+            with os.fdopen(fd, "w", encoding="utf-8") as arquivo:
+                json.dump(info_atual, arquivo, ensure_ascii=False, indent=2)
+            return {"ok": True, "lock": info_atual}
+        return {"ok": False, "erro": "Outra instância está abrindo a biblioteca."}
     except OSError as e:
         return {"ok": False, "erro": f"não consegui gravar lock: {e}"}
 
@@ -318,12 +371,14 @@ def liberar_lock() -> None:
             dono = _json.loads(lp.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return
+        if not isinstance(dono, dict):
+            return
         try:
             host_atual = _socket.gethostname()
         except OSError:
             host_atual = ""
         # campos ausentes = lock de versão antiga: aceita como próprio
-        so_ok = dono.get("so") in (None, "", os.name)
+        so_ok = dono.get("so") in (None, "", os.name, sys.platform)
         host_ok = dono.get("host") in (None, "") or dono.get("host") == host_atual
         if (int(dono.get("pid") or -1) == os.getpid() and so_ok and host_ok):
             try:
@@ -354,11 +409,16 @@ def slugify(s: str) -> str:
     return n or "capa"
 
 
+def nome_arquivo_portatil(caminho: str) -> str:
+    """Basename de caminhos Windows/POSIX, independentemente do SO atual."""
+    return Path(str(caminho or "").replace("\\", "/")).name
+
+
 # Extensões de ROM por provider (aqui p/ scans e emuladores usarem sem ciclo).
 ROM_EXTS_3DS = {".cci", ".cxi", ".3ds", ".3dsx", ".elf", ".app", ".axf"}
 
-# Áudio por jogo (OST futura): só formatos que o Hub vai baixar/guardar.
-MUSICA_EXTS = {".mp3", ".ogg", ".m4a", ".flac", ".wav"}
+# Áudio do catálogo: inclui Opus nativo quando a conversão não está disponível.
+MUSICA_EXTS = {".mp3", ".ogg", ".opus", ".m4a", ".flac", ".wav"}
 
 __all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'MAC_ROOT', 'eh_mac', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'MODS_DIR', 'MUSICAS_DIR', 'BAIXAR_DIR', 'CACHE_WAV_DIR', 'TEXTURAS_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'win_para_mac', 'mac_para_win', 'linux_para_mac', 'mac_para_linux', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
- 'ROM_EXTS_3DS', 'MUSICA_EXTS']
+ 'ROM_EXTS_3DS', 'MUSICA_EXTS', 'nome_arquivo_portatil']

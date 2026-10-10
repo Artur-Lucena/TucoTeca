@@ -270,3 +270,144 @@ def teste_repack_7z_ausente_orienta():
             os.environ.pop("BIBLIOTECA_7Z", None)
         else:
             os.environ["BIBLIOTECA_7Z"] = velho
+
+
+def teste_sanear_pasta_acha_e_limpa():
+    from bib_nucleo import repacks as RP
+    tmp = Path(tempfile.mkdtemp(prefix="suite-rp-"))
+    jogo = tmp / "JogoX"
+    (jogo / "Wrapper").mkdir(parents=True)
+    (jogo / "Wrapper" / "GameX.exe").write_bytes(b"MZ" + b"0" * 5000)
+    (jogo / "Wrapper" / "setup_gamex.exe").write_bytes(b"S" * 500)
+    (jogo / "Wrapper" / "Read_Me.txt").write_bytes(b"leia")
+    (jogo / "Wrapper" / "site.url").write_bytes(b"[x]")
+    (jogo / "Wrapper" / "_CommonRedist").mkdir()
+    res = RP.sanear_pasta(jogo)
+    afirmar(res.get("ok") and not res.get("precisa_instalar"), res)
+    afirmar(Path(res["pasta"]).name == "Wrapper", res)
+    afirmar(res["exe"].endswith("GameX.exe"), res)
+    afirmar(res["quarentenados"] == 1, res)
+    certa = Path(res["pasta"])
+    afirmar(not (certa / "Read_Me.txt").exists(), "lixo ficou")
+    afirmar(not (certa / "site.url").exists(), "url ficou")
+    afirmar(not (certa / "setup_gamex.exe").exists(), "setup ficou")
+    afirmar((certa / ".hub-lixo" / "setup_gamex.exe").is_file(),
+            "quarentena sumiu")
+    so_setup = tmp / "so-setup"
+    so_setup.mkdir()
+    (so_setup / "setup_jogo.exe").write_bytes(b"S")
+    res = RP.sanear_pasta(so_setup)
+    afirmar(res.get("ok") and res.get("precisa_instalar"), res)
+    afirmar((so_setup / "setup_jogo.exe").is_file(), "setup sumiu!")
+    res = RP.sanear_pasta(tmp / "sumiu")
+    afirmar(not res.get("ok"), res)
+    afirmar("sanear_pasta" in core.__all__)
+
+
+def teste_sanear_preserva_instaladores_e_redist_distinto():
+    from bib_nucleo import repacks as RP
+    tmp = Path(tempfile.mkdtemp(prefix="suite-rp-"))
+    instalador = tmp / "instalador"
+    instalador.mkdir()
+    (instalador / "setup.exe").write_bytes(b"setup")
+    (instalador / "Read_Me.txt").write_text("Instruções", encoding="utf-8")
+    r = RP.sanear_pasta(instalador)
+    afirmar(r.get("precisa_instalar"), r)
+    afirmar((instalador / "Read_Me.txt").exists(), "limpou antes de localizar um jogo")
+    jogo = tmp / "Jogo"
+    a, b = jogo / "_CommonRedist", jogo / "Dados/_CommonRedist"
+    a.mkdir(parents=True)
+    b.mkdir(parents=True)
+    (jogo / "Jogo.exe").write_bytes(b"MZ" + b"G" * 5000)
+    (a / "runtime.dll").write_bytes(b"AAAA")
+    (b / "runtime.dll").write_bytes(b"BBBB")
+    RP.organizar_extraido(jogo)
+    afirmar(a.is_dir() and b.is_dir(), "mesmo nome/tamanho foi confundido com duplicata")
+    (b / "runtime.dll").write_bytes(b"AAAA")
+    RP.organizar_extraido(jogo)
+    afirmar(not a.exists() and b.is_dir(), "não preservou a cópia dentro do jogo")
+
+
+def teste_canonizar_steam_exato():
+    import json as _json
+    import urllib.request
+    from bib_nucleo import scans as S
+
+    class _Resp:
+        def __init__(self, dados):
+            self._d = dados
+
+        def read(self):
+            return _json.dumps(self._d).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    payload = {"items": [{"id": 7, "name": "Outro Jogo"},
+                         {"id": 2062430, "name": "BALL x PIT"}]}
+    orig = urllib.request.urlopen
+    urllib.request.urlopen = lambda *a, **k: _Resp(payload)
+    try:
+        afirmar(S.canonizar_steam("Balls", "BALL x PIT")
+                == ("2062430", "BALL x PIT"))
+        afirmar(S.canonizar_steam("zzz") == ("", ""))
+        afirmar(S._appid_steam_por_titulo("BALL x PIT") == "2062430")
+    finally:
+        urllib.request.urlopen = orig
+    urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(
+        OSError("rede-x"))
+    try:
+        afirmar(S.canonizar_steam("BALL x PIT") == ("", ""))
+    finally:
+        urllib.request.urlopen = orig
+
+
+def teste_repack_nome_canonico_e_capa():
+    import urllib.request
+    from bib_nucleo import banco as B
+    from bib_nucleo import repacks as RP
+    from bib_nucleo import scans as S
+    tmp = Path(tempfile.mkdtemp(prefix="suite-rp-"))
+    arq = tmp / "ballpit.zip"
+    with zipfile.ZipFile(arq, "w") as zh:
+        zh.writestr("BALL x PIT/Balls.exe", b"MZ" + b"0" * 5000)
+    payload = {"items": [{"id": 2062430, "name": "BALL x PIT"}]}
+
+    class _Resp:
+        def read(self):
+            import json as _j
+            return _j.dumps(payload).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    con = core.get_db(tmp / "c.db")
+    orig_open, orig_capa = urllib.request.urlopen, S._capa_steam
+    orig_appid = S._appid_steam_por_titulo
+    orig_salvar_b, orig_salvar_s = B.salvar_capa_bytes, S.salvar_capa_bytes
+    chamadas = []
+    urllib.request.urlopen = lambda *a, **k: _Resp()
+    S._capa_steam = lambda a, timeout=15: b"x" * 2000
+    fake_salvar = lambda c, g, f, d: chamadas.append((g, f)) or {"ok": True}
+    B.salvar_capa_bytes = fake_salvar
+    S.salvar_capa_bytes = fake_salvar
+    try:
+        r = RP.importar_repack(con, arq, destino_raiz=tmp / "pir")
+        afirmar(r.get("ok") and r["titulo"] == "BALL x PIT", r)
+        got = B.listar_jogos(con, q="BALL x PIT")
+        afirmar(len(got) == 1 and got[0]["shop"] == "steam"
+                and got[0]["object_id"] == "2062430", got)
+        afirmar(chamadas and chamadas[0][1].endswith(".jpg"), chamadas)
+    finally:
+        urllib.request.urlopen = orig_open
+        S._capa_steam = orig_capa
+        S._appid_steam_por_titulo = orig_appid
+        B.salvar_capa_bytes = orig_salvar_b
+        S.salvar_capa_bytes = orig_salvar_s
+        con.close()

@@ -21,6 +21,7 @@ from bib_nucleo.base import (BACKUP_DIR, LINUX_ROOT, MAC_ROOT, PRESETS_DIR, ROM_
                                WIN_ROOT, eh_mac, existe_aqui_ou_traduzido,
                                resolver_exe, slugify, traduzir_para_atual)
 from bib_nucleo.banco import contar_por_origem
+from bib_nucleo.cheats import titulo_ok
 
 
 def azahar_dir_override() -> Path | None:
@@ -28,7 +29,8 @@ def azahar_dir_override() -> Path | None:
     env = (os.environ.get("BIBLIOTECA_AZAHAR_DIR") or "").strip()
     if env:
         return Path(env)
-    return None
+    from bib_nucleo.ferramentas import emulador_local_dir
+    return emulador_local_dir("Azahar")
 
 
 def _app_macos(pasta: Path) -> str:
@@ -211,9 +213,10 @@ DESMUME_VERSAO_ARQ = "desmume-versao.txt"
 
 def desmume_dir_override() -> Path | None:
     env = (os.environ.get("BIBLIOTECA_DESMUME_DIR") or "").strip()
-    if env and Path(env).is_dir():
+    if env:
         return Path(env)
-    return None
+    from bib_nucleo.ferramentas import emulador_local_dir
+    return emulador_local_dir("DeSmuME")
 
 
 def desmume_dir() -> Path:
@@ -406,13 +409,19 @@ def executar_elevado(executable_path: str, launch_options: str = "") -> dict:
         if not p.exists():
             return {"ok": False, "erro": f"Executável não encontrado: {exe}"}
         cwd = str(p.parent) if p.parent.exists() else None
-        extra = shlex.split(launch_options.strip(), posix=False) if launch_options.strip() else []
-        params = subprocess.list2cmdline(extra) or None
         try:
-            rc = ctypes.windll.shell32.ShellExecuteW(
+            extra = _argumentos_lancamento(launch_options)
+            params = subprocess.list2cmdline(extra) or None
+            from ctypes import wintypes
+            shell = ctypes.WinDLL("shell32", use_last_error=True)
+            shell.ShellExecuteW.argtypes = [wintypes.HWND, wintypes.LPCWSTR,
+                                            wintypes.LPCWSTR, wintypes.LPCWSTR,
+                                            wintypes.LPCWSTR, ctypes.c_int]
+            shell.ShellExecuteW.restype = wintypes.HINSTANCE
+            rc = shell.ShellExecuteW(
                 None, "runas", str(p), params, cwd, 1)
-            if int(rc) <= 32:
-                return {"ok": False, "erro": f"UAC recusou/falhou (código {int(rc)})"}
+            if int(rc or 0) <= 32:
+                return {"ok": False, "erro": f"UAC recusou/falhou (código {int(rc or 0)})"}
             return {"ok": True, "modo": "runas-uac"}
         except Exception as e:
             return {"ok": False, "erro": f"{type(e).__name__}: {e}"}
@@ -451,6 +460,14 @@ def prefixo_wine_hub() -> str:
     return str(WINE_PREFIXO)
 
 
+def _argumentos_lancamento(opcoes: str) -> list[str]:
+    extra = shlex.split(opcoes, posix=(os.name != "nt")) if opcoes.strip() else []
+    if os.name == "nt":
+        extra = [(a[1:-1] if len(a) >= 2 and a[0] == a[-1] and a[0] in "\"'" else a)
+                 for a in extra]
+    return extra
+
+
 def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "",
             elevar: bool = False) -> tuple[dict, object | None]:
     """Núcleo do lançamento. Retorna (resultado, Popen|None).
@@ -473,12 +490,8 @@ def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "
 
     # Aspas são só agrupamento p/ o split (Popen recebe lista e cita sozinho):
     # "C:\com espaco\jogo.cci" vira um arg limpo, sem aspas literais.
-    extra = shlex.split(launch_options, posix=(os.name != "nt")) if launch_options.strip() else []
-    if os.name == "nt":
-        extra = [(a[1:-1] if len(a) >= 2 and a[0] == a[-1] and a[0] in "\"'" else a)
-                 for a in extra]
-
     try:
+        extra = _argumentos_lancamento(launch_options)
         cwd = str(p.parent) if p.parent.exists() else None
         if os.name == "nt":
             ext = p.suffix.lower()
@@ -754,6 +767,8 @@ def listar_sessoes_pendentes() -> list[dict]:
         for arq in sorted(SESSOES_DIR.glob("sessao-*.json")):
             try:
                 d = json.loads(arq.read_text(encoding="utf-8"))
+                if not isinstance(d, dict):
+                    continue
                 d["_arquivo"] = str(arq)
                 out.append(d)
             except (OSError, ValueError):
@@ -763,15 +778,24 @@ def listar_sessoes_pendentes() -> list[dict]:
     return out
 
 
-def encerrar_sessao_manual(arquivo: str, horas: float = 0.0) -> dict:
-    """Fecha marcador: soma horas (se >0) e apaga arquivo. Sempre remove."""
+def encerrar_sessao_manual(arquivo: str, horas: float = 0.0, db_path=None) -> dict:
+    """Fecha marcador depois de validar e registrar horas no banco indicado."""
     from bib_nucleo.base import SESSOES_DIR
     from bib_nucleo.banco import adicionar_horas, get_db
     from bib_nucleo.base import DEFAULT_DB
     p = Path(arquivo)
+    try:
+        horas = float(horas)
+        import math
+        if not math.isfinite(horas) or horas < 0:
+            raise ValueError("horas inválidas")
+    except (TypeError, ValueError):
+        return {"ok": False, "erro": "horas deve ser número finito >= 0"}
     gid = 0
     try:
         d = json.loads(p.read_text(encoding="utf-8"))
+        if not isinstance(d, dict):
+            raise ValueError("marcador não é objeto")
         gid = int(d.get("gid") or 0)
     except (OSError, ValueError, TypeError):
         try:
@@ -782,7 +806,7 @@ def encerrar_sessao_manual(arquivo: str, horas: float = 0.0) -> dict:
     res = {"ok": True, "somado": 0.0}
     if horas and horas > 0 and gid:
         try:
-            con = get_db(DEFAULT_DB)
+            con = get_db(Path(db_path) if db_path is not None else DEFAULT_DB)
             try:
                 r = adicionar_horas(con, gid, float(horas))
             finally:
@@ -790,7 +814,7 @@ def encerrar_sessao_manual(arquivo: str, horas: float = 0.0) -> dict:
             if r.get("ok"):
                 res["somado"] = r["somado"]
             else:
-                res = {"ok": False, "erro": r.get("erro", "falha")}
+                return {"ok": False, "erro": r.get("erro", "falha")}
         except Exception as e:
             return {"ok": False, "erro": f"{type(e).__name__}: {e}"}
     try:
@@ -1099,7 +1123,10 @@ def mods_lib_dir() -> Path:
 
 
 def mods_titulo_dir(title_id: str) -> Path:
-    d = mods_lib_dir() / (title_id or "").strip().upper()
+    tid = titulo_ok(title_id)
+    if not tid:
+        raise ValueError("title ID inválido")
+    d = mods_lib_dir() / tid
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -1142,7 +1169,10 @@ def remover_link(link: str) -> None:
     l = Path(link)
     if _eh_reparse(l):
         try:
-            os.rmdir(l)
+            if l.is_symlink():
+                l.unlink()
+            else:
+                os.rmdir(l)  # junction NTFS
         except OSError as e:
             raise OSError(f"não removi {link}: {e}")
 
@@ -1159,7 +1189,7 @@ def _eh_mod_valido(p: Path) -> bool:
 
 def listar_mods(title_id: str) -> list[str]:
     """Nomes dos mods na biblioteca p/ este title ID (ordenados)."""
-    tid = (title_id or "").strip().upper()
+    tid = titulo_ok(title_id)
     if not tid:
         return []
     try:
@@ -1173,7 +1203,9 @@ def listar_mods(title_id: str) -> list[str]:
 
 def remover_mod(title_id: str, nome: str) -> dict:
     """Apaga um mod da biblioteca (só dentro dela; nunca no Azahar)."""
-    tid = (title_id or "").strip().upper()
+    tid = titulo_ok(title_id)
+    if not tid:
+        return {"ok": False, "erro": "title ID inválido"}
     alvo = mods_lib_dir() / tid / Path(nome or "").name
     try:
         dentro = alvo.resolve().parent == (mods_lib_dir() / tid).resolve()
@@ -1209,13 +1241,15 @@ def _ler_manifesto(pasta: Path) -> dict:
         if isinstance(d, dict) and isinstance(d.get("mods"), list) \
                 and isinstance(d.get("arquivos"), list):
             return {"mods": [m for m in d["mods"] if isinstance(m, str)],
-                    "arquivos": [a for a in d["arquivos"] if isinstance(a, str)]}
+                    "arquivos": [a for a in d["arquivos"] if isinstance(a, str)],
+                    "fontes": d.get("fontes"), "completo": d.get("completo", False)}
     except (OSError, ValueError):
         pass
-    return {"mods": [], "arquivos": []}
+    return {"mods": [], "arquivos": [], "fontes": None, "completo": False}
 
 
-def _gravar_manifesto(pasta: Path, mods: list[str], arquivos: list[str]) -> None:
+def _gravar_manifesto(pasta: Path, mods: list[str], arquivos: list[str],
+                     fontes=None, completo=False) -> None:
     """Grava (ou remove, se vazio) o manifesto do HUB. Nunca levanta."""
     import json as _json
     alvo = pasta / ".hub-mods.json"
@@ -1227,7 +1261,8 @@ def _gravar_manifesto(pasta: Path, mods: list[str], arquivos: list[str]) -> None
                 pass
             return
         tmp = pasta / ".hub-mods.tmp"
-        tmp.write_text(_json.dumps({"mods": mods, "arquivos": arquivos},
+        tmp.write_text(_json.dumps({"mods": mods, "arquivos": arquivos,
+                                   "fontes": fontes, "completo": completo},
                                    ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(alvo)
     except OSError:
@@ -1306,7 +1341,7 @@ def aplicar_mods(jogo: dict) -> dict:
     except OSError as e:
         return {"aplicados": [], "aviso": f"pasta de mods inacessível ({e})"}
     disponiveis = set(listar_mods(tid))
-    avisos += _limpar_hub(pasta, disponiveis)
+    anterior = _ler_manifesto(pasta)
     try:
         desligados = int(jogo.get("azahar_mods_off") or 0) != 0
     except (TypeError, ValueError):
@@ -1316,11 +1351,24 @@ def aplicar_mods(jogo: dict) -> dict:
         if nome not in disponiveis:
             avisos.append(f"mod '{nome}' marcado mas fora da biblioteca")
     pedidos = [m for m in pedidos if m in disponiveis]
+    fontes = []
+    try:
+        for nome in pedidos:
+            origem = mods_lib_dir() / tid / nome
+            for arq in sorted(origem.rglob("*")):
+                if arq.is_file() and not _eh_reparse(arq):
+                    st = arq.stat()
+                    fontes.append([nome, arq.relative_to(origem).as_posix(), st.st_size, st.st_mtime_ns])
+    except OSError as e:
+        return {"aplicados": anterior["mods"], "aviso": f"Mods não atualizados: {e}"}
+    if (pedidos and anterior["mods"] == pedidos and anterior["completo"]
+            and anterior["fontes"] == fontes
+            and all((pasta / a).is_file() for a in anterior["arquivos"])):
+        return {"aplicados": list(pedidos), "aviso": "; ".join(avisos) or None}
+    gerenciados = set(anterior["arquivos"])
+    avisos += _limpar_hub(pasta, disponiveis)
     if not pedidos:
         return {"aplicados": [], "aviso": "; ".join(avisos) or None}
-    mani = _ler_manifesto(pasta)
-    if mani["mods"] == pedidos and all((pasta / a).is_file() for a in mani["arquivos"]):
-        return {"aplicados": list(pedidos), "aviso": "; ".join(avisos) or None}
     arquivos: list[str] = []
     vistos: set[str] = set()
     for nome in pedidos:
@@ -1335,6 +1383,12 @@ def aplicar_mods(jogo: dict) -> dict:
                     continue
                 dest = pasta / Path(*Path(rel).parts)
                 try:
+                    if dest.exists() and rel not in gerenciados and rel not in vistos:
+                        avisos.append(f"mod '{nome}': '{rel}' já existe fora do Hub; preservado")
+                        continue
+                    if pasta.resolve() not in dest.resolve().parents or _eh_reparse(dest):
+                        avisos.append(f"mod '{nome}': destino de '{rel}' é um link; preservado")
+                        continue
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(arq, dest)
                 except OSError as e:
@@ -1346,7 +1400,7 @@ def aplicar_mods(jogo: dict) -> dict:
             aplicados.append(nome)
         except OSError as e:
             avisos.append(f"mod '{nome}' não ativou ({e})")
-    _gravar_manifesto(pasta, pedidos, arquivos)
+    _gravar_manifesto(pasta, pedidos, arquivos, fontes=fontes, completo=not avisos)
     return {"aplicados": aplicados, "aviso": "; ".join(avisos) or None}
 
 

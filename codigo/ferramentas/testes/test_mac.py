@@ -358,3 +358,51 @@ def teste_lancar_exe_sem_wine_no_mac_mensagem():
     finally:
         sys.platform = anterior
     afirmar(not res.get("ok") and "Mac" in (res.get("erro") or ""), res)
+
+
+def teste_update_dmg_preserva_sufixo_no_download():
+    from unittest.mock import patch
+    from bib_nucleo import atualizacao as ATUAL
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
+
+    class Resp:
+        headers = {"Content-Length": "4"}
+        def __init__(self):
+            self.raw = b"DMG!"
+        def read(self, _n):
+            raw, self.raw = self.raw, b""
+            return raw
+        def __enter__(self):
+            return self
+        def __exit__(self, *_exc):
+            pass
+
+    def extrair(pacote, stage):
+        afirmar(pacote.suffix == ".dmg", "download perdeu a extensão do asset")
+        _app_fake(stage, "DeSmuME.app", "desmume")
+        return "DeSmuME.app"
+
+    with patch.object(ATUAL.urllib.request, "urlopen", return_value=Resp()), \
+            patch.object(ATUAL, "_extrair_app_mac", side_effect=extrair):
+        r = ATUAL.instalar({"url": "https://x/emu.dmg", "nome": "emu.dmg", "tag": "v1", "size": 4},
+                          tmp / "emu", plataforma="darwin")
+    afirmar(r["ok"], r)
+
+
+def teste_zip_mac_rejeita_link_externo_antes_de_ativar():
+    import stat
+    import zipfile
+    from bib_nucleo import atualizacao as ATUAL
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
+    zip_path = tmp / "app.zip"
+    link = zipfile.ZipInfo("Azahar.app/Contents/evil")
+    link.external_attr = (stat.S_IFLNK | 0o777) << 16
+    with zipfile.ZipFile(zip_path, "w") as out:
+        out.writestr(link, "../../../../fora")
+    stage = tmp / "stage"
+    stage.mkdir()
+    try:
+        ATUAL._extrair_app_mac(zip_path, stage)
+        afirmar(False, "aceitou link externo")
+    except ValueError as e:
+        afirmar("link externo" in str(e), e)

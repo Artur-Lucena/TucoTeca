@@ -469,3 +469,16 @@ def teste_baixar_pronto_e_ferramentas():
                 os.environ["BIBLIOTECA_YTDLP"] = velho_yt
     else:
         afirmar(BX.dir_ferramentas() is None)
+
+
+def teste_download_state_preserva_staging_apos_falha():
+    tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
+    con = core.get_db(tmp / "b.db")
+    try:
+        core.enfileirar_downloads(con, [{"titulo": "T", "uri": "u"}])
+        did = core.listar_downloads(con)[0]["id"]
+        core.marcar_download(con, did, "baixado", video_id="id", musica_path="stage/audio.m4a")
+        r = core.marcar_download(con, did, "falha", erro="codec indisponível")
+        afirmar(r["musica_path"] == "stage/audio.m4a" and r["video_id"] == "id", r)
+    finally:
+        con.close()

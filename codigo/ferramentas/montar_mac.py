@@ -22,7 +22,7 @@ from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI))
-from montar_portatil import REPO, DIST, podar_dieta
+from montar_portatil import REPO, DIST, copiar_app, podar_dieta
 
 MAC_BUILD = AQUI / ".build" / "mac"
 MAC_CACHE = AQUI / ".cache" / "mac"
@@ -101,12 +101,13 @@ def garantir_mac() -> Path:
 COMMAND_LAUNCHER = """#!/bin/sh
 # TucoTeca (instalada no Mac) — duplo-clique abre a GUI.
 HUB="$(cd "$(dirname "$0")" && pwd)"
-export BIBLIOTECA_HOME="$HUB/dados"
+export BIBLIOTECA_HOME="$HUB"
+[ -f "$HUB/dados/dados/biblioteca.db" ] && export BIBLIOTECA_HOME="$HUB/dados"
 exec python3 "$HUB/app/app_win.py" "$@"
 """
 
 INSTALADOR = """#!/bin/sh
-# TucoTeca no Mac — instalador 100% offline (Python + 3 emuladores inclusos).
+# TucoTeca no Mac — pacote completo offline ou variante leve.
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 DEST="$HOME/Applications/TucoTeca"
 falha() { echo "ERRO: $1" >&2; exit 1; }
@@ -115,6 +116,7 @@ falha() { echo "ERRO: $1" >&2; exit 1; }
 # 1. Python 3.10+ com tkinter (python.org; o da App Store não traz Tk)
 if ! python3 -c 'import sys,tkinter; assert sys.version_info>=(3,10)' 2>/dev/null; then
   echo "[hub] instalando o Python oficial (precisa da sua senha, uma vez só)..."
+  [ -f "$AQUI/python-3.14.7-macos11.pkg" ] || falha "instale Python 3.10+ com Tk (python.org) e execute novamente."
   open "$AQUI"/python-3.14.7-macos11.pkg || falha "não abri o pkg do Python."
   echo "Termine a instalação do Python e rode este instalador de novo."
   exit 0
@@ -127,30 +129,38 @@ HUB="$DEST/tucoteca"
 
 # 3. Emuladores (.app oficiais, sem modificação)
 deszipar() { # $1=zip $2=destino $3=versao-arq $4=versao
-  rm -rf "$2" && mkdir -p "$2"
+  mkdir -p "$2" || return 1
+  rm -rf "$2/.zip"
   unzip -q -o "$1" -d "$2/.zip" || return 1
   APP="$(find "$2/.zip" -maxdepth 2 -name '*.app' | head -n 1)"
   [ -n "$APP" ] || return 1
-  mv "$APP" "$2/" && rm -rf "$2/.zip"
+  rm -rf "$2/$(basename "$APP")"
+  ditto "$APP" "$2/$(basename "$APP")" || return 1
+  rm -rf "$2/.zip"
   echo "$4" > "$2/$3"
 }
 montar_dmg() { # $1=dmg $2=destino $3=versao-arq $4=versao
-  rm -rf "$2" && mkdir -p "$2" || return 1
+  mkdir -p "$2" || return 1
   MNT="$(mktemp -d /tmp/tuco.XXXXXX)" || return 1
   hdiutil attach -nobrowse -mountpoint "$MNT" "$1" >/dev/null || {
     rmdir "$MNT" 2>/dev/null; return 1; }
   APP="$(find "$MNT" -maxdepth 2 -name '*.app' | head -n 1)"
   RC=1
   if [ -n "$APP" ] && [ -d "$APP" ]; then
-    cp -R "$APP" "$2/" && RC=0
+    rm -rf "$2/$(basename "$APP")"
+    ditto "$APP" "$2/$(basename "$APP")" && RC=0
   fi
   hdiutil detach "$MNT" >/dev/null || RC=1
   rmdir "$MNT" 2>/dev/null
   [ "$RC" = 0 ] || return 1
   echo "$4" > "$2/$3"
 }
-deszipar "$AQUI"/azahar-macos-universal-*.zip "$HUB/emuladores/Azahar" \
-  versao-azahar.txt 2126.1.2 || falha "Azahar não instalou."
+if [ -f "$AQUI/azahar-macos-universal-2126.1.2.zip" ]; then
+  deszipar "$AQUI/azahar-macos-universal-2126.1.2.zip" "$HUB/emuladores/Azahar" \
+    versao-azahar.txt 2126.1.2 || falha "Azahar não instalou."
+else
+  echo "[aviso] pacote leve: instale Azahar pelo botão ⬇ do app."
+fi
 mkdir -p "$HUB/emuladores/Azahar/user"
 montar_dmg "$AQUI"/desmume-*.dmg "$HUB/emuladores/DeSmuME" \
   desmume-versao.txt release_0_9_13 || echo "[aviso] DeSmuME não instalou (use o botão ⬇ do app)."
@@ -189,17 +199,7 @@ def montar_base_mac(trab: Path | None = None) -> tuple[Path, dict]:
     base = raiz / "tucoteca"
     app = base / "app"
     app.mkdir(parents=True)
-    for origem in ("codigo/bib_core.py", "codigo/frontends/app_win.py",
-                   "codigo/frontends/app_tui.py"):
-        src = REPO / origem
-        if not src.is_file():
-            raise SystemExit(f"arquivo do app ausente no repo: {origem}")
-        shutil.copy2(src, app / Path(origem).name)
-    nucleo = REPO / "codigo" / "bib_nucleo"
-    if not (nucleo / "__init__.py").is_file():
-        raise SystemExit("pacote bib_nucleo ausente no repo.")
-    shutil.copytree(nucleo, app / "bib_nucleo",
-                    ignore=shutil.ignore_patterns("__pycache__"))
+    copiar_app(app, repo=REPO)
     (base / "BibliotecaHubMac.command").write_text(COMMAND_LAUNCHER,
                                                    encoding="utf-8")
     for sub in ("dados", "dados/backups", "dados/capas", "dados/presets",
@@ -218,13 +218,13 @@ MAC_NAVIO = ("python-3.14.7-macos11.pkg", "python-3.10.11-macos11.pkg",
 
 
 def empacotar_mac(build: Path, data: str, leve: bool = False) -> tuple[Path, Path]:
-    """Monta dist/mac/ profissional: payload + Python + 3 emuladores.
+    """Monta dist/mac/: payload e, no pacote completo, Python + 2 emuladores.
 
     Retorna (payload .tar.xz, Instalar-Mac.command). O Azahar antigo fica
     só no cache (fallback manual); o resto viaja junto (100% offline).
     leve=True: só payload+instalador (mac baixa o resto pelo ⬇ do app).
     """
-    cache = garantir_mac()
+    cache = garantir_mac() if not leve else None
     pasta = DIST / "mac"
     if pasta.exists():
         shutil.rmtree(pasta)

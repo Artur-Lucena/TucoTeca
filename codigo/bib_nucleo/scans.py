@@ -17,7 +17,7 @@ from bib_nucleo.banco import (STATUS_VALIDOS, chave_dedup, normalizar_etiquetas,
                                 salvar_capa_bytes)
 from bib_nucleo.base import (LINUX_ROOT, WIN_ROOT, agora_iso,
                              existe_aqui_ou_traduzido, slugify, traduzir_para_atual,
-                             win_para_linux)
+                              mac_para_linux, win_para_linux)
 from bib_nucleo.emuladores import (default_emu_3ds, default_emu_nds,
                                      provedores,
                                      provedor_por_extensao, provedor_por_origem)
@@ -789,7 +789,7 @@ def preview_roms(roots: list[str] | None = None,
     return roots, [pontuar(j) for j in achados], info, emu
 
 
-EXE_IMPORTAVEIS = {".exe", ".lnk", ".bat", ".cmd", ".sh", ".AppImage"}
+EXE_IMPORTAVEIS = {".exe", ".lnk", ".bat", ".cmd", ".sh", ".appimage"}
 
 
 def analisar_arquivo(caminho: str) -> dict:
@@ -881,7 +881,7 @@ def _norm_caminho(c) -> str:
     c = (c or "").strip()
     if not c:
         return ""
-    return win_para_linux(c).lower()
+    return mac_para_linux(win_para_linux(c)).replace("\\", "/").casefold()
 
 
 def _dobrar_fundido(atual: dict, novo: dict) -> None:
@@ -1311,30 +1311,44 @@ def _appid_steam_por_titulo(titulo: str, timeout: int = 15) -> str:
 
     Nunca levanta (rede falhou = sem capa automática, sem travar import).
     """
+    appid, _nome = canonizar_steam(titulo, timeout=timeout)
+    return appid
+
+
+def canonizar_steam(*candidatos: str, timeout: int = 15) -> tuple[str, str]:
+    """(appid, nome_da_loja) pelo primeiro candidato com match exato.
+
+    Compara normalizado contra `storesearch`; no máximo 3 requisições.
+    Sem match ou sem rede: ("", ""). Nunca levanta.
+    """
     import urllib.parse
     import urllib.request
-    alvo = re.sub(r"\s+", " ", (titulo or "")).strip().lower()
-    if not alvo:
-        return ""
-    try:
-        q = urllib.parse.urlencode({"term": titulo.strip(), "l": "english",
-                                    "cc": "US"})
-        req = urllib.request.Request(
-            f"https://store.steampowered.com/api/storesearch/?{q}",
-            headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            dados = json.loads(r.read().decode("utf-8"))
-        for item in (dados.get("items") or []):
-            if not isinstance(item, dict):
-                continue
-            nome = re.sub(r"\s+", " ", str(item.get("name") or "")).strip()
-            if nome.lower() == alvo:
+    vistos: set[str] = set()
+    limpos: list[str] = []
+    for cand in candidatos:
+        alvo = re.sub(r"\s+", " ", (cand or "")).strip().lower()
+        if len(alvo) >= 2 and alvo not in vistos:
+            vistos.add(alvo)
+            limpos.append(alvo)
+    for alvo in limpos[:3]:
+        try:
+            q = urllib.parse.urlencode({"term": alvo, "l": "english",
+                                        "cc": "US"})
+            req = urllib.request.Request(
+                f"https://store.steampowered.com/api/storesearch/?{q}",
+                headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                dados = json.loads(r.read().decode("utf-8"))
+            for item in (dados.get("items") or []):
+                if not isinstance(item, dict):
+                    continue
+                nome = re.sub(r"\s+", " ", str(item.get("name") or "")).strip()
                 appid = str(item.get("id") or "").strip()
-                if appid.isdigit():
-                    return appid
-    except Exception:
-        pass
-    return ""
+                if appid.isdigit() and nome and nome.lower() in vistos:
+                    return appid, nome
+        except Exception:
+            continue
+    return "", ""
 
 
 def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
@@ -1414,15 +1428,21 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                 etiq_alvo = alvo["etiquetas"] if "etiquetas" in alvo.keys() else ""
                 con.execute(
                     """UPDATE jogos SET horas=?, ultima_execucao=?, status=?, nota=?,
-                       favorito=?, observacoes=?, azahar_preset=?, etiquetas=?, atualizado_em=? WHERE id=?""",
+                       favorito=?, observacoes=?, azahar_preset=?, etiquetas=?,
+                       save_path=?, azahar_mods=?, azahar_mods_off=?, game_code=?, regiao=?,
+                       atualizado_em=? WHERE id=?""",
                     (horas if "horas" in j else alvo["horas"], ultima,
                      j.get("status") if j.get("status") in STATUS_VALIDOS else alvo["status"],
                      nota if "nota" in j else alvo["nota"],
                      int(bool(j.get("favorito"))) if "favorito" in j else alvo["favorito"],
                      j.get("observacoes", alvo["observacoes"]),
-                     j.get("azahar_preset", alvo["azahar_preset"]),
-                     normalizar_etiquetas(j["etiquetas"]) if "etiquetas" in j else etiq_alvo,
-                     j.get("atualizado_em") or agora, alvo["id"]),
+                      j.get("azahar_preset", alvo["azahar_preset"]),
+                      normalizar_etiquetas(j["etiquetas"]) if "etiquetas" in j else etiq_alvo,
+                      j.get("save_path", alvo["save_path"]),
+                      _mods_seguro(j["azahar_mods"]) if "azahar_mods" in j else alvo["azahar_mods"],
+                      int(bool(j["azahar_mods_off"])) if "azahar_mods_off" in j else alvo["azahar_mods_off"],
+                      j.get("game_code", alvo["game_code"]), j.get("regiao", alvo["regiao"]),
+                      j.get("atualizado_em") or agora, alvo["id"]),
                 )
                 atualizados += 1
                 continue
@@ -1442,9 +1462,9 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                    """INSERT OR IGNORE INTO jogos
                    (titulo, executable_path, exe_win, exe_linux, exe_mac, wine_prefix, launch_options,
                     status, nota, favorito, horas, ultima_execucao, observacoes, origem, shop, object_id,
-                    game_code, regiao, azahar_preset, uuid, etiquetas, azahar_mods, azahar_mods_off,
+                     game_code, regiao, azahar_preset, uuid, etiquetas, save_path, azahar_mods, azahar_mods_off,
                     confianca, criado_em, atualizado_em)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (titulo, (j.get("executable_path") or "").strip(),
                  (j.get("exe_win") or "").strip(), (j.get("exe_linux") or "").strip(),
                  (j.get("exe_mac") or "").strip(),
@@ -1456,7 +1476,7 @@ def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:
                  j.get("origem") or "manual", (j.get("shop") or ""),
                  (j.get("object_id") or ""), (j.get("game_code") or "").strip(),
                  (j.get("regiao") or "").strip(), (j.get("azahar_preset") or "").strip(),
-                  uid, normalizar_etiquetas(j.get("etiquetas") or ""),
+                   uid, normalizar_etiquetas(j.get("etiquetas") or ""), j.get("save_path") or "",
                   _mods_seguro(j.get("azahar_mods")),
                   1 if j.get("azahar_mods_off") else 0,
                   confianca, j.get("criado_em") or agora, j.get("atualizado_em") or agora),

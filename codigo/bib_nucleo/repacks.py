@@ -9,6 +9,7 @@ O archive é apagado após verificação do exe. Sem rede, darwin-safe.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import shutil
@@ -28,10 +29,15 @@ _SETUP_RE = re.compile(r"(?i)^setup")
 
 def pasta_piratas() -> Path:
     """Destino padrão dos repacks (override `BIBLIOTECA_PIRATAS`)."""
-    from bib_nucleo.base import LINUX_ROOT, WIN_ROOT
+    from bib_nucleo.base import LINUX_ROOT, MAC_ROOT, WIN_ROOT, eh_mac
     env = os.environ.get("BIBLIOTECA_PIRATAS")
     if env:
         return Path(env)
+    from bib_nucleo.ferramentas import raiz_runtime, runtime_portatil
+    if runtime_portatil():
+        return raiz_runtime() / "dados/downloads/jogos"
+    if eh_mac():
+        return Path(MAC_ROOT) / "Games" / "Piratas"
     if os.name == "nt":
         return Path(f"{str(WIN_ROOT).rstrip(chr(92))}\\Games\\Piratas")
     return Path(f"{str(LINUX_ROOT).rstrip('/')}/Games/Piratas")
@@ -43,6 +49,12 @@ def ferramenta_7z() -> Path | None:
     if env:
         cand = Path(env)
         return cand if cand.is_file() else None
+    from bib_nucleo.ferramentas import localizar_ferramenta, runtime_portatil
+    local = localizar_ferramenta("7z")
+    if local:
+        return Path(local)
+    if runtime_portatil():
+        return None
     if os.name == "nt":
         from bib_nucleo.base import WIN_ROOT
         cand = Path(f"{str(WIN_ROOT).rstrip(chr(92))}\\Games\\ferramentas\\7z.exe")
@@ -168,15 +180,8 @@ def extrair_arquivo(origem: str | os.PathLike, destino: Path) -> dict:
     return {"ok": True, "destino": str(destino)}
 
 
-def organizar_extraido(raiz: Path) -> dict:
-    """Desembrulha pasta única, limpa sobras. Retorna {pasta, avisos, ...}.
-
-    Mantém `_CommonRedist` do jogo, OSTs, `.bak`s e saves; apaga `Read_Me`,
-    `.url`, `_redist_readme`, `_CommonRedist` duplicado da raiz e `setup_*`
-    redundante (só quando já há exe jogável — senão o jogo precisa instalar
-    e o setup é preservado com aviso).
-    """
-    avisos: list[str] = []
+def _pasta_conteudo(raiz: Path) -> Path:
+    """Desembrulha níveis vazios, sem alterar arquivos antes da detecção."""
     pasta = Path(raiz)
     # desce enquanto houver só 1 subpasta e nenhum exe no nível
     while True:
@@ -192,6 +197,17 @@ def organizar_extraido(raiz: Path) -> dict:
             pasta = dirs[0]
         else:
             break
+    return pasta
+
+
+def organizar_extraido(raiz: Path) -> dict:
+    """Desembrulha pasta única, limpa sobras. Retorna {pasta, avisos, ...}.
+
+    Mantém `_CommonRedist` do jogo, OSTs, `.bak`s e saves; apaga `Read_Me`,
+    `.url`, `_redist_readme` e `_CommonRedist` idêntico da raiz.
+    """
+    avisos: list[str] = []
+    pasta = _pasta_conteudo(raiz)
     removidos = 0
     for p in sorted(_iter_reais(pasta)):
         if _LIXO_NOMES.match(p.name):
@@ -210,16 +226,44 @@ def organizar_extraido(raiz: Path) -> dict:
         for d in _dirs:
             if d.lower() == "_commonredist":
                 redists.append(Path(_pasta, d))
-    if len(redists) > 1:
-        fundo = max(len(d.relative_to(pasta).parts) for d in redists)
-        for d in redists:
-            if len(d.relative_to(pasta).parts) < fundo and _dentro(pasta, d):
-                try:
-                    shutil.rmtree(d, ignore_errors=True)
-                    avisos.append("_CommonRedist duplicado da raiz apagado.")
-                except OSError:
-                    pass
+    for d in redists:
+        # Mesmo nome/profundidade não prova duplicata entre jogos diferentes.
+        if d.parent != pasta or not _dentro(pasta, d):
+            continue
+        if any(outro != d and _pastas_iguais(d, outro) for outro in redists):
+            try:
+                shutil.rmtree(d)
+                avisos.append("_CommonRedist idêntico da raiz apagado.")
+            except OSError as e:
+                avisos.append(f"Não foi possível limpar _CommonRedist: {e}")
     return {"pasta": str(pasta), "avisos": avisos}
+
+
+def _pastas_iguais(a: Path, b: Path) -> bool:
+    """Compara arquivos por caminho, tamanho e SHA-256 antes de limpar."""
+    if not _so_dentro(a) or not _so_dentro(b):
+        return False
+    try:
+        aa = {p.relative_to(a): p for p in _iter_reais(a)}
+        bb = {p.relative_to(b): p for p in _iter_reais(b)}
+        if not aa or aa.keys() != bb.keys():
+            return False
+        for nome, pa in aa.items():
+            pb = bb[nome]
+            if pa.stat().st_size != pb.stat().st_size:
+                return False
+            hashes = []
+            for p in (pa, pb):
+                h = hashlib.sha256()
+                with p.open("rb") as f:
+                    for bloco in iter(lambda: f.read(1024 * 1024), b""):
+                        h.update(bloco)
+                hashes.append(h.digest())
+            if hashes[0] != hashes[1]:
+                return False
+        return True
+    except OSError:
+        return False
 
 
 _REP_TAGS = re.compile(
@@ -308,6 +352,42 @@ def _quarentenar_setups(pasta: Path) -> int:
     return n
 
 
+def sanear_pasta(pasta: str | os.PathLike) -> dict:
+    """Acha a pasta do jogo e limpa installers/sobras (reversível).
+
+    Reusa `organizar_extraido` (desce pasta única + lixo + redist dup);
+    com exe jogável, quarentena `setup_*.exe` em `.hub-lixo` (desfazível);
+    sem exe, preserva os setups e avisa `precisa_instalar`.
+    """
+    base = Path(pasta)
+    if not base.is_dir():
+        return {"ok": False, "erro": "pasta não encontrada."}
+    base = _pasta_conteudo(base)
+    ach = achar_exe(base)
+    if not ach.get("ok"):
+        if ach.get("precisa_instalar"):
+            return {"ok": True, "pasta": str(base), "exe": None,
+                    "precisa_instalar": True, "quarentenados": 0,
+                    "avisos": ["só há instalador — pasta preservada."]}
+        return {"ok": False, "erro": ach.get("erro", "sem executável."), "pasta": str(base)}
+    org = organizar_extraido(base)
+    certa = Path(org.get("pasta") or str(base))
+    avisos = list(org.get("avisos") or [])
+    ach = achar_exe(certa)
+    if not ach.get("ok"):
+        if ach.get("precisa_instalar"):
+            return {"ok": True, "pasta": str(certa), "exe": None,
+                    "precisa_instalar": True, "quarentenados": 0,
+                    "avisos": avisos + ["só há instalador — setups preservados."]}
+        return {"ok": False, "erro": ach.get("erro", "sem executável."),
+                "pasta": str(certa)}
+    n = _quarentenar_setups(certa)
+    if n:
+        avisos.append(f"{n} installer(s) em .hub-lixo (reversível).")
+    return {"ok": True, "pasta": str(certa), "exe": ach["exe"],
+            "precisa_instalar": False, "quarentenados": n, "avisos": avisos}
+
+
 def importar_repack(con: sqlite3.Connection, arquivo: str | os.PathLike,
                     destino_raiz: str | os.PathLike | None = None) -> dict:
     """Pipeline completo: extrai → organiza → acha exe → importa → apaga arq.
@@ -317,6 +397,7 @@ def importar_repack(con: sqlite3.Connection, arquivo: str | os.PathLike,
     from bib_nucleo import banco as B
     from bib_nucleo.base import slugify
     from bib_nucleo.scans import _titulo_de_exe, importar_lista, pontuar
+    from bib_nucleo.scans import canonizar_steam
     src = Path((str(arquivo) or "").strip())
     if not src.is_file():
         return {"ok": False, "erro": "arquivo não encontrado."}
@@ -357,10 +438,21 @@ def importar_repack(con: sqlite3.Connection, arquivo: str | os.PathLike,
             titulo = pasta_limpo  # pasta diz mais ("CoolGame" > "Cool")
         if titulo.lower() in ("setup", "install", "") or len(titulo) < 2:
             titulo = pasta_limpo or pasta.name
+        try:  # nome canônico + appid da loja (padrão; offline preserva local)
+            appid_canon, nome_canon = canonizar_steam(titulo, pasta_limpo)
+        except Exception:
+            appid_canon, nome_canon = "", ""
+        if appid_canon:
+            titulo, shop_canon, obj_canon = (nome_canon or titulo), "steam", appid_canon
+        else:
+            shop_canon, obj_canon = "", ""
         item = pontuar({"titulo": titulo, "executable_path": str(exe),
-                        "shop": "", "object_id": "", "horas": 0.0,
+                        "shop": shop_canon, "object_id": obj_canon, "horas": 0.0,
                         "origem": "repack"})
         res = importar_lista(con, [item])
+        if res.get("erros") or not (res.get("novos") or res.get("ignorados")):
+            return {"ok": False, "erro": "; ".join(res.get("erros") or ["importação não concluída"]),
+                    "pasta": str(pasta), "avisos": org["avisos"]}
         capa_auto = False
         try:
             got = B.listar_jogos(con, q=titulo)
@@ -410,4 +502,4 @@ def _capa_automatica(con: sqlite3.Connection, gid: int, titulo: str) -> bool:
 
 __all__ = ['ARQUIVO_EXTS', 'pasta_piratas', 'ferramenta_7z', 'eh_pacote_hub',
            'extrair_arquivo', 'organizar_extraido', 'achar_exe',
-           'importar_repack']
+           'sanear_pasta', 'importar_repack']

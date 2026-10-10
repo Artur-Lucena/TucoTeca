@@ -11,8 +11,10 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
+import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -169,7 +171,7 @@ def _aplicar(stage: Path, dest: Path, tag: str, links: bool = False) -> dict:
         _json_atomico(anterior / DIARIO, estado)
         return {"ok": True, "anterior": str(anterior) if antigos else None}
     except Exception as e:
-        r = recuperar(dest)
+        r = recuperar(dest, links)
         detalhe = "versão anterior restaurada e verificada" if r["ok"] else r["erro"]
         return {"ok": False, "restaurado": r["ok"], "anterior": str(anterior),
                 "erro": f"Atualização falhou: {e}; {detalhe}"}
@@ -188,7 +190,7 @@ def _extrair_app_mac(pacote: Path, stage: Path) -> str:
             mnt = tmp / "mnt"
             mnt.mkdir()
             r = subprocess.run(
-                ["hdiutil", "attach", "-nobrowse", "-mountpoint", str(mnt),
+                ["hdiutil", "attach", "-readonly", "-nobrowse", "-mountpoint", str(mnt),
                  str(pacote)], capture_output=True, text=True, timeout=300)
             try:
                 if r.returncode != 0:
@@ -200,8 +202,10 @@ def _extrair_app_mac(pacote: Path, stage: Path) -> str:
                 shutil.copytree(apps[0], stage / apps[0].name, symlinks=True)
                 nome = apps[0].name
             finally:
-                subprocess.run(["hdiutil", "detach", str(mnt)],
-                               capture_output=True, timeout=120)
+                detach = subprocess.run(["hdiutil", "detach", str(mnt)],
+                                        capture_output=True, timeout=120)
+                if detach.returncode != 0:
+                    raise OSError("hdiutil não conseguiu desmontar a imagem")
         else:
             with zipfile.ZipFile(pacote) as z:
                 for i in z.infolist():
@@ -211,7 +215,31 @@ def _extrair_app_mac(pacote: Path, stage: Path) -> str:
                             or partes[0] in ("__MACOSX",)
                             or any(":" in p or p.casefold() == "user" for p in partes)):
                         raise ValueError("pacote contém caminho inválido ou dados de usuário")
-                z.extractall(tmp / "zip")
+                raiz_zip = tmp / "zip"
+                raiz_zip.mkdir()
+                links = []
+                for i in z.infolist():
+                    partes = PurePosixPath(i.filename.replace("\\", "/")).parts
+                    alvo = raiz_zip.joinpath(*partes)
+                    modo = (i.external_attr >> 16) & 0xFFFF
+                    if stat.S_ISLNK(modo):
+                        destino = z.read(i).decode("utf-8")
+                        absoluto = (alvo.parent / destino).resolve()
+                        if (not destino or Path(destino).is_absolute()
+                                or "\\" in destino or ":" in destino
+                                or raiz_zip.resolve() not in absoluto.parents):
+                            raise ValueError("link externo no pacote Mac")
+                        links.append((alvo, destino))
+                    elif i.is_dir():
+                        alvo.mkdir(parents=True, exist_ok=True)
+                    else:
+                        alvo.parent.mkdir(parents=True, exist_ok=True)
+                        alvo.write_bytes(z.read(i))
+                        if modo & 0o777:
+                            alvo.chmod(modo & 0o777)
+                for alvo, destino in links:
+                    alvo.parent.mkdir(parents=True, exist_ok=True)
+                    alvo.symlink_to(destino)
             apps = sorted(p for p in (tmp / "zip").rglob("*.app") if p.is_dir())
             if not apps:
                 raise ValueError("nenhum .app no .zip")
@@ -242,7 +270,8 @@ def instalar(info: dict, dest: Path, progresso=None, plataforma=None,
         dest.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix=".azahar-stage-", dir=dest.parent) as tmp:
             tmp = Path(tmp)
-            pacote = tmp / "download"
+            nome_asset = str(info.get("nome") or urllib.parse.urlsplit(url).path)
+            pacote = tmp / ("download" + Path(nome_asset).suffix)
             h = hashlib.sha256()
             feito = 0
             with urllib.request.urlopen(url, timeout=60) as r, pacote.open("wb") as f:

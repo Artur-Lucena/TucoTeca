@@ -69,8 +69,9 @@ def teste_fotografar_aplicar_roundtrip():
     r = C.salvar_mapa_gerado("xbox360", nome="x360-teste")
     afirmar(r.get("ok") and r["chaves"] >= 17, r)
     # envenena: profile travado no 0 (bug real achado no Azahar 2126)
-    with open(cfg, "a", encoding="utf-8") as fh:
-        fh.write("profile\\default=true\nprofile=1\n")
+    texto_base = cfg.read_text(encoding="utf-8")
+    cfg.write_text(texto_base.replace("[Controls]\n", "[Controls]\nprofile\\default=true\nprofile=0\n"),
+                   encoding="utf-8")
     r = C.aplicar_preset_controle("x360-teste")
     afirmar(r.get("ok") and r.get("chaves", 0) >= 17, r)
     texto = cfg.read_text(encoding="utf-8")
@@ -81,8 +82,7 @@ def teste_fotografar_aplicar_roundtrip():
     afirmar('profiles\\1\\button_a="api:controller,button:1' in texto)
     afirmar(texto.count("profiles\\1\\button_a=") == 1, "chave duplicada!")
     afirmar("profile\\default" not in texto, "veneno profile\\default ficou!")
-    afirmar("\nprofile=1\n" in texto or texto.startswith("profile=1\n")
-            or "\nprofile=1" in texto)
+    afirmar("\nprofile=0\n" in texto, texto)
     sec = texto.index("[Controls]")
     prox = texto.index("[Renderer]")
     afirmar(sec < texto.index('profiles\\1\\button_a="api:') < prox,
@@ -327,3 +327,46 @@ def teste_parse_devices_js_realista():
             and lst[0]["familia"] == "xbox360", lst)
     afirmar(lst[1]["familia"] == "switchpro", lst)
     afirmar(C._parse_devices("") == [])
+
+
+def teste_higienizar_preserva_outras_secoes():
+    from bib_nucleo import controles as C
+    from executar import azahar_fake
+    emu = Path(os.environ["BIBLIOTECA_AZAHAR_DIR"])
+    azahar_fake(emu)
+    cfg = emu / "user/config/qt-config.ini"
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    original = "[Renderer]\nenabled=true\nprofile=7\n\n# comentário\n[Controls]\nprofile=1\nprofile=0\n\n[Utility]\nenabled=false\nprofile=9\n# comentário\n"
+    cfg.write_text(original, encoding="utf-8")
+    r = C.higienizar_controles()
+    texto = cfg.read_text(encoding="utf-8")
+    afirmar(r["ok"] and r["removidas"] == 1, r)
+    afirmar("[Renderer]\nenabled=true\nprofile=7\n\n# comentário" in texto, texto)
+    afirmar("[Controls]\nprofile=1\n\n[Utility]\nenabled=false\nprofile=9\n# comentário" in texto, texto)
+
+
+def teste_capturar_pov_zero():
+    from bib_nucleo import controles as C
+    r = C.capturar(lambda: {"botoes": set(), "eixos": {}, "pov": 0}, timeout=1)
+    afirmar(r == {"ok": True, "tipo": "chapeu", "indice": 0, "direcao": "0"}, r)
+
+
+def teste_aplicar_controle_nao_mexe_em_profile_do_renderer():
+    from bib_nucleo import controles as C
+    from executar import azahar_fake
+    emu = Path(os.environ["BIBLIOTECA_AZAHAR_DIR"])
+    azahar_fake(emu)
+    cfg = emu / "user/config/qt-config.ini"
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    original = "[Controls]\nprofile=1\nprofiles\\size=2\n[Renderer]\nprofile=7\nprofile\\default=true\n"
+    cfg.write_text(original, encoding="utf-8")
+    C.salvar_mapa_gerado("xbox360", nome="pad")
+    r = C.aplicar_preset_controle("pad", perfil=0)
+    texto = cfg.read_text(encoding="utf-8")
+    afirmar(r["ok"] and "[Renderer]\nprofile=7\nprofile\\default=true\n" in texto, texto)
+    import configparser
+    ini = configparser.ConfigParser()
+    ini.read(cfg, encoding="utf-8")
+    afirmar(ini.get("Controls", "profile") == "0", texto)
+    afirmar(cfg.with_suffix(".ini.bak").read_text(encoding="utf-8") == original,
+            "backup não preservou o INI anterior")

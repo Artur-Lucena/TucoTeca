@@ -1,5 +1,4 @@
 """Update com arquivos temporários: falhas, interrupção e rollback verificável."""
-import hashlib
 import tempfile
 import zipfile
 from pathlib import Path
@@ -41,8 +40,7 @@ def teste_instala_e_upgrade():
             r = emuladores.azahar_instalar(_release(tmp, "v1", b"1"))
         afirmar(r["ok"] and r["exe"] == str(dest / "azahar.exe"), r)
     else:
-        with patch.object(emuladores, "_emu_dir", return_value=dest):
-            r = emuladores.azahar_instalar(_release(tmp, "v1", b"1", "posix"))
+        r = upd.instalar(_release(tmp, "v1", b"1", "posix"), dest, plataforma="posix")
         afirmar(r["ok"] and r["exe"] == str(dest / "azahar.AppImage"), r)
     antes = upd._manifesto(dest)
     r = upd.instalar(_release(tmp, "v2", b"2"), dest, plataforma="nt")
@@ -140,3 +138,24 @@ def teste_appimage_mesma_transacao():
     with patch.object(upd, "_copiar", side_effect=falhar):
         r = upd.instalar(_release(tmp, "v2", b"2", "posix"), dest, plataforma="posix")
     afirmar(not r["ok"] and r["restaurado"] and upd._manifesto(dest) == antes, r)
+
+
+def teste_rollback_propaga_permissao_de_links():
+    tmp, dest = _ambiente()
+    stage = tmp / "stage"
+    stage.mkdir()
+    (stage / "novo.bin").write_bytes(b"novo")
+    (dest / "antigo.bin").write_bytes(b"antigo")
+    original = upd._copiar
+
+    def copiar(orig, alvo):
+        if orig == stage / "novo.bin":
+            raise OSError("falha na atualização")
+        return original(orig, alvo)
+
+    with patch.object(upd, "_copiar", side_effect=copiar), \
+            patch.object(upd, "recuperar", wraps=upd.recuperar) as recuperar:
+        r = upd._aplicar(stage, dest, "v1", links=True)
+    afirmar(not r["ok"] and r["restaurado"], r)
+    afirmar(recuperar.call_args_list[-1].args == (dest, True), recuperar.call_args_list)
+    afirmar((dest / "antigo.bin").read_bytes() == b"antigo")

@@ -90,6 +90,26 @@ def teste_relatorio_import():
         con.close()
 
 
+def teste_restore_preserva_metadados_e_save_path():
+    con, _tmp = _nova_db()
+    try:
+        dados = {"titulo": "Restaurar", "executable_path": "local.exe", "save_path": "saves/r",
+                 "azahar_mods": ["M"], "azahar_mods_off": 1, "game_code": "CTR-X", "regiao": "Europa"}
+        res = core.importar_lista(con, [dados])
+        afirmar(res["novos"] == 1, res)
+        jogo = core.listar_jogos(con)[0]
+        afirmar(jogo["save_path"] == dados["save_path"], jogo)
+        core.atualizar_jogo(con, jogo["id"], {"save_path": "", "azahar_mods": [],
+                                             "azahar_mods_off": 0, "game_code": "", "regiao": ""})
+        res = core.importar_lista(con, [{**dados, "uuid": jogo["uuid"], "executable_path": "remoto.exe"}])
+        novo = core.listar_jogos(con)[0]
+        afirmar(res["atualizados"] == 1 and novo["executable_path"] == "local.exe", res)
+        afirmar(novo["save_path"] == "saves/r" and novo["mods_lista"] == ["M"] and novo["mods_off"], novo)
+        afirmar(novo["game_code"] == "CTR-X" and novo["regiao"] == "Europa", novo)
+    finally:
+        con.close()
+
+
 def teste_pacote_uuid_e_ultima():
     tmp = Path(tempfile.mkdtemp(prefix="suite-cp-"))
     db1 = tmp / "p1.db"

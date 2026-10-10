@@ -1,0 +1,51 @@
+{
+  "data": "2026-10-09T09:16:40.448425",
+  "movimentos": [
+    {
+      "origem": "dist\\superhub-verificacao.json",
+      "destino": "dist\\windows\\superhub-verificacao.json"
+    },
+    {
+      "origem": "dist\\tucoteca-fontes-parte1-20261009.zip",
+      "destino": "dist\\fontes\\tucoteca-fontes-parte1-20261009.zip"
+    },
+    {
+      "origem": "dist\\tucoteca-fontes-parte2-20261009.zip",
+      "destino": "dist\\fontes\\tucoteca-fontes-parte2-20261009.zip"
+    },
+    {
+      "origem": "dist\\tucoteca-portatil-20260923-slim.zip",
+      "destino": "dist\\historico\\windows\\tucoteca-portatil-20260923-slim.zip"
+    },
+    {
+      "origem": "dist\\tucoteca-portatil-20260923.zip",
+      "destino": "dist\\historico\\windows\\tucoteca-portatil-20260923.zip"
+    },
+    {
+      "origem": "dist\\TucoTeca-Setup-20260924.exe",
+      "destino": "dist\\historico\\windows\\TucoTeca-Setup-20260924.exe"
+    },
+    {
+      "origem": "dist\\tucoteca-setup-20260924.run",
+      "destino": "dist\\historico\\linux\\tucoteca-setup-20260924.run"
+    },
+    {
+      "origem": "dist\\tucoteca-superhub-windows-x64-20261009.7z",
+      "destino": "dist\\windows\\tucoteca-superhub-windows-x64-20261009.7z"
+    },
+    {
+      "origem": "dist\\tucoteca-superhub-windows-x64-20261009.zip",
+      "destino": "dist\\windows\\tucoteca-superhub-windows-x64-20261009.zip"
+    },
+    {
+      "origem": "dist\\tucoteca-universal-20260924",
+      "destino": "dist\\historico\\universal\\tucoteca-universal-20260924"
+    },
+    {
+      "origem": "dist\\tucoteca-universal-20260928",
+      "destino": "dist\\historico\\universal\\tucoteca-universal-20260928"
+    }
+  ],
+  "runtime": "programa\\windows-x64",
+  "colecao": "dados/"
+}

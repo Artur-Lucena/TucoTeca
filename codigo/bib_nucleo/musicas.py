@@ -276,16 +276,8 @@ def tocar_musica(caminho: str) -> dict:
     Lê base.MUSICAS_DIR ao vivo (import dentro da função, como
     importar_musicas) p/ acompanhar override de ambiente/patch.
     """
-    from bib_nucleo.base import MUSICAS_DIR
-    p = (caminho or "").strip()
-    if p and not Path(p).is_file():
-        alt = MUSICAS_DIR / Path(p).name
-        try:
-            if alt.is_file():
-                p = str(alt)
-        except OSError:
-            pass
-    if not p or not Path(p).is_file():
+    p = resolver_musica(caminho)
+    if not p:
         return {"ok": False, "erro": "arquivo não encontrado."}
     try:
         if os.name == "nt":
@@ -297,6 +289,22 @@ def tocar_musica(caminho: str) -> dict:
     except OSError as e:
         return {"ok": False, "erro": f"falha ao abrir: {e}"}
     return {"ok": True, "path": p}
+
+
+def resolver_musica(caminho: str) -> str:
+    """Arquivo local/traduzido ou basename em dados/musicas; só leitura."""
+    from bib_nucleo.base import MUSICAS_DIR, nome_arquivo_portatil, traduzir_para_atual
+    p = (caminho or "").strip()
+    if not p or "\x00" in p:
+        return ""
+    try:
+        for cand in (Path(p), Path(traduzir_para_atual(p)),
+                     MUSICAS_DIR / nome_arquivo_portatil(p)):
+            if cand.is_file():
+                return str(cand)
+    except (OSError, ValueError):
+        pass
+    return ""
 
 
 # --------------------------------------------------------------------------
@@ -401,4 +409,4 @@ def baixar_capas_faltantes(con: sqlite3.Connection, limite: int = 200) -> dict:
 __all__ = ['harmoni_dir', 'sugestao_harmoni_dir', 'texto_musica',
            'capa_musica_auto', 'capa_album_url', 'baixar_capa_album',
            'baixar_capas_faltantes', 'ler_tags', 'sha_arquivo', 'varrer_pasta',
-           'importar_musicas', 'tocar_musica']
+           'importar_musicas', 'tocar_musica', 'resolver_musica']

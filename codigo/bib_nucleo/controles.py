@@ -351,8 +351,15 @@ def higienizar_controles() -> dict:
     except OSError as e:
         return {"ok": False, "erro": f"falha ao ler: {e}"}
     vistas, limpas, removidas = set(), [], 0
+    secao = ""
     for l in linhas:
-        k = l.split("=", 1)[0]
+        if l.strip().startswith("[") and l.strip().endswith("]"):
+            secao = l.strip()[1:-1]
+            vistas.clear()
+        if secao != "Controls" or "=" not in l or l.lstrip().startswith(("#", ";")):
+            limpas.append(l)
+            continue
+        k = l.split("=", 1)[0].strip()
         if k.endswith("\\default\\default") or k in vistas:
             removidas += 1
             continue
@@ -390,10 +397,13 @@ def aplicar_preset_controle(nome: str, perfil: int | None = None) -> dict:
     if cfg is None:
         return {"ok": False, "erro": "config do Azahar não encontrada."}
     try:
-        higienizar_controles()
         bak = cfg.with_name(cfg.name + ".bak")
         if not bak.is_file():
             shutil.copy2(str(cfg), str(bak))
+        higiene = higienizar_controles()
+        if not higiene.get("ok"):
+            return higiene
+        ini, _ = _ler_controls()  # seleção do perfil após reparar duplicatas
         novo = configparser.ConfigParser()
         novo.optionxform = str  # type: ignore[assignment]
         novo.read(alvo, encoding="utf-8")
@@ -433,7 +443,8 @@ def aplicar_preset_controle(nome: str, perfil: int | None = None) -> dict:
         for chave, valor in pares:
             novas.append(f"{chave}\\default=false")
             novas.append(f'{chave}="{valor}"')
-        linhas[ini_sec + 1:fim_sec] = corpo + novas
+        antes, depois = linhas[:ini_sec + 1], linhas[fim_sec:]
+        linhas = corpo + novas  # todas as cirurgias seguintes são só de Controls
         # o Azahar REGENERA no game-boot todo perfil chamado "Default":
         # garante nome próprio p/ não perder os binds aplicados.
         nome_chave = f"profiles\\{ativo}\\name"
@@ -448,8 +459,8 @@ def aplicar_preset_controle(nome: str, perfil: int | None = None) -> dict:
                     linhas.insert(i + 1, f"{nome_chave}\\default=false")
             break
         else:
-            linhas.insert(ini_sec + 1, f'{nome_chave}="{slug}"')
-            linhas.insert(ini_sec + 2, f"{nome_chave}\\default=false")
+            linhas.insert(0, f'{nome_chave}="{slug}"')
+            linhas.insert(1, f"{nome_chave}\\default=false")
         # `profile\default=true` trava o perfil 0 p/ sempre (fonte: config.cpp
         # ReadSetting): sem ele com ativo>0, e `profile=<ativo>` garantido.
         linhas = [l for l in linhas
@@ -459,11 +470,10 @@ def aplicar_preset_controle(nome: str, perfil: int | None = None) -> dict:
             if l.split("=", 1)[0] != "profile" or "=" not in l:
                 continue
             tem_profile = True
-            if ativo > 1:
-                linhas[i] = f"profile={ativo - 1}"
+            linhas[i] = f"profile={ativo - 1}"
             break
         if not tem_profile:
-            linhas.insert(ini_sec + 1, f"profile={ativo - 1}")
+            linhas.insert(0, f"profile={ativo - 1}")
         # o Azahar ignora perfis além de profiles\size: garante cobertura
         for i, l in enumerate(linhas):
             if l.split("=", 1)[0] != "profiles\\size" or "=" not in l:
@@ -475,9 +485,9 @@ def aplicar_preset_controle(nome: str, perfil: int | None = None) -> dict:
                 linhas[i] = f"profiles\\size={ativo}"
             break
         else:
-            linhas.insert(ini_sec + 1 + len(corpo) + len(novas),
-                           f"profiles\\size={ativo}")
-        cfg.write_text("\n".join(linhas) + "\n", encoding="utf-8")
+            linhas.insert(len(linhas),
+                            f"profiles\\size={ativo}")
+        cfg.write_text("\n".join(antes + linhas + depois) + "\n", encoding="utf-8")
     except (OSError, configparser.Error) as e:
         return {"ok": False, "erro": f"falha ao mesclar: {e}"}
     return {"ok": True, "preset": slug, "config": str(cfg),
@@ -769,8 +779,8 @@ def capturar(poll, timeout: float = 10.0, limiar_eixo: int = 16000) -> dict:
             if abs(v) >= limiar_eixo:
                 return {"ok": True, "tipo": "eixo",
                         "indice": eixo, "direcao": "+" if v > 0 else "-"}
-        pov = (est.get("pov", 65535) or 65535)
-        if pov != 65535:
+        pov = est.get("pov", 65535)
+        if pov is not None and pov != 65535:
             return {"ok": True, "tipo": "chapeu", "indice": 0,
                     "direcao": str(pov)}
         time.sleep(0.05)

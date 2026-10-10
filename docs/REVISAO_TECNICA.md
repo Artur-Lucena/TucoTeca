@@ -1,0 +1,78 @@
+# Revisão técnica — TucoTeca (06–07/10/2026)
+
+Auditoria de código, estrutura e empacotamento para trabalho em conjunto.
+Base: árvore de trabalho em `98dccd1` + alterações desta revisão (não
+commitadas — ver `git status`). Validação: suíte **221/221** + selftest.
+
+## 1. Método e evidência
+
+- Varredura `ast` de 48 arquivos Python (~22 mil linhas, 288 exports):
+  sem definições duplicadas, sem `__all__` duplicado, sem chamada
+  `self.*` sem método correspondente nas classes `App`/`Tui`, sem
+  colisão de exports entre módulos (só `titulo_ok`, mesmo objeto).
+- Rede, subprocessos e escrita fora da sandbox são bloqueados pelo
+  audit-hook de `executar.py`; cada `teste_*` roda em subprocesso
+  e diretório próprios. Pulos por SO/display aparecem como `SKIP`.
+- `diagnosticar.py` (somente-leitura) confere sintaxe, exports,
+  dependências, mapa de pastas e integridade do SQLite sem migrar o banco.
+- `empacotar_fontes.py` gera `dist/tucoteca-fontes-revisadas.zip` com a
+  árvore atual + manifesto SHA-256, excluindo coleção, caches e builds.
+
+## 2. Erros comprovados e corrigidos
+
+| # | Achado | Prova | Correção |
+|---|---|---|---|
+| 1 | `importar_musicas` retornava `ignorados`, mas o contrato documentado e lido pela GUI/TUI é `ignoradas` (`res['ignoradas']` em `app_win.py`, `app_tui.py`, `test_baixar.py`) — `KeyError` em qualquer importação de música | leitura dos 3 consumidores + teste de contrato novo | chave unificada em `ignoradas` |
+| 2 | Callbacks de worker chamavam `root.after` direto; sem mainloop (testes, fechar janela) levantavam `RuntimeError` e o erro morria na thread | reprodução com App real sem mainloop | `frontends/despacho.py`: `DespachanteUi` com fila drenada pelo `after` da UI; erro de callback vai para `erros.log` + barra, sem derrubar a fila |
+| 3 | `higienizar_controles` removia chaves duplicadas em **qualquer** seção do INI (ex.: `profile=7` do Renderer sumia) | teste com `[Renderer]` + `profile` duplicado | dedup restrito a `[Controls]`, comentários e outras seções preservados |
+| 4 | `aplicar_preset_controle` reordenava chaves e lia a seleção de perfil antes da higiene, podendo mirar o slot errado | teste que envenena `profile\default` e confere posição | cirurgia só dentro de `[Controls]`, releitura após higienizar |
+| 5 | `encerrar_sessao_manual` gravava horas no banco padrão mesmo quando a sessão vinha de outro banco, e apagava o marcador mesmo com valor inválido | teste com banco dedicado + `nan` | `db_path` explícito; inválido preserva o marcador e retorna erro |
+| 6 | `baixar_steamrip` retornava no **primeiro** host resolvido sem tentar os demais; `tentados` sempre vazio no erro | teste com FileDitch falhando + CDN ok | tenta todos na ordem, acumula `tentados`, só então falha |
+| 7 | `_descer` publicava download parcial/incompleto no destino e não checava `Content-Length` | teste com `Content-Length` maior que o corpo | escrita em temporário no mesmo disco + publicação atômica; incompleto não publica |
+| 8 | `recuperar`/`_aplicar` ignoravam o parâmetro `links` no caminho de erro do macOS (rollback vetava `.app` válido) | teste com falha simulada + `links=True` | propaga `links` em todos os caminhos |
+| 9 | Extração de `.zip` no Mac seguia symlinks sem validar e ativava bits arbitrários de modo | zip com symlink externo | validação prévia + recriação manual com modos filtrados |
+| 10 | `.dmg` baixado sem extensão quebrava a extração Mac | teste com asset `.dmg` | nome do download preserva o sufixo do asset |
+| 11 | Pacote de músicas restaurava arquivo **antes** de conferir o SHA e ignorava duplicata já existente | teste com ZIP adulterado | confere SHA antes de publicar; duplicata com arquivo ausente tem o path religado |
+| 12 | `resolver_musica` quebrava com caminho Windows em checkout Linux/macOS (`Path(p).name` não separa `\`) | teste com `Z:\...\faixa.mp3` | `nome_arquivo_portatil` + tradução de prefixo |
+| 13 | Restore de jogos (`importar_lista` por uuid) não restaurava `save_path`, mods, `game_code` e `regiao` | teste de restore dedicado | campos preservados no `UPDATE` de restore |
+| 14 | `remover_link` chamava `os.rmdir` em symlink POSIX (falha/risco) e `mods_titulo_dir` aceitava TID inválido criando pasta `..` | testes de TID inválido | `unlink` para symlink, `rmdir` só para junction; TID validado antes de montar caminho |
+| 15 | Overlay de mods copiava por cima de arquivo local e revalidava só por lista de nomes (edição na fonte passava batida) | teste de colisão + edição de fonte | manifesto com fingerprint (tamanho+mtime) por arquivo; destino ocupado fora do Hub é preservado com aviso |
+| 16 | Instalador Mac apagava `emuladores/` com `rm -rf` antes de extrair (perdia `user/` em reinstalação) e exigia o `.pkg` mesmo no pacote leve | teste do instalador leve | `ditto` por cima, sem apagar; leve pula Python/emuladores com aviso |
+| 17 | `BibliotecaHub.sh`/`.command`/`.bat` exportavam `BIBLIOTECA_HOME` apontando para `dados/` em vez da raiz, quebrando `resolve_home` + instaladores | leitura dos launchers + teste de layout | raiz por padrão, com fallback que reconhece a coleção legada `dados/dados/` sem movê-la |
+| 18 | `montar_linux.py --gui` não repassava argumentos; builders copiavam `app/` com listas divergentes (novo `despacho.py` ficaria de fora) | teste de layout dos 3 builders | `shift` no launcher, `copiar_app` único usado pelos 3 builders |
+| 19 | DeSmuME do bundle Windows usava caminho fixo em vez dos overrides do app | teste com `BIBLIOTECA_EMULADOR_NDS` | `desmume_instalado_dir` resolve como o app |
+| 20 | `importar_repack` apagava o archive mesmo quando `importar_lista` retornava erros | leitura do fluxo + contrato | erro na importação preserva o archive e a pasta extraída |
+
+## 3. Decisões de estrutura
+
+- `bib_nucleo/arquivos.py`: publicação atômica (`destino_temporario`,
+  `gravar_atomico`) usada em downloads, cache WAV, instaladores e pacote
+  de fontes. Não substitui backups versionados.
+- `frontends/despacho.py`: único ponto de entrega worker→UI, com ciclo
+  de vida próprio (cancela timers e descarta fila ao fechar).
+- `ferramentas/diagnosticar.py` e `empacotar_fontes.py`: operação e
+  entrega sem tocar na coleção (banco aberto `mode=ro` + `query_only`).
+- `.github/workflows/testes.yml`: matriz Windows/Linux × Python 3.10/3.14,
+  com relatório JSON por combinação.
+- Removidos sem uso: `_verificar_sessoes_pendentes`,
+  `_verificar_backup_antigo` (GUI), `_musica_ja_tem` (banco),
+  `AZAHAR_USER_EXCLUIR` (builder Linux), imports não usados em
+  `test_fase_a`/`test_fase_b`/`test_varredura`, `_emu_fake` local em
+  `test_mods` (usa o helper do runner).
+
+## 4. O que falta validar (real, não simulado)
+
+- Linux real: TUI, Wine, DeSmuME, tradução de caminhos e `.run`.
+- macOS real: `.command`, `.app` Azahar/DeSmuME, `afplay`, quarentena.
+- Rede real: iTunes, SteamRip/hosts, yt-dlp, FFmpeg, releases GitHub.
+- Áudio real: MCI/WAV/ffmpeg no Windows da coleção; avanço no fim.
+- Instaladores completos (Inno/`--setup`, `.run`, pacote Mac cheio).
+- Concorrência Win+Linux na mesma casa continua vetada pelo lock.
+
+## 5. Como reproduzir
+
+```powershell
+py -3.14 codigo/ferramentas/testes/executar.py --json "$env:TEMP\tucoteca-testes.json"
+py -3.14 codigo/ferramentas/diagnosticar.py --json
+py -3.14 codigo/ferramentas/empacotar_fontes.py
+```

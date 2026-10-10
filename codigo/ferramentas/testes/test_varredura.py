@@ -1,6 +1,5 @@
 """Varredura: horas finitas, erro do update visível, previews tolerantes, pacote em thread."""
 import tempfile
-import threading
 import time
 from pathlib import Path
 

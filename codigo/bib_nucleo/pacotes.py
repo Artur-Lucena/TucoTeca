@@ -13,7 +13,7 @@ from bib_nucleo.banco import (CAPA_EXTS, criar_musica, get_db,
                                 musica_to_dict, row_to_dict,
                                 salvar_capa_bytes)
 from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, DEFAULT_DB, MUSICAS_DIR,
-                               agora_iso, garantir_dirs)
+                               agora_iso, garantir_dirs, nome_arquivo_portatil)
 from bib_nucleo.emuladores import (azahar_versao_local,
                                      presets_dir, presets_prov_dir, provedores)
 from bib_nucleo.scans import importar_lista
@@ -117,7 +117,7 @@ def _musicas_para_pacote(musicas: list[dict]) -> list[tuple[str, Path]]:
     for m in musicas:
         if not isinstance(m, dict):
             continue
-        nome = Path(str(m.get("musica_path") or "")).name
+        nome = nome_arquivo_portatil(m.get("musica_path") or "")
         arq = MUSICAS_DIR / nome
         try:
             ok = bool(nome) and arq.is_file() \
@@ -310,6 +310,8 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                 cat = cats.get(f"capas/{Path(arq).name}")
                 if cat != "capa" or not isinstance(ident, str) or not ident.strip():
                     continue
+                if ident.startswith("mus:"):
+                    continue  # identidade de áudio é resolvida após restaurar músicas
                 try:
                     raw = zf.read(f"capas/{Path(arq).name}")
                 except KeyError:
@@ -375,13 +377,14 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
             if lista_mus:
                 from bib_nucleo.base import MUSICAS_DIR
                 MUSICAS_DIR.mkdir(parents=True, exist_ok=True)
-                mus_por_sha: dict[str, int] = {}
+                mus_por_sha = {r["musica_sha"]: r["id"]
+                               for r in con.execute("SELECT id, musica_sha FROM musicas")}
                 for m in lista_mus:
                     if not isinstance(m, dict):
                         musicas_ignoradas += 1
                         continue
                     sha = str(m.get("musica_sha") or "").strip()
-                    membro = f"musicas/{Path(str(m.get('musica_path') or '')).name}"
+                    membro = f"musicas/{nome_arquivo_portatil(m.get('musica_path') or '')}"
                     if not sha or cats.get(membro) != "musica":
                         musicas_ignoradas += 1
                         continue
@@ -393,7 +396,24 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                                 musicas_ignoradas += 1
                                 continue
                         else:
-                            dest.write_bytes(zf.read(membro))
+                            import hashlib
+                            from bib_nucleo.arquivos import gravar_atomico
+                            raw = zf.read(membro)
+                            if hashlib.sha256(raw).hexdigest() != sha:
+                                musicas_ignoradas += 1
+                                avisos.append(f"Música {Path(membro).name}: SHA-256 divergente")
+                                continue
+                            gravar_atomico(dest, raw)
+                        if sha in mus_por_sha:
+                            from bib_nucleo.musicas import resolver_musica
+                            atual = con.execute("SELECT musica_path FROM musicas WHERE id=?",
+                                                (mus_por_sha[sha],)).fetchone()
+                            if not resolver_musica(atual["musica_path"]):
+                                con.execute("UPDATE musicas SET musica_path=? WHERE id=?",
+                                            (str(dest), mus_por_sha[sha]))
+                                con.commit()
+                            musicas_ignoradas += 1
+                            continue
                         nova = criar_musica(con, {
                             "titulo": m.get("titulo") or Path(membro).stem,
                             "artista": m.get("artista") or "",

@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""Entrega reproduzível dos fontes/documentação, independente de Git e dados pessoais."""
+from __future__ import annotations
+
+import argparse
+import datetime
+import hashlib
+import json
+import os
+import stat
+import sys
+import zipfile
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git"}
+RAIZ_ARQUIVOS = {"README.md", "CONTRIBUTING.md", "LICENSE", ".gitignore", ".gitattributes",
+                 "BibliotecaHub.bat", "BibliotecaHub.sh", "BibliotecaHubMac.command",
+                 "Montar-Universal.bat"}
+EXTENSOES = {"codigo": {".py", ".iss"}, "docs": {".md"},
+             ".github": {".yml", ".yaml"}, "midia": {".png", ".jpg", ".jpeg"}}
+
+
+def _link(path: Path) -> bool:
+    st = path.lstat()
+    return stat.S_ISLNK(st.st_mode) or bool(getattr(st, "st_file_attributes", 0) & 0x400)
+
+
+def listar_fontes(repo: Path = REPO) -> list[Path]:
+    """Allowlist explícita: dados/dist/ROMs/cache/atalhos nunca entram."""
+    repo = Path(repo)
+    arquivos = [repo / nome for nome in RAIZ_ARQUIVOS
+                if (repo / nome).is_file() and not _link(repo / nome)]
+    for nome, extensoes in EXTENSOES.items():
+        base = repo / nome
+        if not base.is_dir() or _link(base):
+            continue
+        for pasta, dirs, nomes in os.walk(base, followlinks=False):
+            dirs[:] = sorted(d for d in dirs if d not in IGNORADAS and not _link(Path(pasta, d)))
+            for fn in sorted(nomes):
+                path = Path(pasta, fn)
+                if path.suffix.lower() in extensoes and not _link(path):
+                    arquivos.append(path)
+    return sorted(arquivos, key=lambda p: p.relative_to(repo).as_posix())
+
+
+def empacotar_fontes(destino: Path, repo: Path = REPO) -> dict:
+    """Inclui a árvore de trabalho atual, inclusive módulos ainda não commitados."""
+    repo, destino = Path(repo), Path(destino)
+    arquivos = listar_fontes(repo)
+    if not (repo / "codigo/bib_core.py").is_file():
+        raise ValueError("pasta não contém os fontes da TucoTeca")
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    sys.path.insert(0, str(repo / "codigo"))
+    from bib_nucleo.arquivos import destino_temporario
+    manifesto = {"esquema": 1, "projeto": "TucoTeca", "origem": "árvore de trabalho",
+                 "gerado_em": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                 "arquivos": {}}
+    with destino_temporario(destino) as tmp, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as out:
+        for path in arquivos:
+            relativo = path.relative_to(repo).as_posix()
+            dados = path.read_bytes()
+            manifesto["arquivos"][relativo] = {"bytes": len(dados),
+                                                "sha256": hashlib.sha256(dados).hexdigest()}
+            info = zipfile.ZipInfo(relativo)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            modo = 0o755 if path.suffix in (".sh", ".command") else 0o644
+            info.external_attr = (stat.S_IFREG | modo) << 16
+            out.writestr(info, dados)
+        out.writestr("MANIFESTO-FONTES.json", json.dumps(manifesto, ensure_ascii=False, indent=2))
+    return {"ok": True, "destino": str(destino), "arquivos": len(arquivos),
+            "bytes": destino.stat().st_size}
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description="Empacota fontes para colaboração técnica.")
+    ap.add_argument("--saida", type=Path, default=REPO / "dist/fontes/tucoteca-fontes-revisadas.zip")
+    args = ap.parse_args(argv)
+    try:
+        r = empacotar_fontes(args.saida)
+    except (OSError, ValueError) as e:
+        print(f"ERRO: {e}", file=sys.stderr)
+        return 1
+    print(f"[ok] {r['destino']} — {r['arquivos']} arquivos, {r['bytes'] / 1048576:.2f} MB")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

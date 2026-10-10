@@ -39,23 +39,27 @@ CACHE = Path(__file__).resolve().parent / ".cache"
 BUILD = Path(__file__).resolve().parent / ".build" / "hub"
 DIST = REPO / "dist"
 APP_ARQS = (("README.md", "README.md"),
-            ("codigo/bib_core.py", "bib_core.py"),
-            ("codigo/frontends/app_win.py", "app_win.py"),
-            ("codigo/frontends/app_tui.py", "app_tui.py"))
+             ("codigo/bib_core.py", "bib_core.py"),
+             ("codigo/frontends/app_win.py", "app_win.py"),
+              ("codigo/frontends/app_tui.py", "app_tui.py"),
+              ("codigo/frontends/aparencia.py", "aparencia.py"),
+              ("codigo/frontends/despacho.py", "despacho.py"))
 
 BAT_GUI = """@echo off
 setlocal
-set BIBLIOTECA_HOME=%~dp0dados
+set BIBLIOTECA_HOME=%~dp0
+if exist "%~dp0dados\\dados\\biblioteca.db" set BIBLIOTECA_HOME=%~dp0dados
 set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
 set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
-start "BibliotecaHub" "%~dp0python\\pythonw.exe" "%~dp0app\\app_win.py"
+start "BibliotecaHub" "%~dp0python\\pythonw.exe" "%~dp0app\\app_win.py" %*
 """
 
 BAT_DEBUG = """@echo off
 setlocal
-set BIBLIOTECA_HOME=%~dp0dados
+set BIBLIOTECA_HOME=%~dp0
+if exist "%~dp0dados\\dados\\biblioteca.db" set BIBLIOTECA_HOME=%~dp0dados
 set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
@@ -185,6 +189,19 @@ def garantir_tcl_scripts(py_dir: Path) -> str:
     serie = f"{m.group(1)}.{m.group(2)}"  # ex.: 9.0
     tagbase = f"core-{serie.replace('.', '-')}"  # ex.: core-9-0
     tcl_dir = py_dir / "tcl"
+    # Build repetido/offline: aproveitar primeiro o par oficial já em cache.
+    for tk_cache in sorted(CACHE.glob(f"tk-{tagbase}-*.tar.gz"), reverse=True):
+        tag = tk_cache.name[len("tk-"):-len(".tar.gz")]
+        tcl_cache = CACHE / f"tcl-{tag}.tar.gz"
+        if not tcl_cache.is_file():
+            continue
+        try:
+            _extrair_lib(tcl_cache, "library/init.tcl", tcl_dir / f"tcl{serie}")
+            _extrair_lib(tk_cache, "library/tk.tcl", tcl_dir / f"tk{serie}")
+            print(f"[cache] scripts Tcl/Tk {tag}")
+            return serie
+        except (OSError, ValueError, LookupError):
+            continue
     for pt in ("9", "8", "7", "6", "5", "4", "3", "2", "1", "0"):
         tag = f"{tagbase}-{pt}"
         try:
@@ -285,6 +302,33 @@ def incluir_desmume(dest_base: Path) -> str:
     return ver
 
 
+def desmume_instalado_dir() -> Path:
+    """Usa os mesmos overrides/raízes do app para o bundle Windows."""
+    sys.path.insert(0, str(REPO / "codigo"))
+    from bib_nucleo.emuladores import default_emu_nds
+    exe = default_emu_nds()
+    if exe and Path(exe).is_file():
+        return Path(exe).parent
+    raise SystemExit("DeSmuME instalado não achado (instale com o botão ⬇ primeiro).")
+
+
+def copiar_app(app_dir: Path, repo: Path | None = None) -> None:
+    """Layout único app/ para os três builders; inclui helpers dos frontends."""
+    repo = REPO if repo is None else Path(repo)
+    app_dir.mkdir(parents=True, exist_ok=True)
+    for origem, destino in APP_ARQS:
+        src = repo / origem
+        if not src.is_file():
+            raise SystemExit(f"arquivo do app ausente no repo: {origem}")
+        shutil.copy2(src, app_dir / destino)
+    nucleo = repo / "codigo" / "bib_nucleo"
+    if not (nucleo / "__init__.py").is_file():
+        raise SystemExit("pacote bib_nucleo ausente no repo.")
+    shutil.copytree(nucleo, app_dir / "bib_nucleo",
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+                    dirs_exist_ok=True)
+
+
 def incluir_azahar(dest_base: Path) -> str:
     """Copia o Azahar instalado p/ emuladores/Azahar. Retorna a versão."""
     src = azahar_instalado_dir()
@@ -350,7 +394,7 @@ def podar_dieta(build: Path) -> int:
             shutil.rmtree(pycache)
         except OSError:
             pass
-    for pyc in sorted(build.rglob("*.py[cod]")):
+    for pyc in sorted(p for p in build.rglob("*") if p.suffix.lower() in (".pyc", ".pyo")):
         try:
             livres += pyc.stat().st_size
             pyc.unlink()
@@ -455,18 +499,7 @@ def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
     (py_dir / f"python{nodot}._pth").write_text(
         f"python{nodot}.zip\n.\nLib\n../app\n", encoding="utf-8")
 
-    app_dir.mkdir(parents=True)
-    for origem, destino in APP_ARQS:
-        src = REPO / origem
-        if not src.is_file():
-            raise SystemExit(f"arquivo do app ausente no repo: {origem}")
-        shutil.copy2(src, app_dir / destino)
-    nucleo_src = REPO / "codigo" / "bib_nucleo"
-    if not (nucleo_src / "__init__.py").is_file():
-        raise SystemExit("pacote bib_nucleo ausente no repo.")
-    shutil.copytree(nucleo_src, app_dir / "bib_nucleo",
-                    ignore=shutil.ignore_patterns("__pycache__"),
-                    dirs_exist_ok=True)
+    copiar_app(app_dir, repo=REPO)
     (BUILD / "BibliotecaHub.bat").write_text(BAT_GUI.format(serie=serie), encoding="utf-8")
     (BUILD / "Debug-Console.bat").write_text(BAT_DEBUG.format(serie=serie), encoding="utf-8")
     (BUILD / "Criar-Atalho.bat").write_text(BAT_ATALHO, encoding="utf-8")
@@ -497,7 +530,7 @@ def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
     env["TK_LIBRARY"] = str(py_dir / "tcl" / f"tk{serie}")
     r = subprocess.run([str(py), "-c",
                         "import tkinter; print('tk', tkinter.TkVersion)"],
-                       capture_output=True, text=True, timeout=60)
+                        capture_output=True, text=True, timeout=60, env=env)
     if r.returncode != 0:
         raise SystemExit(f"tkinter não subiu no embutido:\n{r.stderr[-2000:]}")
     print(f"[ok] {r.stdout.strip()} no Python embutido")

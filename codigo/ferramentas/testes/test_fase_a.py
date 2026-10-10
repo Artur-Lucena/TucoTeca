@@ -1,5 +1,4 @@
 """Fase A: wine preservado, quit aplica sessões, erros.log, lambdas sanados."""
-import os
 import tempfile
 from pathlib import Path
 
@@ -115,3 +114,21 @@ def teste_sem_lambda_e_morta():
     src = (REPO / "codigo/frontends/app_win.py").read_text(encoding="utf-8")
     afirmar("lambda: falhou(e)" not in src, "padrão NameError reintroduzido")
     afirmar("m=msg_erro" in src, "captura por string ausente")
+
+
+def teste_sessao_manual_usa_banco_explicitado_e_preserva_invalida():
+    from bib_nucleo import emuladores as EMU
+    tmp = Path(tempfile.mkdtemp(prefix="suite-sessao-"))
+    db = tmp / "colecao.db"
+    con = core.get_db(db)
+    g = core.criar_jogo(con, {"titulo": "T"})
+    con.close()
+    s = EMU.iniciar_sessao_manual(g["id"], "T")
+    marcador = Path(s["arquivo"])
+    r = EMU.encerrar_sessao_manual(str(marcador), float("nan"), db_path=db)
+    afirmar(not r["ok"] and marcador.is_file(), r)
+    r = EMU.encerrar_sessao_manual(str(marcador), 2.5, db_path=db)
+    con = core.get_db(db)
+    afirmar(r["ok"] and core.listar_jogos(con)[0]["horas"] == 2.5, r)
+    con.close()
+    afirmar(not marcador.exists())

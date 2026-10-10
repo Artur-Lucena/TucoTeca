@@ -9,12 +9,14 @@ import math
 import re
 import shutil
 import sqlite3
+import threading
 import uuid as uuid_mod
+from contextlib import closing
 from pathlib import Path
 
 from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, _desaspas, _txt,
-                                agora_iso, existe_aqui_ou_traduzido,
-                                resolver_exe, slugify, win_para_linux)
+                                 agora_iso, existe_aqui_ou_traduzido,
+                                 mac_para_linux, resolver_exe, slugify, win_para_linux)
 
 
 # --------------------------------------------------------------------------
@@ -343,10 +345,7 @@ def _garantir_coluna_musica_capa(con: sqlite3.Connection) -> None:
     except sqlite3.Error:
         return
     if cols and "musica_capa" not in cols:
-        try:
-            con.execute("ALTER TABLE musicas ADD COLUMN musica_capa TEXT DEFAULT ''")
-        except sqlite3.Error:
-            pass
+        con.execute("ALTER TABLE musicas ADD COLUMN musica_capa TEXT DEFAULT ''")
 
 
 def _garantir_sem_citron(con: sqlite3.Connection) -> None:
@@ -360,11 +359,44 @@ def _garantir_sem_citron(con: sqlite3.Connection) -> None:
         con.commit()
 
 
+_DB_INICIALIZADOS: dict[str, tuple] = {}
+_DB_INIT_LOCK = threading.RLock()
+
+
 def get_db(db_path: Path) -> sqlite3.Connection:
     db_path = Path(db_path)
     if str(db_path.parent) and not db_path.parent.exists():
         db_path.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(str(db_path))
+    con.row_factory = sqlite3.Row
+    try:
+        with _DB_INIT_LOCK:
+            try:
+                st = db_path.stat()
+                chave = str(db_path.resolve())
+                versao = con.execute("PRAGMA schema_version").fetchone()[0]
+                identidade = (st.st_dev, st.st_ino, st.st_mtime_ns, versao)
+            except OSError:  # :memory: não possui identidade de arquivo
+                chave, identidade = "", None
+            pronto = chave and _DB_INICIALIZADOS.get(chave) == identidade
+            # Edição manual/legada de linhas continua recebendo backfill de UUID.
+            if pronto and con.execute("SELECT 1 FROM jogos WHERE uuid IS NULL OR uuid='' LIMIT 1").fetchone():
+                pronto = False
+            if not pronto:
+                _inicializar_db(con, db_path)
+                if chave:
+                    st = db_path.stat()
+                    _DB_INICIALIZADOS[chave] = (st.st_dev, st.st_ino, st.st_mtime_ns,
+                        con.execute("PRAGMA schema_version").fetchone()[0])
+                    if len(_DB_INICIALIZADOS) > 128:
+                        _DB_INICIALIZADOS.pop(next(iter(_DB_INICIALIZADOS)))
+    except BaseException:
+        con.close()
+        raise
+    return con
+
+
+def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     con.row_factory = sqlite3.Row
     # DELETE (não WAL): sem sidecars -wal/-shm, portátil no NTFS compartilhado.
     con.execute("PRAGMA journal_mode=DELETE;")
@@ -376,7 +408,7 @@ def get_db(db_path: Path) -> sqlite3.Connection:
             backup_dir = db_path.parent / "backups"
             backup_dir.mkdir(parents=True, exist_ok=True)
             stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-            with sqlite3.connect(str(backup_dir / f"pre-migracao-{stamp}.db")) as dst:
+            with closing(sqlite3.connect(str(backup_dir / f"pre-migracao-{stamp}.db"))) as dst:
                 con.backup(dst)
         except (OSError, sqlite3.Error):
             pass  # best-effort: disco cheio não pode impedir abrir o banco
@@ -389,8 +421,8 @@ def get_db(db_path: Path) -> sqlite3.Connection:
     _garantir_sem_citron(con)
     _garantir_tabela_musicas(con)
     _garantir_tabela_downloads(con)
+    _garantir_tabela_desejos(con)
     con.commit()
-    return con
 
 
 def row_to_dict(r: sqlite3.Row) -> dict:
@@ -554,7 +586,7 @@ def chave_dedup(titulo: str, exe: str, launch: str) -> tuple:
     def _n(c, caminho=True):
         c = (c or "").strip()
         if caminho:
-            c = win_para_linux(c)
+            c = mac_para_linux(win_para_linux(c))
         return c.replace("/", "\\").casefold()
     return (_n(titulo, False), _n(exe), _n(launch))
 
@@ -719,7 +751,7 @@ def listar_musicas(con: sqlite3.Connection, q: str = "") -> list[dict]:
 
 
 def excluir_musica(con: sqlite3.Connection, mid: int) -> None:
-    row = con.execute("SELECT musica_path FROM musicas WHERE id=?",
+    row = con.execute("SELECT musica_path, musica_capa FROM musicas WHERE id=?",
                       (mid,)).fetchone()
     if not row:
         raise LookupError("música não encontrada")
@@ -732,6 +764,11 @@ def excluir_musica(con: sqlite3.Connection, mid: int) -> None:
             raiz = MUSICAS_DIR.resolve()
             if alvo.resolve() == raiz or raiz in alvo.resolve().parents:
                 alvo.unlink()
+        except OSError:
+            pass
+    if row["musica_capa"]:
+        try:
+            (CAPAS_DIR / Path(row["musica_capa"]).name).unlink()
         except OSError:
             pass
 
@@ -764,18 +801,126 @@ def _garantir_tabela_downloads(con: sqlite3.Connection) -> None:
     con.execute(SCHEMA_DOWNLOADS)
 
 
-def download_to_dict(r: sqlite3.Row) -> dict:
+SCHEMA_DESEJOS = """
+CREATE TABLE IF NOT EXISTS desejos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    appid TEXT NOT NULL,
+    titulo TEXT NOT NULL,
+    ordem INTEGER DEFAULT 0,
+    manual INTEGER DEFAULT 0,
+    criado_em TEXT,
+    atualizado_em TEXT,
+    UNIQUE(appid)
+);
+"""
+
+
+def _garantir_coluna_desejo_manual(con: sqlite3.Connection) -> None:
+    """v17: `manual` em desejos pré-Adicionar (aditivo, sem backup)."""
+    try:
+        cols = {r["name"] for r in con.execute("PRAGMA table_info(desejos)")}
+    except sqlite3.Error:
+        return
+    if cols and "manual" not in cols:
+        con.execute("ALTER TABLE desejos ADD COLUMN manual INTEGER DEFAULT 0")
+
+
+def _garantir_tabela_desejos(con: sqlite3.Connection) -> None:
+    """v16: wishlist Steam espelhada. Idempotente; preserva linhas."""
+    con.execute(SCHEMA_DESEJOS)
+    _garantir_coluna_desejo_manual(con)
+
+
+def desejo_to_dict(r: sqlite3.Row) -> dict:
     return dict(r)
 
 
-def _musica_ja_tem(con: sqlite3.Connection, titulo: str, artista: str) -> bool:
-    """A faixa já está no catálogo? (casa sem caixa, sem acento exigido)."""
-    t, a = titulo.strip().lower(), artista.strip().lower()
-    if not t:
-        return False
-    rows = con.execute("SELECT titulo, artista FROM musicas").fetchall()
-    return any((r["titulo"] or "").strip().lower() == t
-               and (r["artista"] or "").strip().lower() == a for r in rows)
+def listar_desejos(con: sqlite3.Connection, q: str = "") -> list[dict]:
+    q = (q or "").strip().lower()
+    rows = con.execute("SELECT * FROM desejos ORDER BY ordem, titulo").fetchall()
+    out = [desejo_to_dict(r) for r in rows]
+    if q:
+        out = [d for d in out if q in (d.get("titulo") or "").lower()]
+    return out
+
+
+def sincronizar_desejos(con: sqlite3.Connection, itens: list[dict]) -> dict:
+    """Espelha a wishlist: insere novos, atualiza títulos, apaga saídos.
+
+    A wishlist é a fonte da verdade (igual restore por uuid), mas linhas
+    `manual=1` (➕ Adicionar) nunca são apagadas pelo espelho.
+    """
+    novos = atualizados = removidos = 0
+    agora = agora_iso()
+    vistos: set[str] = set()
+    for pos, item in enumerate(itens or []):
+        if not isinstance(item, dict):
+            continue
+        appid = str(item.get("appid") or "").strip()
+        titulo = _txt(item.get("titulo"))
+        if not appid.isdigit() or not titulo or appid in vistos:
+            continue
+        vistos.add(appid)
+        row = con.execute("SELECT * FROM desejos WHERE appid=?",
+                          (appid,)).fetchone()
+        if row is None:
+            con.execute("INSERT INTO desejos (appid, titulo, ordem, manual,"
+                        " criado_em, atualizado_em) VALUES (?,?,?,?,?,?)",
+                        (appid, titulo, pos, 0, agora, agora))
+            novos += 1
+        elif dict(row).get("titulo") != titulo or dict(row).get("ordem") != pos:
+            con.execute("UPDATE desejos SET titulo=?, ordem=?,"
+                        " atualizado_em=? WHERE appid=?",
+                        (titulo, pos, agora, appid))
+            atualizados += 1
+    for r in con.execute("SELECT appid, manual FROM desejos").fetchall():
+        if r["appid"] not in vistos and not r["manual"]:
+            con.execute("DELETE FROM desejos WHERE appid=?", (r["appid"],))
+            removidos += 1
+    con.commit()
+    return {"novos": novos, "atualizados": atualizados,
+            "removidos": removidos}
+
+
+def adicionar_desejo(con: sqlite3.Connection, appid: str, titulo: str) -> dict:
+    """➕ Adicionar manual: insere (ou protege) sem apagar nada.
+
+    Linha nasce `manual=1`: o espelho da wishlist nunca a remove.
+    """
+    appid = str(appid or "").strip()
+    titulo = _txt(titulo)
+    if not appid.isdigit() or not titulo:
+        raise ValueError("appid e título são obrigatórios")
+    agora = agora_iso()
+    row = con.execute("SELECT * FROM desejos WHERE appid=?",
+                      (appid,)).fetchone()
+    if row is None:
+        try:
+            pos = con.execute("SELECT COALESCE(MAX(ordem), -1) + 1 AS p"
+                              " FROM desejos").fetchone()["p"]
+        except (sqlite3.Error, TypeError, KeyError):
+            pos = 0
+        con.execute("INSERT INTO desejos (appid, titulo, ordem, manual,"
+                    " criado_em, atualizado_em) VALUES (?,?,?,?,?,?)",
+                    (appid, titulo, pos, 1, agora, agora))
+        con.commit()
+        return {"ok": True, "novo": True}
+    con.execute("UPDATE desejos SET titulo=?, manual=1, atualizado_em=?"
+                " WHERE appid=?", (titulo, agora, appid))
+    con.commit()
+    return {"ok": True, "novo": False}
+
+
+def remover_desejo(con: sqlite3.Connection, did: int) -> None:
+    row = con.execute("SELECT id FROM desejos WHERE id=?", (did,)).fetchone()
+    if not row:
+        raise LookupError("desejo não encontrado")
+    con.execute("DELETE FROM desejos WHERE id=?", (did,))
+    con.commit()
+
+
+def download_to_dict(r: sqlite3.Row) -> dict:
+    return dict(r)
 
 
 def enfileirar_downloads(con: sqlite3.Connection, itens: list[dict]) -> dict:
@@ -793,7 +938,13 @@ def enfileirar_downloads(con: sqlite3.Connection, itens: list[dict]) -> dict:
                   for r in con.execute(
                       "SELECT artista, titulo FROM downloads").fetchall()}
     agora = agora_iso()
+    catalogo = {(str(r["artista"] or "").strip().casefold(),
+                 str(r["titulo"] or "").strip().casefold())
+                for r in con.execute("SELECT titulo, artista FROM musicas")}
     for item in itens or []:
+        if not isinstance(item, dict):
+            ignorados += 1
+            continue
         tit = _txt((item or {}).get("titulo"))
         if not tit:
             ignorados += 1
@@ -804,12 +955,9 @@ def enfileirar_downloads(con: sqlite3.Connection, itens: list[dict]) -> dict:
         if (uri and uri in vistos_uri) or par in vistos_par:
             ignorados += 1
             continue
-        try:
-            if _musica_ja_tem(con, tit, art):
-                ignorados += 1
-                continue
-        except sqlite3.Error:
-            pass
+        if (art.casefold(), tit.casefold()) in catalogo:
+            ignorados += 1
+            continue
         try:
             con.execute(
                 """INSERT INTO downloads (titulo, artista, album, uri, estado,
@@ -839,9 +987,9 @@ def listar_downloads(con: sqlite3.Connection, estado: str = "") -> list[dict]:
 
 
 def marcar_download(con: sqlite3.Connection, did: int, estado: str,
-                    video_id: str = "", erro: str = "",
-                    musica_sha: str = "", musica_path: str = "") -> dict:
-    """Avança a faixa na fila (Fases B/C preenchem o resto)."""
+                    video_id: str | None = None, erro: str = "",
+                    musica_sha: str | None = None, musica_path: str | None = None) -> dict:
+    """Avança a faixa; campos omitidos preservam arquivo/identidade para retry."""
     if estado not in ESTADOS_DOWNLOAD:
         raise ValueError(f"estado inválido: {estado}")
     row = con.execute("SELECT * FROM downloads WHERE id=?", (did,)).fetchone()
@@ -849,8 +997,10 @@ def marcar_download(con: sqlite3.Connection, did: int, estado: str,
         raise LookupError("download não encontrado")
     con.execute("UPDATE downloads SET estado=?, video_id=?, erro=?,"
                 " musica_sha=?, musica_path=?, atualizado_em=? WHERE id=?",
-                (estado, _txt(video_id), _txt(erro), _txt(musica_sha),
-                 _txt(musica_path), agora_iso(), did))
+                (estado, _txt(video_id) if video_id is not None else row["video_id"],
+                 _txt(erro), _txt(musica_sha) if musica_sha is not None else row["musica_sha"],
+                 _txt(musica_path) if musica_path is not None else row["musica_path"],
+                 agora_iso(), did))
     con.commit()
     return download_to_dict(
         con.execute("SELECT * FROM downloads WHERE id=?", (did,)).fetchone())
@@ -1059,4 +1209,5 @@ def selo_confianca(j: dict) -> str:
         return ""
     return f" · ◎{conf:.2f}" if conf > 0 else ""
 
-__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'MODS_MAX_NOME', 'MODS_MAX_QTD', 'normalizar_mods', 'mods_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'SCHEMA_MUSICAS', 'musica_to_dict', 'criar_musica', 'listar_musicas', 'excluir_musica', 'salvar_capa_musica_bytes', 'ESTADOS_DOWNLOAD', 'SCHEMA_DOWNLOADS', 'download_to_dict', 'enfileirar_downloads', 'listar_downloads', 'marcar_download', 'limpar_downloads', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']
+__all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'MODS_MAX_NOME', 'MODS_MAX_QTD', 'normalizar_mods', 'mods_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'SCHEMA_MUSICAS', 'musica_to_dict', 'criar_musica', 'listar_musicas', 'excluir_musica', 'salvar_capa_musica_bytes', 'ESTADOS_DOWNLOAD', 'SCHEMA_DOWNLOADS', 'download_to_dict', 'enfileirar_downloads', 'listar_downloads', 'marcar_download', 'limpar_downloads', 'SCHEMA_DESEJOS', 'desejo_to_dict', 'listar_desejos',
+ 'sincronizar_desejos', 'adicionar_desejo', 'remover_desejo', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']

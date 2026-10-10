@@ -25,19 +25,21 @@ from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI))
-from montar_portatil import (AZAHAR_URL, AZAHAR_USER_EXCLUIR,
+from montar_portatil import (AZAHAR_URL,
                               AZAHAR_USER_INCLUIR, REPO, DIST, garantir_gpl,
-                              podar_dieta)
+                              copiar_app, podar_dieta)
 
 LIN_BUILD = AQUI / ".build" / "lin"
 
 SH_LAUNCHER = """#!/bin/sh
 # TucoTeca (instalado) — abre o TUI; --gui abre a janela gráfica.
 HUB="$(dirname "$(readlink -f "$0")")"
-export BIBLIOTECA_HOME="$HUB/dados"
+export BIBLIOTECA_HOME="$HUB"
+[ -f "$HUB/dados/dados/biblioteca.db" ] && export BIBLIOTECA_HOME="$HUB/dados"
 export BIBLIOTECA_AZAHAR_DIR="$HUB/emuladores/Azahar"
 export BIBLIOTECA_DESMUME_DIR="$HUB/emuladores/DeSmuME"
 if [ "$1" = "--gui" ]; then
+  shift
   exec python3 "$HUB/app/app_win.py" "$@"
 fi
 exec python3 "$HUB/app/app_tui.py" "$@"
@@ -63,7 +65,6 @@ else
   rm -f "$HUB/BibliotecaHub.sh" "$HUB/VERSAO.txt" "$HUB/desinstalar.sh"
   echo "app removido; coleção preservada em $HUB/dados"
   echo "(--tudo apaga a coleção junto)"
-  exit 0
 fi
 rm -f "$HOME/.local/share/applications/tucoteca.desktop"
 echo "TucoTeca desinstalada."
@@ -190,17 +191,7 @@ def montar_base_linux(trab: Path | None = None) -> tuple[Path, dict]:
     base = raiz / "tucoteca"
     app = base / "app"
     app.mkdir(parents=True)
-    for origem in ("codigo/bib_core.py", "codigo/frontends/app_win.py",
-                   "codigo/frontends/app_tui.py"):
-        src = REPO / origem
-        if not src.is_file():
-            raise SystemExit(f"arquivo do app ausente no repo: {origem}")
-        shutil.copy2(src, app / Path(origem).name)
-    nucleo = REPO / "codigo" / "bib_nucleo"
-    if not (nucleo / "__init__.py").is_file():
-        raise SystemExit("pacote bib_nucleo ausente no repo.")
-    shutil.copytree(nucleo, app / "bib_nucleo",
-                    ignore=shutil.ignore_patterns("__pycache__"))
+    copiar_app(app, repo=REPO)
     (base / "BibliotecaHub.sh").write_text(SH_LAUNCHER, encoding="utf-8")
     (base / "tucoteca.desktop").write_text(DESKTOP, encoding="utf-8")
     (base / "desinstalar.sh").write_text(DESINSTALAR, encoding="utf-8")

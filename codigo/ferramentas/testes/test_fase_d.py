@@ -145,6 +145,46 @@ def teste_backup_pre_import_e_selo():
     afirmar(core.selo_confianca({"confianca": 0}) == "")
 
 
+def teste_lock_abertura_concorrente():
+    import threading
+    barreira = threading.Barrier(8)
+    resultados = []
+
+    def adquirir():
+        barreira.wait(5)
+        resultados.append(core.adquirir_lock())
+
+    threads = [threading.Thread(target=adquirir) for _ in range(8)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(5)
+    try:
+        afirmar(len(resultados) == 8 and sum(r["ok"] for r in resultados) == 1, resultados)
+    finally:
+        core.liberar_lock()
+
+
+def teste_lock_vivo_nao_expira_e_json_invalido():
+    import json
+    import os
+    import socket
+    import sys
+    from bib_nucleo import base
+    lp = base.lock_path()
+    lp.parent.mkdir(parents=True, exist_ok=True)
+    lp.write_text(json.dumps({"pid": os.getpid(), "host": socket.gethostname(),
+                              "so": sys.platform, "inicio": "2000-01-01T00:00:00+00:00"}))
+    try:
+        afirmar(not base.adquirir_lock()["ok"], "lock com PID vivo expirou")
+    finally:
+        base.liberar_lock()
+    lp.write_text("[]")
+    afirmar(not base.adquirir_lock()["ok"], "arquivo recém-criado foi atropelado")
+    base.liberar_lock()  # não levanta em JSON não-objeto
+    lp.unlink()
+
+
 def teste_save_path():
     con, _tmp = _nova_db()
     try:

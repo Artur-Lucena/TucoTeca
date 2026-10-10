@@ -1,5 +1,6 @@
 """Player interno: transporte, playlist e auto-avançar (FakeBackend, sem áudio)."""
 import tempfile
+import wave
 from pathlib import Path
 
 import bib_core as core
@@ -58,6 +59,14 @@ def _faixas(n=3):
     return [{"path": f"m{i}.mp3", "titulo": f"T{i}"} for i in range(n)]
 
 
+def _wav_fake(path):
+    with wave.open(str(path), "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(8000)
+        wav.writeframes(bytes(1600))
+
+
 def teste_player_transporte():
     from bib_nucleo import player as PL
     p = PL.Player(FakeBackend())
@@ -95,6 +104,45 @@ def teste_player_auto_avancar():
     afirmar(not r.get("ok") and p.estado == "parado", (r, p.estado))
     r = p.anterior()
     afirmar(r.get("ok") and p.atual()["titulo"] == "T1", (r, p.atual()))
+
+
+def teste_player_status_desconhecido_nao_avanca():
+    """Erro de consulta é estado desconhecido, não fim da música."""
+    from bib_nucleo import player as PL
+    be = FakeBackend()
+    p = PL.Player(be)
+    p.carregar(_faixas())
+    p.tocar()
+    be.vivo = lambda: None
+    for _ in range(20):
+        afirmar(not p.terminou(), "erro de consulta não pode avançar a fila")
+    afirmar(p.idx == 0 and p.estado == "tocando")
+    be.vivo = lambda: False
+    afirmar(p.terminou(), "fim confirmado deveria permitir avançar")
+
+
+def teste_player_mci_fim_confirmado():
+    """MCI só termina com stopped e posição/duração válidas no fim."""
+    from bib_nucleo import player as PL
+    be = PL.MciBackend()
+    p = PL.Player(be)
+    p.carregar(_faixas())
+    p.estado = "tocando"
+    be._modo = lambda: ""
+    afirmar(be.vivo() is None)
+    afirmar(not p.terminou(), "MCI erro 263 não é fim da faixa")
+    be._modo = lambda: "stopped"
+    be.pos_ms = lambda: 0
+    be.dur_ms = lambda: 120000
+    afirmar(not p.terminou(), "stopped no início não é fim")
+    be.pos_ms = lambda: None
+    afirmar(not p.terminou(), "posição indisponível não é fim")
+    be.pos_ms = lambda: 120000
+    afirmar(p.terminou(), "fim real deveria avançar")
+    be._modo = lambda: "paused"
+    afirmar(not p.terminou(), "pausa não é fim")
+    be._modo = lambda: "playing"
+    afirmar(not p.terminou(), "ainda tocando não é fim")
 
 
 def teste_player_falhas():
@@ -154,13 +202,13 @@ def teste_player_mci_rotear_e_cache():
         afirmar(r.get("ok") and r["modo"] == "cache"
                 and r["alvo"].endswith(".wav"), r)
         # decodificar pula cache existente
-        Path(r["alvo"]).write_bytes(b"WAVvelho")
+        _wav_fake(Path(r["alvo"]))
         afirmar(b._decodificar("ff", str(tmp / "b.mp3"), r["alvo"])["ok"])
         Path(r["alvo"]).unlink()
         velho_run = PL.subprocess.run
         try:
             def _ff(*a, **k):
-                Path(a[0][-1]).write_bytes(b"WAVnovo")
+                _wav_fake(Path(a[0][-1]))
                 class R:
                     returncode = 0
                     stderr = ""
@@ -194,12 +242,32 @@ def teste_player_mci_rotear_e_cache():
     PL._eh_nt = lambda: True
     try:
         b._cmd = lambda c: ""
-        b._decodificar = lambda f, s, d: {"ok": True}
-        r = b.open(str(tmp / "b.mp3"))
+        r = b.open(str(tmp / "a.wav"))
         afirmar(r.get("ok") and b.alias, (r, b.alias))
-        b.vivo()  # com _cmd falso: só não pode levantar
+        b._modo = lambda: ""
+        afirmar(b.vivo() is None)
         b.close()
         afirmar(b.alias == "", b.alias)
     finally:
         PL._eh_nt = velho_nt
         BX.localizar_ffmpeg = velho_loc2
+
+
+def teste_cache_wav_parcial_nao_e_publicado():
+    from unittest.mock import patch
+    from bib_nucleo import player as PL
+    tmp = Path(tempfile.mkdtemp(prefix="suite-pl-"))
+    destino = tmp / "cache.wav"
+    destino.write_bytes(b"cache antigo truncado")
+    be = PL.MciBackend()
+
+    def ruim(cmd, **_kwargs):
+        Path(cmd[-1]).write_bytes(b"RIFF incompleto")
+        from types import SimpleNamespace
+        return SimpleNamespace(returncode=0, stderr="")
+
+    with patch.object(PL.subprocess, "run", side_effect=ruim):
+        r = be._decodificar("ffmpeg-fake", "x.mp3", str(destino))
+    afirmar(not r["ok"], r)
+    afirmar(destino.read_bytes() == b"cache antigo truncado", "substituiu com saída parcial")
+    afirmar(len(list(tmp.iterdir())) == 1, "temporário não foi removido")

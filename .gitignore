@@ -17,6 +17,7 @@ Thumbs.db
 .vscode/
 # Saída do portátil (ferramentas/montar_portatil.py) — artefato, não fonte
 dist/
+programa/
 codigo/ferramentas/.cache/
 codigo/ferramentas/.build/
 # Trava de instância e atalho locais — máquina, não repo

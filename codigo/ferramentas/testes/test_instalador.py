@@ -27,10 +27,14 @@ def teste_dieta_poda_pycache():
     pc.mkdir()
     (pc / "x.pyc").write_bytes(b"0" * 100)
     (build / "solto.pyc").write_bytes(b"1" * 50)
+    (build / "_sqlite3.pyd").write_bytes(b"extensao nativa")
+    (build / "_tkinter.pyd").write_bytes(b"extensao nativa")
     livres = MP.podar_dieta(build)
     afirmar(livres == 150, livres)
     afirmar(not pc.exists() and not (build / "solto.pyc").exists())
     afirmar((build / "app" / "app_tui.py").is_file(), "comeu arquivo real!")
+    afirmar((build / "_sqlite3.pyd").is_file() and (build / "_tkinter.pyd").is_file(),
+            "dieta apagou extensões nativas")
 
 
 def teste_tarxz_roundtrip():
@@ -144,3 +148,45 @@ def teste_universal_junta_tres():
         afirmar("navigator.platform" in html, "sem detecção de SO?")
     finally:
         MU.DIST, MU.montar_mac = velho_dist, velho_mac
+
+
+def teste_builders_copiam_despacho_e_volume():
+    import montar_mac as MM
+    tmp = Path(tempfile.mkdtemp(prefix="suite-inst-"))
+    MP.copiar_app(tmp / "win")
+    mac, _ = MM.montar_base_mac(tmp / "mac")
+    from unittest.mock import patch
+    with patch.object(ML, "incluir_azahar_linux", return_value="fake"):
+        linux, _ = ML.montar_base_linux(tmp / "linux")
+    for app in (tmp / "win", mac / "app", linux / "app"):
+        afirmar((app / "despacho.py").is_file(), app)
+        afirmar((app / "aparencia.py").is_file(), "tema ausente no pacote offline")
+        afirmar((app / "bib_nucleo/volume.py").is_file(), app)
+        afirmar((app / "bib_nucleo/arquivos.py").is_file(), app)
+    afirmar('shift\n' in ML.SH_LAUNCHER)
+    afirmar('BIBLIOTECA_HOME="$HUB"' in ML.SH_LAUNCHER)
+    afirmar("%*" in MP.BAT_GUI)
+
+
+def teste_desmume_origem_do_bundle_resolve():
+    import os
+    tmp = Path(tempfile.mkdtemp(prefix="suite-inst-"))
+    exe = tmp / "desmume.exe"
+    exe.write_bytes(b"MZfake")
+    from unittest.mock import patch
+    with patch.dict(os.environ, {"BIBLIOTECA_EMULADOR_NDS": str(exe)}):
+        afirmar(MP.desmume_instalado_dir() == tmp)
+
+
+def teste_mac_leve_nao_baixa_e_preserva_user():
+    import montar_mac as MM
+    from unittest.mock import patch
+    tmp = Path(tempfile.mkdtemp(prefix="suite-inst-"))
+    base, _ = MM.montar_base_mac(tmp / "build")
+    with patch.object(MM, "DIST", tmp / "dist"), \
+            patch.object(MM, "garantir_mac", side_effect=AssertionError("leve baixou oficiais")):
+        payload, inst = MM.empacotar_mac(base, "20990101", leve=True)
+    texto = inst.read_text(encoding="utf-8")
+    afirmar(payload.is_file() and inst.is_file())
+    afirmar('rm -rf "$2"' not in texto, "reinstalação apagaria o user do emulador")
+    afirmar("ditto" in texto and "pacote leve" in texto)

@@ -339,3 +339,56 @@ def teste_musica_capa_salvar_e_pacote():
         afirmar((CAPAS_DIR / lst[0]["musica_capa"]).is_file(), lst)
     finally:
         con2.close()
+
+
+def teste_pacote_audio_sha_e_capa_em_reimportacao():
+    from bib_nucleo import pacotes as PAC
+    from bib_nucleo import musicas as MUS
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))
+    src = tmp / "src"
+    src.mkdir()
+    _mp3(src)
+    db = tmp / "origem.db"
+    con = core.get_db(db)
+    MUS.importar_musicas(con, src, capa_auto=False)
+    m = core.listar_musicas(con)[0]
+    core.salvar_capa_musica_bytes(con, m["id"], "arte.jpg", b"J" * 2048)
+    con.close()
+    pacote = tmp / "ok.zip"
+    PAC.exportar_pacote(pacote, db_path=db, incluir_saves=False)
+    destino = tmp / "destino.db"
+    afirmar(PAC.importar_pacote(pacote, db_path=destino)["ok"])
+    con = core.get_db(destino)
+    salvo = core.listar_musicas(con)[0]
+    con.execute("UPDATE musicas SET musica_capa='' WHERE id=?", (salvo["id"],))
+    con.commit()
+    con.close()
+    res = PAC.importar_pacote(pacote, db_path=destino)
+    con = core.get_db(destino)
+    afirmar(core.listar_musicas(con)[0]["musica_capa"], res)
+    con.close()
+    # Pacote com áudio adulterado e hash antigo, numa casa sem arquivo existente.
+    from bib_nucleo import base
+    from unittest.mock import patch
+    adulterado = tmp / "ruim.zip"
+    with zipfile.ZipFile(pacote) as original, zipfile.ZipFile(adulterado, "w") as out:
+        for info in original.infolist():
+            out.writestr(info.filename, b"alterado" if info.filename.startswith("musicas/")
+                         else original.read(info.filename))
+    nova_pasta = tmp / "audio"
+    with patch.object(base, "MUSICAS_DIR", nova_pasta):
+        r = PAC.importar_pacote(adulterado, db_path=tmp / "ruim.db")
+    afirmar(r["musicas"] == 0 and r["musicas_ignoradas"] == 1, r)
+    afirmar(list(nova_pasta.iterdir()) == [], "áudio adulterado foi publicado")
+
+
+def teste_resolver_audio_caminho_windows_em_casa_local():
+    from unittest.mock import patch
+    from bib_nucleo import base
+    from bib_nucleo import musicas as MUS
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))
+    alvo = tmp / "faixa.mp3"
+    alvo.write_bytes(b"audio")
+    with patch.object(base, "MUSICAS_DIR", tmp):
+        afirmar(MUS.resolver_musica(r"Z:\outra-maquina\dados\musicas\faixa.mp3") == str(alvo))
+    afirmar(MUS.resolver_musica("\x00") == "")

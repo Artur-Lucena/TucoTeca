@@ -378,7 +378,7 @@ class Tui:
             self.msg = "Horas inválidas."
             return
         try:
-            res = core.encerrar_sessao_manual(alvo["_arquivo"], horas)
+            res = core.encerrar_sessao_manual(alvo["_arquivo"], horas, db_path=self.db_path)
         except Exception as e:
             self.msg = f"Falha: {e}"
             return
@@ -742,7 +742,7 @@ class Tui:
     def menu_principal(self) -> bool:
         """ESC na lista abre as categorias; retorna True se é para sair."""
         opcoes = ["Buscar", "Filtros", "Adicionar jogo", "Importar",
-                  "Músicas", "Controles", "Backup e saves", "Sessão",
+                  "Músicas", "Desejos", "Downloads", "Controles", "Backup e saves", "Sessão",
                   "Emuladores", "Sair"]
         while True:
             idx = self.escolher("TucoTeca", opcoes)
@@ -763,6 +763,10 @@ class Tui:
                 self.menu_importar()
             elif escolha == "Músicas":
                 self.menu_musicas()
+            elif escolha == "Desejos":
+                self.menu_desejos()
+            elif escolha == "Downloads":
+                self.menu_downloads()
             elif escolha == "Controles":
                 self.menu_controles()
             elif escolha == "Backup e saves":
@@ -786,7 +790,6 @@ class Tui:
                     itens = core.listar_musicas(con, q=q)
                 except Exception:
                     itens = []
-                rotulos = [core.texto_musica(m) for m in itens]
                 try:
                     at = self.player.atual() if self.player else None
                 except Exception:
@@ -826,6 +829,7 @@ class Tui:
                     pasta = (r.strip() or sugest)
                     if not pasta:
                         continue
+                    self._backup_pre_import()
                     try:
                         res = core.importar_musicas(con, pasta)
                     except Exception as e:
@@ -920,6 +924,7 @@ class Tui:
                             self._parar_interno()
                             self.msg = "Parado."
                         elif sub == 4:
+                            self._parar_interno()
                             r = core.tocar_musica(itens[pos].get("musica_path") or "")
                             self.msg = (f"Tocando '{rotulos[pos]}' no player ✓"
                                         " (segue com o jogo aberto)"
@@ -1042,13 +1047,14 @@ class Tui:
                 self.msg = f"Baixadas {ok}/{len(alvos)} (Fase C importa)."
                 continue
             if opcoes[idx] == "Importar baixadas":
+                self._backup_pre_import()
                 try:
                     res = core.importar_fila_pronta(con)
                 except Exception as e:
                     self.msg = f"Falha: {e}"
                     continue
                 self.msg = (f"{res['novas']} nova(s),"
-                            f" {res['ignorados']} ignorada(s)")
+                            f" {res['ignoradas']} ignorada(s)")
                 if res["erros"]:
                     self.msg += f" — {res['erros'][0]}"
                 continue
@@ -1067,6 +1073,297 @@ class Tui:
                     core.texto_musica(d), d.get("estado") or "",
                     d.get("video_id") or "", d.get("erro") or "") if x)
                 self.msg = det
+
+    def menu_desejos(self):
+        """Wishlist Steam espelhada: sincronizar, buscar p/ baixar, remover."""
+        con = self._con()
+        try:
+            while True:
+                try:
+                    itens = core.listar_desejos(con)
+                except Exception:
+                    itens = []
+                rotulos = [d["titulo"] for d in itens]
+                opcoes = (rotulos + ["🔄 Sincronizar", "➕ Adicionar…",
+                                     "🌐 Wishlist na Steam",
+                                     "📄 Arquivo…",
+                                     "🔎 Buscar p/ baixar",
+                                     "🗑 Remover", "Voltar"])
+                idx = self.escolher(f"Desejos ({len(itens)})", opcoes)
+                if idx is None or opcoes[idx] == "Voltar":
+                    self.recarregar()
+                    return
+                escolha = opcoes[idx]
+                if escolha == "🔄 Sincronizar":
+                    try:
+                        conta = core.steam_principal()
+                        if not conta:
+                            self.msg = ("Conta Steam não achada neste PC "
+                                        "(BIBLIOTECA_STEAM_ID?).")
+                            continue
+                        leitura = core.ler_wishlist(conta["steamid"])
+                        if leitura["erros"]:
+                            self.msg = f"Falha: {leitura['erros'][0]}"
+                            continue
+                        self._backup_pre_import()
+                        res = core.sincronizar_desejos(con, leitura["itens"])
+                    except Exception as e:
+                        self.msg = f"Falha: {e}"
+                        continue
+                    self.msg = (f"{res['novos']} novo(s), "
+                                f"{res['atualizados']} atualizado(s), "
+                                f"{res['removidos']} removido(s)")
+                    continue
+                if escolha == "➕ Adicionar…":
+                    termo = self.perguntar("Buscar na Steam: ", "")
+                    if not (termo or "").strip():
+                        continue
+                    try:
+                        busca = core.buscar_jogos_steam(termo.strip())
+                    except Exception as e:
+                        self.msg = f"Falha: {e}"
+                        continue
+                    if busca["erros"] and not busca["itens"]:
+                        self.msg = f"Falha: {busca['erros'][0]}"
+                        continue
+                    pos = self._escolher_item(
+                        "Adicionar qual?",
+                        [d["titulo"] for d in busca["itens"]])
+                    if pos is None:
+                        continue
+                    try:
+                        self._backup_pre_import()
+                        core.adicionar_desejo(con, busca["itens"][pos]["appid"],
+                                              busca["itens"][pos]["titulo"])
+                    except (ValueError, LookupError) as e:
+                        self.msg = f"Falha: {e}"
+                        continue
+                    except Exception as e:
+                        self.msg = f"Falha: {e}"
+                        continue
+                    self.msg = (f"Desejo '{busca['itens'][pos]['titulo']}' ✓")
+                    continue
+                if escolha == "🌐 Wishlist na Steam":
+                    conta = core.steam_principal()
+                    if not conta:
+                        self.msg = ("Conta Steam não achada neste PC "
+                                    "(BIBLIOTECA_STEAM_ID?).")
+                        continue
+                    url = ("https://store.steampowered.com/wishlist/profiles/"
+                           f"{conta['steamid']}/")
+                    core.abrir_url(url)
+                    self.msg = ("Confira a wishlist na Steam; use Adicionar "
+                                "ou importe um JSON exportado para alimentar o Hub.")
+                    continue
+                if escolha == "📄 Arquivo…":
+                    caminho = self.perguntar("JSON da wishlist: ", "")
+                    if not (caminho or "").strip():
+                        continue
+                    try:
+                        leitura = core.ler_wishlist_arquivo(caminho.strip())
+                        if leitura["erros"] and not leitura["itens"]:
+                            self.msg = f"Falha: {leitura['erros'][0]}"
+                            continue
+                        self._backup_pre_import()
+                        res = core.sincronizar_desejos(con, leitura["itens"])
+                    except Exception as e:
+                        self.msg = f"Falha: {e}"
+                        continue
+                    self.msg = (f"{res['novos']} novo(s), "
+                                f"{res['atualizados']} atualizado(s), "
+                                f"{res['removidos']} removido(s)")
+                    continue
+                if escolha == "🔎 Buscar p/ baixar":
+                    pos = self._escolher_item(
+                        "Buscar qual desejo?",
+                        [d["titulo"] for d in itens])
+                    if pos is None:
+                        continue
+                    self.menu_desejo_fontes(itens[pos])
+                    continue
+                if escolha == "🗑 Remover":
+                    pos = self._escolher_item(
+                        "Remover qual desejo?",
+                        [d["titulo"] for d in itens])
+                    if pos is None:
+                        continue
+                    if not self.confirmar(f"Tirar '{itens[pos]['titulo']}'?"):
+                        continue
+                    try:
+                        core.remover_desejo(con, itens[pos]["id"])
+                        self.msg = "Desejo removido."
+                    except LookupError as e:
+                        self.msg = f"Falha: {e}"
+                    continue
+        finally:
+            con.close()
+
+    def menu_downloads(self):
+        """% dos torrents do qBittorrent + importar concluídos."""
+        con = self._con()
+        try:
+            while True:
+                try:
+                    leitura = core.listar_torrents()
+                    dls = leitura.get("torrents") or []
+                except Exception:
+                    dls = []
+                rotulos = [f"{'✓ ' if t['completo'] else ''}{t['nome']} · "
+                           f"{t['pct']}% ({core.formatar_tamanho(t['feito'])}/"
+                           f"{core.formatar_tamanho(t['total'])})" for t in dls]
+                opcoes = (rotulos + ["✅ Verificar concluídos", "Voltar"])
+                idx = self.escolher(f"Downloads ({len(dls)})", opcoes)
+                if idx is None or opcoes[idx] == "Voltar":
+                    self.recarregar()
+                    return
+                escolha = opcoes[idx]
+                if escolha == "✅ Verificar concluídos":
+                    prontos = [t for t in dls if t.get("completo")
+                               and t.get("save_path")]
+                    if not prontos:
+                        self.msg = "Nada 100% ainda."
+                        continue
+                    try:
+                        self._backup_pre_import()
+                        linhas = []
+                        for t in prontos:
+                            alvo = Path(t["save_path"])
+                            try:
+                                if alvo.is_file() and alvo.suffix.lower() in (
+                                        ".rar", ".zip", ".7z", ".iso"):
+                                    res = core.importar_repack(con, str(alvo))
+                                    linhas.append(f"'{res.get('titulo', t['nome'])}'"
+                                                   + (" ✓" if res.get("ok")
+                                                      else f": {res.get('erro')}"))
+                                elif alvo.is_dir():
+                                    _r, itens, _i = core.preview_pasta([str(alvo)])
+                                    if not itens:
+                                        linhas.append(f"'{t['nome']}': sem jogo")
+                                        continue
+                                    res = core.importar_lista(con, itens)
+                                    linhas.append(f"'{t['nome']}': +{res.get('novos', 0)}")
+                                else:
+                                    linhas.append(f"'{t['nome']}': sumiu do disco")
+                            except Exception as e:
+                                linhas.append(f"'{t['nome']}': {e}")
+                    except Exception as e:
+                        self.msg = f"Falha: {e}"
+                        continue
+                    self.msg = "; ".join(linhas[:4]) or "Nada importado."
+                    self.recarregar()
+                    continue
+                # escolha direta na lista = detalhe (pasta + %)
+                if idx < len(dls):
+                    t = dls[idx]
+                    self.msg = (f"{t['nome']} · {t['pct']}% · "
+                                f"Pasta: {t.get('save_path') or '?'}")
+                continue
+        finally:
+            con.close()
+
+    def _escolher_item(self, titulo, rotulos):
+        """Índice do item ou None (Voltar/cancelar)."""
+        if not rotulos:
+            self.msg = "Lista vazia."
+            return None
+        idx = self.escolher(titulo, rotulos + ["Voltar"])
+        if idx is None or idx >= len(rotulos):
+            return None
+        return idx
+
+    def menu_desejo_fontes(self, desejo):
+        """Busca o título nas fontes e entrega (download ou abertura)."""
+        try:
+            sr = core.buscar_steamrip(desejo["titulo"])
+        except Exception as e:
+            sr = {"itens": [], "erros": [str(e)]}
+        try:
+            fg = core.buscar_fitgirl(desejo["titulo"])
+        except Exception as e:
+            fg = {"itens": [], "erros": [str(e)]}
+        opcoes = ([f"SteamRip: {i['titulo']}" for i in sr.get("itens") or []]
+                  + [f"FitGirl: {i['titulo']}" for i in fg.get("itens") or []]
+                  + ["Abrir na Steam", "Voltar"])
+        if sr.get("erros") and fg.get("erros"):
+            self.msg = f"Falha: {sr['erros'][0]}"
+        idx = self.escolher(f"Baixar '{desejo['titulo']}'", opcoes)
+        if idx is None or idx >= len(opcoes) - 2:
+            if idx == len(opcoes) - 2:
+                self.msg = f"Abra: https://store.steampowered.com/app/{desejo['appid']}/"
+            return
+        n_sr = len(sr.get("itens") or [])
+        if idx < n_sr:
+            self._desejo_steamrip((sr["itens"] or [])[idx])
+        else:
+            pg = (fg["itens"] or [])[idx - n_sr]
+            self._desejo_fitgirl(pg)
+
+    def _desejo_steamrip(self, pg):
+        try:
+            det = core.detalhes_steamrip(pg["url"])
+        except ValueError as e:
+            self.msg = f"Falha: {e}"
+            return
+        except Exception as e:
+            self.msg = f"Falha: {e}"
+            return
+        hosts = det.get("hosts") or []
+        ops = ([h["nome"] for h in hosts]
+               + ["Automático", "Abrir página (URL)", "Voltar"])
+        h = self.escolher(pg["titulo"], ops)
+        if h is None or h >= len(ops) - 2:
+            if h == len(ops) - 2:
+                self.msg = f"Abra: {pg['url']}"
+            return
+        host = "" if ops[h] == "Automático" else hosts[h]["nome"] \
+            if h < len(hosts) else ""
+        self.msg = f"Baixando '{pg['titulo']}'…"
+        try:
+            res = core.baixar_steamrip(pg["url"], host=host)
+        except Exception as e:
+            self.msg = f"Falha: {e}"
+            return
+        if not res.get("ok"):
+            self.msg = f"Falha: {res.get('erro')}"
+            return
+        self.msg = f"Em Piratas/: {Path(res['path']).name}"
+        if self.confirmar("Importar para o Hub agora?"):
+            self._importar_arquivo(res["path"])
+
+    def _desejo_fitgirl(self, pg):
+        try:
+            det = core.detalhes_fitgirl(pg["url"])
+        except ValueError as e:
+            self.msg = f"Falha: {e}"
+            return
+        except Exception as e:
+            self.msg = f"Falha: {e}"
+            return
+        links = ([{"tipo": "espelho", **h} for h in det.get("espelhos") or []]
+                 + [{"tipo": "magnet", "nome": core.nome_magnet(m), "url": m}
+                    for m in det.get("magnets") or []])
+        if not links:
+            self.msg = "Post sem espelhos nem magnets."
+            return
+        rotulos = [f"🧲 {e['nome']}" if e["tipo"] == "magnet"
+                   else f"{e['nome']} — {e['url'][:60]}" for e in links]
+        h = self.escolher(pg["titulo"],
+                          rotulos + ["Abrir página (URL)",
+                                     "Importar arquivo…", "Voltar"])
+        if h is None or h >= len(rotulos + ["Abrir página (URL)",
+                                            "Importar arquivo…"]):
+            return
+        if h < len(links):
+            r = core.abrir_url(links[h]["url"])
+            self.msg = (f"Aberto: {links[h]['nome'][:60]}"
+                        if r.get("ok") else f"Falha: {r.get('erro')}")
+            return
+        if h == len(links) + 1:
+            arq = self.perguntar("Repack baixado (.rar/.zip/.7z/.iso): ")
+            if arq and arq.strip():
+                self._importar_arquivo(arq.strip())
+            return
+        self.msg = f"Abra: {pg['url']}"
 
     def menu_controles(self):
         """Controles no Hub: listar, testar, fotografar, aplicar, gerar."""
@@ -1224,8 +1521,8 @@ class Tui:
                 self.msg = "Filtros limpos."
 
     def menu_importar(self):
-        opcoes = ["Arquivo (exe, ROM, JSON, .zip, repack)", "Pasta", "Disco (Hydra/lojas)",
-                  "Catálogo SteamRip", "Voltar"]
+        opcoes = ["Arquivo (exe, ROM, JSON, .zip, repack)", "Pasta", "Sanear pasta…", "Disco (Hydra/lojas)",
+                  "Catálogo SteamRip", "Catálogo FitGirl", "Voltar"]
         while True:
             idx = self.escolher("Importar", opcoes)
             if idx is None or opcoes[idx] == "Voltar":
@@ -1241,10 +1538,35 @@ class Tui:
                     continue
                 roots = [x.strip() for x in r.split(";") if x.strip()] or None
                 self._prev_pasta(roots)
+            elif escolha == "Sanear pasta…":
+                r = self.perguntar("Pasta do jogo p/ sanear: ")
+                if not (r or "").strip():
+                    continue
+                try:
+                    self._backup_pre_import()
+                    res = core.sanear_pasta(r.strip())
+                except Exception as e:
+                    self.msg = f"Falha: {e}"
+                    continue
+                if not res.get("ok"):
+                    self.msg = f"Falha: {res.get('erro', 'falha')}"
+                    continue
+                detalhe = f"Pasta: {res['pasta']}"
+                if res.get("avisos"):
+                    detalhe += " · " + " · ".join(res["avisos"][:3])
+                if res.get("precisa_instalar"):
+                    self.msg = detalhe + " · Só há instalador — rode o setup."
+                    continue
+                self.msg = detalhe
+                if self.confirmar(f"Importar '{res['pasta']}' para o Hub?"):
+                    self._prev_pasta([res["pasta"]])
+                    continue
             elif escolha.startswith("Disco"):
                 self._prev_disco()
             elif escolha == "Catálogo SteamRip":
                 self.menu_steamrip()
+            elif escolha == "Catálogo FitGirl":
+                self.menu_fitgirl()
 
     def menu_steamrip(self):
         """Catálogo SteamRip: buscar → hosts → Piratas/ → importar."""
@@ -1280,12 +1602,12 @@ class Tui:
         ops = ([h["nome"] for h in hosts]
                + ["Automático", "Abrir página (URL)", "Voltar"])
         h = self.escolher(pg["titulo"], ops)
-        if h is None or ops[h] == "Voltar":
+        if h is None or h >= len(ops) - 2:
+            if h == len(ops) - 2:
+                self.msg = f"Abra: {pg['url']}"
             return
-        if ops[h] == "Abrir página (URL)":
-            self.msg = f"Abra: {pg['url']}"
-            return
-        host = "" if ops[h] == "Automático" else hosts[h]["nome"]
+        host = "" if ops[h] == "Automático" else hosts[h]["nome"] \
+            if h < len(hosts) else ""
         self.msg = f"Baixando '{pg['titulo']}'…"
         try:
             res = core.baixar_steamrip(pg["url"], host=host)
@@ -1298,6 +1620,62 @@ class Tui:
         self.msg = f"Em Piratas/: {Path(res['path']).name}"
         if self.confirmar("Importar para o Hub agora?"):
             self._importar_arquivo(res["path"])
+
+    def menu_fitgirl(self):
+        """Catálogo FitGirl: buscar → espelhos/magnets → abrir → importar."""
+        r = self.perguntar("Buscar na FitGirl: ")
+        if r is None or not r.strip():
+            return
+        try:
+            res = core.buscar_fitgirl(r.strip())
+        except Exception as e:
+            self.msg = f"Falha: {e}"
+            return
+        if res.get("erros"):
+            self.msg = f"Falha: {res['erros'][0]}"
+            return
+        itens = res.get("itens") or []
+        if not itens:
+            self.msg = "Nada encontrado."
+            return
+        idx = self.escolher(f"FitGirl ({len(itens)})",
+                            [i["titulo"] for i in itens] + ["Voltar"])
+        if idx is None or idx >= len(itens):
+            return
+        pg = itens[idx]
+        try:
+            det = core.detalhes_fitgirl(pg["url"])
+        except ValueError as e:
+            self.msg = f"Falha: {e}"
+            return
+        except Exception as e:
+            self.msg = f"Falha: {e}"
+            return
+        links = ([{"tipo": "espelho", **h} for h in det.get("espelhos") or []]
+                 + [{"tipo": "magnet", "nome": core.nome_magnet(m), "url": m}
+                    for m in det.get("magnets") or []])
+        if not links:
+            self.msg = "Post sem espelhos nem magnets."
+            return
+        rotulos = [f"🧲 {e['nome']}" if e["tipo"] == "magnet"
+                   else f"{e['nome']} — {e['url'][:60]}" for e in links]
+        h = self.escolher(pg["titulo"],
+                          rotulos + ["Abrir página (URL)", "Importar arquivo…",
+                                     "Voltar"])
+        if h is None or h >= len(rotulos + ["Abrir página (URL)",
+                                            "Importar arquivo…"]):
+            return
+        if h < len(links):
+            r = core.abrir_url(links[h]["url"])
+            self.msg = (f"Aberto: {links[h]['nome'][:60]}"
+                        if r.get("ok") else f"Falha: {r.get('erro')}")
+            return
+        if h == len(links) + 1:
+            arq = self.perguntar("Repack baixado (.rar/.zip/.7z/.iso): ")
+            if arq and arq.strip():
+                self._importar_arquivo(arq.strip())
+            return
+        self.msg = f"Abra: {pg['url']}"
 
     def menu_backup(self):
         opcoes = ["Backup do banco", "Backup saves 3DS", "Exportar JSON",
@@ -1698,7 +2076,7 @@ class Tui:
         except (OSError, ValueError) as e:
             self.msg = f"JSON inválido: {e}"
             return
-        lista = dados if isinstance(dados, list) else dados.get("jogos", [])
+        lista = dados if isinstance(dados, list) else dados.get("jogos") if isinstance(dados, dict) else None
         if not isinstance(lista, list):
             self.msg = "JSON deve ser lista ou {jogos:[...]}."
             return
@@ -1806,6 +2184,7 @@ class Tui:
             pass
         self._verificar_pendencias_inicio()
         while True:
+            self._vigiar_player()
             self._aplicar_sessoes()
             self.desenhar()
             try:
@@ -1904,7 +2283,12 @@ def main(argv: list[str] | None = None) -> int:
 
     def _run(stdscr):
         app = Tui(stdscr, Path(args.db))
-        app.rodar()
+        try:
+            app.rodar()
+        finally:
+            if app.player is not None:
+                app.player.parar()
+                app.player.backend.close()
         return getattr(app, "msg_final", "")
 
     msg_final = curses.wrapper(_run)

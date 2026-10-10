@@ -10,11 +10,16 @@ from __future__ import annotations
 import argparse
 import ast
 import importlib.util
+import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 TESTES_DIR = Path(__file__).resolve().parent
@@ -35,7 +40,11 @@ def azahar_fake(emu):
     """Binário falso do Azahar que o SO atual detecta (exe no Win, AppImage no Linux)."""
     from pathlib import Path as _P
     emu = _P(emu)
-    if os.name == "nt":
+    if sys.platform == "darwin":
+        binario = emu / "Azahar.app" / "Contents" / "MacOS"
+        binario.mkdir(parents=True, exist_ok=True)
+        (binario / "azahar").write_bytes(b"MachO-fake")
+    elif os.name == "nt":
         (emu / "azahar.exe").write_bytes(b"MZ" + b"0" * 64)
     else:
         (emu / "azahar.AppImage").write_bytes(b"\x7fELF" + b"0" * 64)
@@ -54,6 +63,7 @@ def isolar(raiz: Path):
         "BIBLIOTECA_AZAHAR_DIR": str(raiz / "emu"),
         "BIBLIOTECA_WIN_ROOT": str(raiz / "win"),
         "BIBLIOTECA_LINUX_ROOT": str(raiz / "linux"),
+        "BIBLIOTECA_MAC_ROOT": str(raiz / "mac"),
         "BIBLIOTECA_SCAN_ROOTS": str(raiz / "roms"),
         "BIBLIOTECA_ROMS_ROOTS": str(raiz / "roms"),
         "APPDATA": str(raiz / "appdata"), "LOCALAPPDATA": str(raiz / "appdata"),
@@ -96,7 +106,11 @@ def isolar(raiz: Path):
             if isinstance(flags, int) and flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC):
                 dentro(path, args[3] if len(args) > 3 else -1)
         elif event == "sqlite3.connect":
-            dentro(args[0])
+            path = os.fsdecode(args[0])
+            if path.startswith("file:"):
+                parsed = urllib.parse.urlsplit(path)
+                path = urllib.request.url2pathname(parsed.path)
+            dentro(path)
         elif event in ("os.rename", "os.replace", "os.link"):
             dentro(args[0], args[2] if len(args) > 2 else -1)
             dentro(args[1], args[3] if len(args) > 3 else -1)
@@ -112,8 +126,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--caso", nargs=2)
     ap.add_argument("--raiz")
+    ap.add_argument("--modulo", action="append", default=[],
+                    help="executa só este módulo, ex.: test_baixar (repetível)")
+    ap.add_argument("--json", metavar="ARQUIVO", help="salva relatório estruturado")
     args = ap.parse_args()
-    if args.caso:
+    if args.caso and args.raiz:
         isolar(Path(args.raiz))
         arq, nome = args.caso
         spec = importlib.util.spec_from_file_location("caso", TESTES_DIR / arq)
@@ -126,23 +143,40 @@ def main():
             return 1
         return 0
 
-    total = falhas = 0
+    total = falhas = pulados = 0
+    resultados = []
     parent = Path(tempfile.gettempdir()) / "opencode"
     parent.mkdir(exist_ok=True)
     for arq in sorted(TESTES_DIR.glob("test_*.py")):
+        if args.caso and arq.name != args.caso[0]:
+            continue
+        if args.modulo and arq.stem not in {m.removesuffix(".py") for m in args.modulo}:
+            continue
         tree = ast.parse(arq.read_text(encoding="utf-8"))
         for nome in sorted(n.name for n in tree.body if isinstance(n, ast.FunctionDef)
-                           and n.name.startswith("teste_")):
+                            and n.name.startswith("teste_")):
+            if args.caso and nome != args.caso[1]:
+                continue
             total += 1
+            inicio = time.monotonic()
             with tempfile.TemporaryDirectory(prefix="hub-teste-", dir=parent) as tmp:
                 env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8")
                 env["PYTHONPATH"] = os.pathsep.join(
                     [str(CODIGO), str(FRONTENDS)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
-                r = subprocess.run([sys.executable, "-B", str(Path(__file__).resolve()),
-                                    "--caso", arq.name, nome, "--raiz", tmp],
-                                   env=env, capture_output=True, text=True, encoding="utf-8",
-                                   timeout=120)
-            print(f"{'PASS' if r.returncode == 0 else 'FAIL'} {arq.stem}.{nome}")
+                try:
+                    r = subprocess.run([sys.executable, "-B", str(Path(__file__).resolve()),
+                                        "--caso", arq.name, nome, "--raiz", tmp],
+                                       env=env, capture_output=True, text=True, encoding="utf-8",
+                                       timeout=120)
+                except subprocess.TimeoutExpired:
+                    r = subprocess.CompletedProcess([], 1, "", "Teste excedeu 120 segundos.")
+            pulo = r.returncode == 0 and bool(re.search(r"\bskip\b|\[pula\]", r.stdout, re.I))
+            status = "FAIL" if r.returncode else "SKIP" if pulo else "PASS"
+            pulados += int(pulo)
+            resultados.append({"teste": f"{arq.stem}.{nome}", "status": status,
+                               "segundos": round(time.monotonic() - inicio, 3),
+                               "saida": r.stdout + r.stderr if r.returncode or pulo else ""})
+            print(f"{status} {arq.stem}.{nome}")
             if r.returncode:
                 falhas += 1
                 try:
@@ -150,7 +184,16 @@ def main():
                 except UnicodeEncodeError:
                     sys.stdout.buffer.write(
                         (r.stdout + r.stderr).encode("utf-8", "replace"))
-    print(f"\n{total - falhas}/{total} testes aprovados (sandbox por teste).")
+    if not total:
+        ap.error("nenhum teste corresponde à seleção")
+    print(f"\n{total - falhas}/{total} casos sem falha; {pulados} pulado(s) por ambiente.")
+    if args.json:
+        destino = Path(args.json)
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_text(json.dumps({"python": sys.version.split()[0], "plataforma": sys.platform,
+                                       "total": total, "falhas": falhas, "pulados": pulados,
+                                       "resultados": resultados}, ensure_ascii=False, indent=2),
+                           encoding="utf-8")
     return int(bool(falhas))
 
 
