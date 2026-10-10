@@ -16,8 +16,8 @@ REPO = Path(__file__).resolve().parents[2]
 IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git"}
 RAIZ_ARQUIVOS = {"README.md", "CONTRIBUTING.md", "LICENSE", ".gitignore", ".gitattributes",
                  "BibliotecaHub.bat", "BibliotecaHub.sh", "BibliotecaHubMac.command",
-                 "Montar-Universal.bat"}
-EXTENSOES = {"codigo": {".py", ".iss"}, "docs": {".md"},
+                 "Montar-Universal.bat", "requirements-ui.txt"}
+EXTENSOES = {"codigo": {".py", ".iss", ".qml"}, "docs": {".md"},
              ".github": {".yml", ".yaml"}, "midia": {".png", ".jpg", ".jpeg"}}
 
 
@@ -39,7 +39,7 @@ def listar_fontes(repo: Path = REPO) -> list[Path]:
             dirs[:] = sorted(d for d in dirs if d not in IGNORADAS and not _link(Path(pasta, d)))
             for fn in sorted(nomes):
                 path = Path(pasta, fn)
-                if path.suffix.lower() in extensoes and not _link(path):
+                if (path.suffix.lower() in extensoes or fn == "qmldir") and not _link(path):
                     arquivos.append(path)
     return sorted(arquivos, key=lambda p: p.relative_to(repo).as_posix())
 

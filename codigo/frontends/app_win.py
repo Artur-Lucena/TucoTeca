@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 TucoTeca — aplicativo local Windows (tkinter, stdlib).
-Visual estilo Hydra: sidebar, grade de cards com capas e painel de detalhes.
+Modo clássico, congelado: só correções críticas. O frontend principal é Qt.
+Biblioteca com capas, painel de detalhes e modo Big Picture por teclado.
 Mesmo banco e mesmas regras do terminal Linux; nada de navegador.
 
 Uso:
@@ -23,6 +24,7 @@ import traceback
 from pathlib import Path
 from queue import Empty, SimpleQueue
 from tkinter import filedialog, messagebox, simpledialog, ttk
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import bib_core as core
@@ -246,6 +248,7 @@ class App:
         self.db_path = db_path
         self.jogos: list[dict] = []
         self.sel: int | None = None
+        self.big_picture = False
         self.nav_idx = 0
         self.filtro_prov: str | None = None  # chave do provider (fundo, não jogo)
         self.prov_btns: dict[str, ttk.Button] = {}
@@ -281,7 +284,7 @@ class App:
         self._dl_timer = None
         self._dl_snapshot = {"torrents": [], "erros": []}
         self._despacho = DespachanteUi(root, ao_erro=self._erro_callback)
-        root.title("TucoTeca")
+        root.title("TucoTeca — clássico (congelado)")
         root.geometry(f"{min(1280, root.winfo_screenwidth() - 80)}x"
                       f"{min(800, root.winfo_screenheight() - 100)}")
         root.minsize(860, 560)
@@ -473,8 +476,28 @@ class App:
         self.lbl_secao.grid(row=0, column=0, sticky="w")
         self.lbl_subtitulo = ttk.Label(cabecalho, style="Subtitle.TLabel")
         self.lbl_subtitulo.grid(row=1, column=0, columnspan=3, sticky="w", pady=(2, 0))
+        self.btn_imersivo = ttk.Button(cabecalho, text="Tela cheia · F11",
+                                      command=self._alternar_big_picture)
+        self.btn_imersivo.grid(row=0, column=3, padx=(6, 0))
+        self.nav_superior = ttk.Frame(centro)
+        self.nav_superior_btns = []
+        for i, (rotulo, _s, _f) in enumerate(NAV):
+            botao = ttk.Button(self.nav_superior, text=rotulo.split(" ", 1)[-1],
+                               command=lambda i=i: self._ir_nav(i))
+            botao.pack(side="left", padx=(0, 8))
+            self.nav_superior_btns.append(botao)
+        self.destaque = ttk.Frame(centro, style="Panel.TFrame", padding=18)
+        self.destaque.columnconfigure(0, weight=1)
+        self.destaque_titulo = ttk.Label(self.destaque, style="Panel.Title.TLabel")
+        self.destaque_titulo.grid(row=0, column=0, sticky="w")
+        ttk.Label(self.destaque, text="↑ ↓ ← →  Navegar     Enter  Jogar     Esc  Voltar",
+                  style="Panel.TLabel", foreground=MUT).grid(row=1, column=0, sticky="w", pady=(8, 0))
+        self.destaque_jogar = ttk.Button(self.destaque, text="▶  JOGAR",
+                                        style="Accent.TButton", command=self.jogar)
+        self.destaque_jogar.grid(row=0, column=1, rowspan=2, padx=(18, 0))
         # Busca expansível; filtros da biblioteca em uma área adaptável.
         barra = ttk.Frame(centro)
+        self.barra_busca = barra
         barra.pack(fill="x", padx=20, pady=(0, 10))
         lin1 = ttk.Frame(barra)
         lin1.pack(fill="x")
@@ -576,13 +599,17 @@ class App:
         self.root.bind("<Control-f>", lambda _e: self.ent_busca.focus_set())
         self.canvas.bind("<Return>", lambda _e: self.jogar())
         self.canvas.bind("<Delete>", lambda _e: self.excluir())
+        for tecla in ("Left", "Right", "Up", "Down", "Home", "End"):
+            self.canvas.bind(f"<{tecla}>", self._navegar_grade)
+        self.root.bind("<F11>", self._alternar_big_picture)
+        self.root.bind("<Escape>", self._sair_big_picture)
         self.root.bind("<Configure>", self._dimensionar_interface, add="+")
         self._atualizar_contexto()
 
     def _dimensionar_interface(self, e):
         if e.widget is not self.root:
             return
-        compacto = e.width < 1120
+        compacto = self.big_picture or e.width < 1120
         if compacto != getattr(self, "_compacto", None):
             self._compacto = compacto
             if compacto:
@@ -595,6 +622,61 @@ class App:
         largura = max(180, self.centro.winfo_width() - 40)
         self.lbl_cont.configure(wraplength=largura)
         self.lbl_vazio.configure(wraplength=largura)
+
+    def _alternar_big_picture(self, _e=None):
+        """Liga/desliga a tela cheia preservando a aba atual (clássico congelado)."""
+        self.big_picture = not self.big_picture
+        try:
+            self.root.attributes("-fullscreen", self.big_picture)
+        except tk.TclError:
+            self.big_picture = not self.big_picture
+            return
+        self.btn_imersivo.configure(text="Sair · Esc" if self.big_picture else "Tela cheia · F11")
+        self._fechar_detalhe()
+        if self.big_picture:
+            self.sidebar.grid_remove()
+        else:
+            self.sidebar.grid()
+        self._pintar_nav()
+        self._dimensionar_interface(SimpleNamespace(widget=self.root, width=self.root.winfo_width()))
+        self.recarregar()
+        try:
+            self.canvas.focus_set()
+        except tk.TclError:
+            pass
+        return "break"
+
+    def _sair_big_picture(self, _e=None):
+        if self.big_picture:
+            return self._alternar_big_picture()
+
+    def _tamanho_card(self):
+        return (216, 288) if self.big_picture else (CARD_W, CARD_H)
+
+    def _navegar_grade(self, e):
+        if self._em_musicas() or self._em_desejos() or self._em_downloads() or not self.cards:
+            return
+        cols = max(1, max(1, self.canvas.winfo_width()) // self._largura_coluna())
+        atual = self.sel if self.sel is not None else 0
+        destinos = {"Left": atual - 1, "Right": atual + 1,
+                    "Up": atual - cols, "Down": atual + cols,
+                    "Home": 0, "End": len(self.cards) - 1}
+        destino = destinos.get(getattr(e, "keysym", ""))
+        if destino is None:
+            return
+        self.sel = max(0, min(len(self.cards) - 1, destino))
+        self._pintar_selecao()
+        self.mostrar_detalhe()
+        fr = self.cards[self.sel]["frame"]
+        topo, baixo = fr.winfo_y(), fr.winfo_y() + fr.winfo_height()
+        visivel = self.canvas.canvasy(0)
+        altura = self.canvas.winfo_height()
+        total = max(1, self.grade.winfo_height())
+        if topo < visivel:
+            self.canvas.yview_moveto(topo / total)
+        elif baixo > visivel + altura:
+            self.canvas.yview_moveto((baixo - altura) / total)
+        return "break"
 
     def _abrir_detalhe(self):
         if not getattr(self, "_compacto", False):
@@ -659,8 +741,19 @@ class App:
         self.lbl_secao.configure(text=titulo)
         self.lbl_subtitulo.configure(text=subtitulos.get(titulo, ""))
         biblioteca = not (self._em_musicas() or self._em_desejos() or self._em_downloads())
-        if biblioteca:
+        if self.big_picture:
+            self.nav_superior.pack(fill="x", padx=20, pady=(0, 12), before=self.barra_busca)
+        else:
+            self.nav_superior.pack_forget()
+        if biblioteca and self.big_picture:
+            self.destaque.pack(fill="x", padx=20, pady=(0, 12), before=self.barra_busca)
+        else:
+            self.destaque.pack_forget()
+        if biblioteca and not self.big_picture:
             self.filtros_area.pack(fill="x", pady=(8, 0), before=self.lbl_cont)
+        else:
+            self.filtros_area.pack_forget()
+        if biblioteca:
             self.vscroll.pack(side="right", fill="y", before=self.canvas)
         else:
             self.filtros_area.pack_forget()
@@ -834,6 +927,8 @@ class App:
 
     # -- navegação / grade
     def _pintar_nav(self):
+        for i, botao in enumerate(getattr(self, "nav_superior_btns", [])):
+            botao.configure(style="ChipAct.TButton" if i == self.nav_idx else "Chip.TButton")
         for i, b in enumerate(self.nav_btns):
             b.configure(style="SideAct.TButton" if i == self.nav_idx else "Side.TButton")
         try:
@@ -961,7 +1056,7 @@ class App:
         chutar: a conta fixa estourava a viewport e a última coluna sumia
         atrás da borda do painel.
         """
-        passo = CARD_W + 28
+        passo = self._tamanho_card()[0] + 28
         if self.cards:
             try:
                 mais_largo = max(c["frame"].winfo_reqwidth() for c in self.cards)
@@ -1207,6 +1302,8 @@ class App:
             return False
 
     def recarregar(self):
+        selecionado_id = (self.jogos[self.sel]["id"] if self.sel is not None
+                          and 0 <= self.sel < len(self.jogos) else None)
         if self._deb is not None:
             self.root.after_cancel(self._deb)
             self._deb = None
@@ -1279,8 +1376,8 @@ class App:
         for j in visiveis:
             self.cards.append(self._criar_card(j))
         self._reorganizar()
-        if self.sel is None or self.sel >= len(self.jogos):
-            self.sel = 0 if self.jogos else None
+        self.sel = next((i for i, j in enumerate(visiveis) if j["id"] == selecionado_id),
+                        0 if visiveis else None)
         self._pintar_selecao()
         self.mostrar_detalhe()
         n = len(self.jogos)
@@ -2828,22 +2925,23 @@ class App:
         self._aviso_barra(f"Fila limpa ({n} removida(s))")
 
     def _criar_card(self, j: dict) -> dict:
+        largura, altura = self._tamanho_card()
         fr = ttk.Frame(self.grade, style="Card.TFrame", cursor="hand2")
         img = None
         if j.get("capa"):
             alvo = core.caminho_capa(j["capa"])
             if alvo is not None:
-                img = carregar_miniatura(alvo, master=self.root)
+                img = carregar_miniatura(alvo, largura, altura, master=self.root)
         if img is not None:
             self._imgs_cards.append(img)
-            lb = tk.Label(fr, image=img, width=CARD_W, height=CARD_H,
+            lb = tk.Label(fr, image=img, width=largura, height=altura,
                           bg=CARD, cursor="hand2",
                           highlightthickness=2, highlightbackground=CARD,
                           borderwidth=0)
             lb.pack(padx=6, pady=(6, 2))
             fr._imgw = lb  # type: ignore[attr-defined]
         else:
-            cv = tk.Canvas(fr, width=CARD_W, height=CARD_H, bg=CARD,
+            cv = tk.Canvas(fr, width=largura, height=altura, bg=CARD,
                            highlightthickness=2, highlightbackground=CARD,
                            cursor="hand2")
             cv.pack(padx=6, pady=(6, 2))
@@ -2851,16 +2949,16 @@ class App:
                 plat_cv = j.get("plataforma") or core.plataforma_jogo(j)
             except Exception:
                 plat_cv = ""
-            desenhar_tile(cv, j["titulo"], CARD_W, CARD_H, subtitulo=plat_cv)
+            desenhar_tile(cv, j["titulo"], largura, altura, subtitulo=plat_cv)
             fr._tile = cv  # type: ignore[attr-defined]
             fr._imgw = cv  # type: ignore[attr-defined]
-        # etiqueta de plataforma no canto (roxo, como no print) + tags livres
+        # Plataforma no canto da capa + etiquetas livres.
         try:
             plat = j.get("plataforma") or core.plataforma_jogo(j)
         except Exception:
             plat = "PC"
         tags = list(j.get("etiquetas_lista") or [])
-        badge_plat = tk.Label(fr, text=plat, bg="#352f52", fg="#d7ceff",
+        badge_plat = tk.Label(fr, text=plat, bg=PANEL, fg=ACC,
                               font=("Segoe UI", 8, "bold"), padx=7, pady=3,
                               cursor="hand2")
         badge_plat.place(x=6, y=6)
@@ -2872,7 +2970,7 @@ class App:
             badge_tags.place(x=6, y=30)
             fr._badge_tags = badge_tags  # type: ignore[attr-defined]
         t = tk.Label(fr, text=f"{'★ ' if j['favorito'] else ''}{j['titulo']}",
-                     bg=CARD, fg=TXT, wraplength=CARD_W + 8,
+                     bg=CARD, fg=TXT, wraplength=largura + 8,
                      font=("Segoe UI", 10, "bold"), cursor="hand2")
         t.pack(fill="x", pady=(6, 4), padx=6)
         cor = STATUS_CORES.get(j["status"], MUT)
@@ -2882,7 +2980,7 @@ class App:
             horas_n = 0
         horas = f" · {horas_n:g}h" if horas_n else ""
         m = tk.Label(fr, text=f"{j['status']}{horas}{core.selo_confianca(j)}", bg=CARD, fg=cor,
-                     font=("Segoe UI", 9), wraplength=CARD_W + 8, justify="center", cursor="hand2")
+                     font=("Segoe UI", 9), wraplength=largura + 8, justify="center", cursor="hand2")
         m.pack(pady=(0, 8))
         fr._titulo = t  # type: ignore[attr-defined]
         fr._meta = m  # type: ignore[attr-defined]
@@ -2959,10 +3057,16 @@ class App:
             menu.grab_release()
 
     def _pintar_selecao(self):
+        jogo = self.jogos[self.sel] if self.sel is not None and 0 <= self.sel < len(self.jogos) else None
+        self.destaque_titulo.configure(text=jogo["titulo"] if jogo else "Sua próxima aventura começa aqui",
+                                       wraplength=max(200, self.centro.winfo_width() - 230))
+        self.destaque_jogar.configure(state="normal" if jogo else "disabled")
         for i, c in enumerate(self.cards):
             fr = c["frame"]
             sel = (i == self.sel)
             fr.configure(style="Selected.Card.TFrame" if sel else "Card.TFrame")
+            fr._titulo.configure(bg=CARD, foreground=TXT)
+            fr._meta.configure(bg=CARD)
             imgw = getattr(fr, "_imgw", None)
             if isinstance(imgw, tk.Label):
                 try:
@@ -2975,7 +3079,7 @@ class App:
                         w.configure(highlightbackground=ACC if sel else CARD)
                     except tk.TclError:
                         pass
-                    desenhar_tile(w, c["jogo"]["titulo"], CARD_W, CARD_H,
+                    desenhar_tile(w, c["jogo"]["titulo"], *self._tamanho_card(),
                                   selecionado=sel,
                                   subtitulo=(c["jogo"].get("plataforma") or ""))
 

@@ -5,14 +5,14 @@ import math
 import tkinter as tk
 from tkinter import font, ttk
 
-BG = "#10131b"
-PANEL = "#171c28"
-CARD = "#202737"
-HOVER = "#2b3549"
-LINE = "#343e53"
+BG = "#0e1622"
+PANEL = "#131f2e"
+CARD = "#1c2c40"
+HOVER = "#28425b"
+LINE = "#344b63"
 TXT = "#f0f3fa"
 MUT = "#a5b1c7"
-ACC = "#8b73ff"
+ACC = "#59c7f3"
 
 
 def _superficie(root, cor, borda=None, tamanho=24):
@@ -45,7 +45,7 @@ def aplicar_tema(root):
     root.option_add("*Toplevel.background", BG)
     root.option_add("*Listbox.background", BG)
     root.option_add("*Listbox.foreground", TXT)
-    root.option_add("*Listbox.selectBackground", "#423665")
+    root.option_add("*Listbox.selectBackground", "#25465f")
     root.option_add("*Listbox.selectForeground", TXT)
     root.option_add("*Listbox.exportSelection", False)
     root.option_add("*Listbox.borderWidth", 0)
@@ -53,14 +53,14 @@ def aplicar_tema(root):
     root.option_add("*Listbox.highlightBackground", LINE)
     root.option_add("*TCombobox*Listbox.background", CARD)
     root.option_add("*TCombobox*Listbox.foreground", TXT)
-    root.option_add("*TCombobox*Listbox.selectBackground", "#423665")
+    root.option_add("*TCombobox*Listbox.selectBackground", "#25465f")
     root.configure(background=BG)
     st.configure(".", font=(familia, 10), foreground=TXT, background=BG)
     st.configure("TFrame", background=BG)
     st.configure("Panel.TFrame", background=PANEL)
     st.configure("Card.TFrame", background=CARD, padding=2)
     st.configure("Hover.Card.TFrame", background=HOVER, padding=2)
-    st.configure("Selected.Card.TFrame", background="#423665", padding=2)
+    st.configure("Selected.Card.TFrame", background=ACC, padding=2)
     for nome, bg, fg in (("TLabel", BG, TXT), ("Mut.TLabel", BG, MUT),
                          ("Panel.TLabel", PANEL, TXT), ("Sec.TLabel", CARD, MUT)):
         st.configure(nome, background=bg, foreground=fg, font=(familia, 10))
@@ -93,12 +93,12 @@ def aplicar_tema(root):
         st.map(nome, foreground=[("disabled", "#68768e")])
 
     botao("TButton", CARD, HOVER)
-    botao("Accent.TButton", "#7357e8", "#896bfa", "white", padding=(14, 12))
+    botao("Accent.TButton", "#167ca7", "#2298c6", "white", padding=(14, 12))
     botao("Side.TButton", PANEL, CARD, MUT, PANEL, None, (12, 8))
-    botao("SideAct.TButton", "#352f52", "#423960", TXT, PANEL, None, (12, 8))
+    botao("SideAct.TButton", "#25465f", "#305873", TXT, PANEL, None, (12, 8))
     botao("Group.TButton", PANEL, CARD, MUT, PANEL, None, (10, 6))
     botao("Chip.TButton", CARD, HOVER, MUT, padding=(8, 6))
-    botao("ChipAct.TButton", "#423665", "#514179", TXT, padding=(8, 6))
+    botao("ChipAct.TButton", "#25465f", "#305873", TXT, padding=(8, 6))
     botao("Volume.TButton", CARD, HOVER, padding=(3, 4))
     st.configure("Volume.TButton", font=(familia, 9))
     for nome in ("Side.TButton", "SideAct.TButton", "Group.TButton"):
@@ -124,7 +124,7 @@ def aplicar_tema(root):
         st.configure(nom, background=BG, fieldbackground=BG, foreground=TXT,
                      borderwidth=0, rowheight=int(root.winfo_fpixels("24p")),
                      font=(familia, 10))
-        st.map(nom, background=[("selected", "#423665")],
+        st.map(nom, background=[("selected", "#25465f")],
                foreground=[("selected", TXT)])
     st.layout("Lista.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
     st.configure("Lista.Treeview.Heading", background=CARD, foreground=MUT,
@@ -145,13 +145,13 @@ def aplicar_tema(root):
     for y in range(48):
         for x in range(48):
             if 5 <= x < 43 and 5 <= y < 43:
-                icone.put("#7357e8", (x, y))
+                icone.put("#167ca7", (x, y))
             if 10 <= x < 38 and 18 <= y < 32:
                 icone.put(TXT, (x, y))
             if (14 <= x < 17 and 21 <= y < 29) or (12 <= x < 20 and 24 <= y < 27):
-                icone.put("#7357e8", (x, y))
+                icone.put("#167ca7", (x, y))
             if (x - 29) ** 2 + (y - 23) ** 2 < 4 or (x - 34) ** 2 + (y - 27) ** 2 < 4:
-                icone.put("#7357e8", (x, y))
+                icone.put("#167ca7", (x, y))
     root.iconphoto(True, icone)
     root._tuco_icone = icone
 

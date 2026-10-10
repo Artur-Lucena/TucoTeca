@@ -1,8 +1,10 @@
 # TucoTeca
 
-Aplicativo local de biblioteca de jogos e músicas: GUI tkinter no Windows,
-TUI curses no Linux e GUI experimental no macOS. Núcleo em **Python 3.10+
-com biblioteca padrão**, SQLite e arquivos locais.
+Aplicativo local de biblioteca de jogos e músicas. Desktop moderno em
+**PySide6 / Qt Quick** (frontend principal), ferramentas clássicas em tkinter
+(**congeladas**: só correções críticas) e TUI curses no Linux.
+Núcleo em **Python 3.10+ com biblioteca padrão**, SQLite e arquivos locais.
+Qt é uma dependência da interface desktop, não do núcleo.
 
 O catálogo, a importação local e a reprodução local funcionam offline.
 Busca de capas, atualização de ferramentas/emuladores, CSV → áudio e
@@ -18,18 +20,32 @@ para conversão/preview de imagens; ferramentas externas são descritas abaixo.
 | Acabamento visual e revisão atual; prioridades da Parte 2 | [docs/PARTE1_VISUAL_E_AUDITORIA.md](docs/PARTE1_VISUAL_E_AUDITORIA.md) |
 | Runtime completo, compactação e ferramentas independentes | [docs/PARTE2_RUNTIME_E_INTEGRACOES.md](docs/PARTE2_RUNTIME_E_INTEGRACOES.md) |
 | Trabalhar em conjunto | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Desktop Qt, arquitetura e cobertura da migração | [docs/DESKTOP_QT.md](docs/DESKTOP_QT.md) |
+| Visão TucoOS, roadmap e integrações | [docs/VISAO_OS.md](docs/VISAO_OS.md) |
 | Diagnosticar a instalação sem alterar a coleção | `python codigo/ferramentas/diagnosticar.py` |
 | Gerar a entrega de código para outro desenvolvedor | `python codigo/ferramentas/empacotar_fontes.py` |
 
 ## Executar
 
-- **Windows:** `BibliotecaHub.bat` ou `py -3.14 codigo/frontends/app_win.py`.
+- **Windows:** `BibliotecaHub.bat` (Qt neste checkout) ou `py -3.14 codigo/frontends/desktop.py`.
+- **Clássico (congelado):** `BibliotecaHub.bat --classico` ou Configurações → Abrir ferramentas clássicas.
+  Recebe só correções críticas; novidades vão para o Qt.
 - **Linux:** `./BibliotecaHub.sh` ou `python3 codigo/frontends/app_tui.py`.
 - **macOS:** `BibliotecaHubMac.command` (experimental; requer Python com Tk).
 
 Nesta instalação, `BibliotecaHub.bat` usa o Python e as ferramentas de
 `programa/windows-x64/`, os fontes atuais de `codigo/` e sua coleção em
 `dados/`. Os atalhos TucoTeca apontam para esse launcher.
+
+Em um ambiente de desenvolvimento novo, instale a camada visual:
+
+```powershell
+py -3.14 -m pip install -r requirements-ui.txt
+py -3.14 codigo/frontends/desktop.py
+```
+
+Sem PySide6, o dispatcher usa tkinter. `--big-picture` inicia Qt em tela cheia.
+O launcher respeita `BIBLIOTECA_HOME` explícito em desenvolvimento.
 
 Para uma coleção de desenvolvimento separada, na raiz do checkout:
 
@@ -44,9 +60,16 @@ capas, backups, saves, mods e músicas; permanece fora do Git. A trava
 
 ## Funcionalidades
 
-- **Interface:** tema escuro local, botões arredondados, tabelas com colunas,
-  ações que quebram linha e painéis roláveis. Em janelas compactas, o botão
-  **Detalhes** abre o painel separado; filtros de jogos aparecem na Biblioteca.
+- **Desktop Qt:** tema azul-noite/ciano, componentes QML, transições de hover,
+  capas assíncronas, grade virtualizada, busca, favoritos, ordenação e painel
+  de detalhes. Estados vazios, atividade em segundo plano e mensagens de erro.
+- **HUD superior:** Início, Jogos, Músicas, Desejos, Downloads e Integrações ficam
+  acessíveis também em tela cheia. Player persistente no rodapé.
+- **Busca global:** **Ctrl+K** acha jogo/música/desejo/download na coleção local.
+- **Big Picture:** botão **Big Picture** ou **F11**; **Esc** retorna à janela.
+  **Ctrl+1…6** troca de categoria, **Ctrl+F** busca, **setas** navegam pela
+  grade, **Enter** joga e **Espaço** abre detalhes. Teclado e mouse;
+  navegação por gamepad ainda não implementada.
 - **Jogos:** título, capa, horas, nota/status, etiquetas, favoritos e filtros.
 - **Lançamento:** executável/provider por SO, minimização da GUI e registro
   de sessão; `--jogar "Título"` atende atalhos de Desktop.
@@ -78,10 +101,14 @@ capas, backups, saves, mods e músicas; permanece fora do Git. A trava
 
 ## Dependências por funcionalidade
 
+As funcionalidades abaixo pertencem ao conjunto Qt + ferramentas clássicas.
+A [matriz de migração](docs/DESKTOP_QT.md#cobertura) explicita onde cada fluxo está.
+
 | Recurso | Requisito |
 |---|---|
 | Núcleo, banco, scanners e ZIP | Python 3.10+ stdlib |
-| GUI | tkinter/Tcl/Tk (em algumas distribuições Linux, `python3-tk`) |
+| Desktop Qt | PySide6-Essentials 6.10.2 (`requirements-ui.txt`) |
+| GUI clássica | tkinter/Tcl/Tk (em algumas distribuições Linux, `python3-tk`) |
 | TUI | curses; no Windows prefira a GUI |
 | Imagens JPG/WebP/conversão | Pillow opcional; PNG/GIF têm suporte Tk |
 | RAR/7z/ISO | 7-Zip (`BIBLIOTECA_7Z` ou descoberta local) |

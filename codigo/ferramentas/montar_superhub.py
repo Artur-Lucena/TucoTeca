@@ -237,6 +237,24 @@ def incluir_pillow(raiz: Path):
             shutil.copytree(info / "licenses", raiz / "python/LICENSES-Pillow", dirs_exist_ok=True)
 
 
+def incluir_qt(raiz: Path):
+    """Qt Quick completo, plugins e licenças das wheels fixadas no requirements."""
+    from importlib.metadata import distribution
+    for nome in ("PySide6-Essentials", "shiboken6"):
+        dist = distribution(nome)
+        if dist.version != "6.10.2":
+            raise ValueError("Instale requirements-ui.txt antes de montar o runtime Qt.")
+        for arquivo in dist.files or []:
+            if ".." in arquivo.parts or "__pycache__" in arquivo.parts or arquivo.suffix == ".pyc":
+                continue
+            origem = Path(dist.locate_file(arquivo))
+            if origem.is_file():
+                destino = raiz / "python/Lib" / str(arquivo)
+                destino.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(origem, destino)
+    return "6.10.2"
+
+
 def criar_manifesto(raiz: Path, componentes: dict, versoes: dict) -> dict:
     arquivos = {}
     for p in sorted(raiz.rglob("*")):
@@ -315,7 +333,7 @@ def validar_runtime(raiz: Path) -> dict:
         env["BIBLIOTECA_HOME"] = tmp
         env["BIBLIOTECA_AZAHAR_DIR"] = str(raiz / "emuladores/Azahar")
         env["BIBLIOTECA_DESMUME_DIR"] = str(raiz / "emuladores/DeSmuME")
-        r = subprocess.run([str(py), str(raiz / "app/app_win.py"), "--selftest"], env=env,
+        r = subprocess.run([str(py), str(raiz / "app/desktop.py"), "--selftest"], env=env,
                            cwd=tmp, capture_output=True, text=True, encoding="utf-8", timeout=60)
         if r.returncode or "[ok] selftest" not in r.stdout:
             raise ValueError("UI do runtime falhou: " + r.stderr[-1000:])
@@ -368,6 +386,7 @@ def montar(formato="todos", reutilizar=False):
             raiz, v = MP.montar_base(sem_azahar=True)
             componentes = incluir_componentes(raiz)
             incluir_pillow(raiz)
+        v["qt"] = incluir_qt(raiz)
         (raiz / "README-PORTATIL.txt").write_text(LEIAME, encoding="utf-8")
         shutil.copy2(REPO / "LICENSE", raiz / "LICENSE-TucoTeca.txt")
         MP.podar_dieta(raiz)

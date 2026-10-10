@@ -42,8 +42,12 @@ APP_ARQS = (("README.md", "README.md"),
              ("codigo/bib_core.py", "bib_core.py"),
              ("codigo/frontends/app_win.py", "app_win.py"),
               ("codigo/frontends/app_tui.py", "app_tui.py"),
-              ("codigo/frontends/aparencia.py", "aparencia.py"),
-              ("codigo/frontends/despacho.py", "despacho.py"))
+               ("codigo/frontends/aparencia.py", "aparencia.py"),
+               ("codigo/frontends/despacho.py", "despacho.py"),
+               ("codigo/frontends/desktop.py", "desktop.py"),
+               ("codigo/frontends/app_qt.py", "app_qt.py"),
+               ("codigo/frontends/qt_bridge.py", "qt_bridge.py"),
+               ("codigo/frontends/servicos_ui.py", "servicos_ui.py"))
 
 BAT_GUI = """@echo off
 setlocal
@@ -53,7 +57,7 @@ set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
 set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
-start "BibliotecaHub" "%~dp0python\\pythonw.exe" "%~dp0app\\app_win.py" %*
+start "BibliotecaHub" "%~dp0python\\pythonw.exe" "%~dp0app\\desktop.py" %*
 """
 
 BAT_DEBUG = """@echo off
@@ -64,7 +68,7 @@ set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
 set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
 set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
-"%~dp0python\\python.exe" "%~dp0app\\app_win.py" %*
+"%~dp0python\\python.exe" "%~dp0app\\desktop.py" %*
 if errorlevel 1 pause
 """
 
@@ -327,6 +331,7 @@ def copiar_app(app_dir: Path, repo: Path | None = None) -> None:
     shutil.copytree(nucleo, app_dir / "bib_nucleo",
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
                     dirs_exist_ok=True)
+    shutil.copytree(repo / "codigo/frontends/qml", app_dir / "qml", dirs_exist_ok=True)
 
 
 def incluir_azahar(dest_base: Path) -> str:

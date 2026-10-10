@@ -34,3 +34,32 @@ jobs:
         with:
           name: testes-${{ matrix.os }}-${{ matrix.python }}
           path: resultados-testes.json
+  qt:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+      QML_DISABLE_DISK_CACHE: '1'
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Bibliotecas Qt Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
+      - name: Dependências desktop
+        run: python -m pip install -r requirements-ui.txt
+      - name: Contratos e interface Qt Quick
+        run: python -B codigo/ferramentas/testes/executar.py --modulo test_qt --json resultados-qt.json
+      - name: Relatório Qt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt-${{ matrix.os }}
+          path: resultados-qt.json

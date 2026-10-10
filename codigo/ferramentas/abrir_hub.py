@@ -10,7 +10,7 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 def preparar():
-    os.environ["BIBLIOTECA_HOME"] = str(REPO)
+    os.environ.setdefault("BIBLIOTECA_HOME", str(REPO))
     runtime = REPO / "programa/windows-x64"
     arq = runtime / "manifesto-runtime.json"
     if arq.is_file():
@@ -31,8 +31,8 @@ def preparar():
 
 def main():
     preparar()
-    import app_win
-    return app_win.main()
+    from desktop import main as desktop_main
+    return desktop_main()
 
 
 if __name__ == "__main__":

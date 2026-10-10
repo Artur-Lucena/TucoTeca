@@ -65,6 +65,90 @@ def teste_visual_resize_e_grade_sem_reentrada():
         root.destroy()
 
 
+def teste_visual_big_picture_teclado_e_retorno():
+    from types import SimpleNamespace
+    root, app = _montar()
+    if root is None:
+        return
+    try:
+        root.geometry("1280x800")
+        _bombear(root)
+        app._alternar_big_picture()
+        _bombear(root)
+        afirmar(app.big_picture and root.attributes("-fullscreen"), "não entrou em tela cheia")
+        afirmar(not app.sidebar.winfo_ismapped(), "sidebar ocupou o modo imersivo")
+        afirmar(not app.det_painel.winfo_ismapped(), "painel ocupou o modo imersivo")
+        afirmar(not app.filtros_area.winfo_ismapped(), "filtros ocuparam o modo imersivo")
+        afirmar(app.destaque.winfo_ismapped(), "destaque ausente")
+        for i in (1, 2, 3, 0):
+            app.nav_superior_btns[i].invoke()
+            _bombear(root)
+            afirmar(app.nav_idx == i and app.big_picture, "HUD não navegou em tela cheia")
+            afirmar(app.nav_superior.winfo_ismapped(), "navegação superior desapareceu")
+            afirmar(bool(app.destaque.winfo_ismapped()) == (i == 0), "destaque de jogo vazou para outra categoria")
+        app.nav_superior_btns[1].invoke()
+        _bombear(root)
+        app._sair_big_picture()
+        _bombear(root)
+        afirmar(app.nav_idx == 1 and not app.big_picture, "saída trocou de aba")
+        app._alternar_big_picture()
+        _bombear(root)
+        afirmar(app.nav_idx == 1 and app.big_picture, "tela cheia trocou de aba sozinha")
+        afirmar(app.nav_superior.winfo_ismapped() and not app.destaque.winfo_ismapped(),
+                "HUD inconsistente fora da biblioteca")
+        app.nav_superior_btns[0].invoke()
+        _bombear(root)
+        app._navegar_grade(SimpleNamespace(keysym="F1"))
+        afirmar(app.big_picture, "tecla desconhecida saiu da tela cheia")
+        afirmar(app._tamanho_card() == (216, 288), "capas não cresceram")
+        app._navegar_grade(SimpleNamespace(keysym="End"))
+        _bombear(root)
+        afirmar(app.sel == 14, "End não selecionou o último card")
+        ultimo = app.cards[14]["frame"]
+        afirmar(ultimo.winfo_y() >= app.canvas.canvasy(0) - 2 and
+                ultimo.winfo_y() + ultimo.winfo_height() <=
+                app.canvas.canvasy(app.canvas.winfo_height()) + 2,
+                "seleção ficou fora da área visível")
+        afirmar(app.destaque_titulo.cget("text") == app.jogos[14]["titulo"], "destaque errado")
+        app._navegar_grade(SimpleNamespace(keysym="Right"))
+        afirmar(app.sel == 14, "navegação passou do fim")
+        app._navegar_grade(SimpleNamespace(keysym="Home"))
+        app._navegar_grade(SimpleNamespace(keysym="Right"))
+        afirmar(app.sel == 1, "setas não navegaram")
+        app._sair_big_picture()
+        _bombear(root)
+        afirmar(not app.big_picture and not root.attributes("-fullscreen"), "não saiu da tela cheia")
+        afirmar(app.sidebar.winfo_ismapped() and app.filtros_area.winfo_ismapped(), "layout não restaurado")
+        afirmar(not app.destaque.winfo_ismapped(), "destaque permaneceu aberto")
+        afirmar(not app._erros_visuais_teste, app._erros_visuais_teste)
+    finally:
+        root.destroy()
+
+
+def teste_visual_recarga_preserva_identidade_selecionada():
+    root, app = _montar()
+    if root is None:
+        return
+    try:
+        _bombear(root)
+        app.sel = 5
+        escolhido = app.jogos[5]["id"]
+        con = app._con()
+        try:
+            core.criar_jogo(con, {"titulo": "AAA novo primeiro jogo"})
+        finally:
+            con.close()
+        app.recarregar()
+        afirmar(app.jogos[app.sel]["id"] == escolhido, "recarga selecionou outro jogo")
+        app.var_q.set("sem resultado xyz")
+        app.recarregar()
+        afirmar(app.sel is None and not app.cards, "seleção fantasma na busca vazia")
+        afirmar(str(app.destaque_jogar.cget("state")) == "disabled", "jogar habilitado sem jogo")
+        afirmar(not app._erros_visuais_teste, app._erros_visuais_teste)
+    finally:
+        root.destroy()
+
+
 def teste_visual_tabelas_e_acoes_sem_cortes():
     from aparencia import BarraAcoes
     root, app = _montar()

@@ -1,0 +1,130 @@
+# Desktop Qt Quick
+
+## Decisão de arquitetura
+
+O frontend principal do checkout Windows é PySide6 + Qt Quick/QML.
+O tkinter (`app_win.py`) está congelado: recebe só correções críticas e serve
+como fallback (`--classico`, Qt ausente) e abrigo das ferramentas avançadas
+até a paridade integral.
+Python permanece no domínio: substituir banco, emulação e áudio por outra
+linguagem acrescentaria uma reescrita sem benefício necessário para a UI.
+Qt entrega controles, cena acelerada, foco, imagens assíncronas e layouts.
+
+```text
+BibliotecaHub.bat → abrir_hub.py → desktop.py
+                                  ├── app_qt.py (Qt instalado)
+                                  │    ├── qml/ (apresentação e componentes)
+                                  │    └── qt_bridge.py (modelos, estado, workers)
+                                  │          └── servicos_ui.py (casos de uso/adaptadores)
+                                  │                └── bib_core / bib_nucleo / SQLite
+                                  └── app_win.py (--classico ou Qt ausente)
+```
+
+Qt e tkinter nunca usam a coleção ao mesmo tempo no fluxo de troca. O código
+de saída 42 encerra Qt, fecha player/workers e libera o lock; o dispatcher
+abre então as ferramentas clássicas. Não há migração nova de schema.
+
+## Interface
+
+- HUD permanente com **Início / Jogos / Músicas / Desejos / Downloads / Integrações**.
+- Início OS: continuar, resumo local (backup/sessões/disco), acesso rápido, recentes.
+- Paleta global Ctrl+K: busca local unificada, Enter abre o primeiro resultado.
+- Tela cheia preserva a categoria e continua permitindo a troca entre telas.
+- Biblioteca com arte local em destaque, capas em grade virtualizada, filtros
+  por plataforma/favoritos/status, busca e ordenação por nome/horas/recência.
+- Drawer de detalhes, formulários e confirmação de exclusão.
+- Listas de músicas/desejos/downloads; player persistente no rodapé.
+- `Theme.qml` centraliza tokens; `ActionButton.qml` e `PosterCard.qml` são
+  componentes reaproveitáveis. Hover/foco/seleção têm estados explícitos.
+- Layout compacto validado em 960×640; destaque recolhe em telas baixas para
+  reservar espaço para a coleção. Renderização sem GPU pode usar
+  `QT_QUICK_BACKEND=software` (útil em testes e diagnóstico).
+
+## Cobertura
+
+| Fluxo | Qt Quick | Ferramentas clássicas |
+|---|---|---|
+| Coleção, busca, filtros, favorito, adicionar/editar/excluir jogo | Sim | Sim |
+| Editar nota 0–10 e etiquetas; saúde exe/ROM no Início | Sim | Sim (diálogo) |
+| Jogar com provider, presets/mods já configurados e sessão rastreada | Sim | Sim |
+| Músicas locais: importar pasta, tocar, pausar, anterior/próxima, parar | Sim | Sim |
+| Fila visível, modos sequência/aleatório/repetir, volume no rodapé | Sim | Parcial |
+| Desejos: listar, adicionar por appid, remover, abrir Steam | Sim | Sim |
+| Torrents: progresso, velocidade/ETA, iniciar, pausar/retomar, abrir pasta | Sim | Sim |
+| SteamRip/FitGirl: pesquisar e abrir página do resultado | Sim | Sim |
+| Backup da coleção / volume global Windows | Sim | Sim |
+| Sistema: lista de backups, sessões pendentes (+1h), últimos erros | Sim | Parcial |
+| Configurar mods, HD, cheats, controles, presets, atualizar emuladores | Acesso pelo botão de ferramentas clássicas | Sim |
+| Importação avançada de jogos/ROMs, sanar/religar executáveis, UAC | Ferramentas clássicas | Sim |
+| CSV → áudio, fila de downloads de músicas, buscar capas | Ferramentas clássicas | Sim |
+| Sincronizar wishlist, importar torrent concluído, baixar de hosts | Ferramentas clássicas | Sim |
+| Exportar/importar pacotes e registrar sessões manuais | Ferramentas clássicas | Sim |
+| Navegação por gamepad | Ainda não | Ainda não |
+
+Não se trata ainda de paridade integral: a migração visual preserva acesso
+explícito aos fluxos avançados existentes. Distribuições anteriores em `dist/`
+não são atualizadas ao editar os fontes.
+
+## Contratos e integrações
+
+`RegistroIntegracoes` recebe descritores `Integracao` com chave estável,
+nome, descrição, tipo e um adaptador de busca opcional. O contrato de busca
+é `buscar(termo) -> {itens: [{titulo, url}], erros: [str]}`. O frontend não
+precisa saber como a fonte consulta/normaliza dados. Chaves duplicadas falham
+explicitamente; DTOs enviados ao QML não contêm callables.
+
+Para incluir uma fonte:
+
+1. Implemente o adaptador de domínio (timeouts, normalização, erros).
+2. Registre o descritor em `integracoes_padrao()` ou injete um registro em
+   `ServicoBiblioteca`. O catálogo aparece no mesmo componente da UI.
+3. Teste o adaptador sem rede real e o contrato do registro.
+
+É uma API interna de adaptadores, não um carregador de plugins de terceiros.
+Downloads e instalações continuam ações explícitas do usuário.
+
+## Concorrência e persistência
+
+- SQLite: cada caso de uso abre/fecha sua conexão; mutações usam lock de
+  escrita e backup antes de alterar a coleção.
+- `QThreadPool` executa I/O; `Signal` com `QueuedConnection` entrega os
+  resultados à thread Qt. Nenhum worker altera widgets/modelos.
+- Refresh e busca remota usam gerações para descartar respostas obsoletas.
+- MCI: preparo/conversão de áudio no worker; open/play/pause/close na
+  thread dona do dispositivo. Token impede áudio tardio após Parar.
+- A UI mantém o processo aberto enquanto conclui operações em andamento.
+- Snapshot usa IDs estáveis; filtro/ordenação não selecionam outra entrada
+  apenas porque sua posição mudou. Nenhum limite artificial de 150 cards.
+
+## Desenvolvimento e verificação
+
+```powershell
+py -3.14 -m pip install -r requirements-ui.txt
+py -3.14 codigo/frontends/desktop.py
+py -3.14 codigo/frontends/desktop.py --big-picture
+py -3.14 codigo/frontends/desktop.py --classico
+py -3.14 codigo/ferramentas/testes/executar.py --modulo test_qt
+```
+
+Use `BIBLIOTECA_HOME` separado para provas. `app_qt.py --selftest` carrega
+QML e dados, encerra o player e libera o lock. `--screenshot caminho.png`
+grava uma captura no selftest. A suíte Qt usa plataforma offscreen e backend
+software, com rede/processos/escrita externa vetados pelo runner.
+
+No checkout atual, as wheels estão instaladas no Python oficial de
+desenvolvimento e no runtime `programa/windows-x64/python/Lib`. A CI inclui
+um job Qt separado para Windows e Linux. Os testes stdlib continuam podendo
+rodar sem Qt (casos de GUI Qt são marcados como pulados).
+
+## Empacotamento e licenças
+
+`copiar_app()` inclui Python, QML e `qmldir`. O pacote de fontes inclui
+`requirements-ui.txt`. `montar_superhub.py` inclui PySide6-Essentials e
+shiboken6 6.10.2, recursos/plugins e metadados/licenças das distribuições,
+e executa o selftest do dispatcher no runtime montado. O builder exige
+essas versões no ambiente de build. Portáteis mínimos sem Qt usam tkinter.
+
+PySide6/Qt possuem licenças próprias (LGPL/GPL/comercial conforme componente);
+a licença MIT do Hub não relicencia Qt. Preserve os avisos/licenças e as
+bibliotecas dinâmicas substituíveis ao redistribuir. O bundle completo novo
+precisa ser reconstruído e validado antes de uma release.

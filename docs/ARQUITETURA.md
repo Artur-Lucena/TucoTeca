@@ -80,7 +80,12 @@ de entrega seleciona somente fontes/documentos por allowlist.
 
 | Arquivo | Função |
 |---|---|
-| `frontends/app_win.py` | App, navegação, grade, detalhes, diálogos e tarefas GUI |
+| `frontends/app_win.py` | App tkinter clássico CONGELADO (só correções críticas), grade, detalhes e ferramentas avançadas |
+| `frontends/desktop.py` | Dispatcher Qt ↔ clássico (saída 42 troca preservando lock) |
+| `frontends/app_qt.py` | Shell Qt Quick, lock, selftest e screenshot |
+| `frontends/qt_bridge.py` | Modelos, seções, workers, player, paleta e sistema |
+| `frontends/servicos_ui.py` | Casos de uso desktop, `resumo_sistema`, `busca_global`, registro |
+| `frontends/qml/` | `Main.qml`, componentes, `Theme.qml`, HUD + Início + paleta |
 | `frontends/app_tui.py` | Tui, desenho, prompts, menus e loop de terminal |
 | `frontends/despacho.py` | callbacks de workers entregues pela thread Tk |
 | `frontends/aparencia.py` | tema local, elementos nine-slice, barras adaptáveis e painéis roláveis |

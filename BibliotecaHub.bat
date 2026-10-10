@@ -1,7 +1,7 @@
 @echo off
 rem TucoTeca atualizada: runtime local e coleção desta pasta.
 setlocal
-set BIBLIOTECA_HOME=%~dp0
+if not defined BIBLIOTECA_HOME set "BIBLIOTECA_HOME=%~dp0"
 if exist "%~dp0programa\windows-x64\python\pythonw.exe" (
   start "TucoTeca" "%~dp0programa\windows-x64\python\pythonw.exe" "%~dp0codigo\ferramentas\abrir_hub.py" %*
   exit /b

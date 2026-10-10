@@ -76,3 +76,73 @@ py -3.14 codigo/ferramentas/testes/executar.py --json "$env:TEMP\tucoteca-testes
 py -3.14 codigo/ferramentas/diagnosticar.py --json
 py -3.14 codigo/ferramentas/empacotar_fontes.py
 ```
+
+## 6. Revisão e modo Big Picture — 10/10/2026
+
+- Base de trabalho limpa; diagnóstico geral dos 62 fontes Python, exports,
+  dependências e integridade do banco. Coleção encontrada: 25 jogos,
+  51 músicas, 4 desejos. O diagnóstico indicou yt-dlp ausente no ambiente
+  consultado; as outras dependências verificadas estavam disponíveis.
+- Tema azul-noite/ciano, seleção com borda contrastante e cores alinhadas
+  entre cards, botões, tabelas e navegação lateral.
+- F11/botão Tela cheia abre a biblioteca imersiva: capas 216×288,
+  destaque com título e Jogar, sidebar e filtros recolhidos. Esc restaura
+  o layout de janela. Mouse/teclado; gamepad não foi implementado.
+- Setas e Home/End navegam na grade, com rolagem para manter o card
+  visível. Enter usa o lançamento existente. Ctrl+F focaliza a busca.
+- Correção: recarga preserva seleção pelo ID em vez do índice; adicionar
+  ou renomear jogos não seleciona silenciosamente outro título. Seleção
+  limitada aos cards renderizados; busca vazia desabilita Jogar do destaque.
+- Correção visual: repintura limpa cores residuais de hover nos títulos.
+- Dois testes de regressão adicionados: entrada/saída de tela cheia e
+  navegação; preservação da seleção após inserção e busca sem resultados.
+- Validação Windows/Python 3.14: **261 casos, 255 PASS, 6 SKIP, 0 FAIL**;
+  `py_compile` dos fontes alterados e `git diff --check` sem erros.
+  `--selftest` passou com uma casa temporária vazia; a suíte visual usa
+  uma coleção de 15 jogos em sandbox. Jogos e áudio reais não foram
+  disparados. Linux/macOS continuam cobertos por casos simulados, sem
+  validação presencial nesses sistemas nesta revisão.
+
+## 7. Fundações TucoOS — 10/10/2026
+
+- Corrigido `Binding loop` no `GridView`/`ListView` (modelo agora é `hub.itens`
+  incondicional; visibilidade controla a tela). Guarda anti-eco no `onMudou`
+  (`currentIndex` só atribui se diferente). QML usa blocos multilinha após
+  grupo `font {}` em vez de `};`.
+- HUD com 6 categorias (Início incluso) em janela e tela cheia. Seção inicial
+  vira o padrão do Qt. Atalhos Ctrl+1…6; busca local Ctrl+F; paleta global Ctrl+K.
+- `servicos_ui.py`: `resumo_sistema()` (contagens, recentes, pendentes, backup,
+  disco via stdlib) + `busca_global()` (filtro em memória, DTOs sem callable).
+  `snapshot()` agora inclui `sistema`; `panorama()` cobre teste de busca.
+- `qt_bridge.py`: `sistema`/`recentes`/`paleta`/`paletaQuantidade`,
+  `buscarPaleta`/`abrirPaleta`/`abrirPrimeiraPaleta`; `atualizar()` recarrega
+  sistema e reemite paleta. Sem I/O na paleta; sem rede.
+- QML: Início com Continuar/Coleção/Acesso rápido/Recentes; paleta com Enter
+  abrindo o primeiro resultado; `Theme.qml` intacto como fonte de tokens.
+- Teste novo `teste_qt_inicio_paleta_e_sistema_local`; HUD cobre `inicio`.
+  Suite Qt 10/10; Qt+visual 20/20. Captura validada em cópia isolada
+  (25 jogos, 51 músicas), sem executar jogo/áudio. Docs: `VISAO_OS.md` novo,
+  `DESKTOP_QT.md`/`ARQUITETURA.md`/`README.md` atualizados.
+
+## 8. QoL 1.0 — 10/10/2026 (4 tópicos)
+
+- T1 Biblioteca Pro: `salvarJogo` com nota/etiquetas (`qt_bridge.py`,
+  `servicos_ui.py`), diálogo com Nota 0–10 + etiquetas, detalhe com nota,
+  `saude_colecao()` (exe/ROM por jogo) com card no Início.
+- T2 Player/Downloads: fila (`filaAudio`), modos sequência/aleatório/repetir
+  (`modoAudio`), volume no rodapé, velocidade MB/s + ETA min nos downloads.
+- T3 Visual: tokens `Theme.qml`, paleta com ↑↓/Enter (`paletaItem`),
+  foco/seleção preservados, sem `Binding loop`/`};` após grupo `font`.
+- T4 Sistema: diálogo com backups (10), sessões pendentes (+1h) e `erros.log`;
+  atalho em Configurações e no card de saúde. Slots `listarBackups`,
+  `listarSessoes`, `verLog`, `registrarSessao`.
+- Teste `teste_qt_qol_biblioteca_player_sistema`. Suite Qt 11/11 no módulo.
+
+## 9. Congelamento do tkinter — 10/10/2026
+
+- Revisão final do clássico: Big Picture preserva a aba (sem reset p/ Biblioteca),
+  `nav_superior` centralizada em `_atualizar_contexto`, toggle com `try` em
+  fullscreen/foco, `_navegar_grade` ignora tecla desconhecida e largura zero.
+- Título `TucoTeca — clássico (congelado)` + docstring de congelamento.
+- Regressão em `test_visual.py` (preservar aba + tecla desconhecida).
+- Visual/tkinter: 10/10; diálogo/despacho/volume: 27/27. Foco agora é o Qt.

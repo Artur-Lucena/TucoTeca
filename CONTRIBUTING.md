@@ -27,6 +27,9 @@ Uma instalação sem emuladores/coleção é válida para desenvolver o núcleo.
 - Volume geral Windows: `volume.py`.
 - Integração remota: `fontes.py`.
 - GUI/TUI: `codigo/frontends/`; thread dispatch: `despacho.py`.
+- Desktop Qt: `app_qt.py`, `qt_bridge.py`, `servicos_ui.py` e `qml/`.
+  Instale `requirements-ui.txt`; arquitetura e matriz de migração em
+  [DESKTOP_QT](docs/DESKTOP_QT.md). Testes: `executar.py --modulo test_qt`.
 - Layout dos bundles: `montar_portatil.copiar_app`, usado pelos três builders.
 
 O índice detalhado está em [ARQUITETURA](docs/ARQUITETURA.md).
