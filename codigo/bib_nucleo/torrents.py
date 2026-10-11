@@ -201,6 +201,10 @@ def _listar_torrents_arquivos(pasta: Path | None = None) -> dict:
             resume, _p2 = _bdecodificar(raw)
             resume = resume if isinstance(resume, dict) else {}
             spa = _save_path_de(resume)
+            if spa:
+                # O .fastresume pode ter sido gravado no Windows antes do dual boot.
+                from bib_nucleo.base import traduzir_para_atual
+                spa = traduzir_para_atual(spa)
         except (OSError, ValueError):
             spa = ""
         base = Path(spa) / nome if spa else None

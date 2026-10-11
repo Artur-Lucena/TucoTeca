@@ -349,7 +349,8 @@ def capa_album_url(artista: str, album: str, titulo: str,
                     return re.sub(r"\d+x\d+bb", "600x600bb", url)
     except Exception:
         pass
-    return ""
+    from bib_nucleo.capas import capa_musica_fallback
+    return capa_musica_fallback(art, alb, tit)
 
 
 def baixar_capa_album(con: sqlite3.Connection, mid: int,
@@ -373,8 +374,13 @@ def baixar_capa_album(con: sqlite3.Connection, mid: int,
             return {"ok": False, "capa_pendente": True,
                     "erro": "sem arte/offline"}
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            raw = r.read(2_500_000)
+        from bib_nucleo.online import cache_path
+        cache = cache_path("imagens", url, ".img")
+        if cache.is_file():
+            raw = cache.read_bytes()
+        else:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                raw = r.read(2_500_000)
         if len(raw) < 1024:
             return {"ok": False, "capa_pendente": True, "erro": "arte vazia"}
         return B.salvar_capa_musica_bytes(con, mid, f"capa-{mid}.jpg", raw)

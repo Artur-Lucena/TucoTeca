@@ -77,10 +77,7 @@ def default_emu_3ds() -> str:
         if os.name == "nt":
             cand = ov / "azahar.exe"
             return str(cand) if cand.is_file() else ""
-        imgs = sorted(ov.glob("azahar*.AppImage"))
-        if imgs:
-            return str(imgs[-1])
-        return ""
+        return _appimage_na_pasta(ov, "azahar")
     if eh_mac():
         return _app_macos(Path(MAC_ROOT) / "Games/Emuladores/Azahar")
     if os.name == "nt":
@@ -88,9 +85,7 @@ def default_emu_3ds() -> str:
         return str(cand) if cand.is_file() else ""
     pasta = Path(LINUX_ROOT) / "Games/Emuladores/Azahar"
     if pasta.is_dir():
-        imgs = sorted(pasta.glob("azahar*.AppImage"))
-        if imgs:
-            return str(imgs[-1])
+        return _appimage_na_pasta(pasta, "azahar")
     return ""
 
 
@@ -280,6 +275,7 @@ def default_emu_nds() -> str:
     # apt Ubuntu instala como `desmume-cli` em /usr/games; outros, `desmume`
     import shutil
     for cand in (shutil.which("desmume"), shutil.which("desmume-cli"),
+                 "/usr/games/desmume", "/usr/games/desmume-cli",
                  str(Path.home() / ".local/share/flatpak/exports/bin/org.desmume.DeSmuME"),
                  "/var/lib/flatpak/exports/bin/org.desmume.DeSmuME",
                  "/snap/bin/desmume", "/snap/bin/desmume-emulator"):
@@ -362,8 +358,13 @@ def desmume_config_atual() -> Path | None:
 
 
 def desmume_flags() -> list[str]:
-    """Flags extras ao bootar ROM NDS (padrão tela cheia em janela)."""
-    return shlex.split(os.environ.get("BIBLIOTECA_DESMUME_FLAGS", "--windowed-fullscreen"),
+    """Flags NDS explícitas; fullscreen é padrão somente da build Windows.
+
+    GTK/SDL do Linux e o bundle Mac não compartilham as flags da build Win.
+    Sem override, esses frontends recebem apenas o caminho da ROM.
+    """
+    padrao = "--windowed-fullscreen" if os.name == "nt" and not eh_mac() else ""
+    return shlex.split(os.environ.get("BIBLIOTECA_DESMUME_FLAGS", padrao),
                        posix=(os.name != "nt"))
 
 

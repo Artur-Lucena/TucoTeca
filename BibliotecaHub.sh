@@ -1,6 +1,8 @@
 #!/bin/sh
-# Biblioteca Hub (Linux) — duplo-clique ou ./BibliotecaHub.sh no terminal.
-# Abre o TUI (aplicativo de terminal). Casa e banco ficam na pasta do projeto.
+# TucoTeca Linux — execute em um terminal: ./BibliotecaHub.sh
+# BIBLIOTECA_HOME é a pasta-mãe de dados/. Override explícito é preservado.
 HUB="$(dirname "$(readlink -f "$0")")"
-export BIBLIOTECA_HOME="$HUB"
+if [ -z "${BIBLIOTECA_HOME:-}" ]; then
+  export BIBLIOTECA_HOME="$HUB"
+fi
 exec python3 "$HUB/codigo/frontends/app_tui.py" "$@"

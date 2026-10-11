@@ -21,22 +21,24 @@ def teste_runtime_local_sem_dependencia_do_pc():
     ff = p / "ferramentas/ffmpeg" / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
     ff.parent.mkdir(parents=True)
     ff.write_bytes(b"MZ")
+    ff.chmod(0o755)
     with patch.object(base, "HOME_DIR", p), patch.object(F.shutil, "which", return_value="C:/sistema/ffmpeg.exe") as procura:
         afirmar(F.localizar_ferramenta("ffmpeg") == str(ff))
         afirmar(not F.localizar_ferramenta("ytdlp"), "pacote usou ferramenta do PC")
         afirmar(not procura.called)
         afirmar(F.emulador_local_dir("Azahar") == p / "emuladores/Azahar")
         from bib_nucleo import repacks
-        afirmar(repacks.pasta_piratas() == p / "dados/downloads/jogos")
+        afirmar(repacks.pasta_piratas() == p / "Piratas")
 
 
 def teste_runtime_manifesto_e_override_editaveis():
     p = _pacote()
-    custom = p / "meus-binarios/motor.exe"
+    custom = p / "meus-binarios" / ("motor.exe" if os.name == "nt" else "motor")
     custom.parent.mkdir()
     custom.write_bytes(b"bin")
+    custom.chmod(0o755)
     (p / "manifesto-runtime.json").write_text(json.dumps({
-        "componentes": {"ffmpeg": {"executavel": "meus-binarios/motor.exe"}}}), encoding="utf-8")
+        "componentes": {"ffmpeg": {"executavel": custom.relative_to(p).as_posix()}}}), encoding="utf-8")
     with patch.object(base, "HOME_DIR", p):
         afirmar(F.localizar_ferramenta("ffmpeg") == str(custom))
         afirmar(F._caminho_local("../fora.exe") is None)
@@ -78,6 +80,33 @@ def teste_qbit_perfil_independente_e_comando():
         Q.qbit_config_path().write_text(texto + ";personalizado\n", encoding="utf-8")
         Q.qbit_iniciar()
         afirmar("personalizado" in Q.qbit_config_path().read_text(encoding="utf-8"), "perfil foi sobrescrito")
+
+
+def teste_qbit_destino_piratas_em_novos_e_perfil_antigo():
+    from bib_nucleo import repacks
+    piratas = Path(tempfile.mkdtemp(prefix="piratas-"))
+    magnet = "magnet:?xt=urn:btih:" + "a" * 40
+    with patch.object(Q, "qbit_api_url", return_value=""), \
+            patch.dict(os.environ, {"BIBLIOTECA_PIRATAS": str(piratas)}):
+        r = Q.qbit_adicionar(magnet)
+        afirmar(not r["ok"] and "Iniciar cliente" in r["erro"], r)
+        for ruim in ("", "https://example.com/pagina", "C:/jogo.torrent"):
+            afirmar(not Q.qbit_adicionar(ruim)["ok"], ruim)
+    with patch.object(Q, "qbit_api_url", return_value="http://127.0.0.1:9999"), \
+            patch.object(Q, "qbit_request", return_value="") as req, \
+            patch.dict(os.environ, {"BIBLIOTECA_PIRATAS": str(piratas)}):
+        r = Q.qbit_adicionar(magnet)
+        afirmar(r["ok"] and r["destino"] == str(piratas.resolve()), r)
+        ep, dados = req.call_args.args
+        afirmar(ep == "torrents/add", ep)
+        afirmar(dados["urls"] == magnet and dados["category"] == "tucoteca", dados)
+        afirmar(Path(dados["savepath"]).resolve() == piratas.resolve(), dados)
+    velho = "[BitTorrent]\nSession\\DefaultSavePath=C:/Downloads\nOutro=1\n"
+    novo = Q.migrar_save_path(velho, piratas)
+    afirmar(f"Session\\DefaultSavePath={piratas.as_posix()}" in novo and "Outro=1" in novo, novo)
+    sem_secao = Q.migrar_save_path("[GUI]\nA=1\n", piratas)
+    afirmar("[BitTorrent]" in sem_secao and piratas.as_posix() in sem_secao, sem_secao)
+    afirmar(Q.migrar_save_path(novo, piratas) == novo, "migração não é idempotente")
 
 
 def teste_qbit_api_progresso_estado_e_controle():

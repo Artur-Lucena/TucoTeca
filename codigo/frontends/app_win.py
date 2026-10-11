@@ -1655,6 +1655,14 @@ class App:
                 for t in prontos:
                     alvo = Path(t["save_path"])
                     try:
+                        if not core.dentro_de_piratas(alvo):
+                            org = core.organizar_em_piratas(alvo)
+                            if org.get("ok"):
+                                alvo = Path(org["path"])
+                                linhas.append(f"'{t['nome']}': movido p/ Piratas/")
+                            else:
+                                linhas.append(f"'{t['nome']}': {org.get('erro')}")
+                                continue
                         if alvo.is_file() and alvo.suffix.lower() in (
                                 ".rar", ".zip", ".7z", ".iso"):
                             res = core.importar_repack(con, str(alvo))
@@ -2655,6 +2663,7 @@ class App:
         fr_btn.pack(fill="x", pady=(8, 0))
         fr_btn.adicionar("Buscar", lambda: buscar())
         if fonte == "fitgirl":
+            fr_btn.adicionar("Baixar no Hub", lambda: baixar_no_hub())
             fr_btn.adicionar("Abrir selecionado", lambda: abrir_link())
             fr_btn.adicionar("Abrir página", lambda: abrir())
             fr_btn.adicionar("Importar arquivo…", lambda: importar_arquivo())
@@ -2842,6 +2851,30 @@ class App:
                 estado(f"Aberto: {e['nome'][:60]}")
             else:
                 messagebox.showwarning(marca, r.get("erro", "falha"))
+
+        def baixar_no_hub():
+            e = link_sel()
+            if not e or not str(e.get("url") or "").startswith("magnet:?"):
+                messagebox.showinfo(marca, "Escolha um magnet p/ baixar no Hub.")
+                return
+            estado("Adicionando no qBittorrent do Hub (Piratas/)…")
+
+            def trabalho(url_fx=e["url"]):
+                try:
+                    res = core.qbit_adicionar(url_fx)
+                except Exception as ex:
+                    res = {"ok": False, "erro": str(ex)}
+                self._depois(lambda: fim_hub(res))
+
+            threading.Thread(target=trabalho, daemon=True).start()
+
+        def fim_hub(res):
+            if res.get("ok"):
+                estado(f"No Hub → {res.get('destino', 'Piratas/')}")
+                messagebox.showinfo(marca, f"Torrent no cliente do Hub.\nDestino: {res.get('destino', 'Piratas/')}")
+            else:
+                estado(f"Falha: {res.get('erro', 'falha')}")
+                messagebox.showwarning(marca, res.get("erro", "falha"))
 
         def importar_arquivo():
             try:

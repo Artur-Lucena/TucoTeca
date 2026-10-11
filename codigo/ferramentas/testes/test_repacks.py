@@ -92,16 +92,49 @@ def teste_repack_caminhos_padrao_win():
             _os.environ["BIBLIOTECA_PIRATAS"] = velho
 
 
+def teste_repack_organizar_em_piratas_padrao_todos():
+    import os as _os
+    from bib_nucleo import repacks as RP
+    from pathlib import Path as _P
+    tmp = _P(tempfile.mkdtemp(prefix="suite-rp-org-"))
+    pir = tmp / "Piratas"
+    velho = _os.environ.get("BIBLIOTECA_PIRATAS")
+    _os.environ["BIBLIOTECA_PIRATAS"] = str(pir)
+    try:
+        fora = tmp / "Downloads" / "Hell Clock [FitGirl Repack]"
+        fora.mkdir(parents=True)
+        (fora / "setup.exe").write_bytes(b"S")
+        afirmar(not RP.dentro_de_piratas(fora))
+        r = RP.organizar_em_piratas(fora)
+        afirmar(r["ok"] and r["movido"] and not fora.exists(), r)
+        afirmar((_P(r["path"]) / "setup.exe").is_file())
+        afirmar(RP.dentro_de_piratas(r["path"]))
+        r2 = RP.organizar_em_piratas(r["path"])
+        afirmar(r2["ok"] and not r2["movido"], r2)
+        outra = tmp / "outra" / "Hell Clock [FitGirl Repack]"
+        outra.mkdir(parents=True)
+        r3 = RP.organizar_em_piratas(outra)
+        afirmar(r3["ok"] and _P(r3["path"]).name == "Hell Clock [FitGirl Repack]-2", r3)
+        r4 = RP.organizar_em_piratas(tmp / "sumiu")
+        afirmar(not r4["ok"], r4)
+    finally:
+        if velho is None:
+            _os.environ.pop("BIBLIOTECA_PIRATAS", None)
+        else:
+            _os.environ["BIBLIOTECA_PIRATAS"] = velho
+
+
 def teste_repack_7z_override():
     import os as _os
     import tempfile as _tf
     from bib_nucleo import repacks as RP
     tmp = _tf.mkdtemp(prefix="suite-rp7z-")
     from pathlib import Path as _P
-    falso = _P(tmp) / "meu7z.exe"
+    falso = _P(tmp) / ("meu7z.exe" if _os.name == "nt" else "meu7z")
     falso.write_bytes(b"7z")
     velho = _os.environ.get("BIBLIOTECA_7Z")
     _os.environ["BIBLIOTECA_7Z"] = str(falso)
+    falso.chmod(0o755)
     try:
         afirmar(RP.ferramenta_7z() == falso)
         _os.environ["BIBLIOTECA_7Z"] = str(_P(tmp) / "inexistente.exe")

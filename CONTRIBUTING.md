@@ -2,8 +2,9 @@
 
 ## Ambiente e primeiro ciclo
 
-1. Use Python 3.10+ com Tk para trabalhar na GUI; o desenvolvimento local
-   do Windows foi verificado com Python oficial 3.14.
+1. Use Python 3.10+ para o núcleo; o desktop principal é Qt/PySide6
+   (`requirements-ui.txt`). Tk é usado pelas ferramentas clássicas.
+   O desenvolvimento local Windows usa Python oficial 3.14.
 2. Abra o terminal na raiz do projeto.
 3. Execute `python codigo/ferramentas/diagnosticar.py` e a suíte abaixo.
 4. Use uma `BIBLIOTECA_HOME` de desenvolvimento para experimentar a UI.
@@ -16,6 +17,19 @@ py -3.14 codigo/ferramentas/testes/executar.py --json "$env:TEMP\tucoteca-testes
 
 No Linux/macOS, os mesmos scripts de núcleo/testes usam `python3`.
 Uma instalação sem emuladores/coleção é válida para desenvolver o núcleo.
+
+No Linux, para uma coleção descartável (a variável aponta para a pasta-mãe
+de `dados/`, não para o banco):
+
+```sh
+export BIBLIOTECA_HOME="$(mktemp -d)"
+python3 codigo/frontends/app_tui.py --selftest
+python3 codigo/ferramentas/testes/executar.py --modulo test_linux_portabilidade
+```
+
+`--selftest` usa tela simulada e também pode rodar no Windows sem curses.
+Para a TUI interativa Linux, execute `./BibliotecaHub.sh` em um terminal.
+Matriz de compatibilidade e procedimentos: [revisão Linux](docs/REVISAO_LINUX_W11.md).
 
 ## Pontos de entrada para mudanças
 
@@ -61,6 +75,11 @@ py -3.14 codigo/ferramentas/testes/executar.py
 - Casos são funções `teste_*` em `codigo/ferramentas/testes/test_*.py`.
 - A suíte cria a sandbox automaticamente, inclusive com `--caso`.
 - Simule rede/subprocessos e use arquivos locais pequenos em fixtures.
+- Executáveis falsos nativos Linux/macOS precisam de `chmod(0o755)`; use
+  nomes sem `.exe`. Ao simular Linux no Windows, injete `sys.platform`
+  ou um proxy `os` no módulo-alvo; trocar `os.name` global altera `pathlib`.
+- Prova opcional de shell isolada: `python codigo/ferramentas/provar_linux_shell.py`.
+  No Windows usa Git Bash; `--ffmpeg` valida os seis presets com WAV sintético.
 - Testes de GUI usam root oculto e pulam sem Tk/display.
 - Não execute jogos nem áudio real pela suíte; provas manuais ficam fora
   dos testes herméticos e devem descrever SO, duração e resultado.

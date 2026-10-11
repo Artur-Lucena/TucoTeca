@@ -55,7 +55,7 @@ def diagnosticar_banco(db: Path) -> dict:
             integridade = [r[0] for r in con.execute("PRAGMA quick_check")]
             tabelas = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             contagens, colunas = {}, {}
-            for nome in ("jogos", "musicas", "downloads", "desejos"):
+            for nome in ("jogos", "musicas", "downloads", "desejos", "videos"):
                 if nome in tabelas:
                     contagens[nome] = con.execute(f"SELECT COUNT(*) FROM {nome}").fetchone()[0]
                     colunas[nome] = [r[1] for r in con.execute(f"PRAGMA table_info({nome})")]

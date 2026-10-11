@@ -13,6 +13,7 @@ QtObject {
     readonly property color ink: "#082332"
     readonly property color positive: "#7ce3b8"
     readonly property color danger: "#ff9eaa"
+    readonly property color warning: "#f0c47b"
     readonly property string family: Qt.platform.os === "windows" ? "Segoe UI" : "Sans Serif"
     readonly property int radius: 16
     readonly property int radiusSmall: 10
@@ -20,6 +21,8 @@ QtObject {
     readonly property int pad: 18
     readonly property int gap: 14
     readonly property int title: 30
-    readonly property int subtitle: 12
-    readonly property int card: 14
+    readonly property int subtitle: 14
+    readonly property int card: 15
+    readonly property int meta: 13
+    readonly property int kicker: 12
 }

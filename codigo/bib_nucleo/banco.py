@@ -422,6 +422,7 @@ def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     _garantir_tabela_musicas(con)
     _garantir_tabela_downloads(con)
     _garantir_tabela_desejos(con)
+    _garantir_tabela_videos(con)
     con.commit()
 
 
@@ -1059,8 +1060,8 @@ def _enquadrar_capa(img):
     return tela
 
 
-def _normalizar_capa(raw: bytes, ext: str) -> tuple[bytes, str]:
-    """Se Pillow existir: jpg/webp/gif → PNG 600x800 padronizado.
+def _normalizar_capa(raw: bytes, ext: str, enquadrar=True) -> tuple[bytes, str]:
+    """Se Pillow existir: jogos → PNG 600x800; álbuns preservam proporção.
 
     Sem Pillow, devolve bytes/ext originais (GUI mostra tile p/ não-png/gif).
     Nunca levanta: falha de conversão = original.
@@ -1081,7 +1082,10 @@ def _normalizar_capa(raw: bytes, ext: str) -> tuple[bytes, str]:
             img.save(buf, format="PNG")
             out = buf.getvalue()
             return (out, ".png") if len(out) <= 2_000_000 else (raw, ext)
-        img = _enquadrar_capa(img)
+        if enquadrar:
+            img = _enquadrar_capa(img)
+        else:
+            img.thumbnail((1200, 1200))
         for _tent in (1, 2):
             buf = BytesIO()
             img.save(buf, format="PNG", optimize=True)
@@ -1131,7 +1135,7 @@ def salvar_capa_musica_bytes(con: sqlite3.Connection, mid: int,
     row = con.execute("SELECT * FROM musicas WHERE id=?", (mid,)).fetchone()
     if not row:
         return {"ok": False, "erro": "música não encontrada"}
-    raw, ext = _normalizar_capa(raw, ext)
+    raw, ext = _normalizar_capa(raw, ext, enquadrar=False)
     if len(raw) > 2_000_000:
         return {"ok": False, "erro": "capa maior que 2 MB"}
     CAPAS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1201,6 +1205,77 @@ def contar_por_origem(con: sqlite3.Connection) -> dict:
     return {(r["origem"] or ""): r["n"] for r in rows}
 
 
+# Videoteca 2.0 (v18): filmes/vídeos locais + downloads do YouTube.
+# --------------------------------------------------------------------------
+
+SCHEMA_VIDEOS = """
+CREATE TABLE IF NOT EXISTS videos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo TEXT NOT NULL,
+    canal TEXT DEFAULT '',
+    video_id TEXT DEFAULT '',
+    video_path TEXT DEFAULT '',
+    video_sha TEXT DEFAULT '',
+    thumb TEXT DEFAULT '',
+    origem TEXT DEFAULT 'local',
+    duracao_s INTEGER DEFAULT 0,
+    criado_em TEXT,
+    atualizado_em TEXT,
+    UNIQUE(video_id)
+);
+"""
+
+
+def _garantir_tabela_videos(con: sqlite3.Connection) -> None:
+    """v18: videoteca. Idempotente; preserva linhas (só cria quando ausente)."""
+    con.execute(SCHEMA_VIDEOS)
+
+
+def video_to_dict(r: sqlite3.Row) -> dict:
+    return dict(r)
+
+
+def criar_video(con: sqlite3.Connection, dados: dict) -> dict:
+    titulo = _txt((dados or {}).get("titulo"))
+    if not titulo:
+        raise ValueError("título do vídeo é obrigatório")
+    vid = _txt((dados or {}).get("video_id"))
+    if not vid:
+        vid = "local:" + uuid_mod.uuid4().hex
+    agora = agora_iso()
+    try:
+        cur = con.execute(
+            """INSERT INTO videos (titulo, canal, video_id, video_path, video_sha,
+               thumb, origem, duracao_s, criado_em, atualizado_em)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (titulo, _txt((dados or {}).get("canal")), vid,
+             _txt((dados or {}).get("video_path")), _txt((dados or {}).get("video_sha")),
+             _txt((dados or {}).get("thumb")), _txt((dados or {}).get("origem")) or "local",
+             int((dados or {}).get("duracao_s") or 0), agora, agora))
+    except sqlite3.IntegrityError:
+        raise ValueError("este vídeo já está na videoteca") from None
+    con.commit()
+    return video_to_dict(con.execute("SELECT * FROM videos WHERE id=?", (cur.lastrowid,)).fetchone())
+
+
+def listar_videos(con: sqlite3.Connection, q: str = "") -> list[dict]:
+    rows = con.execute("SELECT * FROM videos ORDER BY titulo").fetchall()
+    out = [video_to_dict(r) for r in rows]
+    if (q or "").strip():
+        ql = q.strip().lower()
+        out = [v for v in out if ql in (v.get("titulo") or "").lower()
+               or ql in (v.get("canal") or "").lower()]
+    return out
+
+
+def excluir_video(con: sqlite3.Connection, vid: int) -> None:
+    row = con.execute("SELECT id FROM videos WHERE id=?", (vid,)).fetchone()
+    if not row:
+        raise LookupError("vídeo não encontrado")
+    con.execute("DELETE FROM videos WHERE id=?", (vid,))
+    con.commit()
+
+
 def selo_confianca(j: dict) -> str:
     """' · ◎0.85' se o jogo tem confiança de importação, senão ''."""
     try:
@@ -1210,4 +1285,4 @@ def selo_confianca(j: dict) -> str:
     return f" · ◎{conf:.2f}" if conf > 0 else ""
 
 __all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'MODS_MAX_NOME', 'MODS_MAX_QTD', 'normalizar_mods', 'mods_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'SCHEMA_MUSICAS', 'musica_to_dict', 'criar_musica', 'listar_musicas', 'excluir_musica', 'salvar_capa_musica_bytes', 'ESTADOS_DOWNLOAD', 'SCHEMA_DOWNLOADS', 'download_to_dict', 'enfileirar_downloads', 'listar_downloads', 'marcar_download', 'limpar_downloads', 'SCHEMA_DESEJOS', 'desejo_to_dict', 'listar_desejos',
- 'sincronizar_desejos', 'adicionar_desejo', 'remover_desejo', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca']
+ 'sincronizar_desejos', 'adicionar_desejo', 'remover_desejo', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca', 'SCHEMA_VIDEOS', 'video_to_dict', 'criar_video', 'listar_videos', 'excluir_video']

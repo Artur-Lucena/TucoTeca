@@ -28,6 +28,9 @@ jobs:
       - name: Suíte Linux
         if: runner.os == 'Linux'
         run: xvfb-run -a python -B codigo/ferramentas/testes/executar.py --json resultados-testes.json
+      - name: Launchers e instalador Linux em sandbox
+        if: runner.os == 'Linux'
+        run: python -B codigo/ferramentas/provar_linux_shell.py
       - name: Relatório
         if: always()
         uses: actions/upload-artifact@v4

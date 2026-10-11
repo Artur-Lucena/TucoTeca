@@ -79,7 +79,8 @@ SAVES_DIR = DADOS_DIR / "saves"
 WINE_PREFIXO = SAVES_DIR / "wine"
 
 # Biblioteca de mods por provider: mods/<prov>/<title-id>/<mod>/ (LayeredFS
-# extraído e normalizado). O play materializa só os ativos via junction.
+# extraído e normalizado). O play copia o overlay ativo para o emulador;
+# arquivos que não pertencem ao Hub são preservados.
 MODS_DIR = DADOS_DIR / "mods"
 
 # Catálogo de áudio independente dos jogos; arquivos importados por conteúdo.
@@ -100,6 +101,11 @@ CACHE_WAV_DIR = DADOS_DIR / "cache-wav"
 # (GBs — mesmo trato dos mods: pacote portátil não inclui).
 TEXTURAS_DIR = DADOS_DIR / "texturas"
 
+# Videoteca local da 2.0: filmes/vídeos pesquisados e baixados do YouTube
+# (yt-dlp BYOB) + arquivos locais importados. Fora do git e do scanner de
+# jogos (SKIP). O pacote de coleção v4 ainda não transporta vídeos.
+VIDEOS_DIR = DADOS_DIR / "videos"
+
 
 def garantir_dirs() -> None:
     HOME_DIR.mkdir(parents=True, exist_ok=True)
@@ -114,6 +120,7 @@ def garantir_dirs() -> None:
     BAIXAR_DIR.mkdir(parents=True, exist_ok=True)
     CACHE_WAV_DIR.mkdir(parents=True, exist_ok=True)
     TEXTURAS_DIR.mkdir(parents=True, exist_ok=True)
+    VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _com_barra(p: str) -> str:
@@ -420,5 +427,8 @@ ROM_EXTS_3DS = {".cci", ".cxi", ".3ds", ".3dsx", ".elf", ".app", ".axf"}
 # Áudio do catálogo: inclui Opus nativo quando a conversão não está disponível.
 MUSICA_EXTS = {".mp3", ".ogg", ".opus", ".m4a", ".flac", ".wav"}
 
-__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'MAC_ROOT', 'eh_mac', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'MODS_DIR', 'MUSICAS_DIR', 'BAIXAR_DIR', 'CACHE_WAV_DIR', 'TEXTURAS_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'win_para_mac', 'mac_para_win', 'linux_para_mac', 'mac_para_linux', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
- 'ROM_EXTS_3DS', 'MUSICA_EXTS', 'nome_arquivo_portatil']
+# Vídeo da 2.0: contêineres que os 3 reprodutores (VLC/MPV/MPC-HC) abrem.
+VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v", ".ogv"}
+
+__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'MAC_ROOT', 'eh_mac', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'MODS_DIR', 'MUSICAS_DIR', 'BAIXAR_DIR', 'CACHE_WAV_DIR', 'TEXTURAS_DIR', 'VIDEOS_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'win_para_mac', 'mac_para_win', 'linux_para_mac', 'mac_para_linux', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
+ 'ROM_EXTS_3DS', 'MUSICA_EXTS', 'VIDEO_EXTS', 'nome_arquivo_portatil']

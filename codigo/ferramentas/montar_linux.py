@@ -2,16 +2,16 @@
 # -*- coding: utf-8 -*-
 """
 Monta o instalador Linux: tucoteca-setup-<data>.run (auto-extraível,
-100% offline — AppImage do Azahar + app + dados vazios).
+offline — fontes + AppImage disponível + dados vazios).
 
     py -3.14 codigo/ferramentas/montar_linux.py [--formato run|tarxz|todos]
 
 A árvore Linux é montada AQUI no Windows (só cópia de arquivos) e o
 payload é o mesmo .tar.xz dos instaladores (LZMA2 stdlib). O stub .run
 é shell POSIX: pergunta a pasta, checa python3+tk, extrai com tar -xJ,
-cria o .desktop e o desinstalador. DeSmuME no Linux = pacote do
-sistema ou AppImage próprio (o ⬇ do app resolve depois); o bundle leva
-o que estiver instalado aqui.
+cria o .desktop e o desinstalador. O sistema precisa de Python 3.10+;
+Tk é opcional para --gui (frontend clássico). DeSmuME no Linux usa pacote
+do sistema ou AppImage próprio; seu updater não instala uma build Linux.
 """
 from __future__ import annotations
 
@@ -34,10 +34,12 @@ LIN_BUILD = AQUI / ".build" / "lin"
 SH_LAUNCHER = """#!/bin/sh
 # TucoTeca (instalado) — abre o TUI; --gui abre a janela gráfica.
 HUB="$(dirname "$(readlink -f "$0")")"
-export BIBLIOTECA_HOME="$HUB"
-[ -f "$HUB/dados/dados/biblioteca.db" ] && export BIBLIOTECA_HOME="$HUB/dados"
-export BIBLIOTECA_AZAHAR_DIR="$HUB/emuladores/Azahar"
-export BIBLIOTECA_DESMUME_DIR="$HUB/emuladores/DeSmuME"
+if [ -z "${BIBLIOTECA_HOME:-}" ]; then
+  export BIBLIOTECA_HOME="$HUB"
+  [ -f "$HUB/dados/dados/biblioteca.db" ] && export BIBLIOTECA_HOME="$HUB/dados"
+fi
+export BIBLIOTECA_AZAHAR_DIR="${BIBLIOTECA_AZAHAR_DIR:-$HUB/emuladores/Azahar}"
+# Não fixar DESMUME_DIR vazio: isso impediria a descoberta do pacote do sistema.
 if [ "$1" = "--gui" ]; then
   shift
   exec python3 "$HUB/app/app_win.py" "$@"
@@ -49,7 +51,7 @@ DESKTOP = """[Desktop Entry]
 Type=Application
 Name=TucoTeca
 Comment=Biblioteca pessoal de jogos
-Exec={dest}/BibliotecaHub.sh
+Exec="{dest}/BibliotecaHub.sh"
 Terminal=true
 Categories=Game;
 Icon=applications-games
@@ -58,6 +60,10 @@ Icon=applications-games
 DESINSTALAR = """#!/bin/sh
 # Remove a TucoTeca instalada. Mantém a coleção? (dados/ só sai com --tudo)
 HUB="$(dirname "$(readlink -f "$0")")"
+ATALHO=""
+if [ -f "$HUB/atalho-linux.txt" ]; then
+  IFS= read -r ATALHO < "$HUB/atalho-linux.txt"
+fi
 if [ "$1" = "--tudo" ]; then
   rm -rf "$HUB"
 else
@@ -66,7 +72,9 @@ else
   echo "app removido; coleção preservada em $HUB/dados"
   echo "(--tudo apaga a coleção junto)"
 fi
-rm -f "$HOME/.local/share/applications/tucoteca.desktop"
+# O instalador registra exatamente o atalho que criou (usuário ou root).
+[ -n "$ATALHO" ] && rm -f -- "$ATALHO"
+rm -f "$HUB/atalho-linux.txt"
 echo "TucoTeca desinstalada."
 """
 
@@ -76,18 +84,20 @@ STUB = r"""#!/bin/sh
 VERSAO="__VERSAO__"
 OFFSET=__OFFSET__
 DESTINO=""
-for a in "$@"; do
-  case "$a" in
-    --destino=*) DESTINO="${a#--destino=}" ;;
-    --ajuda|-h) echo "uso: $0 [--destino DIR]"; exit 0 ;;
-  esac
-done
 falha() { echo "ERRO: $1" >&2; exit 1; }
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --destino) [ "$#" -ge 2 ] || falha "--destino precisa da pasta."; DESTINO="$2"; shift ;;
+    --destino=*) DESTINO="${1#--destino=}" ;;
+    --ajuda|-h) echo "uso: $0 [--destino DIR | --destino=DIR]"; exit 0 ;;
+    *) falha "opção desconhecida: $1" ;;
+  esac
+  shift
+done
 command -v tar >/dev/null || falha "sem 'tar' no sistema."
 tar --help 2>&1 | grep -q -- "-J" || falha "seu tar não lê xz (instale o xz)."
 command -v python3 >/dev/null || falha "instale o Python 3.10+ (python3)."
-PYV="$(python3 -c 'import sys; print(sys.version_info[0]*10+sys.version_info[1])')"
-[ "$PYV" -ge 40 ] || falha "python3 antigo demais (precisa 3.10+)."
+python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' || falha "python3 antigo demais (precisa 3.10+)."
 python3 -c 'import tkinter' 2>/dev/null || {
   echo "[aviso] sem tkinter: a GUI (--gui) não abre; o TUI funciona normal."
   echo "        Debian/Ubuntu: sudo apt install python3-tk | Fedora: sudo dnf install python3-tkinter"
@@ -99,7 +109,8 @@ if [ -z "$DESTINO" ]; then
   [ -n "$RESP" ] && DESTINO="$RESP"
 fi
 case "$DESTINO" in "~"*) DESTINO="$HOME${DESTINO#\~}" ;; esac
-mkdir -p "$DESTINO" || falha "não criei $DESTINO."
+mkdir -p -- "$DESTINO" || falha "não criei $DESTINO."
+DESTINO="$(cd -- "$DESTINO" && pwd -P)" || falha "destino inacessível."
 echo "[hub] extraindo em $DESTINO ..."
 tail -c +$((OFFSET + 1)) "$0" | tar -xJf - -C "$DESTINO" || falha "extração falhou."
 HUB="$DESTINO/tucoteca"
@@ -108,8 +119,23 @@ chmod +x "$HUB/BibliotecaHub.sh" "$HUB/desinstalar.sh"
 chmod +x "$HUB"/emuladores/Azahar/*.AppImage 2>/dev/null
 APP_DIR="$HOME/.local/share/applications"
 [ "$(id -u)" = "0" ] && APP_DIR="/usr/share/applications"
-mkdir -p "$APP_DIR"
-sed "s|{dest}|$HUB|" "$HUB/tucoteca.desktop" > "$APP_DIR/tucoteca.desktop"
+mkdir -p "$APP_DIR" || falha "não criei a pasta de atalhos."
+# Exec não é comando de shell. Escapar aspas, barras e códigos % conforme
+# Desktop Entry; sed direto interpretava &, | e outros caracteres do destino.
+python3 - "$HUB" "$APP_DIR/tucoteca.desktop" <<'PY_DESKTOP'
+import sys
+from pathlib import Path
+hub, atalho = map(Path, sys.argv[1:])
+exe = (hub / "BibliotecaHub.sh").as_posix().replace("%", "%%")
+for char in ('\\', '"', '`', '$'):
+    exe = exe.replace(char, '\\' + char)
+exe = exe.replace('\\', '\\\\')
+texto = (hub / "tucoteca.desktop").read_text(encoding="utf-8")
+linhas = ['Exec="' + exe + '"' if l.startswith('Exec=') else l for l in texto.splitlines()]
+atalho.write_text('\n'.join(linhas) + '\n', encoding="utf-8", newline="\n")
+(hub / "atalho-linux.txt").write_text(atalho.as_posix() + '\n', encoding="utf-8", newline="\n")
+PY_DESKTOP
+[ "$?" -eq 0 ] || falha "não gravei o atalho."
 rm -f "$HUB/tucoteca.desktop"
 echo "[ok] TucoTeca $VERSAO instalada em $HUB"
 echo "     abrir: $HUB/BibliotecaHub.sh (ou o ícone TucoTeca no menu)"
@@ -192,9 +218,9 @@ def montar_base_linux(trab: Path | None = None) -> tuple[Path, dict]:
     app = base / "app"
     app.mkdir(parents=True)
     copiar_app(app, repo=REPO)
-    (base / "BibliotecaHub.sh").write_text(SH_LAUNCHER, encoding="utf-8")
-    (base / "tucoteca.desktop").write_text(DESKTOP, encoding="utf-8")
-    (base / "desinstalar.sh").write_text(DESINSTALAR, encoding="utf-8")
+    (base / "BibliotecaHub.sh").write_text(SH_LAUNCHER, encoding="utf-8", newline="\n")
+    (base / "tucoteca.desktop").write_text(DESKTOP, encoding="utf-8", newline="\n")
+    (base / "desinstalar.sh").write_text(DESINSTALAR, encoding="utf-8", newline="\n")
     for sub in ("dados", "dados/backups", "dados/capas", "dados/presets",
                 "dados/sessoes"):
         (base / sub).mkdir(parents=True, exist_ok=True)
@@ -207,7 +233,7 @@ def montar_base_linux(trab: Path | None = None) -> tuple[Path, dict]:
     (base / "VERSAO.txt").write_text(
         f"TucoTeca Linux — build {data}\n"
         f"Azahar: {azahar_ver or 'ausente (use o ⬇ do app)'}\n"
-        "DeSmuME: pacote do sistema ou AppImage próprio\n",
+        "DeSmuME: pacote do sistema ou AppImage próprio (sem updater Linux)\n",
         encoding="utf-8")
     podar_dieta(base)
     return base, {"azahar": azahar_ver, "data": data}

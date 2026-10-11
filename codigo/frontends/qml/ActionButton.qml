@@ -11,7 +11,7 @@ Button {
     padding: 12
     hoverEnabled: true
     font.family: Theme.family
-    font.pixelSize: 13
+    font.pixelSize: Theme.subtitle
     font.weight: Font.DemiBold
     opacity: enabled ? 1 : 0.4
     Accessible.name: text

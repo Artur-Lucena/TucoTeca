@@ -22,6 +22,7 @@ para conversão/preview de imagens; ferramentas externas são descritas abaixo.
 | Trabalhar em conjunto | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Desktop Qt, arquitetura e cobertura da migração | [docs/DESKTOP_QT.md](docs/DESKTOP_QT.md) |
 | Visão TucoOS, roadmap e integrações | [docs/VISAO_OS.md](docs/VISAO_OS.md) |
+| QoL 1.5: melhorias entregues, pesquisa e próximos ajustes | [docs/QOL_1_5.md](docs/QOL_1_5.md) |
 | Diagnosticar a instalação sem alterar a coleção | `python codigo/ferramentas/diagnosticar.py` |
 | Gerar a entrega de código para outro desenvolvedor | `python codigo/ferramentas/empacotar_fontes.py` |
 
@@ -64,13 +65,16 @@ capas, backups, saves, mods e músicas; permanece fora do Git. A trava
   capas assíncronas, grade virtualizada, busca, favoritos, ordenação e painel
   de detalhes. Estados vazios, atividade em segundo plano e mensagens de erro.
 - **HUD superior:** Início, Jogos, Músicas, Desejos, Downloads e Integrações ficam
-  acessíveis também em tela cheia. Player persistente no rodapé.
+  acessíveis também em tela cheia, junto da nova aba Vídeos. Player e volume do PC persistentes no rodapé.
 - **Busca global:** **Ctrl+K** acha jogo/música/desejo/download na coleção local.
 - **Big Picture:** botão **Big Picture** ou **F11**; **Esc** retorna à janela.
   **Ctrl+1…6** troca de categoria, **Ctrl+F** busca, **setas** navegam pela
   grade, **Enter** joga e **Espaço** abre detalhes. Teclado e mouse;
   navegação por gamepad ainda não implementada.
 - **Jogos:** título, capa, horas, nota/status, etiquetas, favoritos e filtros.
+- **QoL 1.5:** saúde completa da coleção com filtro de pendências, contagem
+  contextual e Limpar filtros, busca global que seleciona o resultado certo,
+  avisos em fila e registro manual de horas nos detalhes/Sistema.
 - **Lançamento:** executável/provider por SO, minimização da GUI e registro
   de sessão; `--jogar "Título"` atende atalhos de Desktop.
 - **Importação:** arquivo/pasta, ROMs com metadados, manifestos de lojas,
@@ -80,8 +84,18 @@ capas, backups, saves, mods e músicas; permanece fora do Git. A trava
 - **Músicas:** importa uma pasta do Harmoni/áudio local, enfileira CSV do
   Exportify, baixa/converte áudio, busca capas de álbum e toca no Hub.
   A música continua enquanto o jogo está aberto. Player externo é opcional.
-- **Volume do PC (Windows):** slider 0–100%, −/+5 pontos e mute na barra
-  lateral; controla a saída padrão inteira e reflete ajustes externos.
+- **Bibliotecas de música:** Deezer, iTunes e MusicBrainz buscam faixas sem
+  chave/login; escolha resultados e envie à fila para baixar/importar. Spotify
+  usa configuração OAuth para playlists/curtidas e exibe o resultado na mesma lista.
+- **Conquistas do Hub:** Steam fornece referência; o save nativo e regras locais
+  determinam desbloqueios persistentes/offline. Saves sem leitor ficam pendentes.
+- **Vídeos:** importa arquivos locais, pesquisa/baixa YouTube via yt-dlp,
+  e abre com VLC/MPV/MPC-HC. Ferramentas de mídia reúne editores de imagem,
+  editores/EQ de áudio e reprodutores; presets FFmpeg geram cópias importadas.
+- **Integrações:** + Adicionar registra atalhos HTTPS próprios, incluindo busca
+  por `{q}`; cartões personalizados são persistentes e podem ser removidos.
+- **Volume do PC (Windows):** slider no rodapé Qt ou na barra lateral clássica;
+  controla a saída padrão inteira. A interface clássica inclui −/+5 e mute.
 - **SteamRip:** catálogo pesquisável, página do jogo, hosts e fluxo de
   download/importação. A disponibilidade é a do serviço remoto.
 - **Desejos:** lista local, inclusão pela busca da Steam e importação de JSON.
@@ -92,7 +106,8 @@ capas, backups, saves, mods e músicas; permanece fora do Git. A trava
   atualizações a cada 3 segundos; o cliente grava o histórico em seu próprio
   intervalo. Sem peças registradas, ocupação em disco é apenas uma estimativa.
   **Iniciar cliente** usa um perfil da coleção; API local mostra velocidade,
-  ETA, pausa/retomada. Magnets do Hub são entregues diretamente ao cliente.
+  ETA, pausa/retomada. Magnets do Hub vão ao cliente do Hub com destino
+  Piratas/ (nunca ao cliente do SO); o que caiu fora pode voltar com Organizar.
 - **Sanear pasta:** localiza o jogo antes da limpeza, preserva instaladores
   ainda necessários e compara redistribuíveis por conteúdo. Na GUI, roda em
   segundo plano; setups redundantes vão para `.hub-lixo/`.

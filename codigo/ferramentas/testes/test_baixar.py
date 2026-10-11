@@ -120,8 +120,9 @@ def teste_baixar_localizar_e_consulta():
     afirmar(BX.consulta_busca("", "") == "")
     afirmar("BIBLIOTECA_YTDLP" in BX.erro_sem_ytdlp())
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
-    falso = tmp / "yt-dlp.exe"
+    falso = tmp / ("yt-dlp.exe" if os.name == "nt" else "yt-dlp")
     falso.write_bytes(b"fake")
+    falso.chmod(0o755)
     velho = os.environ.get("BIBLIOTECA_YTDLP")
     os.environ["BIBLIOTECA_YTDLP"] = str(falso)
     try:
@@ -326,8 +327,9 @@ def teste_baixar_converter_ffmpeg_mock():
         afirmar(not BX.converter_faixa(con, did, ffmpeg="ff")["ok"])
         afirmar(not BX.converter_faixa(con, 9999, ffmpeg="ff")["ok"])
         # localizar_ffmpeg respeita o env
-        ff = tmp / "ffmpeg.exe"
+        ff = tmp / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
         ff.write_bytes(b"fake")
+        ff.chmod(0o755)
         velho_env = os.environ.get("BIBLIOTECA_FFMPEG")
         os.environ["BIBLIOTECA_FFMPEG"] = str(ff)
         try:
@@ -448,7 +450,7 @@ def teste_baixar_pronto_e_ferramentas():
     velho_env = os.environ.get("BIBLIOTECA_FFMPEG")
     os.environ["BIBLIOTECA_FFMPEG"] = str(tmp / "peq.exe")
     try:
-        afirmar(BX.localizar_ffmpeg() == str(tmp / "peq.exe"))
+        afirmar(BX.localizar_ffmpeg() == (str(tmp / "peq.exe") if os.name == "nt" else ""))
         afirmar(BX.ffmpeg_pronto() == "", "pequeno demais devia reprovar")
     finally:
         if velho_env is None:

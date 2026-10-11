@@ -366,6 +366,9 @@ class _ProcessoBackend:
     def play(self) -> dict:
         if self.proc is None:
             return {"ok": False, "erro": "nada aberto"}
+        # Popen já iniciou a reprodução; SIGCONT só é necessário após pausa.
+        if not self._pausado_em:
+            return {"ok": self.vivo(), "erro": "" if self.vivo() else "player encerrado"}
         return self.resume()
 
     def _sinal(self, sig) -> dict:
@@ -378,12 +381,16 @@ class _ProcessoBackend:
         return {"ok": True}
 
     def pause(self) -> dict:
+        if getattr(self, "_pausado_em", 0):
+            return {"ok": self.vivo()}
         r = self._sinal(_signal.SIGSTOP)
         if r.get("ok"):
             self._pausado_em = time.monotonic()
         return r
 
     def resume(self) -> dict:
+        if not getattr(self, "_pausado_em", 0):
+            return {"ok": self.vivo()}
         r = self._sinal(_signal.SIGCONT)
         if r.get("ok") and self._pausado_em:
             self._pausa_total += time.monotonic() - self._pausado_em
@@ -394,17 +401,23 @@ class _ProcessoBackend:
         if self.proc is not None:
             try:
                 if self.proc.poll() is None:
+                    # Um processo parado por SIGSTOP não atende SIGTERM até voltar.
+                    if getattr(self, "_pausado_em", 0):
+                        self.proc.send_signal(_signal.SIGCONT)
                     self.proc.terminate()
                     try:
                         self.proc.wait(timeout=5)
                     except (OSError, subprocess.SubprocessError):
                         try:
                             self.proc.kill()
-                        except OSError:
+                            self.proc.wait(timeout=5)
+                        except (OSError, subprocess.SubprocessError):
                             pass
             except OSError:
                 pass
             self.proc = None
+        self._aberto = ""
+        self._pausado_em = 0.0
 
     def vivo(self) -> bool:
         return self.proc is not None and self.proc.poll() is None

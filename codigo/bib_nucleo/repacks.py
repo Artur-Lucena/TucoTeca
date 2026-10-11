@@ -35,7 +35,7 @@ def pasta_piratas() -> Path:
         return Path(env)
     from bib_nucleo.ferramentas import raiz_runtime, runtime_portatil
     if runtime_portatil():
-        return raiz_runtime() / "dados/downloads/jogos"
+        return raiz_runtime() / "Piratas"
     if eh_mac():
         return Path(MAC_ROOT) / "Games" / "Piratas"
     if os.name == "nt":
@@ -43,13 +43,54 @@ def pasta_piratas() -> Path:
     return Path(f"{str(LINUX_ROOT).rstrip('/')}/Games/Piratas")
 
 
+def dentro_de_piratas(caminho: str | os.PathLike) -> bool:
+    """O caminho já está sob Piratas/ (critério padrão de todos os downloads)?"""
+    try:
+        base = pasta_piratas().resolve()
+        alvo = Path(caminho).resolve()
+        return alvo == base or base in alvo.parents
+    except OSError:
+        return False
+
+
+def organizar_em_piratas(caminho: str | os.PathLike) -> dict:
+    """Move pasta/arquivo de jogo p/ Piratas/ (padrão p/ todo download fora do lugar).
+
+    Não move o que já está em Piratas. Colisão de nome ganha sufixo -2, -3…
+    Aviso honesto: o cliente torrent original perde o rastro (reaponte nele).
+    """
+    p = Path(caminho)
+    if "\x00" in str(caminho):
+        return {"ok": False, "erro": "caminho inválido"}
+    if not p.exists():
+        return {"ok": False, "erro": "caminho sumiu do disco"}
+    if dentro_de_piratas(p):
+        return {"ok": True, "path": str(p), "movido": False}
+    base = pasta_piratas().resolve()
+    if p.resolve() in base.parents or not p.name or p.resolve() == Path(p.anchor):
+        return {"ok": False, "erro": "A origem é uma raiz/pasta ancestral de Piratas; não pode ser movida para dentro dela."}
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+        dest = base / p.name
+        n = 1
+        while dest.exists():
+            n += 1
+            dest = base / f"{p.stem}-{n}{p.suffix}" if p.is_file() else base / f"{p.name}-{n}"
+        shutil.move(str(p), str(dest))
+    except (OSError, ValueError) as e:
+        return {"ok": False, "erro": f"não movi p/ Piratas: {e}"}
+    return {"ok": True, "path": str(dest), "movido": True,
+            "aviso": "Reaponte o torrent no cliente original (ele perdeu o rastro)."}
+
+
 def ferramenta_7z() -> Path | None:
     """7z p/ rar/7z/iso (override `BIBLIOTECA_7Z`; None = sem extrator)."""
+    from bib_nucleo.ferramentas import localizar_ferramenta, runtime_portatil
     env = os.environ.get("BIBLIOTECA_7Z")
     if env:
-        cand = Path(env)
-        return cand if cand.is_file() else None
-    from bib_nucleo.ferramentas import localizar_ferramenta, runtime_portatil
+        # Mesma validação de SO/chmod das demais ferramentas; sem fallback oculto.
+        local = localizar_ferramenta("7z")
+        return Path(local) if local else None
     local = localizar_ferramenta("7z")
     if local:
         return Path(local)
@@ -500,6 +541,7 @@ def _capa_automatica(con: sqlite3.Connection, gid: int, titulo: str) -> bool:
         return False
 
 
-__all__ = ['ARQUIVO_EXTS', 'pasta_piratas', 'ferramenta_7z', 'eh_pacote_hub',
+__all__ = ['ARQUIVO_EXTS', 'pasta_piratas', 'dentro_de_piratas', 'organizar_em_piratas',
+           'ferramenta_7z', 'eh_pacote_hub',
            'extrair_arquivo', 'organizar_extraido', 'achar_exe',
            'sanear_pasta', 'importar_repack']

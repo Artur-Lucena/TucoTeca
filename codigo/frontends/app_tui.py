@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TucoTeca — aplicativo de terminal (curses, stdlib).
-Alvo principal: Linux. Mesmo banco e mesmas regras da GUI Windows.
+TucoTeca — aplicativo de terminal (curses, stdlib), voltado ao Linux.
+Compartilha o núcleo e a coleção com o desktop Qt e as ferramentas clássicas.
 
 Uso:
-    python codigo/frontends/app_tui.py [--db ~/.../biblioteca.db]
+    python3 codigo/frontends/app_tui.py [--db ~/.../biblioteca.db]
 
-Teclas (lista): ↑/↓ ou j/k navegar · PgUp/PgDn · / buscar · f status ·
-  * favoritos · V provider · Y plataforma · T etiquetas · Enter jogar ·
-  a adicionar · e editar · d excluir ·
-  I importar (arquivo, pasta ou disco — ROM liga no emu sozinha) ·
-  b backup · U saves 3DS · E exportar JSON · P pacote portátil · S registrar sessão manual ·
-  A atualizar Azahar · G atualizar DeSmuME · r recarregar · q sair
+Lista: ↑/↓ ou j/k navegam; PgUp/PgDn mudam de página; Enter abre ações
+do jogo; Esc abre o menu principal; q sai. Busca, filtros, importação,
+backup e atualização são escolhas dos menus (sem atalhos antigos de letras).
+DeSmuME Linux: pacote do sistema/AppImage manual, sem atualização automática.
 Preview: Espaço marca/desmarca · PgUp/PgDn · i importa marcados · q volta
 
 Horas automáticas: ao jogar, o tempo do processo é somado sozinho
@@ -461,6 +459,8 @@ class Tui:
 
         Com rolagem (listas longas) e largura limitada ao terminal.
         """
+        if not opcoes:
+            return None
         s = self.stdscr
         cur = 0
         k_down = getattr(curses, "KEY_DOWN", -2)
@@ -514,7 +514,7 @@ class Tui:
             try:
                 ch = s.getch()
             except Exception:
-                ch = -1
+                return None  # terminal fechado/erro real; -1 é apenas timeout normal
             if ch == -1:
                 continue
             if ch in (k_down, ord("j")):
@@ -1354,9 +1354,15 @@ class Tui:
                                             "Importar arquivo…"]):
             return
         if h < len(links):
-            r = core.abrir_url(links[h]["url"])
-            self.msg = (f"Aberto: {links[h]['nome'][:60]}"
-                        if r.get("ok") else f"Falha: {r.get('erro')}")
+            e = links[h]
+            if e["tipo"] == "magnet":
+                r = core.qbit_adicionar(e["url"])
+                self.msg = (f"No Hub → {r.get('destino', 'Piratas/')}"
+                            if r.get("ok") else f"Falha: {r.get('erro')}")
+            else:
+                r = core.abrir_url(e["url"])
+                self.msg = (f"Aberto: {e['nome'][:60]}"
+                            if r.get("ok") else f"Falha: {r.get('erro')}")
             return
         if h == len(links) + 1:
             arq = self.perguntar("Repack baixado (.rar/.zip/.7z/.iso): ")
@@ -1666,9 +1672,15 @@ class Tui:
                                             "Importar arquivo…"]):
             return
         if h < len(links):
-            r = core.abrir_url(links[h]["url"])
-            self.msg = (f"Aberto: {links[h]['nome'][:60]}"
-                        if r.get("ok") else f"Falha: {r.get('erro')}")
+            e = links[h]
+            if e["tipo"] == "magnet":
+                r = core.qbit_adicionar(e["url"])
+                self.msg = (f"No Hub → {r.get('destino', 'Piratas/')}"
+                            if r.get("ok") else f"Falha: {r.get('erro')}")
+            else:
+                r = core.abrir_url(e["url"])
+                self.msg = (f"Aberto: {e['nome'][:60]}"
+                            if r.get("ok") else f"Falha: {r.get('erro')}")
             return
         if h == len(links) + 1:
             arq = self.perguntar("Repack baixado (.rar/.zip/.7z/.iso): ")
@@ -2224,7 +2236,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--selftest", action="store_true",
                     help="monta o TUI sem terminal e sai (verificação)")
     args = ap.parse_args(argv)
-    if curses is None:
+    if curses is None and not args.selftest:
         print("curses indisponível neste Python (no Windows, use app_win.py).",
               file=sys.stderr)
         return 2

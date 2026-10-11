@@ -26,7 +26,7 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 
 ## Interface
 
-- HUD permanente com **Início / Jogos / Músicas / Desejos / Downloads / Integrações**.
+- HUD permanente com **Início / Jogos / Músicas / Desejos / Downloads / Integrações / Vídeos**.
 - Início OS: continuar, resumo local (backup/sessões/disco), acesso rápido, recentes.
 - Paleta global Ctrl+K: busca local unificada, Enter abre o primeiro resultado.
 - Tela cheia preserva a categoria e continua permitindo a troca entre telas.
@@ -39,6 +39,12 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 - Layout compacto validado em 960×640; destaque recolhe em telas baixas para
   reservar espaço para a coleção. Renderização sem GPU pode usar
   `QT_QUICK_BACKEND=software` (útil em testes e diagnóstico).
+- QoL 1.5: textos auxiliares de 13–14px, cabeçalho adaptativo, primeira linha
+  de cards com status/horas visíveis no compacto, resumo dos filtros e botão
+  Limpar filtros. Ctrl+F no Início/Integrações abre a busca global.
+- Saúde da coleção contabiliza todos os jogos e permite filtrar pendências;
+  avisos são mostrados em fila, com botão para fechar. Registro de horas aceita
+  decimais e encerra o marcador de sessão pendente após backup.
 
 ## Cobertura
 
@@ -53,12 +59,16 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 | Torrents: progresso, velocidade/ETA, iniciar, pausar/retomar, abrir pasta | Sim | Sim |
 | SteamRip/FitGirl: pesquisar e abrir página do resultado | Sim | Sim |
 | Backup da coleção / volume global Windows | Sim | Sim |
-| Sistema: lista de backups, sessões pendentes (+1h), últimos erros | Sim | Parcial |
+| Sistema: backups, registro/encerramento de sessões pendentes, últimos erros | Sim | Parcial |
 | Configurar mods, HD, cheats, controles, presets, atualizar emuladores | Acesso pelo botão de ferramentas clássicas | Sim |
 | Importação avançada de jogos/ROMs, sanar/religar executáveis, UAC | Ferramentas clássicas | Sim |
 | CSV → áudio, fila de downloads de músicas, buscar capas | Ferramentas clássicas | Sim |
 | Sincronizar wishlist, importar torrent concluído, baixar de hosts | Ferramentas clássicas | Sim |
-| Exportar/importar pacotes e registrar sessões manuais | Ferramentas clássicas | Sim |
+| Registrar horas manualmente nos detalhes e encerrar sessão pendente no Sistema | Sim | Sim |
+| Bibliotecas sem credencial, catálogo Spotify, download/conversão/importação de músicas | Sim | CSV/import local |
+| Videoteca, YouTube, reprodutores, editores e EQ por cópia | Sim | — |
+| Atalhos personalizados em Integrações | Sim | — |
+| Exportar/importar pacotes | Ferramentas clássicas | Sim |
 | Navegação por gamepad | Ainda não | Ainda não |
 
 Não se trata ainda de paridade integral: a migração visual preserva acesso
@@ -81,7 +91,9 @@ Para incluir uma fonte:
 3. Teste o adaptador sem rede real e o contrato do registro.
 
 É uma API interna de adaptadores, não um carregador de plugins de terceiros.
-Downloads e instalações continuam ações explícitas do usuário.
+Atalhos https do usuário (botão + Adicionar, com `{q}` p/ busca) são
+persistidos na coleção; padrões não saem. Downloads e instalações continuam
+ações explícitas do usuário.
 
 ## Concorrência e persistência
 

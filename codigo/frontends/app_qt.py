@@ -80,7 +80,7 @@ def main(argv=None):
                 if args.screenshot and not window.grabWindow().save(args.screenshot):
                     app.exit(1)
                     return
-                print(f"[ok] selftest Qt Quick: {bridge.quantidade} jogos; navegação, modelos e QML carregados")
+                print(f"[ok] selftest Qt Quick: {bridge.sistema['jogos']} jogos; navegação, modelos e QML carregados")
                 app.exit(0)
             timer.timeout.connect(verificar)
             timer.start()

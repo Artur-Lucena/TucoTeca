@@ -3,6 +3,8 @@
 *.py text eol=lf
 *.md text eol=lf
 *.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
 *.txt text eol=lf
 *.sh text eol=lf
 *.command text eol=lf
@@ -13,4 +15,5 @@ qmldir text eol=lf
 *.vbs text eol=crlf
 *.bat text eol=crlf
 .gitignore text eol=lf
+.gitattributes text eol=lf
 LICENSE text eol=lf

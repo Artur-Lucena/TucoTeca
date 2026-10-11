@@ -58,14 +58,14 @@ Item {
         }
         Rectangle {
             x: 13; y: 13
-            width: platform.implicitWidth + 16; height: 25; radius: 7
+            width: platform.implicitWidth + 18; height: 27; radius: 7
             color: "#e0101a29"
             Text {
                 id: platform
                 anchors.centerIn: parent
                 text: card.game.plataforma || "PC"
                 color: Theme.text
-                font { family: Theme.family; pixelSize: 10; weight: Font.Bold }
+                font { family: Theme.family; pixelSize: 12; weight: Font.Bold }
             }
         }
         Text {
@@ -78,21 +78,21 @@ Item {
             anchors { left: parent.left; bottom: parent.bottom; margins: 15 }
             text: card.selected ? "PRONTO PARA JOGAR" : ""
             color: Theme.accent
-            font { family: Theme.family; pixelSize: 9; weight: Font.Bold; letterSpacing: 1 }
+            font { family: Theme.family; pixelSize: Theme.kicker; weight: Font.Bold; letterSpacing: 0.5 }
         }
     }
     Text {
         anchors { left: parent.left; right: parent.right; top: art.bottom; margins: 9 }
         text: card.game.titulo || ""
         color: Theme.text
-        font { family: Theme.family; pixelSize: 14; weight: Font.DemiBold }
+        font { family: Theme.family; pixelSize: Theme.card; weight: Font.DemiBold }
         elide: Text.ElideRight
     }
     Text {
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 9 }
         text: (card.game.status || "backlog") + "  ·  " + Number(card.game.horas || 0).toFixed(1) + " h"
         color: Theme.muted
-        font { family: Theme.family; pixelSize: 11 }
+        font { family: Theme.family; pixelSize: Theme.meta }
         elide: Text.ElideRight
     }
     MouseArea {

@@ -59,29 +59,84 @@ def qbit_request(endpoint: str, dados: dict | None = None, timeout=1.0):
     return raw.decode("utf-8", "replace")
 
 
+def _perfil_texto(destino: Path) -> str:
+    salt = os.urandom(16)
+    # O GUI exige hash não vazio mesmo com autenticação local dispensada.
+    key = hashlib.pbkdf2_hmac("sha512", os.urandom(32), salt, 100000)
+    credencial = base64.b64encode(salt).decode() + ":" + base64.b64encode(key).decode()
+    return ("[Meta]\nMigrationVersion=8\n[LegalNotice]\nAccepted=true\n\n"
+            "[GUI]\nStartUpWindowState=Hidden\n\n"
+            "[Preferences]\nWebUI\\Enabled=true\nWebUI\\Address=127.0.0.1\n"
+            f"WebUI\\Port={qbit_porta()}\nWebUI\\LocalHostAuth=false\n"
+            f"WebUI\\Password_PBKDF2=@ByteArray({credencial})\n"
+            "WebUI\\CSRFProtection=true\nWebUI\\HostHeaderValidation=true\n"
+            "WebUI\\ServerDomains=127.0.0.1\nAdvanced\\updateCheck=false\n\n"
+            "[BitTorrent]\nSession\\DefaultSavePath=" + destino.as_posix() + "\n\n"
+            "[AddNewTorrentDialog]\nEnabled=false\n")
+
+
+def migrar_save_path(texto: str, destino: Path) -> str:
+    """Garante DefaultSavePath=Piratas em perfil existente, sem tocar no resto."""
+    alvo = "Session\\DefaultSavePath=" + destino.as_posix()
+    linhas = texto.splitlines()
+    for i, linha in enumerate(linhas):
+        if linha.startswith("Session\\DefaultSavePath="):
+            linhas[i] = alvo
+            return "\n".join(linhas) + ("\n" if texto.endswith("\n") else "")
+    for i, linha in enumerate(linhas):
+        if linha.strip() == "[BitTorrent]":
+            linhas.insert(i + 1, alvo)
+            return "\n".join(linhas) + ("\n" if texto.endswith("\n") else "")
+    return texto + ("\n" if not texto.endswith("\n") else "") + "[BitTorrent]\n" + alvo + "\n"
+
+
 def qbit_preparar_perfil() -> Path:
-    """Configura só um perfil novo do Hub, incluindo credencial exigida pelo Qt GUI."""
+    """Cria o perfil do Hub ou migra o existente (destino sempre Piratas/)."""
     from bib_nucleo.repacks import pasta_piratas
     destino = pasta_piratas().resolve()
     cfg = qbit_config_path()
     destino.mkdir(parents=True, exist_ok=True)
     cfg.parent.mkdir(parents=True, exist_ok=True)
     if not cfg.exists():
-        salt = os.urandom(16)
-        # O GUI exige hash não vazio mesmo com autenticação local dispensada.
-        key = hashlib.pbkdf2_hmac("sha512", os.urandom(32), salt, 100000)
-        credencial = base64.b64encode(salt).decode() + ":" + base64.b64encode(key).decode()
-        texto = ("[Meta]\nMigrationVersion=8\n[LegalNotice]\nAccepted=true\n\n"
-                 "[GUI]\nStartUpWindowState=Hidden\n\n"
-                 "[Preferences]\nWebUI\\Enabled=true\nWebUI\\Address=127.0.0.1\n"
-                 f"WebUI\\Port={qbit_porta()}\nWebUI\\LocalHostAuth=false\n"
-                 f"WebUI\\Password_PBKDF2=@ByteArray({credencial})\n"
-                 "WebUI\\CSRFProtection=true\nWebUI\\HostHeaderValidation=true\n"
-                 "WebUI\\ServerDomains=127.0.0.1\nAdvanced\\updateCheck=false\n\n"
-                 "[BitTorrent]\nSession\\DefaultSavePath=" + destino.as_posix() + "\n\n"
-                 "[AddNewTorrentDialog]\nEnabled=false\n")
-        gravar_atomico(cfg, texto.encode("utf-8"))
+        gravar_atomico(cfg, _perfil_texto(destino).encode("utf-8"))
+    else:
+        try:
+            atual = cfg.read_text(encoding="utf-8")
+        except OSError:
+            return cfg
+        novo = migrar_save_path(atual, destino)
+        if novo != atual:
+            gravar_atomico(cfg.with_suffix(cfg.suffix + ".bak"), atual.encode("utf-8"))
+            gravar_atomico(cfg, novo.encode("utf-8"))
     return cfg
+
+
+def qbit_adicionar(url: str) -> dict:
+    """Adiciona magnet/URL ao qBittorrent do Hub, sempre com destino Piratas/.
+
+    Nunca entrega ao cliente do SO (era assim que jogos caíam fora de Piratas).
+    Exige o cliente do Hub ligado (Downloads → Iniciar cliente).
+    """
+    url = (url or "").strip()
+    if not url.startswith("magnet:?") and not url.startswith("https://"):
+        return {"ok": False, "erro": "Link de torrent inválido."}
+    try:
+        if not qbit_api_url():
+            return {"ok": False,
+                    "erro": "Inicie o qBittorrent do Hub primeiro (Downloads → Iniciar cliente)."}
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
+    from bib_nucleo.repacks import pasta_piratas
+    destino = pasta_piratas().resolve()
+    try:
+        destino.mkdir(parents=True, exist_ok=True)
+        resposta = qbit_request("torrents/add", {"urls": url, "savepath": str(destino),
+                                                 "autoTMM": "false", "category": "tucoteca", "tags": "tucoteca"})
+        if resposta.strip() not in ("", "Ok."):
+            raise ValueError("O cliente recusou o torrent: " + resposta[:120])
+    except Exception as e:
+        return {"ok": False, "erro": f"qBittorrent do Hub: {e}"}
+    return {"ok": True, "destino": str(destino)}
 
 
 def qbit_iniciar(url: str = "") -> dict:
@@ -147,4 +202,5 @@ def qbit_controlar(hash_torrent: str, acao: str) -> dict:
 
 
 __all__ = ["perfil_qbit", "qbit_config_path", "qbit_backup_local", "qbit_porta",
-           "qbit_api_url", "qbit_iniciar", "qbit_listar", "qbit_controlar", "qbit_preparar_perfil"]
+           "qbit_api_url", "qbit_iniciar", "qbit_listar", "qbit_controlar", "qbit_preparar_perfil",
+           "qbit_adicionar", "migrar_save_path"]

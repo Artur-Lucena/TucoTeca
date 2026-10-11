@@ -15,7 +15,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from bib_nucleo.arquivos import gravar_atomico
+from bib_nucleo.arquivos import destino_temporario, gravar_atomico
 
 YTDLP_ENV = "BIBLIOTECA_YTDLP"
 FFMPEG_ENV = "BIBLIOTECA_FFMPEG"  # Fase C usa; nome centralizado aqui
@@ -183,31 +183,28 @@ def baixar_faixa(con, did: int, ytdlp: str = "", destino=None,
            "-o", str(base / "%(id)s.%(ext)s"), "--no-playlist", "--quiet",
            "--progress", "--newline", "--socket-timeout", "20",
            "-f", "bestaudio/best", *_args_js()]
+    diagnostico = []
+    def linha_recebida(linha):
+        if "ERROR:" in linha or "WARNING:" in linha:
+            diagnostico.append(linha.strip()[:350])
+            del diagnostico[:-8]
+        m = _PCT_RE.search(linha or "")
+        if m and progresso:
+            progresso(did, float(m.group(1)))
     try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, text=True,
-                                encoding="utf-8", errors="replace")
-    except (OSError, subprocess.SubprocessError) as e:
-        B.marcar_download(con, did, "falha", video_id=casa["video_id"],
-                          erro=f"download: {e}")
-        return {"ok": False, "erro": f"download: {e}"}
-    try:
-        for linha in (proc.stdout or []):
-            m = _PCT_RE.search(linha or "")
-            if m and progresso:
-                try:
-                    progresso(did, float(m.group(1)))
-                except Exception:
-                    pass
-        rc = proc.wait(timeout=1800)
+        from bib_nucleo.processos import executar_com_progresso
+        # Prazo total: cobre também yt-dlp sem produzir stdout (antes bloqueava).
+        rc = executar_com_progresso(cmd, linha_recebida, timeout=1800)
     except (OSError, subprocess.SubprocessError) as e:
         B.marcar_download(con, did, "falha", video_id=casa["video_id"],
                           erro=f"download: {e}")
         return {"ok": False, "erro": f"download: {e}"}
     if rc != 0:
+        erros = [s for s in diagnostico if "ERROR:" in s]
+        msg = erros[-1] if erros else f"yt-dlp rc={rc}"
         B.marcar_download(con, did, "falha", video_id=casa["video_id"],
-                          erro=f"yt-dlp rc={rc}")
-        return {"ok": False, "erro": f"yt-dlp rc={rc}"}
+                          erro=msg)
+        return {"ok": False, "erro": msg}
     achados = sorted(p for p in base.glob(f"{casa['video_id']}.*")
                      if p.is_file() and p.suffix.lower() in
                      (".mp3", ".m4a", ".ogg", ".opus", ".flac", ".wav", ".webm", ".mp4")
@@ -434,9 +431,14 @@ def converter_faixa(con, did: int, ffmpeg: str = "",
                f"title={tit}", "-metadata", f"artist={art}", "-metadata",
                f"album={alb}", str(dest)]
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=900)
-        except (OSError, subprocess.SubprocessError) as e:
+            with destino_temporario(dest) as tmp:
+                cmd[-1] = str(tmp)
+                r = subprocess.run(cmd, capture_output=True, text=True,
+                                   encoding="utf-8", errors="replace", timeout=900)
+                if r.returncode != 0 or not tmp.is_file() or tmp.stat().st_size == 0:
+                    detalhe = (r.stderr or "").strip().splitlines()
+                    raise ValueError(detalhe[-1][:200] if detalhe else f"ffmpeg rc={r.returncode}")
+        except (OSError, subprocess.SubprocessError, ValueError) as e:
             B.marcar_download(con, did, "falha", video_id=d.get("video_id") or "",
                               erro=f"ffmpeg: {e}")
             return {"ok": False, "erro": f"ffmpeg: {e}"}
@@ -471,8 +473,9 @@ def converter_faixa(con, did: int, ffmpeg: str = "",
     try:
         sha = sha_arquivo(dest)
         nova = B.criar_musica(con, {"titulo": tit, "artista": art, "album": alb,
-                                    "musica_path": str(dest),
-                                    "musica_sha": sha, "origem": "csv"})
+                                     "musica_path": str(dest),
+                                    "musica_sha": sha, "origem": "spotify-catalogo" if
+                                    str(d.get("uri") or "").startswith("spotify:") else "csv"})
     except ValueError as e:
         try:
             dest.unlink()

@@ -9,6 +9,7 @@ from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, Property,
 from PySide6.QtGui import QDesktopServices
 
 import bib_core as core
+from bib_nucleo import online, spotify
 from servicos_ui import ServicoBiblioteca
 
 
@@ -57,6 +58,14 @@ class HubBridge(QObject):
     mudou = Signal()
     playerMudou = Signal()
     volumeMudou = Signal()
+    provedoresMudou = Signal()
+    conquistasMudou = Signal()
+    spotifyMudou = Signal()
+    downloadMusicaMudou = Signal()
+    midiasMudou = Signal()
+    videoMudou = Signal()
+    _progressoVideo = Signal(object)
+    _progressoMusica = Signal(object)
     aviso = Signal(str, bool)
     jogoIniciado = Signal()
     jogoTerminou = Signal()
@@ -69,12 +78,41 @@ class HubBridge(QObject):
         self.modelo = ModeloItens(self)
         self.resultados = ModeloItens(self)
         self.global_resultados = ModeloItens(self)
+        self.artes = ModeloItens(self)
+        self.spotify_resultados = ModeloItens(self)
+        self.musica_online_resultados = ModeloItens(self)
+        self.video_resultados = ModeloItens(self)
+        self._videos_geracao = 0
+        self._videos_mensagem = "Busque um vídeo/canal ou importe arquivos locais."
+        self._video_progresso = {"rotulo": "", "pct": 0}
+        self._midias_status = {"imagens": {}, "equalizadores": {}, "videos": {}, "eq_presets": []}
+        self._progressoVideo.connect(self._mostrar_progresso_video, Qt.QueuedConnection)
+        self._musica_online_selecao = set()
+        self._musica_online_geracao = 0
+        self._musica_online_mensagem = "Busca sem conta: Deezer, iTunes e MusicBrainz."
+        self._arte_contexto = None
+        self._arte_geracao = 0
+        self._fila_musicas = []
+        self._conquistas = {"itens": [], "total": 0, "desbloqueadas": 0, "avaliaveis": 0,
+                            "status": "Sincronize o catálogo de referência para começar.", "appid": "", "save": ""}
+        self._conquistas_gid = 0
+        self._conquistas_geracao = 0
+        self._jogo_gid = 0
+        self._spotify_selecao = set()
+        self._spotify_proxima = ""
+        self._spotify_contexto = ("busca", "")
+        self._spotify_geracao = 0
+        self._cancelar_musicas = threading.Event()
+        self._download_musica = {"rotulo": "", "pct": 0, "id": 0, "cancelando": False}
+        self._progressoMusica.connect(self._mostrar_progresso_musica, Qt.QueuedConnection)
         self._secao, self._busca, self._filtro, self._ordem = "inicio", "", "todos", "titulo"
-        self._dados = {"jogos": [], "musicas": [], "desejos": [], "downloads": []}
+        self._dados = {"jogos": [], "musicas": [], "desejos": [], "downloads": [], "videos": []}
         self._sistema = {"jogos": 0, "musicas": 0, "desejos": 0, "downloads": 0,
                          "pendentes": 0, "backup": "…", "disco_livre_gb": 0,
+                         "backup_idade_dias": None, "backup_estado": "carregando",
                          "disco_total_gb": 0, "recentes": []}
-        self._saude = {"total": 0, "problemas": [], "ok": 0}
+        self._saude = {"total": 0, "problemas": [], "ok": 0, "pendentes": 0,
+                       "ids_pendentes": [], "verificada": False}
         self._paleta = ""
         self._modo_audio = "sequencia"
         self._selecionado = {}
@@ -103,6 +141,409 @@ class HubBridge(QObject):
         self._timer_downloads = QTimer(self)
         self._timer_downloads.setInterval(5000)
         self._timer_downloads.timeout.connect(self._atualizar_downloads)
+        self._timer_volume = QTimer(self)
+        self._timer_volume.setInterval(1000)
+        self._timer_volume.timeout.connect(self.consultarVolume)
+        self._timer_volume.start()
+        QTimer.singleShot(0, self.consultarVolume)
+        self._timer_conquistas = QTimer(self)
+        self._timer_conquistas.setInterval(5000)
+        self._timer_conquistas.timeout.connect(self._atualizar_conquistas)
+        self._timer_conquistas.start()
+        self._timer_spotify = QTimer(self)
+        self._timer_spotify.setInterval(500)
+        self._timer_spotify.timeout.connect(self._callback_spotify)
+        self._timer_spotify.start()
+
+    @Property(QObject, constant=True)
+    def capasResultados(self):
+        return self.artes
+
+    @Property("QVariantMap", notify=provedoresMudou)
+    def provedoresOnline(self):
+        return online.estado_provedores()
+
+    @Property("QVariantMap", notify=conquistasMudou)
+    def conquistas(self):
+        return self._conquistas
+
+    @Property(QObject, constant=True)
+    def spotifyItens(self):
+        return self.spotify_resultados
+
+    @Property(QObject, constant=True)
+    def musicaOnlineItens(self):
+        return self.musica_online_resultados
+
+    @Property(str, notify=spotifyMudou)
+    def musicaOnlineMensagem(self):
+        return self._musica_online_mensagem
+
+    @Property("QVariantList", notify=spotifyMudou)
+    def musicaOnlineSelecionados(self):
+        return sorted(self._musica_online_selecao)
+
+    @Property(QObject, constant=True)
+    def videosResultados(self):
+        return self.video_resultados
+
+    @Property(str, notify=videoMudou)
+    def videosMensagem(self):
+        return self._videos_mensagem
+
+    @Property("QVariantMap", notify=videoMudou)
+    def videoProgresso(self):
+        return self._video_progresso
+
+    @Property("QVariantMap", notify=midiasMudou)
+    def midiasStatus(self):
+        return self._midias_status
+
+    @Slot()
+    def consultarMidias(self):
+        def pronto(r):
+            self._midias_status = r
+            self.midiasMudou.emit()
+        self.executar("Detectando ferramentas de mídia…", self.servico.midias_status, pronto)
+
+    @Slot(str, str, str)
+    def abrirFerramentaMidia(self, tipo, nome, caminho):
+        self.executar("Abrindo ferramenta de mídia…",
+                      lambda: self.servico.abrir_ferramenta_midia(tipo, nome, caminho))
+
+    @Slot(str, str)
+    def aplicarEqualizacao(self, caminho, preset):
+        self._alterar("Equalizando cópia de áudio…", lambda: self.servico.aplicar_eq_musica(caminho, preset))
+
+    @Slot(QUrl)
+    def importarVideos(self, url):
+        caminho = url.toLocalFile()
+        if caminho:
+            self._alterar("Importando videoteca…", lambda: self.servico.importar_videos(caminho))
+
+    @Slot(int, str)
+    def reproduzirVideo(self, ident, reprodutor="auto"):
+        self.executar("Abrindo vídeo…", lambda: self.servico.reproduzir_video(ident, reprodutor))
+
+    @Slot(str, bool)
+    def buscarVideos(self, termo, atualizar=False):
+        self._videos_geracao += 1
+        geracao = self._videos_geracao
+        self._videos_mensagem = "Buscando no YouTube…"
+        self.videoMudou.emit()
+        def pronto(r):
+            if geracao == self._videos_geracao:
+                self.video_resultados.substituir(r.get("itens", []))
+                self._videos_mensagem = "; ".join(r.get("erros", [])) or f'{len(r.get("itens", []))} resultado(s)'
+                self.videoMudou.emit()
+        def falha(erro):
+            if geracao == self._videos_geracao:
+                self._videos_mensagem = erro
+                self.videoMudou.emit()
+        self.executar("Buscando vídeos…", lambda: self.servico.buscar_videos_online(termo, atualizar=atualizar), pronto, falha)
+
+    @Slot(str)
+    def baixarVideo(self, video_id):
+        if self.ocupado:
+            return
+        def trabalho():
+            try:
+                return self.servico.baixar_video_online(video_id, lambda vid, pct:
+                    self._progressoVideo.emit({"rotulo": vid, "pct": pct}))
+            finally:
+                self._progressoVideo.emit({"rotulo": "", "pct": 0})
+        self._alterar("Baixando vídeo para a videoteca…", trabalho)
+
+    @Slot(object)
+    def _mostrar_progresso_video(self, dados):
+        if not self._fechado:
+            self._video_progresso = dados
+            self.videoMudou.emit()
+
+    @Property("QVariantMap", notify=spotifyMudou)
+    def spotifyEstado(self):
+        return self.servico.spotify.estado()
+
+    @Property("QVariantList", notify=spotifyMudou)
+    def spotifySelecionados(self):
+        return sorted(self._spotify_selecao)
+
+    @Property(bool, notify=spotifyMudou)
+    def spotifyTemMais(self):
+        return bool(self._spotify_proxima)
+
+    @Property("QVariantList", notify=mudou)
+    def filaMusicas(self):
+        return self._fila_musicas
+
+    @Property("QVariantMap", notify=downloadMusicaMudou)
+    def downloadMusica(self):
+        return self._download_musica
+
+    @Slot(str, str, str)
+    @Slot(str, str, str, str)
+    def configurarProvedores(self, steam, steamgrid, spotify_id, spotify_secret=""):
+        def pronto(_r):
+            self.provedoresMudou.emit()
+            self.spotifyMudou.emit()
+            self.aviso.emit("Configuração dos provedores salva nesta coleção.", False)
+        self.executar("Salvando provedores…", lambda: self.servico.configurar_provedores(
+            steam, steamgrid, spotify_id, spotify_secret), pronto)
+
+    @Slot(str, int, str, bool)
+    def buscarCapas(self, categoria, ident, provedor, atualizar=False):
+        self._arte_geracao += 1
+        geracao = self._arte_geracao
+        self._arte_contexto = (categoria, ident)
+        self.artes.substituir([])
+        def pronto(r):
+            if geracao != self._arte_geracao:
+                return
+            self.artes.substituir(r.get("itens", []))
+            if r.get("erros"):
+                self.aviso.emit("; ".join(r["erros"]), not bool(r.get("itens")))
+            elif not r.get("itens"):
+                self.aviso.emit("Nenhuma capa encontrada neste provedor.", False)
+        self.executar("Pesquisando capas…", lambda: self.servico.buscar_capas(categoria, ident, provedor, atualizar), pronto)
+
+    @Slot(int)
+    def aplicarCapa(self, indice):
+        if self._arte_contexto and 0 <= indice < len(self.artes.itens):
+            categoria, ident = self._arte_contexto
+            candidato = dict(self.artes.itens[indice])
+            self._alterar("Salvando capa local…", lambda: self.servico.aplicar_capa(categoria, ident, candidato))
+
+    @Slot(int)
+    def monitorarConquistas(self, gid):
+        if gid != self._conquistas_gid:
+            self._conquistas = {"itens": [], "total": 0, "desbloqueadas": 0, "avaliaveis": 0,
+                                "status": "Lendo save local…" if gid else "", "appid": "", "save": ""}
+            self.conquistasMudou.emit()
+        self._conquistas_gid = gid
+        self._conquistas_geracao += 1
+        self._atualizar_conquistas()
+
+    def _atualizar_conquistas(self):
+        gid = self._conquistas_gid or self._jogo_gid
+        if not gid or self._fechado or any(t[2] == "Lendo save local…" for t in self._tarefas.values()):
+            return
+        geracao = self._conquistas_geracao
+        def pronto(r):
+            if geracao == self._conquistas_geracao:
+                self._conquistas = r
+                self.conquistasMudou.emit()
+            else:
+                self._atualizar_conquistas()
+        self.executar("Lendo save local…", lambda: self.servico.avaliar_conquistas(gid), pronto)
+
+    @Slot(int, str, str)
+    def sincronizarConquistas(self, gid, appid, save):
+        self._conquistas_gid = gid
+        self._conquistas_geracao += 1
+        geracao = self._conquistas_geracao
+        def pronto(r):
+            if geracao == self._conquistas_geracao:
+                self._conquistas = r
+                self.conquistasMudou.emit()
+            self.aviso.emit("Catálogo de referência salvo. Desbloqueios serão calculados pelo Hub no save local.", False)
+        self.executar("Consultando referência Steam…", lambda: self.servico.sincronizar_conquistas(gid, appid, save), pronto)
+
+    @Slot(int, str)
+    def salvarRegrasConquistas(self, gid, texto):
+        def pronto(r):
+            self._conquistas = r
+            self.conquistasMudou.emit()
+            self.aviso.emit("Regras locais salvas e avaliadas.", False)
+        self.executar("Avaliando regras do save…", lambda: self.servico.regras_conquistas(gid, texto), pronto)
+
+    @Slot()
+    def conectarSpotify(self):
+        try:
+            self.abrirUrl(self.servico.spotify.iniciar_login())
+            self.spotifyMudou.emit()
+        except ValueError as e:
+            self.aviso.emit(str(e), True)
+
+    def _callback_spotify(self):
+        resposta = self.servico.spotify.receber_callback()
+        if resposta is not None:
+            def pronto(_r):
+                self.spotifyMudou.emit()
+                self.aviso.emit("Spotify conectado. Escolha suas músicas ou playlists.", False)
+            self.executar("Autorizando Spotify…", lambda: self.servico.spotify.finalizar_login(resposta), pronto)
+
+    @Slot()
+    def desconectarSpotify(self):
+        self.servico.spotify.desconectar()
+        self._spotify_selecao.clear()
+        self.spotifyMudou.emit()
+
+    @Slot(str)
+    def colarCodigoSpotify(self, codigo):
+        def pronto(_r):
+            self.spotifyMudou.emit()
+            self.aviso.emit("Spotify conectado. Escolha suas músicas ou playlists.", False)
+        self.executar("Autorizando Spotify…", lambda: self.servico.spotify.trocar_codigo(codigo), pronto)
+
+    @Slot(str, str, bool)
+    def consultarSpotify(self, modo, termo, mais=False):
+        link = spotify.identificar_spotify(termo)
+        if link:
+            modo = {"track": "faixa", "album": "album", "playlist": "playlist"}[link[0]]
+            termo = link[1]
+        self._spotify_geracao += 1
+        geracao = self._spotify_geracao
+        if not mais:
+            self._spotify_contexto = (modo, termo)
+            self._spotify_selecao.clear()
+            self.spotify_resultados.substituir([])
+        else:
+            modo, termo = self._spotify_contexto
+        pagina = self._spotify_proxima if mais else ""
+        def pronto(r):
+            if geracao != self._spotify_geracao:
+                return
+            self.spotify_resultados.substituir((self.spotify_resultados.itens if mais else []) + r["itens"])
+            self._spotify_proxima = r.get("next") or ""
+            self.musica_online_resultados.substituir([dict(f, fonte="spotify", nome_fonte="Spotify") for f in self.spotify_resultados.itens])
+            self._musica_online_selecao.clear()
+            self._musica_online_mensagem = r.get("aviso") or f'{len(self.spotify_resultados.itens)} resultado(s) do Spotify'
+            self.spotifyMudou.emit()
+            if r.get("aviso"):
+                self.aviso.emit(r["aviso"], False)
+        self.executar("Consultando catálogo Spotify…", lambda: self.servico.spotify.consultar(modo, termo, pagina), pronto)
+
+    @Slot(str, bool)
+    def selecionarSpotify(self, uri, selecionar):
+        if selecionar:
+            self._spotify_selecao.add(uri)
+        else:
+            self._spotify_selecao.discard(uri)
+        self.spotifyMudou.emit()
+
+    @Slot(bool)
+    def selecionarTodasSpotify(self, selecionar):
+        self._spotify_selecao = {i["uri"] for i in self.spotify_resultados.itens if i.get("uri")} if selecionar else set()
+        self.spotifyMudou.emit()
+
+    @Slot(bool)
+    def enfileirarSpotify(self, baixar=False):
+        itens = [i for i in self.spotify_resultados.itens if i.get("uri") in self._spotify_selecao]
+        if not itens:
+            return
+        def pronto(r):
+            self.aviso.emit(f'{r["novos"]} faixa(s) na fila; {r["ignorados"]} já existentes.', False)
+            if baixar:
+                self.baixarFilaMusicas()
+            else:
+                self.atualizar()
+        self.executar("Enfileirando músicas…", lambda: self.servico.enfileirar_musicas(itens), pronto)
+
+    @Slot(str, str)
+    @Slot(str, str, bool)
+    def pesquisarMusicas(self, termo, fonte="todas", atualizar=False):
+        self._musica_online_geracao += 1
+        geracao = self._musica_online_geracao
+        self._musica_online_selecao.clear()
+        self.musica_online_resultados.substituir([])
+        self._musica_online_mensagem = "Buscando nas bibliotecas…"
+        self.spotifyMudou.emit()
+        def pronto(r):
+            if geracao != self._musica_online_geracao:
+                return
+            self.musica_online_resultados.substituir(r.get("itens", []))
+            if r.get("aviso") and not r.get("itens"):
+                self._musica_online_mensagem = r["aviso"]
+            elif r.get("erros"):
+                self._musica_online_mensagem = "; ".join(r["erros"])
+            elif not r.get("itens"):
+                self._musica_online_mensagem = "Nada encontrado. Tente artista + faixa."
+            else:
+                self._musica_online_mensagem = (f'{len(r["itens"])} resultado(s)'
+                                                + (" (do cache local)" if r.get("cache") else ""))
+            self.spotifyMudou.emit()
+        self.executar("Buscando músicas…",
+                      lambda: self.servico.buscar_musicas_online(termo, fonte, atualizar), pronto,
+                      lambda erro: self._erro_busca_musicas(geracao, erro))
+
+    def _erro_busca_musicas(self, geracao, erro):
+        if geracao == self._musica_online_geracao:
+            self._musica_online_mensagem = erro
+            self.spotifyMudou.emit()
+
+    @Slot(str, bool)
+    def alternarMusicaOnline(self, uri, selecionar):
+        if selecionar:
+            self._musica_online_selecao.add(uri)
+        else:
+            self._musica_online_selecao.discard(uri)
+        self.spotifyMudou.emit()
+
+    @Slot(bool)
+    def selecionarTodasMusicasOnline(self, selecionar):
+        self._musica_online_selecao = {
+            i["uri"] for i in self.musica_online_resultados.itens if i.get("uri")} if selecionar else set()
+        self.spotifyMudou.emit()
+
+    @Slot(bool)
+    def enfileirarMusicasOnline(self, baixar=False):
+        itens = [dict(i, uri=i.get("uri") or i.get("url", ""))
+                 for i in self.musica_online_resultados.itens
+                 if i.get("uri") in self._musica_online_selecao]
+        if not itens:
+            return
+        def pronto(r):
+            self.aviso.emit(f'{r["novos"]} faixa(s) na fila; {r["ignorados"]} já existentes.', False)
+            if baixar:
+                self.baixarFilaMusicas()
+            else:
+                self.atualizar()
+        self.executar("Enfileirando músicas…", lambda: self.servico.enfileirar_musicas(itens), pronto)
+
+    @Slot()
+    def baixarFilaMusicas(self):
+        if self.ocupado:
+            self.aviso.emit("Aguarde a operação atual terminar para baixar a fila.", False)
+            return
+        self._cancelar_musicas.clear()
+        def pronto(r):
+            self._download_musica = {"rotulo": "", "pct": 0, "id": 0, "cancelando": False}
+            self.downloadMusicaMudou.emit()
+            self.aviso.emit(f'{r["novas"]} faixa(s) salvas e importadas.' + ("; ".join(r["erros"][:3]) if r["erros"] else ""), bool(r["erros"]))
+            self.atualizar()
+        def trabalho():
+            try:
+                return self.servico.baixar_musicas(self._cancelar_musicas, self._progressoMusica.emit)
+            finally:
+                self._progressoMusica.emit({"id": 0, "rotulo": "", "pct": 0})
+        self.executar("Baixando e importando músicas…", trabalho, pronto)
+
+    @Slot()
+    def pararDownloadMusicas(self):
+        self._cancelar_musicas.set()
+        self._download_musica = dict(self._download_musica, cancelando=True)
+        self.downloadMusicaMudou.emit()
+
+    @Slot(object)
+    def _mostrar_progresso_musica(self, dados):
+        if self._fechado:
+            return
+        self._download_musica = dict(dados, cancelando=bool(dados.get("rotulo")) and self._cancelar_musicas.is_set())
+        self.downloadMusicaMudou.emit()
+
+    @Slot()
+    def instalarAudio(self):
+        self._alterar("Instalando dependências de áudio…", self.servico.instalar_audio)
+
+    @Slot(QUrl)
+    def importarCsvMusicas(self, url):
+        caminho = url.toLocalFile()
+        def trabalho():
+            dados = core.ler_csv_exportify(caminho)
+            if dados["erros"]:
+                raise ValueError("; ".join(dados["erros"]))
+            return self.servico.enfileirar_musicas(dados["itens"])
+        self._alterar("Importando CSV de músicas…", trabalho)
 
     @Property(QObject, constant=True)
     def itens(self):
@@ -131,7 +572,7 @@ class HubBridge(QObject):
     @Property("QVariantList", notify=mudou)
     def filaAudio(self):
         return [{"id": f.get("id"), "titulo": f.get("titulo", ""),
-                 "artista": f.get("artista", ""), "atual": i == (self._player.idx or -1)}
+                 "artista": f.get("artista", ""), "atual": i == self._player.idx}
                 for i, f in enumerate(self._player.fila)]
 
     @Property(int, notify=mudou)
@@ -149,6 +590,23 @@ class HubBridge(QObject):
     @Property(str, notify=mudou)
     def filtro(self):
         return self._filtro
+
+    @Property(str, notify=mudou)
+    def ordem(self):
+        return self._ordem
+
+    @Property(str, notify=mudou)
+    def resumoLista(self):
+        total = len(self._dados.get(self._secao, []))
+        nomes = {"jogos": "jogos", "musicas": "músicas", "desejos": "desejos",
+                 "downloads": "downloads", "videos": "vídeos"}
+        resumo = f"{self.quantidade} de {total} {nomes.get(self._secao, 'itens')}"
+        if self._secao == "jogos" and self._filtro != "todos":
+            resumo += " · " + {"favoritos": "Favoritos", "jogando": "Jogando",
+                                "pendencias": "Com pendências"}.get(self._filtro, self._filtro)
+        if self._busca.strip():
+            resumo += f" · busca “{self._busca.strip()}”"
+        return resumo
 
     @Property("QVariantMap", notify=mudou)
     def selecionado(self):
@@ -180,7 +638,7 @@ class HubBridge(QObject):
     def atividade(self):
         return next((t[2] for t in self._tarefas.values()), "Tudo pronto")
 
-    @Property("QVariantList", constant=True)
+    @Property("QVariantList", notify=mudou)
     def integracoes(self):
         return self.servico.integracoes.listar()
 
@@ -199,6 +657,8 @@ class HubBridge(QObject):
 
     @Slot()
     def consultarVolume(self):
+        if self._fechado:
+            return
         self._volume = core.ler_volume_pc()
         self.volumeMudou.emit()
 
@@ -214,13 +674,13 @@ class HubBridge(QObject):
         self._volume = core.alternar_mudo_pc()
         self.volumeMudou.emit()
 
-    def executar(self, rotulo, trabalho, pronto=None):
+    def executar(self, rotulo, trabalho, pronto=None, falha=None):
         if self._fechado:
             return
         self._numero += 1
         tarefa = Tarefa(self._numero, trabalho)
         tarefa.sinais.terminou.connect(self._concluir, Qt.QueuedConnection)
-        self._tarefas[self._numero] = (tarefa, pronto, rotulo)
+        self._tarefas[self._numero] = (tarefa, pronto, rotulo, falha)
         self.mudou.emit()
         self._pool.start(tarefa)
 
@@ -231,12 +691,17 @@ class HubBridge(QObject):
             return
         try:
             if erro:
-                self.aviso.emit(erro, True)
+                if entrada[3]:
+                    entrada[3](erro)
+                else:
+                    self.aviso.emit(erro, True)
             elif entrada[1]:
                 entrada[1](resultado)
         except Exception as exc:
             self.aviso.emit(str(exc), True)
         finally:
+            if entrada[2] == "Autorizando Spotify…":
+                self.spotifyMudou.emit()
             self.mudou.emit()
 
     @Slot()
@@ -244,14 +709,23 @@ class HubBridge(QObject):
         self._geracao += 1
         geracao = self._geracao
 
+        def saude_pronta(saude):
+            if geracao == self._geracao:
+                self._saude = dict(saude, verificada=True)
+                if self._secao == "jogos" and self._filtro == "pendencias":
+                    self._filtrar()
+                else:
+                    self.mudou.emit()
+
         def pronto(dados):
             if geracao == self._geracao:
                 self._sistema = dados.pop("sistema", self._sistema)
+                self._fila_musicas = dados.pop("fila_musicas", [])
                 self._dados.update(dados)
                 self._filtrar()
                 self.buscarPaleta(self._paleta)
                 self.executar("Verificando saúde da coleção…", self.servico.saude,
-                              lambda s: (setattr(self, "_saude", s), self.mudou.emit()))
+                              saude_pronta)
         self.executar("Carregando sua coleção…", self.servico.snapshot, pronto)
         if self._secao == "downloads":
             self._atualizar_downloads()
@@ -276,7 +750,24 @@ class HubBridge(QObject):
 
     @Slot(str)
     def filtrar(self, filtro):
+        if filtro not in ("todos", "favoritos", "jogando", "PC", "3DS", "NDS", "pendencias"):
+            return
         self._filtro = filtro
+        self._filtrar()
+
+    @Slot()
+    def limparFiltros(self):
+        self._busca_timer.stop()
+        self._busca = ""
+        if self._secao == "jogos":
+            self._filtro = "todos"
+        self._filtrar()
+
+    @Slot()
+    def verPendencias(self):
+        self.navegar("jogos")
+        self._busca_timer.stop()
+        self._busca, self._filtro = "", "pendencias"
         self._filtrar()
 
     @Slot(str)
@@ -301,30 +792,30 @@ class HubBridge(QObject):
     @Slot(int, result="QVariantMap")
     def paletaItem(self, idx):
         try:
-            return dict(self.global_resultados.itens[int(idx)])
-        except (IndexError, TypeError, ValueError):
-            return {}
+            idx = int(idx)
+            if 0 <= idx < len(self.global_resultados.itens):
+                return dict(self.global_resultados.itens[idx])
+        except (TypeError, ValueError):
+            pass
+        return {}
 
     @Slot("QVariantMap")
     def abrirPaleta(self, item):
         tipo = (item or {}).get("tipo")
-        if tipo == "jogo":
-            self.navegar("jogos")
-            idx = next((i for i, j in enumerate(self.modelo.itens)
-                        if j.get("id") == item.get("id")), -1)
-            if idx >= 0:
-                self.selecionar(idx)
-        elif tipo == "musica":
-            self.navegar("musicas")
-            idx = next((i for i, m in enumerate(self.modelo.itens)
-                        if m.get("id") == item.get("id")), -1)
-            if idx >= 0:
-                self.selecionar(idx)
+        secao = {"jogo": "jogos", "musica": "musicas", "desejo": "desejos",
+                 "download": "downloads"}.get(tipo)
+        if secao is None:
+            return
+        self.navegar(secao)
+        self.limparFiltros()
+        idx = next((i for i, entrada in enumerate(self.modelo.itens)
+                    if entrada.get("id", entrada.get("hash")) == item.get("id")), -1)
+        if idx >= 0:
+            self.selecionar(idx)
+            if tipo == "musica":
                 self.tocar(item["id"])
-        elif tipo == "desejo":
-            self.navegar("desejos")
-        elif tipo == "download":
-            self.navegar("downloads")
+        else:
+            self.aviso.emit("Este resultado não está mais na coleção. Atualize a busca.", False)
 
     def _filtrar(self):
         itens = list(self._dados.get(self._secao, []))
@@ -335,6 +826,9 @@ class HubBridge(QObject):
                 itens = [j for j in itens if j.get("plataforma") == self._filtro]
             elif self._filtro == "jogando":
                 itens = [j for j in itens if j.get("status") == "jogando"]
+            elif self._filtro == "pendencias":
+                pendentes = set(self._saude.get("ids_pendentes", []))
+                itens = [j for j in itens if j.get("id") in pendentes]
             if self._ordem == "recentes":
                 itens.sort(key=lambda j: j.get("ultima_execucao") or "", reverse=True)
             elif self._ordem == "horas":
@@ -344,7 +838,7 @@ class HubBridge(QObject):
         palavras = self._busca.casefold().split()
         if palavras:
             itens = [j for j in itens if all(p in " ".join(str(j.get(k) or "") for k in
-                     ("titulo", "nome", "artista", "album", "etiquetas")).casefold() for p in palavras)]
+                     ("titulo", "nome", "artista", "album", "etiquetas", "canal")).casefold() for p in palavras)]
         anterior = self._selecionado.get("id", self._selecionado.get("hash"))
         self.modelo.substituir(itens)
         self._selecionado = next((j for j in itens if j.get("id", j.get("hash")) == anterior),
@@ -366,7 +860,8 @@ class HubBridge(QObject):
             if isinstance(resultado, dict) and resultado.get("ok") is False:
                 raise ValueError(resultado.get("erro", "A operação não foi concluída."))
             erros = resultado.get("erros", []) if isinstance(resultado, dict) else []
-            mensagem = "; ".join(erros) if erros else "Operação concluída."
+            avisos = resultado.get("avisos", []) if isinstance(resultado, dict) else []
+            mensagem = "; ".join(erros or avisos) if erros or avisos else "Operação concluída."
             self.aviso.emit(mensagem, bool(erros))
             self.atualizar()
         self.executar(rotulo, operacao, pronto)
@@ -376,7 +871,8 @@ class HubBridge(QObject):
         self._alterar("Atualizando favorito…", lambda: self.servico.favorito(gid))
 
     @Slot(int, str, str, str, str, str, str)
-    def salvarJogo(self, gid, titulo, exe, argumentos, status, nota="", etiquetas=""):
+    @Slot(int, str, str, str, str, str, str, bool)
+    def salvarJogo(self, gid, titulo, exe, argumentos, status, nota="", etiquetas="", sincronizar=False):
         try:
             nota_v = int(nota) if str(nota).strip() not in ("", "None") else None
         except (TypeError, ValueError):
@@ -384,7 +880,7 @@ class HubBridge(QObject):
             return
         dados = {"titulo": titulo, "executable_path": exe, "launch_options": argumentos,
                  "status": status or "backlog", "nota": nota_v, "etiquetas": etiquetas}
-        self._alterar("Salvando jogo…", lambda: self.servico.salvar_jogo(gid, dados))
+        self._alterar("Salvando jogo…", lambda: self.servico.salvar_jogo(gid, dados, sincronizar))
 
     @Slot(str)
     def modoAudio(self, modo):
@@ -412,6 +908,10 @@ class HubBridge(QObject):
     def registrarSessao(self, gid, horas):
         self._alterar("Registrando sessão…", lambda: self.servico.registrar_sessao(gid, horas))
 
+    @Slot(str, float)
+    def encerrarSessao(self, arquivo, horas):
+        self._alterar("Encerrando sessão…", lambda: self.servico.encerrar_sessao(arquivo, horas))
+
     @Slot(str, int)
     def excluir(self, categoria, ident):
         self._alterar("Removendo da coleção…", lambda: self.servico.excluir(categoria, ident))
@@ -435,6 +935,7 @@ class HubBridge(QObject):
         if self.ocupado or self._em_jogo:
             return
         self._em_jogo = True
+        self._jogo_gid = gid
         self.mudou.emit()
 
         def trabalho():
@@ -452,6 +953,8 @@ class HubBridge(QObject):
     @Slot(int, float, bool)
     def _fim_jogo(self, gid, horas, rastreado):
         self._em_jogo = False
+        self._atualizar_conquistas()
+        self._jogo_gid = 0
         if rastreado:
             self.executar("Registrando sessão…", lambda: self.servico.registrar_sessao(gid, horas),
                           lambda _r: self.atualizar())
@@ -541,9 +1044,57 @@ class HubBridge(QObject):
     def controlarDownload(self, ident, acao):
         self._alterar("Atualizando download…", lambda: core.qbit_controlar(ident, acao))
 
+    @Slot(str)
+    def baixarTorrent(self, url):
+        def pronto(r):
+            self.aviso.emit(f"Torrent no cliente do Hub → {r.get('destino', 'Piratas/')}.", False)
+            self._atualizar_downloads()
+        self.executar("Adicionando torrent no Hub…", lambda: self.servico.baixar_torrent_hub(url), pronto)
+
+    @Slot(str, result=bool)
+    def foraDePiratas(self, caminho):
+        return self.servico.fora_de_piratas(caminho)
+
+    @Slot(str)
+    def organizarDownload(self, caminho):
+        def pronto(r):
+            msg = "Já estava em Piratas/." if not r.get("movido") else \
+                f"Movido p/ Piratas. {r.get('aviso', '')}"
+            self.aviso.emit(msg, False)
+            self._atualizar_downloads()
+        self.executar("Organizando em Piratas…", lambda: self.servico.organizar_download(caminho), pronto)
+
     @Slot()
     def iniciarDownloads(self):
         self._alterar("Iniciando qBittorrent…", core.qbit_iniciar)
+
+    @Slot(str, str, str, str, str)
+    def adicionarIntegracao(self, chave, nome, descricao, tipo, url):
+        try:
+            item = self.servico.adicionar_integracao(
+                {"chave": chave, "nome": nome, "descricao": descricao, "tipo": tipo, "url": url})
+        except ValueError as e:
+            self.aviso.emit(str(e), True)
+            return
+        self.mudou.emit()
+        self.aviso.emit(f"Integração '{item['nome']}' adicionada.", False)
+
+    @Slot(str)
+    def removerIntegracao(self, chave):
+        try:
+            self.servico.remover_integracao(chave)
+        except ValueError as e:
+            self.aviso.emit(str(e), True)
+            return
+        self.mudou.emit()
+        self.aviso.emit("Integração removida.", False)
+
+    @Slot(str, str)
+    def abrirIntegracao(self, chave, termo=""):
+        try:
+            self.abrirUrl(self.servico.url_integracao(chave, termo))
+        except ValueError as e:
+            self.aviso.emit(str(e), True)
 
     @Slot(str, str)
     def buscarIntegracao(self, chave, termo):
@@ -590,7 +1141,11 @@ class HubBridge(QObject):
         self._audio_token += 1
         self._timer_player.stop()
         self._timer_downloads.stop()
+        self._timer_volume.stop()
+        self._timer_conquistas.stop()
+        self._timer_spotify.stop()
         self._busca_timer.stop()
         self._pool.waitForDone()
         self._player.parar()
         self._player.backend.close()
+        self.servico.spotify.fechar()
