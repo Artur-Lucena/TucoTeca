@@ -761,6 +761,31 @@ class ServicoBiblioteca:
     def importar_repack_local(self, caminho):
         return self.alterar(lambda con: core.importar_repack(con, caminho))
 
+    def pacotes_piratas(self):
+        with closing(core.get_db(self.db_path)) as con:
+            return core.listar_pacotes_piratas(con)
+
+    def preparar_pacote(self, arquivo):
+        core.fazer_backup(self.db_path)
+        r = core.preparar_pacote(arquivo)
+        if not r.get("ok"):
+            raise ValueError(r.get("erro", "Não foi possível preparar o pacote."))
+        return r
+
+    def abrir_instalador_pacote(self, exe):
+        r = core.abrir_instalador(exe)
+        if not r.get("ok"):
+            raise ValueError(r.get("erro", "Não foi possível abrir o instalador."))
+        return r
+
+    def importar_pacote(self, pasta, exe=""):
+        core.fazer_backup(self.db_path)
+        with closing(core.get_db(self.db_path)) as con:
+            r = core.importar_pasta(con, pasta, exe)
+        if not r.get("ok"):
+            raise ValueError(r.get("erro", "Não foi possível importar o pacote."))
+        return r
+
     def estatisticas(self):
         from bib_nucleo.estatisticas import resumo_ano
         from bib_nucleo.preferencias_pessoais import ler_preferencias

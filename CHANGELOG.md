@@ -5,6 +5,39 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
+### Portado da instalação real (revisão R5, 11/10/2026)
+
+A instalação em `D:\Tuco-Compartilhado\Jogos\biblioteca` estava em `051e716`
+com trabalho local **não commitado** e divergente de `main`. Todo ele foi
+preservado antes de qualquer atualização: patch completo e cópia dos fontes
+em `dist/marco-s0-s8/backup-instalacao-real/` (103 arquivos, 1,57 MB).
+
+Portado para o `main` — nada foi descartado:
+
+- `bib_nucleo/processos.opcoes_sem_janela()`: processos de fundo (yt-dlp,
+  FFmpeg, 7z, busca) sobem sem janela de console, porque uma GUI iniciada
+  com `pythonw` abre terminal próprio para cada console-app. Aplicado em
+  `baixar.py`, `equalizadores.py`, `player.py`, `rede/repacks.py` e
+  `rede/videos_youtube.py`.
+- Fluxo de pacotes em `Pacotes em Piratas…`: `listar_pacotes_piratas`,
+  `preparar_pacote` (idempotente, extrai e organiza sem apagar o archive),
+  `instaladores_pacote`, `abrir_instalador` e `_estado_pasta`, com
+  `importar_pasta` para jogo já instalado. Na UI: slots `atualizarPacotes`,
+  `pacotesPiratas`, `tem7z`, `prepararPacote`, `abrirInstaladorPacote` e
+  `importarPacote`, mais `PiratasDialog.qml` e o botão na seção Downloads.
+- `_importar_exe` extraído de `importar_repack`: os dois caminhos de importação
+  compartilham a mesma cauda (título/canonização/capa), em vez de duplicar.
+- `opcoes_sem_janela` também no `abrir_instalador` (ramo não-Windows), onde a
+  instalação usava a função sem importá-la no escopo — que só não quebrava
+  porque o caminho Windows não chega lá.
+
+Verificado: `ruff` limpo, fachada `bib_core` intacta (380 exportados) e
+51 casos de repacks/UI/visual sem falha.
+
+Os diálogos QML da instalação diferiam apenas em estilo e acentuação (uma
+ferramenta havia reintroduzido `?` no lugar de `…`). Os contratos `hub.*` são
+idênticos nos dois lados, portanto essa diferença não foi copiada.
+
 ### Higienizacao de lint (revisao R4, 11/10/2026)
 - `ruff check codigo conftest.py` **limpo**: 246 achados → 0. Nenhuma regra
   silenciada sem justificativa registrada; as tres excecoes restantes estao

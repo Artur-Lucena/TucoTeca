@@ -15,6 +15,18 @@ import threading
 import time
 
 
+def opcoes_sem_janela() -> dict:
+    """Kwargs p/ processo de FUNDO (yt-dlp, ffmpeg, 7z…) sem console visível.
+
+    Um console-app iniciado por uma GUI sem console (pythonw, launcher) abre
+    uma janela de terminal própria; CREATE_NO_WINDOW evita isso no Windows.
+    Não use em programas que o usuário deve ver (emuladores, editores).
+    """
+    if os.name != "nt":
+        return {}
+    return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
+
+
 def executar_com_progresso(comando, ao_ler=None, timeout=1800) -> int:
     """Executa argv e entrega linhas ao callback; timeout conta desde Popen.
 

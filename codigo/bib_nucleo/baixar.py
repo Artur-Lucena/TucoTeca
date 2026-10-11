@@ -127,12 +127,13 @@ def casar_video(ytdlp: str, artista: str, titulo: str) -> dict:
     if not q:
         raise ValueError("faixa sem título")
     from bib_nucleo.ferramentas import comando_externo
+    from bib_nucleo.processos import opcoes_sem_janela
     try:
         r = subprocess.run(
             [*comando_externo(ytdlp), q, "--print", "%(id)s\t%(title)s", "--ignore-config", "--no-playlist",
              "--quiet", "--socket-timeout", "20", *_args_js()],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=120)
+            timeout=120, stdin=subprocess.DEVNULL, **opcoes_sem_janela())
     except (OSError, subprocess.SubprocessError) as e:
         raise ValueError(f"busca falhou: {e}")
     if r.returncode != 0:
@@ -413,8 +414,10 @@ def converter_faixa(con, did: int, ffmpeg: str = "",
         try:
             with destino_temporario(dest) as tmp:
                 cmd[-1] = str(tmp)
+                from bib_nucleo.processos import opcoes_sem_janela
                 r = subprocess.run(cmd, capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=900)
+                                   encoding="utf-8", errors="replace", timeout=900,
+                                   stdin=subprocess.DEVNULL, **opcoes_sem_janela())
                 if r.returncode != 0 or not tmp.is_file() or tmp.stat().st_size == 0:
                     detalhe = (r.stderr or "").strip().splitlines()
                     raise ValueError(detalhe[-1][:200] if detalhe else f"ffmpeg rc={r.returncode}")

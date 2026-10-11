@@ -473,6 +473,12 @@ ApplicationWindow {
                 text: "Fila de downloads"; implicitHeight: 36
                 onClicked: musicDownloads.open()
             }
+            ActionButton {
+                objectName: "pacotesButton"
+                visible: hub.secao === "downloads"
+                text: "Pacotes em Piratas…"; implicitHeight: 36
+                onClicked: { pacotes.open(); hub.atualizarPacotes() }
+            }
             ActionButton { visible: hub.secao === "videos"; text: "Pesquisar YouTube…"; implicitHeight: 36; onClicked: youtube.open() }
             TextField {
                 id: youtubeQuery
@@ -1125,6 +1131,7 @@ ApplicationWindow {
     AchievementsDialog { id: achievements; onConfigureProviders: providers.open() }
     SpotifyDialog { id: spotifyCatalog; onConfigureProviders: providers.open(); onShowDownloads: { close(); musicDownloads.open() } }
     MusicDownloadsDialog { id: musicDownloads }
+    PiratasDialog { id: pacotes }
     YouTubeDialog { id: youtube }
     MediaToolsDialog { id: mediaTools }
     GameToolsDialog { id: gameTools }

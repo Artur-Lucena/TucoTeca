@@ -17,7 +17,7 @@ import tempfile
 from pathlib import Path
 
 from bib_nucleo import online
-from bib_nucleo.processos import executar_com_progresso
+from bib_nucleo.processos import executar_com_progresso, opcoes_sem_janela
 
 VIDEO_ID_RE = re.compile(r"[A-Za-z0-9_-]{11}")
 _YT_HOSTS = ("www.youtube.com", "youtube.com", "youtu.be", "m.youtube.com")
@@ -96,7 +96,8 @@ def buscar_youtube(termo: str, limite: int = 10, atualizar: bool = False) -> dic
            *_args_js()]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
-                           errors="replace", timeout=120)
+                           errors="replace", timeout=120, stdin=subprocess.DEVNULL,
+                           **opcoes_sem_janela())
     except (OSError, subprocess.SubprocessError) as e:
         if isinstance(cache, dict) and cache.get("itens"):
             return {"itens": cache["itens"], "erros": [f"busca falhou: {e}"], "cache": True}
@@ -146,7 +147,8 @@ def info_video_youtube(video_id: str) -> dict:
            *_args_js()]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
-                           errors="replace", timeout=120)
+                           errors="replace", timeout=120, stdin=subprocess.DEVNULL,
+                           **opcoes_sem_janela())
     except (OSError, subprocess.SubprocessError) as e:
         raise ValueError(f"info falhou: {e}") from None
     if r.returncode != 0:

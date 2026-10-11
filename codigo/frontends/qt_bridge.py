@@ -129,6 +129,7 @@ class HubBridge(QObject):
         self._progressoMusica.connect(self._mostrar_progresso_musica, Qt.QueuedConnection)
         self._secao, self._busca, self._filtro, self._ordem = "inicio", "", "todos", "titulo"
         self._dados = {"jogos": [], "musicas": [], "desejos": [], "downloads": [], "videos": []}
+        self._pacotes_piratas = []
         self._sistema = {"jogos": 0, "musicas": 0, "desejos": 0, "downloads": 0,
                          "pendentes": 0, "backup": "…", "disco_livre_gb": 0,
                          "backup_idade_dias": None, "backup_estado": "carregando",
@@ -814,6 +815,59 @@ class HubBridge(QObject):
     @Slot(QUrl)
     def importarRepack(self, url):
         self._alterar("Importando pacote de jogo…", lambda: self.servico.importar_repack_local(url.toLocalFile()))
+
+    @Property("QVariantList", notify=mudou)
+    def pacotesPiratas(self):
+        return self._pacotes_piratas
+
+    @Slot()
+    def atualizarPacotes(self):
+        self.executar("Lendo pacotes em Piratas…", self.servico.pacotes_piratas,
+                      self._pacotes_prontos)
+
+    def _pacotes_prontos(self, itens):
+        self._pacotes_piratas = list(itens or [])
+        self.mudou.emit()
+
+    @Slot(result=bool)
+    def tem7z(self):
+        return core.ferramenta_7z() is not None
+
+    @Slot(str)
+    def prepararPacote(self, arquivo):
+        self.executar("Extraindo pacote…", lambda: self.servico.preparar_pacote(arquivo),
+                      self._pacote_preparado)
+
+    def _pacote_preparado(self, r):
+        avisar = r.get("estado") == "sem_exe"
+        if r.get("estado") == "pronta":
+            msg = "Pacote extraído e com executável pronto. Importe para a coleção."
+        elif r.get("estado") == "instalar":
+            msg = "Pacote extraído: só há instalador. Abra o instalador e depois importe."
+        else:
+            msg = "Pacote extraído, mas nenhum executável foi encontrado."
+        self.aviso.emit(msg, avisar)
+        self._recarregar_pacotes()
+
+    @Slot(str)
+    def abrirInstaladorPacote(self, exe):
+        def pronto(_r):
+            self.aviso.emit("Instalador aberto. Conclua a instalação e importe o jogo.", False)
+        self.executar("Abrir instalador…", lambda: self.servico.abrir_instalador_pacote(exe), pronto)
+
+    @Slot(str, str)
+    def importarPacote(self, pasta, exe):
+        def pronto(r):
+            avisos = "; ".join(r.get("avisos") or [])
+            self.aviso.emit(f"'{r.get('titulo', 'Jogo')}' entrou na coleção. {avisos}".strip(), False)
+            self.atualizar()
+            self._recarregar_pacotes()
+        self.executar("Importando pacote…",
+                      lambda: self.servico.importar_pacote(pasta, exe), pronto)
+
+    def _recarregar_pacotes(self):
+        self.executar("Atualizando pacotes…", self.servico.pacotes_piratas,
+                      self._pacotes_prontos)
 
     @Slot(str, str, str)
     def aplicarPatchRom(self, rom, patch, destino):

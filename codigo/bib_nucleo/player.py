@@ -247,6 +247,7 @@ class MciBackend:
 
     def _decodificar(self, ffmpeg: str, src: str, dest: str) -> dict:
         """mp3/m4a → wav (pula se o cache já existe)."""
+        from bib_nucleo.processos import opcoes_sem_janela
         if self._wav_valido(Path(dest)):
             return {"ok": True}
         try:
@@ -255,7 +256,8 @@ class MciBackend:
                     [ffmpeg, "-y", "-v", "error", "-i", str(src),
                      "-ac", "2", "-ar", "44100", "-f", "wav", str(tmp)],
                     capture_output=True, text=True, encoding="utf-8",
-                    errors="replace", timeout=600)
+                    errors="replace", timeout=600, stdin=subprocess.DEVNULL,
+                    **opcoes_sem_janela())
                 if r.returncode != 0 or not self._wav_valido(tmp):
                     detalhe = (r.stderr or "").strip().splitlines()
                     raise ValueError(detalhe[-1][:200] if detalhe else
