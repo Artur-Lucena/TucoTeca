@@ -114,6 +114,7 @@ def teste_baixar_v14_idempotente():
 
 def teste_baixar_localizar_e_consulta():
     import os
+
     from bib_nucleo import baixar as BX
     afirmar(BX.consulta_busca("Chico", "Cotidiano") == "ytsearch1:Chico - Cotidiano")
     afirmar(BX.consulta_busca("", "Solo") == "ytsearch1:Solo")
@@ -275,6 +276,7 @@ def _urlopen_binario(dados_ou_erro):
 
 def teste_baixar_converter_ffmpeg_mock():
     import os
+
     from bib_nucleo import baixar as BX
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
     stage = tmp / "stage"
@@ -382,6 +384,7 @@ def teste_baixar_converter_sem_ffmpeg():
 def teste_baixar_instalar_ffmpeg_mock():
     import hashlib
     import urllib.request
+
     from bib_nucleo import baixar as BX
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
     velho_min = BX.FFMPEG_ZIP_MIN
@@ -427,6 +430,7 @@ def teste_baixar_instalar_ffmpeg_mock():
 def teste_baixar_instalar_ytdlp_mock():
     import hashlib
     import urllib.request
+
     from bib_nucleo import baixar as BX
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
     velho_min = BX.YTDLP_EXE_MIN
@@ -454,6 +458,7 @@ def teste_baixar_instalar_ytdlp_mock():
 
 def teste_baixar_pronto_e_ferramentas():
     import os
+
     from bib_nucleo import baixar as BX
     from bib_nucleo import base
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))

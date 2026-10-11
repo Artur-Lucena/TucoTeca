@@ -4,7 +4,6 @@ Também roda em Linux real na CI. Fixtures nativas recebem chmod; sinais,
 PATH, Wine e filhos são injetados. A sandbox continua protegendo a coleção.
 """
 import io
-import json
 import os
 import sqlite3
 import subprocess
@@ -15,9 +14,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import bib_core as core
-from bib_nucleo import base, baixar, emuladores, ferramentas as F, player, processos
-from bib_nucleo import editores_imagem as EI, equalizadores as EQ, reprodutores_video as RV
-from bib_nucleo import videos as VI, videos_youtube as YT
+from bib_nucleo import baixar, base, emuladores, player, processos
+from bib_nucleo import editores_imagem as EI
+from bib_nucleo import equalizadores as EQ
+from bib_nucleo import ferramentas as F
+from bib_nucleo import reprodutores_video as RV
+from bib_nucleo import videos as VI
+from bib_nucleo import videos_youtube as YT
 from executar import afirmar
 
 
@@ -313,6 +316,7 @@ def teste_linux_traducao_exe_windows_e_prioridade_linux():
 
 def teste_tui_selftest_sem_curses_libera_lock():
     import contextlib
+
     import app_tui as tui
     db = Path(tempfile.mkdtemp()) / "tui.db"
     con = core.get_db(db)

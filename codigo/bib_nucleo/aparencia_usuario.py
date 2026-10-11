@@ -5,7 +5,6 @@ Caminho: `dados/aparencia.json`. Sempre devolve um dict completo com defaults.
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 TEMAS = ("escuro", "claro")

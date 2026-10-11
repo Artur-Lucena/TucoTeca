@@ -38,10 +38,10 @@ def provar(raiz, saida, extras, ffmpeg=""):
     for p in (Path(__file__).parent, Path(__file__).parent.parent,
               Path(__file__).parent.parent / "frontends"):
         sys.path.insert(0, str(p))
-    from PySide6.QtCore import QObject, QUrl, QMetaObject, Q_ARG, qInstallMessageHandler
+    from PySide6.QtCore import QMetaObject, QObject, QUrl, qInstallMessageHandler
     from PySide6.QtGui import QGuiApplication
-    from PySide6.QtQuickControls2 import QQuickStyle
     from PySide6.QtQml import QQmlExpression
+    from PySide6.QtQuickControls2 import QQuickStyle
     from shiboken6 import delete
     if extras == "completo":
         from PySide6.QtWebEngineQuick import QtWebEngineQuick
@@ -49,8 +49,8 @@ def provar(raiz, saida, extras, ffmpeg=""):
     QQuickStyle.setStyle("Basic")
     app = QGuiApplication.instance() or QGuiApplication([])
     import bib_core as core
-    from qt_bridge import HubBridge
     from app_qt import criar_engine
+    from qt_bridge import HubBridge
     core.garantir_dirs()
     audio = raiz / ("caminho-de-audio-longo-" * 4) / "prova.wav"
     audio.parent.mkdir(parents=True, exist_ok=True)

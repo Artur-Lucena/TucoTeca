@@ -1,11 +1,11 @@
 """Perfis Tuco/Isa e atalhos internos; não instala hooks globais."""
 from __future__ import annotations
 
-import threading
 import re
+import threading
 
-from bib_nucleo.base import DADOS_DIR
 from bib_nucleo.arquivos import gravar_json, ler_json
+from bib_nucleo.base import DADOS_DIR
 
 PERFIS = ("Tuco", "Isa")
 ATALHOS = {"tela_cheia": "F11", "buscar": "Ctrl+F", "paleta": "Ctrl+K",

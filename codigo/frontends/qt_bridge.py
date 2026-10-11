@@ -5,12 +5,22 @@ import importlib.util
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, Property,
-                            QRunnable, Qt, QThreadPool, QTimer, QUrl, Signal, Slot)
-from PySide6.QtGui import QDesktopServices
-
 import bib_core as core
 from bib_nucleo import online, spotify
+from PySide6.QtCore import (
+    Property,
+    QAbstractListModel,
+    QModelIndex,
+    QObject,
+    QRunnable,
+    Qt,
+    QThreadPool,
+    QTimer,
+    QUrl,
+    Signal,
+    Slot,
+)
+from PySide6.QtGui import QDesktopServices
 from servicos_ui import ServicoBiblioteca
 
 
@@ -856,6 +866,7 @@ class HubBridge(QObject):
 
     def _consultar_watch(self):
         import os
+
         from bib_nucleo.pastas_vigiadas import VigiaPasta
         if self._fechado or self.ocupado or self._em_jogo:
             return
@@ -933,6 +944,7 @@ class HubBridge(QObject):
     def webDisponivel(self):
         """QtWebEngine instalado? (variante completa do bundle)."""
         import os
+
         from bib_nucleo.rede import rede_ativa
         if os.environ.get("BIBLIOTECA_WEBENGINE", "1") == "0" or not rede_ativa():
             return False
@@ -1104,6 +1116,7 @@ class HubBridge(QObject):
         """Diagnostico somente-leitura; resultado vira texto no relatorio."""
         import json as _json
         from pathlib import Path as _P
+
         from ferramentas.diagnosticar import diagnosticar
 
         def trabalho():

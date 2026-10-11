@@ -1,6 +1,5 @@
 """Controles: GUIDs, mapas padrão, merge de perfil, captura, detecção."""
 import os
-import tempfile
 from pathlib import Path
 
 from executar import afirmar
@@ -55,7 +54,6 @@ def teste_gerar_perfil_tipos_divergentes():
 
 def teste_fotografar_aplicar_roundtrip():
     from bib_nucleo import controles as C
-    tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
     from executar import azahar_fake as _azahar_fake
@@ -97,8 +95,8 @@ def teste_fotografar_aplicar_roundtrip():
 
 def teste_fotografar_pula_identidade():
     import configparser
+
     from bib_nucleo import controles as C
-    tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
     from executar import azahar_fake as _azahar_fake
@@ -120,7 +118,6 @@ def teste_fotografar_pula_identidade():
 
 def teste_perfil_ativo_e_detectar_sdl():
     from bib_nucleo import controles as C
-    tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
     from executar import azahar_fake as _azahar_fake
@@ -154,7 +151,6 @@ def teste_perfil_ativo_e_detectar_sdl():
 
 def teste_aplicar_garante_size():
     from bib_nucleo import controles as C
-    tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
     from executar import azahar_fake as _azahar_fake
@@ -176,8 +172,8 @@ def teste_aplicar_garante_size():
 
 def teste_fotografar_pula_flags():
     import configparser
+
     from bib_nucleo import controles as C
-    tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
     from executar import azahar_fake as _azahar_fake
@@ -198,7 +194,6 @@ def teste_fotografar_pula_flags():
 
 def teste_aplicar_em_slot_explicito():
     from bib_nucleo import controles as C
-    tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
     from executar import azahar_fake as _azahar_fake
@@ -222,7 +217,6 @@ def teste_aplicar_em_slot_explicito():
 
 def teste_higienizar_remove_crud():
     from bib_nucleo import controles as C
-    tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
     from executar import azahar_fake as _azahar_fake
@@ -247,7 +241,6 @@ def teste_higienizar_remove_crud():
 
 def teste_nomes_sdl_da_amostra():
     from bib_nucleo import controles as C
-    tmp = Path(tempfile.mkdtemp(prefix="suite-ctl-"))
     emu = Path(os.environ.get("BIBLIOTECA_AZAHAR_DIR"))
     (emu / "user" / "config").mkdir(parents=True, exist_ok=True)
     from executar import azahar_fake as _azahar_fake

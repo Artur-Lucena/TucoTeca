@@ -37,6 +37,7 @@ def teste_repack_zip_extracao_e_classificacao():
 
 def teste_repack_pacote_hub_preservado():
     import json
+
     from bib_nucleo import repacks as RP
     tmp = Path(tempfile.mkdtemp(prefix="suite-rp-"))
     arq = tmp / "pack.zip"
@@ -74,8 +75,9 @@ def teste_repack_organizar_e_achar_exe():
 
 def teste_repack_caminhos_padrao_win():
     import os as _os
-    from bib_nucleo import repacks as RP
     from pathlib import Path as _P
+
+    from bib_nucleo import repacks as RP
     pir = RP.pasta_jogos()
     if _os.name == "nt":
         afirmar("\\Games\\Meus Jogos Locais" in str(pir), pir)
@@ -94,8 +96,9 @@ def teste_repack_caminhos_padrao_win():
 
 def teste_repack_organizar_no_destino_padrao_todos():
     import os as _os
-    from bib_nucleo import repacks as RP
     from pathlib import Path as _P
+
+    from bib_nucleo import repacks as RP
     tmp = _P(tempfile.mkdtemp(prefix="suite-rp-org-"))
     pir = tmp / "Meus Jogos Locais"
     velho = _os.environ.get("BIBLIOTECA_PIRATAS")
@@ -127,6 +130,7 @@ def teste_repack_organizar_no_destino_padrao_todos():
 def teste_repack_7z_override():
     import os as _os
     import tempfile as _tf
+
     from bib_nucleo import repacks as RP
     tmp = _tf.mkdtemp(prefix="suite-rp7z-")
     from pathlib import Path as _P
@@ -149,8 +153,9 @@ def teste_repack_7z_override():
 
 
 def teste_repack_titulo_pasta_limpa():
-    from bib_nucleo import repacks as RP
     from pathlib import Path as _P
+
+    from bib_nucleo import repacks as RP
     afirmar(RP._titulo_pasta(_P("Hades II [FitGirl Repack]")) == "Hades II")
     afirmar(RP._titulo_pasta(_P("CoolGame")) == "Cool Game")
     afirmar(RP._titulo_pasta(_P("Mewgenics-SteamRIP.com")) == "Mewgenics")
@@ -185,7 +190,6 @@ def teste_repack_import_ponta_a_ponta():
 
 
 def teste_repack_capa_automatica_padrao():
-    import urllib.request
     from bib_nucleo import banco as B
     from bib_nucleo import repacks as RP
     from bib_nucleo import scans as S
@@ -220,6 +224,7 @@ def teste_repack_capa_automatica_padrao():
 def teste_repack_appid_casa_nome_exato():
     import json as _json
     import urllib.request
+
     from bib_nucleo import scans as S
 
     class _Resp:
@@ -364,6 +369,7 @@ def teste_sanear_preserva_instaladores_e_redist_distinto():
 def teste_canonizar_steam_exato():
     import json as _json
     import urllib.request
+
     from bib_nucleo import scans as S
 
     class _Resp:
@@ -400,6 +406,7 @@ def teste_canonizar_steam_exato():
 
 def teste_repack_nome_canonico_e_capa():
     import urllib.request
+
     from bib_nucleo import banco as B
     from bib_nucleo import repacks as RP
     from bib_nucleo import scans as S
@@ -427,7 +434,9 @@ def teste_repack_nome_canonico_e_capa():
     chamadas = []
     urllib.request.urlopen = lambda *a, **k: _Resp()
     S._capa_steam = lambda a, timeout=15: b"x" * 2000
-    fake_salvar = lambda c, g, f, d: chamadas.append((g, f)) or {"ok": True}
+    def fake_salvar(c, g, f, d):
+        chamadas.append((g, f))
+        return {"ok": True}
     B.salvar_capa_bytes = fake_salvar
     S.salvar_capa_bytes = fake_salvar
     try:
@@ -451,6 +460,7 @@ def teste_repack_pasta_jogos_env_legado_e_migracao():
     import tempfile
     from pathlib import Path
     from unittest.mock import patch
+
     from bib_nucleo.rede import repacks as RP
     tmp = Path(tempfile.mkdtemp(prefix="suite-jogos-"))
     with patch.dict(os.environ, {"BIBLIOTECA_JOGOS_DIR": str(tmp / "novo"),

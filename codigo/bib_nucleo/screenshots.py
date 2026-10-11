@@ -1,5 +1,4 @@
 """Galeria local por UUID do jogo; somente imagens, sem scripts ou links."""
-from pathlib import Path
 
 from bib_nucleo.base import DADOS_DIR
 from bib_nucleo.saves import chave_jogo

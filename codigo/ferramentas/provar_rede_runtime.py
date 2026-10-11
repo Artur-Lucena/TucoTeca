@@ -36,9 +36,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix="rede-prova-", dir=saida) as tmp:
         os.environ["BIBLIOTECA_HOME"] = tmp
         from bib_nucleo import baixar
-        from bib_nucleo.rede import capas_libretro, fontes, letras, sponsorblock, videos_youtube
         from bib_nucleo.banco import get_db, listar_musicas, listar_videos
         from bib_nucleo.base import DEFAULT_DB
+        from bib_nucleo.rede import capas_libretro, fontes, letras, sponsorblock, videos_youtube
         resultados = {}
         def testar(nome, trabalho):
             try:

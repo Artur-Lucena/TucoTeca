@@ -20,10 +20,10 @@ def provar(raiz):
     for p in (Path(__file__).parent.parent, Path(__file__).parent.parent / "frontends", Path(__file__).parent):
         sys.path.insert(0, str(p))
     import bib_core as core
-    from servicos_ui import ServicoBiblioteca
+    from bib_nucleo import organizacao_local, pastas_vigiadas, saves, screenshots
     from bib_nucleo.api_local import ApiLocal
-    from bib_nucleo import saves, screenshots, organizacao_local, pastas_vigiadas, arquivos
     from bib_nucleo.everything import buscar_executaveis
+    from servicos_ui import ServicoBiblioteca
     core.garantir_dirs()
     con = core.get_db(core.DEFAULT_DB)
     jogo = core.criar_jogo(con, {"titulo": "Jogo sintético", "executable_path": str(raiz / "jogos/game.exe")})

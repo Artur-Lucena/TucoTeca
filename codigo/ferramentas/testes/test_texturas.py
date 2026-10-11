@@ -26,8 +26,7 @@ def _pack(tmp, nome="pack", n=3):
 
 
 def teste_texturas_base_e_skip():
-    from bib_nucleo import base
-    from bib_nucleo import scans
+    from bib_nucleo import base, scans
     afirmar("texturas" in scans.SKIP_DIRS, sorted(scans.SKIP_DIRS))
     afirmar("TEXTURAS_DIR" in base.__all__, base.__all__)
     base.garantir_dirs()
@@ -69,7 +68,6 @@ def teste_texturas_instalar_listar_alternar():
 
 def teste_texturas_ignora_lixo():
     from bib_nucleo import texturas as TEX
-    tmp = Path(tempfile.mkdtemp(prefix="suite-tex-"))
     _emu_fake()
     base = TEX.load_textures_dir()
     (base / "leia-me.txt").write_bytes(b"x")
@@ -85,8 +83,8 @@ def teste_texturas_ignora_lixo():
 
 def teste_texturas_estado_e_flag():
     import configparser
+
     from bib_nucleo import texturas as TEX
-    tmp = Path(tempfile.mkdtemp(prefix="suite-tex-"))
     emu = _emu_fake()
     afirmar(TEX.flag_custom_textures() is None)
     est = TEX.estado_textura(TID)
@@ -110,6 +108,7 @@ def teste_texturas_estado_e_flag():
 
 def teste_preparar_lancamento_avisa_hd_sem_flag():
     import configparser
+
     from bib_nucleo import emuladores as EMU
     from bib_nucleo import texturas as TEX
     tmp = Path(tempfile.mkdtemp(prefix="suite-tex-"))

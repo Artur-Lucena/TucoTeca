@@ -9,14 +9,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import bib_core as core
 from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
-from shiboken6 import delete
-
-import bib_core as core
 from qt_bridge import HubBridge
+from shiboken6 import delete
 
 
 def criar_engine(bridge):

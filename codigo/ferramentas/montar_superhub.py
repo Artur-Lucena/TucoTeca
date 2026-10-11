@@ -174,7 +174,7 @@ def incluir_componentes(raiz: Path) -> dict:
     trans = dest / "translations"
     if trans.is_dir():
         for p in trans.iterdir():
-            if p.is_file() and not any(l in p.name for l in ("pt_BR", "_en", "_pt.")):
+            if p.is_file() and not any(sufixo in p.name for sufixo in ("pt_BR", "_en", "_pt.")):
                 p.unlink()
     shutil.copy2(gpl, dest / "COPYING.txt")
     _nota(dest, "qBittorrent", "5.2.4", "https://github.com/qbittorrent/qBittorrent", "GPL-2.0-or-later")

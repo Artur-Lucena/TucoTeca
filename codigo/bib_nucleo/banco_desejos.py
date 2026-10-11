@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+
 from bib_nucleo.base import _txt, agora_iso
 
 SCHEMA_DESEJOS = """

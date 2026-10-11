@@ -1,6 +1,5 @@
 """Cheats Gateway: parse, toggle *citra_enabled, add/remove, tudo em sandbox."""
 import os
-import tempfile
 from pathlib import Path
 
 from executar import afirmar
@@ -18,7 +17,6 @@ def _emu_fake():
 
 def teste_cheats_add_toggle_remove():
     from bib_nucleo import cheats as CH
-    tmp = Path(tempfile.mkdtemp(prefix="suite-cheat-"))
     _emu_fake()
     afirmar(CH.listar_cheats(TID) == [])
     afirmar(CH.cheats_ativos(TID) == [])
@@ -54,7 +52,6 @@ def teste_cheats_add_toggle_remove():
 
 def teste_cheats_preserva_resto():
     from bib_nucleo import cheats as CH
-    tmp = Path(tempfile.mkdtemp(prefix="suite-cheat-"))
     _emu_fake()
     arq = CH.cheats_path(TID)
     arq.write_text("# meus cheats\n\n[Um]\n*citra_enabled\n00112233 44556677\n*obs\n\n[Dois]\nAABBCCDD EEFF0011\n",

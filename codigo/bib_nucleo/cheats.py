@@ -85,7 +85,7 @@ def listar_cheats(tid: str) -> list[dict]:
         return []
     out = []
     for nome, linhas in blocos:
-        corpo = [l for l in linhas if l.strip()]
+        corpo = [linha for linha in linhas if linha.strip()]
         ativo = bool(corpo) and corpo[0].strip() == _ATIVO
         out.append({"nome": nome, "ativo": ativo, "linhas": len(corpo)})
     return out
@@ -120,14 +120,14 @@ def definir_cheat(tid: str, nome: str, ativo: bool) -> dict:
         return {"ok": False, "erro": f"falha ao ler: {e}"}
     for i, (n, linhas) in enumerate(blocos):
         if n == nome:
-            corpo = [l for l in linhas if l.strip()]
+            corpo = [linha for linha in linhas if linha.strip()]
             tem = bool(corpo) and corpo[0].strip() == _ATIVO
             if ativo and not tem:
                 blocos[i] = (n, [_ATIVO] + linhas)
             elif not ativo and tem:
                 resto = list(linhas)
-                for j, l in enumerate(resto):
-                    if l.strip():
+                for j, linha in enumerate(resto):
+                    if linha.strip():
                         del resto[j]
                         break
                 blocos[i] = (n, resto)
@@ -170,13 +170,13 @@ def adicionar_cheat(tid: str, nome: str, codigo: str) -> dict:
         return {"ok": False, "erro": "nome inválido."}
     linhas, ruins = [], []
     for bruta in (codigo or "").splitlines():
-        l = bruta.strip()
-        if not l or l.startswith("*"):
-            if l and l != _ATIVO:
-                linhas.append(l)
+        limpa = bruta.strip()
+        if not limpa or limpa.startswith("*"):
+            if limpa and limpa != _ATIVO:
+                linhas.append(limpa)
             continue
-        if _LINHA_COD.match(l):
-            linhas.append(l.upper())
+        if _LINHA_COD.match(limpa):
+            linhas.append(limpa.upper())
         else:
             ruins.append(bruta.strip()[:24])
     if not linhas:
@@ -216,10 +216,10 @@ def remover_cheat(tid: str, nome: str) -> dict:
         pre, blocos = _ler_blocos(arq.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
         return {"ok": False, "erro": f"falha ao ler: {e}"}
-    novos = [(n, l) for n, l in blocos if n != nome]
+    novos = [(nome_b, linhas) for nome_b, linhas in blocos if nome_b != nome]
     if len(novos) == len(blocos):
         return {"ok": False, "erro": f"cheat '{nome}' não achado."}
-    if not novos and not [l for l in pre if l.strip()]:
+    if not novos and not [pre_l for pre_l in pre if pre_l.strip()]:
         try:
             arq.unlink()
         except OSError as e:

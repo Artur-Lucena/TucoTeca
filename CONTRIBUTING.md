@@ -84,6 +84,9 @@ py -3.14 codigo/ferramentas/testes/executar.py
 - A suíte cria a sandbox automaticamente, inclusive com `--caso`.
 - Pytest coleta por AST e usa o mesmo subprocesso/sandbox por caso.
   `--cobertura` mede os casos, não só o coletor; HTML/JSON em `.provas/cobertura/`.
+- Lint: `ruff check codigo conftest.py` está limpo (0 achados desde a revisão
+  R4). As exceções (`E402`, `F403`, `F401` em testes de tkinter) estão
+  declaradas em `pyproject.toml` com justificativa, não escondidas no diff.
 - Simule rede/subprocessos e use arquivos locais pequenos em fixtures.
 - Executáveis falsos nativos Linux/macOS precisam de `chmod(0o755)`; use
   nomes sem `.exe`. Ao simular Linux no Windows, injete `sys.platform`
@@ -110,9 +113,24 @@ reprodução e API local na árvore montada e no ZIP extraído. Não pula a prov
 de áudio quando MCI falha. Smokes remotos ficam fora da suíte e registram
 versão/data/limites; contrato mockado não prova disponibilidade de um host.
 
-Lint crítico: `ruff check codigo conftest.py --select E9,F63,F7,F82`.
-O lint completo também deve ser registrado: dívida de imports/estilo não pode
-ser anunciada como resultado verde só porque o gate crítico passou.
+Lint: `ruff check codigo conftest.py` completo está **limpo** (revisão R4).
+O gate crítico continua como exigência mínima:
+`ruff check codigo conftest.py --select E9,F63,F7,F82`.
+
+Três exceções estão declaradas em `pyproject.toml`, com justificativa no
+próprio arquivo — nenhuma regra foi silenciada sem registrar o motivo:
+
+- `E402`: imports no meio do arquivo quebram ciclos de importação de propósito
+  (`banco`↔`banco_desejos`, `scans`↔`scans_hydra`, `emuladores`↔
+  `sessoes_manuais`, `musicas`↔`rede.metadados`, `baixar`↔`rede.binarios`);
+- `F403` em `bib_core.py`: a fachada reexporta a API via `__all__` de cada
+  módulo justamente para preservar consumidores antigos;
+- `F401` em testes de tkinter: o import é a prova de disponibilidade do
+  módulo (`try: import tkinter`), não código morto.
+
+Um `--fix` automático não é neutro: `F841` remove ligações locais, `I001`
+reordena imports e `F401` apaga imports usados só em tipos anotados. Rode a
+suíte depois de qualquer `--fix`.
 
 ## Fluxo de trabalho em conjunto
 

@@ -87,8 +87,9 @@ def teste_patch_preserva_rom_e_rejeita_destino_existente():
 
 
 def teste_snapshot_saves_manifesto_hash_retencao_e_original_intacto():
-    from bib_nucleo import saves
     import zipfile
+
+    from bib_nucleo import saves
     raiz, jogo, svc = _base()
     pasta = raiz / "meu-save"
     pasta.mkdir()
@@ -191,8 +192,8 @@ def teste_ferramenta_sha_divergente_preserva_instalacao():
 
 
 def teste_rede_desligada_bloqueia_http_e_processos_remotos():
-    from bib_nucleo.rede import fontes, online
     from bib_nucleo import baixar, scans
+    from bib_nucleo.rede import fontes, online
     from bib_nucleo.rede.videos_youtube import info_video_youtube
     with patch.dict(os.environ, BIBLIOTECA_REDE="0"), \
          patch("urllib.request.urlopen", side_effect=AssertionError("HTTP inesperado")), \
@@ -211,7 +212,6 @@ def teste_rede_desligada_bloqueia_http_e_processos_remotos():
 
 
 def teste_estatisticas_registro_na_colecao_certa():
-    from bib_nucleo import estatisticas
     raiz, jogo, svc = _base()
     svc.registrar_sessao(jogo["id"], 1.5)
     resumo = svc.estatisticas()
@@ -260,6 +260,7 @@ def teste_snapshot_restauracao_hash_e_backup_antes():
 
 def teste_pacote_rejeita_links_reservados_duplicatas_e_backup_presets():
     import zipfile
+
     from bib_nucleo import pacotes as P
     raiz, jogo, svc = _base()
     for nome in ("presets/NUL.ini", "presets/perfil.ini ", "presets/../fora.ini"):
@@ -309,8 +310,16 @@ def teste_snapshot_nao_redireciona_origens_e_restauracao_de_save_apagado():
 
 
 def teste_modo_aviao_bloqueia_entradas_remotas_sem_chamar_transporte():
-    from bib_nucleo.rede import online, letras, fontes, sponsorblock, binarios, capas_libretro, spotify
-    from bib_nucleo import emuladores, scans, musicas
+    from bib_nucleo import emuladores, musicas, scans
+    from bib_nucleo.rede import (
+        binarios,
+        capas_libretro,
+        fontes,
+        letras,
+        online,
+        sponsorblock,
+        spotify,
+    )
     with patch.dict(os.environ, BIBLIOTECA_REDE="0"), patch("urllib.request.urlopen") as abrir:
         for trabalho in (
             lambda: online.requisitar_json("https://example.org/a"),
@@ -337,7 +346,8 @@ def teste_modo_aviao_bloqueia_entradas_remotas_sem_chamar_transporte():
 
 
 def teste_sessao_manual_idempotente_se_apagar_marcador_falhar():
-    from bib_nucleo import sessoes_manuais as S, estatisticas
+    from bib_nucleo import estatisticas
+    from bib_nucleo import sessoes_manuais as S
     raiz, jogo, svc = _base()
     marcador = Path(S.iniciar_sessao_manual(jogo["id"], jogo["titulo"])["arquivo"])
     with patch.object(Path, "unlink", side_effect=OSError("ocupado")):

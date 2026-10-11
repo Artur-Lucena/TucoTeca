@@ -9,9 +9,8 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from bib_nucleo.arquivos import destino_temporario
+from bib_nucleo.arquivos import destino_temporario, gravar_json, ler_json
 from bib_nucleo.base import BACKUP_DIR, DADOS_DIR
-from bib_nucleo.arquivos import gravar_json, ler_json
 
 
 def chave_jogo(jogo):
@@ -125,7 +124,7 @@ def listar_snapshots(jogo):
 
 def restaurar_snapshot(jogo, arquivo, limite_bytes=5 * 1024 ** 3):
     """Valida identidade, caminhos e SHA antes de tocar em saves; guarda o atual."""
-    from bib_nucleo.pacotes import destino_seguro, _membro_pacote_ok
+    from bib_nucleo.pacotes import _membro_pacote_ok, destino_seguro
     arquivo = Path(arquivo)
     permitidos = {s["path"] for s in listar_snapshots(jogo)}
     if str(arquivo) not in permitidos or _link(arquivo):

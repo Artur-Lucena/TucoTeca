@@ -1,8 +1,8 @@
 """Histórico local de sessões e uso de disco, sem Steam ou telemetria."""
 from __future__ import annotations
 
-import os
 import math
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 

@@ -24,8 +24,8 @@ from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI))
-from montar_portatil import DIST
 from montar_mac import montar as montar_mac
+from montar_portatil import DIST
 
 HTML = """<!DOCTYPE html>
 <html lang="pt-BR">

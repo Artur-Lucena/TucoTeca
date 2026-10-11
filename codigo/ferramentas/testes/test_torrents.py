@@ -4,9 +4,8 @@ import tempfile
 from pathlib import Path
 
 import bib_core as core
-from executar import afirmar
-
 from bib_nucleo import torrents as TT
+from executar import afirmar
 
 
 def _bt(tmp: Path) -> Path:

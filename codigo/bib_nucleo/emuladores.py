@@ -13,14 +13,23 @@ import sqlite3
 import subprocess
 import threading
 import time
-import urllib.request
 import zipfile
 from pathlib import Path
 
-from bib_nucleo.base import (BACKUP_DIR, LINUX_ROOT, MAC_ROOT, PRESETS_DIR, ROM_EXTS_3DS,
-                               WIN_ROOT, eh_mac, existe_aqui_ou_traduzido,
-                               resolver_exe, slugify, traduzir_para_atual)
 from bib_nucleo.banco import contar_por_origem
+from bib_nucleo.base import (
+    BACKUP_DIR,
+    LINUX_ROOT,
+    MAC_ROOT,
+    PRESETS_DIR,
+    ROM_EXTS_3DS,
+    WIN_ROOT,
+    eh_mac,
+    existe_aqui_ou_traduzido,
+    resolver_exe,
+    slugify,
+    traduzir_para_atual,
+)
 from bib_nucleo.cheats import titulo_ok
 
 
@@ -642,8 +651,12 @@ def procurar_rom(nome_arquivo: str, roots: list[str] | None = None,
 
     Só leitura, com teto. Compara case-insensitive pelo nome do arquivo.
     """
-    from bib_nucleo.scans import (SKIP_DIRS, default_roms_nds_roots,
-                                   default_roms_roots, default_scan_roots)
+    from bib_nucleo.scans import (
+        SKIP_DIRS,
+        default_roms_nds_roots,
+        default_roms_roots,
+        default_scan_roots,
+    )
     alvo = (nome_arquivo or "").strip().lower()
     if not alvo:
         return []
@@ -720,7 +733,6 @@ def executar_monitorado(jogo: dict, ao_fim=None,
     abre sessão manual (arquivo em dados/sessoes/) e chama ao_fim(0.0, False).
     Se o launcher fechar, a sessão manual sobrevive e pode ser reconciliada.
     """
-    from bib_nucleo.base import SESSOES_DIR
     res, proc = _lancar_jogo_dict(jogo)
     rastreavel = bool(res.get("ok")) and proc is not None
     res["rastreado"] = rastreavel
@@ -745,9 +757,11 @@ def executar_monitorado(jogo: dict, ao_fim=None,
     return res
 
 
-from bib_nucleo.sessoes_manuais import (iniciar_sessao_manual, listar_sessoes_pendentes,
-                                      encerrar_sessao_manual)
-
+from bib_nucleo.sessoes_manuais import (
+    encerrar_sessao_manual,
+    iniciar_sessao_manual,
+    listar_sessoes_pendentes,
+)
 
 # --------------------------------------------------------------------------
 # Provedores de emulação (HUB): um registro, N emuladores
@@ -1091,13 +1105,13 @@ def _eh_reparse(p: Path) -> bool:
 
 def remover_link(link: str) -> None:
     """Remove junction/symlink sem tocar no alvo. Só age em reparse point."""
-    l = Path(link)
-    if _eh_reparse(l):
+    alvo = Path(link)
+    if _eh_reparse(alvo):
         try:
-            if l.is_symlink():
-                l.unlink()
+            if alvo.is_symlink():
+                alvo.unlink()
             else:
-                os.rmdir(l)  # junction NTFS
+                os.rmdir(alvo)  # junction NTFS
         except OSError as e:
             raise OSError(f"não removi {link}: {e}")
 

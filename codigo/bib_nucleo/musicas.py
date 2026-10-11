@@ -11,7 +11,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 import shutil
 import sqlite3
 import subprocess
@@ -345,6 +344,7 @@ def baixar_capa_album(con: sqlite3.Connection, mid: int,
             raw = cache.read_bytes()
         else:
             import urllib.request
+
             from bib_nucleo.rede import abrir_rede
             req = urllib.request.Request(url, headers={"User-Agent": "TucoTeca/1.0"})
             with abrir_rede(req, timeout=timeout) as r:

@@ -170,6 +170,7 @@ def teste_lock_vivo_nao_expira_e_json_invalido():
     import os
     import socket
     import sys
+
     from bib_nucleo import base
     lp = base.lock_path()
     lp.parent.mkdir(parents=True, exist_ok=True)

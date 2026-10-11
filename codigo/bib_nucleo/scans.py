@@ -13,15 +13,30 @@ import uuid as uuid_mod
 import zlib
 from pathlib import Path
 
-from bib_nucleo.banco import (STATUS_VALIDOS, chave_dedup, normalizar_etiquetas, normalizar_mods,
-                                salvar_capa_bytes)
-from bib_nucleo.base import (LINUX_ROOT, WIN_ROOT, agora_iso,
-                             existe_aqui_ou_traduzido, slugify, traduzir_para_atual,
-                              mac_para_linux, win_para_linux)
-from bib_nucleo.emuladores import (default_emu_3ds, default_emu_nds,
-                                     provedores,
-                                     provedor_por_extensao, provedor_por_origem)
-
+from bib_nucleo.banco import (
+    STATUS_VALIDOS,
+    chave_dedup,
+    normalizar_etiquetas,
+    normalizar_mods,
+    salvar_capa_bytes,
+)
+from bib_nucleo.base import (
+    LINUX_ROOT,
+    WIN_ROOT,
+    agora_iso,
+    existe_aqui_ou_traduzido,
+    mac_para_linux,
+    slugify,
+    traduzir_para_atual,
+    win_para_linux,
+)
+from bib_nucleo.emuladores import (
+    default_emu_3ds,
+    default_emu_nds,
+    provedor_por_extensao,
+    provedor_por_origem,
+    provedores,
+)
 
 # --------------------------------------------------------------------------
 # Confiança (preview de importação)
@@ -122,9 +137,15 @@ def find_hydra_db() -> Path | None:
     return None
 
 
-from bib_nucleo.scans_hydra import (TITLE_RE, EXEC_RE, SHOP_RE, OBJID_RE,
-                                  PLAYTIME_RE, _unescape, scan_hydra_db)
-
+from bib_nucleo.scans_hydra import (
+    EXEC_RE,
+    OBJID_RE,
+    PLAYTIME_RE,
+    SHOP_RE,
+    TITLE_RE,
+    _unescape,
+    scan_hydra_db,
+)
 
 # Scanner de disco (D:\\Games, SteamLibrary, Riot...) + manifests Steam
 # --------------------------------------------------------------------------
@@ -823,7 +844,7 @@ def _norm_titulo(t) -> str:
 
 
 def _norm_caminho(c) -> str:
-    """Mesmo arquivo em SOs distintos compara igual (D:\… == /run/media/…)."""
+    """Mesmo arquivo em SOs distintos compara igual."""
     c = (c or "").strip()
     if not c:
         return ""
@@ -834,19 +855,16 @@ def _dobrar_fundido(atual: dict, novo: dict) -> None:
     """Funde `novo` dentro de `atual` (mesmo jogo, outra fonte)."""
     exe_a, exe_n = (atual.get("executable_path") or ""), (novo.get("executable_path") or "")
     # o exe que existe neste ou no outro SO vence; senão, o não-vazio
-    troca = False
     for cand in (exe_n, exe_a):
         if cand and existe_aqui_ou_traduzido(cand)[0]:
             if cand != exe_a:
                 atual["executable_path"] = cand
                 atual["launch_options"] = novo.get("launch_options") or atual.get("launch_options")
-                troca = True
             break
     else:
         if exe_n and not exe_a:
             atual["executable_path"] = exe_n
             atual["launch_options"] = novo.get("launch_options") or atual.get("launch_options")
-            troca = True
     if (novo.get("horas") or 0) > (atual.get("horas") or 0):
         atual["horas"] = novo["horas"]
     for campo in ("shop", "object_id", "game_code", "regiao", "rom_path"):

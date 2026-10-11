@@ -29,8 +29,8 @@ import datetime
 import os
 import shutil
 import subprocess
-import tempfile
 import sys
+import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path

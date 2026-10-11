@@ -11,7 +11,7 @@ import urllib.request
 from pathlib import Path
 
 from bib_nucleo import base
-from bib_nucleo.arquivos import gravar_atomico, ler_json, gravar_json
+from bib_nucleo.arquivos import gravar_atomico, gravar_json, ler_json
 
 USER_AGENT = "TucoTeca/1.5 (https://github.com/Artur-Lucena/Projeto-Launcher)"
 _lock = threading.RLock()

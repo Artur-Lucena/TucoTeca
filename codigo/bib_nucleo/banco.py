@@ -14,10 +14,18 @@ import uuid as uuid_mod
 from contextlib import closing
 from pathlib import Path
 
-from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, _desaspas, _txt,
-                                 agora_iso, existe_aqui_ou_traduzido,
-                                 mac_para_linux, resolver_exe, slugify, win_para_linux)
-
+from bib_nucleo.base import (
+    BACKUP_DIR,
+    CAPAS_DIR,
+    _desaspas,
+    _txt,
+    agora_iso,
+    existe_aqui_ou_traduzido,
+    mac_para_linux,
+    resolver_exe,
+    slugify,
+    win_para_linux,
+)
 
 # --------------------------------------------------------------------------
 # Banco + validação + CRUD
@@ -882,9 +890,16 @@ def _garantir_tabela_downloads(con: sqlite3.Connection) -> None:
     con.execute(SCHEMA_DOWNLOADS)
 
 
-from bib_nucleo.banco_desejos import (SCHEMA_DESEJOS, _garantir_coluna_desejo_manual,
-    _garantir_tabela_desejos, desejo_to_dict, listar_desejos, sincronizar_desejos,
-    adicionar_desejo, marcar_desejo_obtido, remover_desejo)
+from bib_nucleo.banco_desejos import (
+    SCHEMA_DESEJOS,
+    _garantir_tabela_desejos,
+    adicionar_desejo,
+    desejo_to_dict,
+    listar_desejos,
+    marcar_desejo_obtido,
+    remover_desejo,
+    sincronizar_desejos,
+)
 
 
 def download_to_dict(r: sqlite3.Row) -> dict:
@@ -1012,7 +1027,7 @@ def _enquadrar_capa(img):
 
     Ícones pequenos (≤200px nos dois lados) voltam intactos.
     """
-    from PIL import Image, ImageFilter
+    from PIL import ImageFilter
     if img.width <= CAPA_ICON_MAX and img.height <= CAPA_ICON_MAX:
         return img
     base = img.convert("RGB")
@@ -1035,6 +1050,7 @@ def _normalizar_capa(raw: bytes, ext: str, enquadrar=True) -> tuple[bytes, str]:
     """
     try:
         from io import BytesIO
+
         from PIL import Image  # opcional, não é dependência
         img = Image.open(BytesIO(raw))
         img.load()

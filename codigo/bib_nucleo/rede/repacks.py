@@ -476,8 +476,7 @@ def importar_repack(con: sqlite3.Connection, arquivo: str | os.PathLike,
     """
     from bib_nucleo import banco as B
     from bib_nucleo.base import slugify
-    from bib_nucleo.scans import _titulo_de_exe, importar_lista, pontuar
-    from bib_nucleo.scans import canonizar_steam
+    from bib_nucleo.scans import _titulo_de_exe, canonizar_steam, importar_lista, pontuar
     src = Path((str(arquivo) or "").strip())
     if not src.is_file():
         return {"ok": False, "erro": "arquivo não encontrado."}

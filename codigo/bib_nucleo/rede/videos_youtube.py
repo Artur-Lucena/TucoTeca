@@ -272,13 +272,13 @@ def baixar_video_youtube(con, video_id: str, progresso=None) -> dict:
 
 def baixar_audio_youtube(con, video, progresso=None):
     """MP3 por URL/ID validado; sem busca aproximada nem configuração externa do yt-dlp."""
-    from bib_nucleo.rede import exigir_rede
-    from bib_nucleo.baixar import localizar_ffmpeg
-    from bib_nucleo.base import MUSICAS_DIR
-    from bib_nucleo.banco import criar_musica
     from bib_nucleo.arquivos import destino_temporario
+    from bib_nucleo.baixar import localizar_ffmpeg
+    from bib_nucleo.banco import criar_musica
+    from bib_nucleo.base import MUSICAS_DIR
     from bib_nucleo.ferramentas import comando_externo
     from bib_nucleo.musicas import sha_arquivo
+    from bib_nucleo.rede import exigir_rede
     vid = identificar_youtube(video)
     if not vid:
         return {"ok": False, "erro": "Link/ID do YouTube inválido."}

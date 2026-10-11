@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import urllib.request
+
 from bib_nucleo.rede import abrir_rede
 
 

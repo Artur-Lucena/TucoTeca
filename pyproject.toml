@@ -52,4 +52,22 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
-ignore = ["E501"]
+# Excecoes declaradas (nada foi silenciado sem justificativa registrada):
+#
+# E501 - linhas longas sao preferidas a quebrar contrato/mensagem de erro.
+# E402 - imports no meio do arquivo quebram ciclos de importacao de proposito
+#        (banco<->banco_desejos, scans<->scans_hydra,
+#        emuladores<->sessoes_manuais, musicas<->rede.metadados,
+#        baixar<->rede.binarios) ou antecedem o ajuste de sys.path nos
+#        builders. Mover para o topo quebraria o carregamento do nucleo;
+#        a convencao esta documentada em CONTRIBUTING.md e ARQUITETURA.md.
+# F403 - bib_core.py e a fachada de compatibilidade: reexporta a API publica
+#        via `__all__` de cada modulo justamente para preservar consumidores
+#        antigos. Trocar por 22 imports nomeados anularia esse proposito.
+ignore = ["E501", "E402", "F403"]
+
+[tool.ruff.lint.per-file-ignores]
+# F401 nesses arquivos e a prova de disponibilidade do modulo
+# (`try: import tkinter` -> skip), nao codigo morto.
+"codigo/ferramentas/testes/test_dialogo.py" = ["F401"]
+"codigo/ferramentas/testes/test_varredura.py" = ["F401"]

@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from executar import afirmar
-from test_qt import _qt, _aguardar, _encontrar
+from test_qt import _aguardar, _encontrar, _qt
 
 
 def teste_qt_youtube_navega_fallback_e_slots_retornam_ao_qml():
@@ -12,10 +12,10 @@ def teste_qt_youtube_navega_fallback_e_slots_retornam_ao_qml():
         app, bridge = _qt()
         if app is None:
             return
-        from PySide6.QtQml import QQmlExpression
-        from PySide6.QtCore import qInstallMessageHandler
-        from shiboken6 import delete
         from app_qt import criar_engine
+        from PySide6.QtCore import qInstallMessageHandler
+        from PySide6.QtQml import QQmlExpression
+        from shiboken6 import delete
         erros = []
         anterior = qInstallMessageHandler(lambda t, c, m: erros.append(m))
         engine = criar_engine(bridge)
@@ -44,10 +44,10 @@ def teste_qt_dialogos_pessoais_saves_atalhos_e_perfis():
     app, bridge = _qt()
     if app is None:
         return
-    from PySide6.QtCore import QObject, QMetaObject, qInstallMessageHandler
+    from app_qt import criar_engine
+    from PySide6.QtCore import QMetaObject, QObject, qInstallMessageHandler
     from PySide6.QtTest import QTest
     from shiboken6 import delete
-    from app_qt import criar_engine
     erros = []
     anterior = qInstallMessageHandler(lambda t, c, m: erros.append(m))
     engine = criar_engine(bridge)
@@ -108,8 +108,9 @@ def teste_qt_backup_pos_sessao_acontece_depois_de_gravar_horas():
 
 
 def teste_youtube_mp3_por_id_sem_busca_e_importacao_local():
-    import bib_core as core
     import tempfile
+
+    import bib_core as core
     from bib_nucleo.rede import videos_youtube as V
     raiz = Path(tempfile.mkdtemp())
     con = core.get_db(raiz / "b.db")

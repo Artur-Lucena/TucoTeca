@@ -255,6 +255,7 @@ def teste_player_mci_rotear_e_cache():
 
 def teste_cache_wav_parcial_nao_e_publicado():
     from unittest.mock import patch
+
     from bib_nucleo import player as PL
     tmp = Path(tempfile.mkdtemp(prefix="suite-pl-"))
     destino = tmp / "cache.wav"
@@ -275,6 +276,7 @@ def teste_cache_wav_parcial_nao_e_publicado():
 
 def teste_player_mci_caminho_longo_preparado_preserva_original():
     from unittest.mock import patch
+
     from bib_nucleo import player as PL
     tmp = Path(tempfile.mkdtemp(prefix="suite-mci-"))
     original = tmp / ("audio-longo-" * 9) / "faixa.wav"
@@ -310,6 +312,7 @@ def teste_player_mci_caminho_longo_preparado_preserva_original():
 
 def teste_player_mci_cache_curto_indisponivel_nao_mexe_no_original():
     from unittest.mock import patch
+
     from bib_nucleo import player as PL
     tmp = Path(tempfile.mkdtemp(prefix="suite-mci-"))
     original = tmp / ("audio-longo-" * 9) / "faixa.wav"

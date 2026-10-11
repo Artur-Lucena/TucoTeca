@@ -6,21 +6,31 @@ from __future__ import annotations
 import datetime
 import json
 import re
-import stat
 import sqlite3
+import stat
 import zipfile
 from pathlib import Path
 
-from bib_nucleo.banco import (CAPA_EXTS, criar_musica, get_db,
-                                musica_to_dict, row_to_dict,
-                                salvar_capa_bytes)
-from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, DEFAULT_DB, MUSICAS_DIR,
-                               agora_iso, garantir_dirs, nome_arquivo_portatil)
-from bib_nucleo.emuladores import (azahar_versao_local,
-                                     presets_dir, presets_prov_dir, provedores)
-from bib_nucleo.scans import importar_lista
 from bib_nucleo.arquivos import destino_temporario, gravar_atomico
-
+from bib_nucleo.banco import (
+    CAPA_EXTS,
+    criar_musica,
+    get_db,
+    musica_to_dict,
+    row_to_dict,
+    salvar_capa_bytes,
+)
+from bib_nucleo.base import (
+    BACKUP_DIR,
+    CAPAS_DIR,
+    DEFAULT_DB,
+    MUSICAS_DIR,
+    agora_iso,
+    garantir_dirs,
+    nome_arquivo_portatil,
+)
+from bib_nucleo.emuladores import azahar_versao_local, presets_dir, presets_prov_dir, provedores
+from bib_nucleo.scans import importar_lista
 
 # --------------------------------------------------------------------------
 # Pacote portátil (.zip): banco + capas + presets + saves 3DS

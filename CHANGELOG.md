@@ -5,6 +5,30 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
+### Higienizacao de lint (revisao R4, 11/10/2026)
+- `ruff check codigo conftest.py` **limpo**: 246 achados → 0. Nenhuma regra
+  silenciada sem justificativa registrada; as tres excecoes restantes estao
+  declaradas em `pyproject.toml`.
+- `E741` (18): `l` ambíguo renomeado para `linha`/`alvo`/`limpa` em `cheats.py`,
+  `controles.py`, `emuladores.py`, `montar_superhub.py`, `test_s7b_externos.py`
+  e `app_tui.py`. Duas correcoes incompletas deixaram `F821` (nome indefinido)
+  em `controles.py`, pego na validacao seguinte.
+- `F841` (16): variavel morta `troca` removida de `scans.py` (atribuida e
+  nunca lida) e 15 atribuicoes `tmp`/`g` sem uso em testes.
+- `F401` (29 automaticas): imports nao usados, incluindo o `PIL.Image` de
+  `banco.py` (so `ImageFilter` era usado).
+- `F811` (3): `from bib_nucleo import base` sombreado pela variavel local em
+  `test_mac.py`, agora importado como `mbase`.
+- `E702`/`E701`/`E731` (16): ponto-e-virgula e lambdas atribuidas quebradas
+  em linhas proprias, `f.write(x); h.update(x)` de `atualizacao.py` incluido.
+- `I001` (120): ordenacao de imports. Em `bib_core.py` a reodenacao
+  reorganizou os reexports `*` da fachada; os 375 nomes de `__all__`
+  continuam acessiveis, conferido por script.
+- Excecoes declaradas (nao escondidas no diff): `E402` para imports no meio
+  do arquivo que quebram ciculos de proposito; `F403` em `bib_core.py`, que e
+  fachada de compatibilidade; `F401` em testes de tkinter, onde o import e a
+  prova de disponibilidade do modulo.
+
 ### Validado e integrado (revisão R3, 11/10/2026)
 - Suíte completa: 412 casos stdlib sem falha (6 pulos por ambiente) e
   406 passed/6 skipped no pytest, com 63% de cobertura real dos subprocessos.

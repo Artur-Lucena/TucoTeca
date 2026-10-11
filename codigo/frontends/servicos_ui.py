@@ -544,7 +544,11 @@ class ServicoBiblioteca:
 
     def favorito(self, gid):
         with self._escrita:
-            from bib_nucleo.preferencias_pessoais import ler_preferencias, salvar_favorito, aplicar_perfil
+            from bib_nucleo.preferencias_pessoais import (
+                aplicar_perfil,
+                ler_preferencias,
+                salvar_favorito,
+            )
             jogo = self.jogo(gid)
             novo = not aplicar_perfil([jogo])[0]["favorito"]
             if ler_preferencias()["ativo"] == "Tuco":

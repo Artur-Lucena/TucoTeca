@@ -1,10 +1,10 @@
 """Publicação atômica de arquivos: nunca substitui um destino com dados parciais."""
 from __future__ import annotations
 
-import os
 import json
-import threading
+import os
 import tempfile
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 

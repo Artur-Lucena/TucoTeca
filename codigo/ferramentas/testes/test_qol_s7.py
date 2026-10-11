@@ -28,7 +28,6 @@ def _bridge():
 
 def teste_notas_do_jogo_persistem_no_campo_observacoes():
     from bib_nucleo import banco as B
-    from bib_nucleo import base
     tmp = Path(tempfile.mkdtemp(prefix="suite-notas-"))
     con = B.get_db(tmp / "biblioteca.db")
     try:

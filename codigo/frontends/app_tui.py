@@ -704,10 +704,10 @@ class Tui:
                     continue
                 linhas = []
                 while True:
-                    l = self.perguntar(f"Linha {len(linhas) + 1} (vazio termina): ")
-                    if l is None or not l.strip():
+                    digitado = self.perguntar(f"Linha {len(linhas) + 1} (vazio termina): ")
+                    if digitado is None or not digitado.strip():
                         break
-                    linhas.append(l)
+                    linhas.append(digitado)
                 if not linhas:
                     continue
                 res = core.adicionar_cheat(tid, nome.strip(), "\n".join(linhas))

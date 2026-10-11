@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import urllib.parse
 
-from bib_nucleo.rede import exigir_rede, online
+from bib_nucleo.rede import online
 
 BASE = "https://thumbnails.libretro.com"
 SISTEMAS = {"3DS": "Nintendo - Nintendo 3DS", "NDS": "Nintendo - Nintendo DS"}

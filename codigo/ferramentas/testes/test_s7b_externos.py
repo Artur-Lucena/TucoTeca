@@ -53,7 +53,7 @@ def teste_letras_parse_lrc_ordena_e_ignora_lixo():
     from bib_nucleo.rede import letras
     texto = "[00:21.50] segunda\n[00:05.00] primeira\nlixo sem tempo\n[01:02] terceira"
     linhas = letras.linhas_lrc(texto)
-    afirmar([l["texto"] for l in linhas] == ["primeira", "segunda", "terceira"], linhas)
+    afirmar([item["texto"] for item in linhas] == ["primeira", "segunda", "terceira"], linhas)
     afirmar(linhas[0]["t"] == 5.0 and linhas[2]["t"] == 62.0, linhas)
 
 
@@ -216,7 +216,7 @@ def teste_letras_malformadas_nao_entram_no_cache():
         r = letras.buscar_letras("A", "Formato errado")
     afirmar(not r["ok"] and "inválida" in r["erro"], r)
     linhas = letras.linhas_lrc("[00:01.125][00:03.250] refrão\n[00:99] lixo")
-    afirmar([l["t"] for l in linhas] == [1.125, 3.25], linhas)
+    afirmar([item["t"] for item in linhas] == [1.125, 3.25], linhas)
 
 
 def teste_desejo_download_falho_nao_mexe_na_lista():

@@ -12,8 +12,8 @@ import json
 import os
 import shutil
 import sys
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 
 MANIFESTO_RUNTIME = "manifesto-runtime.json"
 FERRAMENTAS = {

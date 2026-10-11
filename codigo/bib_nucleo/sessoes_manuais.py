@@ -5,7 +5,7 @@ import datetime
 import math
 from pathlib import Path
 
-from bib_nucleo.arquivos import ler_json, gravar_json
+from bib_nucleo.arquivos import gravar_json, ler_json
 
 
 def iniciar_sessao_manual(gid: int, titulo: str = "") -> dict:
@@ -36,8 +36,8 @@ def listar_sessoes_pendentes() -> list[dict]:
 
 
 def encerrar_sessao_manual(arquivo: str, horas: float = 0.0, db_path=None) -> dict:
-    from bib_nucleo.base import SESSOES_DIR, DEFAULT_DB
     from bib_nucleo.banco import adicionar_horas, get_db
+    from bib_nucleo.base import DEFAULT_DB, SESSOES_DIR
     p = Path(arquivo)
     if p.is_symlink() or p.resolve().parent != SESSOES_DIR.resolve() or not p.name.startswith("sessao-"):
         return {"ok": False, "erro": "marcador fora da pasta de sessões; nada foi alterado"}

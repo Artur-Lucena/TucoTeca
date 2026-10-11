@@ -187,9 +187,8 @@ def teste_qt_qml_hud_todas_categorias_em_tela_cheia():
     app, bridge = _qt()
     if app is None:
         return
-    from PySide6.QtCore import QMetaObject, qInstallMessageHandler
+    from PySide6.QtCore import QMetaObject, QUrl, qInstallMessageHandler
     from PySide6.QtQml import QQmlApplicationEngine
-    from PySide6.QtCore import QUrl
     from shiboken6 import delete
     erros = []
     anterior = qInstallMessageHandler(lambda t, c, m: erros.append(m))
@@ -361,9 +360,8 @@ def teste_qt_qol_biblioteca_player_sistema():
 
 
 def teste_servico_integracao_personalizada_persiste_e_valida():
-    from servicos_ui import (INTEGRACAO_TIPOS, carregar_personalizadas, integracoes_padrao,
-                             url_integracao)
     from bib_nucleo import online
+    from servicos_ui import INTEGRACAO_TIPOS, carregar_personalizadas
     servico = ServicoBiblioteca(_base())
     n_antes = len(servico.integracoes.listar())
     for ruim in ({"chave": "x", "nome": "N", "descricao": "", "tipo": "link", "url": "https://a.example/"},
@@ -409,10 +407,11 @@ def teste_qt_torrent_hub_organizar_e_botao_magnet():
     app, bridge = _qt()
     if app is None:
         return
+    from unittest.mock import patch
+
+    from app_qt import criar_engine
     from PySide6.QtCore import QMetaObject, QObject, qInstallMessageHandler
     from shiboken6 import delete
-    from app_qt import criar_engine
-    from unittest.mock import patch
     avisos = []
     anterior = qInstallMessageHandler(lambda t, c, m: avisos.append(m))
     engine = criar_engine(bridge)
@@ -461,10 +460,11 @@ def teste_qt_musica_online_busca_seleciona_enfileira():
     app, bridge = _qt()
     if app is None:
         return
+    from unittest.mock import patch
+
+    from app_qt import criar_engine
     from PySide6.QtCore import QMetaObject, QObject, qInstallMessageHandler
     from shiboken6 import delete
-    from app_qt import criar_engine
-    from unittest.mock import patch
     faixas = [{"titulo": "Faixa Grátis", "artista": "Artista", "album": "Álbum",
                "duracao_ms": 200000, "capa_url": "", "url": "https://www.deezer.com/track/9",
                "uri": "deezer:track:9", "fonte": "deezer", "nome_fonte": "Deezer"}]
@@ -539,6 +539,7 @@ def teste_qt_fontes_e_builders_incluem_recursos_qml():
 
 def teste_servico_saude_total_real_e_idade_backup():
     from unittest.mock import patch
+
     from servicos_ui import resumo_sistema, saude_colecao
     servico = ServicoBiblioteca(_base())
     jogos = servico.snapshot()["jogos"]
@@ -646,10 +647,10 @@ def teste_qt_qol_avisos_fifo_controles_compactos_e_registro_horas():
     app, bridge = _qt()
     if app is None:
         return
+    from app_qt import criar_engine
     from PySide6.QtCore import QMetaObject, QObject, Qt, qInstallMessageHandler
     from PySide6.QtTest import QTest
     from shiboken6 import delete
-    from app_qt import criar_engine
     avisos = []
     anterior = qInstallMessageHandler(lambda t, c, m: avisos.append(m))
     engine = criar_engine(bridge)
@@ -757,10 +758,10 @@ def teste_qt_volume_pc_barra_visivel_teclado_e_polling_sem_sobrescrever():
         app, bridge = _qt()
         if app is None:
             return
+        from app_qt import criar_engine
         from PySide6.QtCore import Qt
         from PySide6.QtTest import QTest
         from shiboken6 import delete
-        from app_qt import criar_engine
         engine = criar_engine(bridge)
         try:
             janela = engine.rootObjects()[0]
@@ -790,18 +791,20 @@ def teste_qt_provedores_dialogos_e_spotify_enfileira_sem_bloquear_ui():
     app, bridge = _qt()
     if app is None:
         return
-    from PySide6.QtCore import QMetaObject, QObject, qInstallMessageHandler
-    from shiboken6 import delete
+    from unittest.mock import patch
+
     from app_qt import criar_engine
     from bib_nucleo.rede.spotify import normalizar_faixa
-    from unittest.mock import patch
+    from PySide6.QtCore import QMetaObject, QObject, qInstallMessageHandler
+    from shiboken6 import delete
     avisos = []
     anterior = qInstallMessageHandler(lambda t, c, m: avisos.append(m))
     engine = criar_engine(bridge)
     try:
         afirmar(engine.rootObjects(), avisos)
         janela = engine.rootObjects()[0]
-        janela.setWidth(960); janela.setHeight(640)
+        janela.setWidth(960)
+        janela.setHeight(640)
         bridge.atualizar()
         _aguardar(app, lambda: not bridge.ocupado)
         gid = bridge._dados["jogos"][0]["id"]

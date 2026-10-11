@@ -6,7 +6,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 import bib_core as core
-from bib_nucleo import base, ferramentas as F, qbit as Q
+from bib_nucleo import base
+from bib_nucleo import ferramentas as F
+from bib_nucleo import qbit as Q
 from executar import afirmar
 
 
@@ -83,7 +85,6 @@ def teste_qbit_perfil_independente_e_comando():
 
 
 def teste_qbit_destino_jogos_em_novos_e_perfil_antigo():
-    from bib_nucleo import repacks
     jogos = Path(tempfile.mkdtemp(prefix="jogos-"))
     magnet = "magnet:?xt=urn:btih:" + "a" * 40
     with patch.object(Q, "qbit_api_url", return_value=""), \

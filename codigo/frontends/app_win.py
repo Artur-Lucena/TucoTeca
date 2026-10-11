@@ -28,8 +28,8 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import bib_core as core
-from aparencia import ACC, BG, CARD, HOVER as CARD_HOVER, LINE, MUT, PANEL, TXT
-from aparencia import BarraAcoes, PainelRolavel, aplicar_tema
+from aparencia import ACC, BG, CARD, LINE, MUT, PANEL, TXT, BarraAcoes, PainelRolavel, aplicar_tema
+from aparencia import HOVER as CARD_HOVER
 from despacho import DespachanteUi
 
 OK_C = "#2ecc71"

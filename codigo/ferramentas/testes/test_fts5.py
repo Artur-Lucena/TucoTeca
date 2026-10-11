@@ -1,7 +1,6 @@
 """FTS5 em jogos: busca sem acento, prefixo, sincronia e fallback."""
 from __future__ import annotations
 
-import sqlite3
 import tempfile
 from pathlib import Path
 
