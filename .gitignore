@@ -28,3 +28,5 @@ baseline-testes.json
 pos-fix-repacks.json
 resultados-testes.json
 resultados-qt.json
+pos-*.json
+pos-*.log
