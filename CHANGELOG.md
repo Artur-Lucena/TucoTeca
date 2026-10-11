@@ -5,6 +5,25 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
+### Validado e integrado (revisão R3, 11/10/2026)
+- Suíte completa: 412 casos stdlib sem falha (6 pulos por ambiente) e
+  406 passed/6 skipped no pytest, com 63% de cobertura real dos subprocessos.
+- Rodada sem PySide6 (`python -S`): 14 casos, 0 falhas, 11 pulos — o núcleo
+  continua utilizável e a UI degrada em vez de falhar.
+- Lint crítico (`E9,F63,F7,F82`) limpo; o lint completo mantém 246 achados de
+  estilo/import como pendência declarada, não como resultado verde.
+- Gitleaks 8.30.1 sem segredos nos fontes empacotados e nos 79 commits locais.
+- Bundles Windows validados na árvore e no ZIP extraído: essencial 215.73 MB
+  (SHA-256 `338d3f6813983fd2d95d5558e2e93ec8d839c6cebdb18ded0b3e86704bb0ece6`)
+  e completo 361.65 MB (SHA-256 `5db6ec4926a754d346f4924ed14335aeb8c3e6e0df6923aed2d610850c20ac2c`).
+- Provas nativas: 12 capturas em 1440×920 e 960×640, áudio MCI com destaque
+  LRC em caminho longo (190 → 104 caracteres, original intacto), Chromium com
+  perfil privado e allowlist, vídeo sintético com retomada de 1000 ms.
+- Integração local: `feat/s7b` mesclado em `main`; `qa/testes`, `os/windows` e
+  `feat/youtube-embed` alinhados por fast-forward. Sem force-push.
+- Entrega de revisão em `dist/marco-s0-s8/` (bundles, SHA256SUMS, relatórios
+  de verificação e fontes R3, ZIP `be7e25ba…68c4`).
+
 ### QoL pessoal e correções de contratos
 - Fluxo de desejos com fontes, SteamRip → importação e histórico de obtidos;
   falhas preservam o desejo/arquivo. FitGirl permanece página externa.
@@ -17,6 +36,12 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 - Player MCI prepara cópia em cache temporário curto para WAVs em caminhos
   longos, com publicação atômica e original preservado. Prova nativa cobre
   áudio/LRC nesses caminhos. Backup pós-sessão respeita o opt-out persistido.
+- `montar_superhub.py` confere arquivo por arquivo (SHA-256) que o `app/` do
+  runtime corresponde à revisão congelada e recusa arquivos obsoletos ou
+  divergentes; a prova de runtime usa quarentena curta, porque `TEMP`
+  profundamente aninhado quebra a descoberta de Known Folders no Windows.
+- Casos de UI que dependem de PySide6 agora pulam explicitamente quando o
+  módulo não existe, em vez de falhar; prova com `python -S` cobre esse caminho.
 - IPS/BPS com CRC/limites, saída nova e original intacto; hardlinks opt-in com
   fallback de cópia, sem junctions automáticas.
 - QtMultimedia opcional, retomada/velocidade, MP3 por URL/ID e SponsorBlock opt-in.
