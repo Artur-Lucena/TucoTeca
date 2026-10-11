@@ -517,7 +517,9 @@ def montar(formato="todos", reutilizar=False, extras="essencial", revisao=""):
         componentes["qbittorrent"]["versao"] = provas["qbittorrent"]["versao"].lstrip("v")
         m = criar_manifesto(raiz, componentes, v, fontes)
         rel = {"bytes_runtime": m["bytes_runtime"], "provas": provas,
-               "componentes": componentes, "extras": extras, "fontes": fontes}
+               "componentes": componentes, "extras": extras, "fontes": fontes,
+               "tucoteca": v.get("tucoteca", ""), "revisao_git": v.get("revisao_git", ""),
+               "python": v.get("python", ""), "qt": v.get("qt", "")}
         verificacao = DIST / f"superhub-verificacao-{extras}.json"
         verificacao.parent.mkdir(parents=True, exist_ok=True)
         verificacao.write_text(json.dumps(rel, ensure_ascii=False, indent=2), encoding="utf-8")

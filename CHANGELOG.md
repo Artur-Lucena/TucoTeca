@@ -5,8 +5,10 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [1.0.0] — 11/10/2026
 
-Primeira release privada formal do projeto, gerada a partir da revisão
-`424c1238f1f0283bc081a69a53eadab2f130b62e` dos fontes.
+Primeira release privada formal do projeto, publicada na tag `v1.0.0`. A
+revisão exata dos fontes fica registrada em `release.json`, no
+`MANIFESTO-FONTES.json` do pacote de fontes e no `manifesto-runtime.json` de
+cada bundle, conferida por SHA-256.
 
 ### Adicionado
 
