@@ -83,33 +83,36 @@ BAT_ATALHO = """@echo off
 setlocal
 set HUB=%~dp0
 set HUB=%HUB:~0,-1%
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$w = New-Object -ComObject WScript.Shell; $a = $w.CreateShortcut($env:USERPROFILE + '\\Desktop\\TucoTeca.lnk'); $a.TargetPath = '%HUB%\\BibliotecaHub.bat'; $a.WorkingDirectory = '%HUB%'; $a.WindowStyle = 7; $a.Description = 'TucoTeca (portatil)'; $a.Save()"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$w = New-Object -ComObject WScript.Shell; $a = $w.CreateShortcut($env:USERPROFILE + '\\Desktop\\TucoTeca.lnk'); $a.TargetPath = '%HUB%\\TucoTeca.bat'; $a.WorkingDirectory = '%HUB%'; $a.WindowStyle = 7; $a.Description = 'TucoTeca (portatil)'; $a.Save()"
 echo Atalho criado na Area de Trabalho.
 pause
 """
 
-LEIAME_PORTATIL = """BIBLIOTECA HUB (portátil Windows) — sem instalar nada.
+LEIAME_PORTATIL = """TUCOTECA (portatil Windows) — sem instalar nada.
 
 COMO USAR
 1. Extraia esta pasta onde quiser (inclusive pendrive).
-2. Duplo-clique em BibliotecaHub.bat (sem janela preta) ou rode
-   Criar-Atalho.bat uma vez para ganhar um atalho na Área de Trabalho.
-3. O Azahar já vem junto (emuladores/Azahar/, com seus mods e saves).
+2. Duplo-clique em TucoTeca.bat (sem janela preta) ou rode
+   Criar-Atalho.bat uma vez para ganhar um atalho na Area de Trabalho.
+   BibliotecaHub.bat continua funcionando como alias legado.
+3. O Azahar ja vem junto (emuladores/Azahar/, com seus mods e saves).
    Pacote magro (--sem-azahar)? Sidebar BANCO > "Atualizar Azahar".
 
-ONDE FICA O QUÊ
+ONDE FICA O QUE
+- TucoTeca.bat ...... entrada principal (sem console); BibliotecaHub.bat e alias
 - dados/ ........... sua casa: banco, backups, capas, presets, sessoes
-- app/ ............. código do launcher (pode atualizar por cima)
-- python/ .......... Python embutido (não usa o do sistema)
-- emuladores/ ...... Azahar + DeSmuME incluídos (pacote magro não tem; use ⬇)
-  (DeSmuME: NDS; saves .dsv ficam ao lado das ROMs)
-- Criar-Atalho.bat .. atalho na Área de Trabalho (duplo-clique, sem console)
+- app/ ............. codigo do launcher (pode atualizar por cima)
+- python/ .......... Python embutido (nao usa o do sistema)
+- emuladores/ ...... Azahar + DeSmuME incluidos (pacote magro nao tem; use a seta de download)
+   (DeSmuME: NDS; saves .dsv ficam ao lado das ROMs)
+- Criar-Atalho.bat .. atalho na Area de Trabalho (duplo-clique, sem console)
 - Debug-Console.bat  abre com janela de texto (para ver erros)
+- manifesto-runtime.json  componentes, versoes, tamanhos e SHA-256
 
-O botão "Atualizar Azahar" atualiza o emulador DENTRO do pacote.
-Chaves (aes_keys.txt) nunca vêm junto: dump do seu 3DS em
+O botao "Atualizar Azahar" atualiza o emulador DENTRO do pacote.
+Chaves (aes_keys.txt) nunca vem junto: dump do seu 3DS em
 emuladores/Azahar/user/sysdata/ quando precisar.
-Leve a pasta inteira para outra máquina, ou gere um .zip dela.
+Leve a pasta inteira para outra maquina, ou gere um .zip dela.
 """
 
 

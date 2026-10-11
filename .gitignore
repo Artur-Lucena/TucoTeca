@@ -34,3 +34,4 @@ pos-*.log
 .coverage*
 htmlcov/
 .ruff_cache/
+.venv/

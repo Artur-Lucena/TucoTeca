@@ -3,6 +3,41 @@
 Todas as mudanças relevantes do TucoTeca. Formo: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.0.0] — 11/10/2026
+
+Primeira release privada formal do projeto, gerada a partir da revisão
+`424c1238f1f0283bc081a69a53eadab2f130b62e` dos fontes.
+
+### Adicionado
+
+- `codigo/ferramentas/preparar_release.py`: monta a pasta de release com os
+  bundles já validados, o pacote de fontes congelado na revisão, as notas
+  (`NOTAS-RELEASE.md`), `SHA256SUMS.txt` e `release.json`. Confere hash por
+  hash, recusa pacote com caminho de dado pessoal e **não publica nada** —
+  criar a release no GitHub continua sendo passo explícito.
+- Pacote de fontes passa a registrar `versao` (de `VERSION`) e `revisao_git`
+  (quando informada) no `MANIFESTO-FONTES.json`; revisão inválida é recusada.
+- `montar_superhub.py --revisao`: grava a revisão e a versão no manifesto do
+  runtime, além de `VERSION` e `VERSAO.txt` dentro do pacote. Um runtime
+  reutilizado não herda a revisão do build anterior.
+- O pacote de fontes ignora `.provas/`, `.venv/`, `.pytest_cache/` e
+  `.ruff_cache/`, e inclui os modelos de issue/PR de `.github/`.
+- `TucoTeca.bat` virou a entrada principal; `BibliotecaHub.bat` continua
+  funcionando exatamente como antes (alias), inclusive no bundle.
+- Testes novos em `codigo/ferramentas/testes/test_release.py` (6 casos):
+  revisão inválida, manifesto com versão/revisão, exclusão de caches e dados,
+  recusa de pacote com banco pessoal, detecção de hash divergente e conteúdo
+  das notas da release.
+
+### Alterado
+
+- **README reescrito** em linguagem mais direta e humana: o que o hub faz, o
+  que não faz (gamepad, conquistas online, overlay, assinatura, macOS), como
+  começar, como gerar pacotes e como a release é montada.
+- `pytest` e `ruff` passam a guardar seus caches em `.provas/`, fora da raiz;
+  `.venv/` entra no `.gitignore`. A raiz do projeto fica só com arquivos de
+  entrada, configuração e documentação.
+
 ## [Não lançado]
 
 ### Portabilidade dos testes na CI (11/10/2026)

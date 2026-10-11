@@ -7,6 +7,7 @@ import datetime
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -467,11 +468,31 @@ def empacotar(raiz: Path, formato="todos", extras="essencial") -> list[Path]:
     return saidas
 
 
-def montar(formato="todos", reutilizar=False, extras="essencial"):
+def _versoes_release(raiz: Path, versoes: dict, revisao: str, repo: Path | None = None) -> dict:
+    """Grava versão/revisão no pacote sem herdar dado de runtime reutilizado."""
+    repo = REPO if repo is None else Path(repo)
+    if revisao and not re.fullmatch(r"[0-9a-f]{40}", revisao):
+        raise ValueError("A revisão deve ser o SHA Git completo (40 caracteres hexadecimais).")
+    versoes["tucoteca"] = (repo / "VERSION").read_text(encoding="utf-8").strip()
+    versoes.pop("revisao_git", None)  # nunca herdar a revisão de um runtime reutilizado
+    if revisao:
+        versoes["revisao_git"] = revisao
+    (raiz / "VERSION").write_text(versoes["tucoteca"] + "\n", encoding="utf-8")
+    (raiz / "VERSAO.txt").write_text(
+        f"TucoTeca {versoes['tucoteca']} — Windows x64, {versoes.get('extras', 'essencial')}\n"
+        f"Revisão Git: {revisao or 'árvore de trabalho não identificada'}\n"
+        f"Python: {versoes.get('python', '?')}\nQt: {versoes.get('qt', '?')}\n"
+        "Componentes, licenças e hashes: manifesto-runtime.json\n", encoding="utf-8")
+    return versoes
+
+
+def montar(formato="todos", reutilizar=False, extras="essencial", revisao=""):
     anterior = MP.BUILD
     MP.BUILD = BUILD / extras
     if extras not in ("completo", "essencial"):
         raise SystemExit(f"--extras deve ser completo|essencial (veio {extras!r})")
+    if revisao and not re.fullmatch(r"[0-9a-f]{40}", revisao):
+        raise ValueError("A revisão deve ser o SHA Git completo (40 caracteres hexadecimais).")
     try:
         if reutilizar:
             raiz = MP.BUILD
@@ -486,6 +507,7 @@ def montar(formato="todos", reutilizar=False, extras="essencial"):
             incluir_pillow(raiz)
         v["qt"] = incluir_qt(raiz, extras)
         v["extras"] = "completo" if extras == "completo" else "essencial"
+        _versoes_release(raiz, v, revisao)
         (raiz / "README-PORTATIL.txt").write_text(LEIAME, encoding="utf-8")
         shutil.copy2(REPO / "LICENSE", raiz / "LICENSE-TucoTeca.txt")
         MP.podar_dieta(raiz)
@@ -531,9 +553,10 @@ def main():
     ap.add_argument("--reutilizar", action="store_true", help="atualiza fontes no runtime já montado")
     ap.add_argument("--extras", choices=("completo", "essencial"), default="essencial",
                      help="completo = QtWebEngine/Multimedia (sem gamepad); "
-                         "essencial = leve, abre YouTube no navegador do sistema")
+                          "essencial = leve, abre YouTube no navegador do sistema")
+    ap.add_argument("--revisao", default="", help="SHA completo do checkout limpo/congelado para a release")
     args = ap.parse_args()
-    montar(args.formato, args.reutilizar, args.extras)
+    montar(args.formato, args.reutilizar, args.extras, revisao=args.revisao)
 
 
 if __name__ == "__main__":

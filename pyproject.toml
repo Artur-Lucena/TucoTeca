@@ -41,6 +41,7 @@ where = ["codigo"]
 testpaths = ["codigo/ferramentas/testes"]
 python_functions = ["teste_*"]
 addopts = "-q"
+cache_dir = ".provas/pytest-cache"
 
 [tool.coverage.run]
 source = ["codigo/bib_nucleo", "codigo/frontends"]
@@ -49,6 +50,7 @@ omit = ["codigo/ferramentas/testes/*"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+cache-dir = ".provas/ruff-cache"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]

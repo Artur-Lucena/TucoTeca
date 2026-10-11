@@ -5,247 +5,211 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Versão](https://img.shields.io/badge/vers%C3%A3o-1.0.0-informational)](VERSION)
 
-Aplicativo local de biblioteca de jogos e músicas. Desktop moderno em
-**PySide6 / Qt Quick** (frontend principal), ferramentas clássicas em tkinter
-(**congeladas**: só correções críticas) e TUI curses no Linux.
-Núcleo em **Python 3.10+ com biblioteca padrão**, SQLite e arquivos locais.
-Qt é uma dependência da interface desktop, não do núcleo.
+Um hub para a **sua** coleção de jogos, músicas e vídeos — no seu computador,
+sem conta, sem nuvem e sem depender de ninguém para abrir a biblioteca.
 
-**Uso pessoal de Tuco e Isa.** Sem conta obrigatória, telemetria ou publicação
-automática de bundles. Steam é apenas fonte de catálogo/wishlist: os jogos
-são iniciados localmente e as conquistas ficam na coleção.
+Ele nasceu de uma necessidade simples: ter tudo o que eu já baixei em um só
+lugar, com cara de aplicativo moderno, funcionando offline, e sem entregar
+para terceiros a lista do que eu tenho. Hoje é usado por duas pessoas (Tuco e
+Isa) e é mantido assim: projeto pessoal, estável, e com os limites ditos em
+voz alta em vez de escondidos.
 
-O catálogo, a importação local e a reprodução local funcionam offline.
-Busca de capas, atualização de ferramentas/emuladores, CSV → áudio e
-catálogo SteamRip usam rede **sob ação do usuário**. Pillow é opcional
-para conversão/preview de imagens; ferramentas externas são descritas abaixo.
+- **A coleção é sua.** Fica em `dados/`, na sua máquina. Nenhum servidor
+  próprio, nenhuma telemetria, nenhum login obrigatório.
+- **A internet é opcional.** Abrir, jogar, ouvir e ver funcionam sem rede.
+  Buscar capas, letras, catálogos ou baixar algo é sempre **você quem pede**.
+- **O que é de terceiros é separado do que é seu.** Emuladores e ferramentas
+  são programas independentes, agregados como estão, com suas licenças.
 
-## Comece por aqui
+## Primeiros passos
 
-| Objetivo | Documento/comando |
-|---|---|
-| Entender a arquitetura e as pastas | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) |
-| Ver o que foi auditado, corrigido e o que falta validar | [docs/REVISAO_TECNICA.md](docs/REVISAO_TECNICA.md) |
-| Acabamento visual e revisão atual; prioridades da Parte 2 | [docs/PARTE1_VISUAL_E_AUDITORIA.md](docs/PARTE1_VISUAL_E_AUDITORIA.md) |
-| Runtime completo, compactação e ferramentas independentes | [docs/PARTE2_RUNTIME_E_INTEGRACOES.md](docs/PARTE2_RUNTIME_E_INTEGRACOES.md) |
-| Trabalhar em conjunto | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Desktop Qt, arquitetura e cobertura da migração | [docs/DESKTOP_QT.md](docs/DESKTOP_QT.md) |
-| Visão TucoOS, roadmap e integrações | [docs/VISAO_OS.md](docs/VISAO_OS.md) |
-| QoL 1.5: melhorias entregues, pesquisa e próximos ajustes | [docs/QOL_1_5.md](docs/QOL_1_5.md) |
-| Diagnosticar a instalação sem alterar a coleção | `python codigo/ferramentas/diagnosticar.py` |
-| Gerar a entrega de código para outro desenvolvedor | `python codigo/ferramentas/empacotar_fontes.py` |
+**Windows** — duplo-clique em `TucoTeca.bat`
+(`BibliotecaHub.bat` continua como alias legado).
 
-## Executar
+**Linux** — `./BibliotecaHub.sh` em um terminal (abre a TUI).
 
-- **Windows:** `TucoTeca.bat` (`BibliotecaHub.bat` é alias legado) ou `py -3.14 codigo/frontends/desktop.py`.
-- **Clássico (congelado):** `BibliotecaHub.bat --classico` ou Configurações → Abrir ferramentas clássicas.
-  Recebe só correções críticas; novidades vão para o Qt.
-- **Linux:** `./BibliotecaHub.sh` ou `python3 codigo/frontends/app_tui.py`.
-- **macOS:** `BibliotecaHubMac.command` (experimental; requer Python com Tk).
+**macOS** — `BibliotecaHubMac.command` (experimental; precisa de Python com Tk).
 
-Nesta instalação, `BibliotecaHub.bat` usa o Python e as ferramentas de
-`programa/windows-x64/`, os fontes atuais de `codigo/` e sua coleção em
-`dados/`. Os atalhos TucoTeca apontam para esse launcher.
-
-Em um ambiente de desenvolvimento novo, instale a camada visual:
+Se você tem Python e quer desenvolver:
 
 ```powershell
 py -3.14 -m pip install -r requirements-ui.txt
 py -3.14 codigo/frontends/desktop.py
 ```
 
-Sem PySide6, o dispatcher usa tkinter. `--big-picture` inicia Qt em tela cheia.
-O launcher respeita `BIBLIOTECA_HOME` explícito em desenvolvimento.
+Sem PySide6, o hub cai automaticamente para a interface clássica em tkinter.
+`--big-picture` abre direto em tela cheia; `--classico` força o modo clássico.
 
-Para uma coleção de desenvolvimento separada, na raiz do checkout:
+Para testar sem encostar na sua coleção de verdade:
 
 ```powershell
 $env:BIBLIOTECA_HOME = Join-Path $env:TEMP "tucoteca-dev"
 py -3.14 codigo/frontends/app_win.py --selftest
 ```
 
-`BIBLIOTECA_HOME` é a **pasta-mãe de `dados/`**. A coleção contém banco,
-capas, backups, saves, mods e músicas; permanece fora do Git. A trava
-`.biblioteca.lock` impede abertura simultânea da mesma casa.
+`BIBLIOTECA_HOME` é a pasta onde vive o `dados/` do hub. A trava
+`.biblioteca.lock` impede que duas cópias abram a mesma coleção ao mesmo tempo.
 
-## Funcionalidades
+## O que ele faz
 
-- **Desktop Qt:** tema azul-noite/ciano, componentes QML, transições de hover,
-  capas assíncronas, grade virtualizada, busca, favoritos, ordenação e painel
-  de detalhes. Estados vazios, atividade em segundo plano e mensagens de erro.
-- **HUD superior:** Início, Jogos, Músicas, Desejos, Downloads e Integrações ficam
-  acessíveis também em tela cheia, junto da nova aba Vídeos. Player e volume do PC persistentes no rodapé.
-- **Busca global:** **Ctrl+K** acha jogo/música/desejo/download na coleção local.
-- **Big Picture:** botão **Big Picture** ou **F11**; **Esc** retorna à janela.
-  **Ctrl+1…6** troca de categoria, **Ctrl+F** busca, **setas** navegam pela
-  grade, **Enter** joga e **Espaço** abre detalhes. Teclado e mouse;
-  navegação por gamepad ainda não implementada.
-- **Jogos:** título, capa, horas, nota/status, etiquetas, favoritos e filtros.
-- **QoL 1.5:** saúde completa da coleção com filtro de pendências, contagem
-  contextual e Limpar filtros, busca global que seleciona o resultado certo,
-  avisos em fila e registro manual de horas nos detalhes/Sistema.
-- **Lançamento:** executável/provider por SO, minimização da GUI e registro
-  de sessão; `--jogar "Título"` atende atalhos de Desktop.
-- **Importação:** arquivo/pasta, ROMs com metadados, manifestos de lojas,
-  Hydra e repacks. Archives são removidos após importação confirmada.
-- **Emulação:** Azahar/3DS e DeSmuME/NDS, presets e backup de saves.
-- **Mods/HD/cheats/controles:** gerenciamento local por jogo e presets.
-- **Músicas:** importa uma pasta do Harmoni/áudio local, enfileira CSV do
-  Exportify, baixa/converte áudio, busca capas de álbum e toca no Hub.
-  A música continua enquanto o jogo está aberto. Player externo é opcional.
-- **Bibliotecas de música:** Deezer, iTunes e MusicBrainz buscam faixas sem
-  chave/login; escolha resultados e envie à fila para baixar/importar. Spotify
-  usa configuração OAuth para playlists/curtidas e exibe o resultado na mesma lista.
-- **Conquistas do Hub:** Steam fornece referência; o save nativo e regras locais
-  determinam desbloqueios persistentes/offline. Saves sem leitor ficam pendentes.
-- **Vídeos:** importa arquivos locais, pesquisa/baixa YouTube via yt-dlp,
-  toca no QtMultimedia opcional (variante completa, com retomada/velocidade)
-  ou abre com VLC/MPV/MPC-HC. Ferramentas de mídia reúne editores de imagem,
-  editores/EQ de áudio e reprodutores; presets FFmpeg geram cópias importadas.
-- **Integrações:** + Adicionar registra atalhos HTTPS próprios, incluindo busca
-  por `{q}`; cartões personalizados são persistentes e podem ser removidos.
-- **Volume do PC (Windows):** slider no rodapé Qt ou na barra lateral clássica;
-  controla a saída padrão inteira. A interface clássica inclui −/+5 e mute.
-- **SteamRip:** catálogo pesquisável, página do jogo, hosts e fluxo de
-  download/importação. A disponibilidade é a do serviço remoto.
-- **Desejos:** lista local, inclusão pela busca da Steam e importação de JSON.
-  A sincronização remota pode ficar indisponível; falha ou resposta parcial
-  preserva a lista anterior.
-- **Torrents:** histórico local do qBittorrent, peças recebidas no último
-  `.fastresume`, progresso e importação explícita dos concluídos. A aba consulta
-  atualizações a cada 3 segundos; o cliente grava o histórico em seu próprio
-  intervalo. Sem peças registradas, ocupação em disco é apenas uma estimativa.
-  **Iniciar cliente** usa um perfil da coleção; API local mostra velocidade,
-  ETA, pausa/retomada. Magnets do Hub vão ao cliente do Hub com destino
-  Meus Jogos Locais/ (nunca ao cliente do SO); o que caiu fora pode voltar com Organizar.
-- **Sanear pasta:** localiza o jogo antes da limpeza, preserva instaladores
-  ainda necessários e compara redistribuíveis por conteúdo. Na GUI, roda em
-  segundo plano; setups redundantes vão para `.hub-lixo/`.
-- **Coleção portátil:** JSON/ZIP com identidade estável, capas, presets,
-  músicas e saves opcionais. Backup versionado guarda os últimos 10 pares.
-- **Desejo → fontes → coleção:** SteamRip oferece download/importação no Qt;
-  FitGirl abre a página. Obtido só após importação bem-sucedida, sem reaparecer
-  no próximo espelho da wishlist. Disponibilidade remota não é garantida.
-- **Ferramentas pessoais:** perfis Tuco/Isa (favoritos/filtros independentes),
-  atalhos da janela, pasta vigiada opt-in, histórico anual local e API de
-  leitura em loopback com token (desligada por padrão).
-- **Saves e arquivos:** configure saves por jogo; snapshot e restauração com
-  SHA-256/backup prévio, galeria local de screenshots e IPS/BPS para uma nova
-  ROM. Cópia/hardlinks são explícitos; hardlinks **não são backup**.
-- **Música/YouTube:** letras LRCLIB em cache, acompanhamento durante a música
-  correspondente, MP3 do vídeo escolhido e SponsorBlock opt-in.
-  Não há sincronização de conquistas, overlay ou lançamento pela Steam.
+**A biblioteca**
+- Grade de capas, busca, favoritos, filtros por plataforma/status e ordenação.
+- Detalhes com horas de jogo, nota, etiquetas, observações e conquistas locais.
+- Jogar com um clique, escolhendo o executável certo para o seu sistema.
+- Capturas de tela por jogo, notas e registro manual de horas.
 
-## Dependências por funcionalidade
+**Músicas**
+- Importa uma pasta inteira sem duplicar faixas.
+- Toca enquanto você joga, com player persistente no rodapé.
+- Baixa e converte áudio (yt-dlp + FFmpeg), busca capas de álbum e letras
+  sincronizadas (LRCLIB), com cache local.
+- Busca faixas no Deezer, iTunes e MusicBrainz sem precisar de conta.
 
-As funcionalidades abaixo pertencem ao conjunto Qt + ferramentas clássicas.
-A [matriz de migração](docs/DESKTOP_QT.md#cobertura) explicita onde cada fluxo está.
+**Vídeos e YouTube**
+- Videoteca local, com retomada de onde parou e controle de velocidade.
+- Na variante completa, o YouTube roda embutido com perfil privado; na
+  essencial, abre no navegador do sistema.
 
-| Recurso | Requisito |
+**Baixar e organizar**
+- Desejos com histórico: você marca o que quer, o hub ajuda a achar a fonte,
+  baixa e importa, e só então marca como obtido.
+- Catálogo SteamRip pesquisável e histórico local de torrents (qBittorrent).
+- Organiza a pasta de downloads com hardlink ou cópia, sem apagar a origem e
+  sem sermos "backup" — hardlink não é backup.
+- Sanea pastas de instalação com cuidado: acha o jogo antes de limpar.
+
+**Coisas pequenas que ajudam**
+- Modo tela cheia (F11) navegável pelo teclado.
+- Busca global `Ctrl+K`.
+- Volume geral do PC no rodapé.
+- Backup da coleção em um clique, exportável para outro computador.
+- Perfis separados para Tuco e Isa (favoritos e filtros independentes).
+- API local de leitura (desligada por padrão, só loopback, com token).
+
+## O que ele **não** faz
+
+Vale a dizer claramente, porque é a diferença entre um hub honesto e um
+promessômetro:
+
+- **Nada de gamepad.** A navegação em tela cheia é teclado e mouse.- **Nada de conquistas online, overlay ou integração com a Steam como
+  destino.** A Steam serve só como catálogo e lista de desejos; as conquistas
+  do hub são locais e persistidas no seu banco.
+- **Nada de conta obrigatória ou sincronização entre máquinas.** O pacote de
+  coleção existe para levar sua biblioteca de um PC a outro na mão.
+- **Sem assinatura de código.** O Windows pode reclamar do SmartScreen na
+  primeira execução.
+- **macOS é experimental.** Os fontes e os testes mantêm os caminhos, mas não
+  há bundle macOS validado.
+- **Everything** (busca instantânea) é opcional; sem ele, a varredura normal
+  continua sendo a fonte da verdade.
+
+## Requisitos
+
+| Recurso | O que precisa |
 |---|---|
-| Núcleo, banco, scanners e ZIP | Python 3.10+ stdlib |
-| Desktop Qt | PySide6-Essentials 6.10.2 (`requirements-ui.txt`) |
-| GUI clássica | tkinter/Tcl/Tk (em algumas distribuições Linux, `python3-tk`) |
-| TUI | curses; no Windows prefira a GUI |
-| Imagens JPG/WebP/conversão | Pillow opcional; PNG/GIF têm suporte Tk |
-| RAR/7z/ISO | 7-Zip (`BIBLIOTECA_7Z` ou descoberta local) |
-| CSV → áudio | yt-dlp; FFmpeg para MP3/conversão |
-| Player interno Windows | MCI waveaudio; FFmpeg para formatos comprimidos |
-| Player interno Linux/macOS | mpv/ffplay/mpg123/play ou afplay, respectivamente |
-| Jogos 3DS/NDS | Emulador e ROMs próprios; Wine para executáveis Windows no Linux |
+| Núcleo, banco e testes | Python 3.10+ (só biblioteca padrão) |
+| Interface principal | PySide6-Essentials 6.10.2 (`requirements-ui.txt`) |
+| YouTube embutido e vídeo interno | `requirements-extras.txt` (PySide6-Addons, variante completa) |
+| Interface clássica e TUI | tkinter/Tcl/Tk e curses |
+| Imagens JPG/WebP | Pillow (opcional; PNG/GIF funcionam sem ele) |
+| RAR/7z/ISO | 7-Zip instalado ou no pacote |
+| Áudio e vídeo | FFmpeg (conversão) e um player externo como opção |
 
-Ferramentas de áudio podem ser instaladas pelo botão de dependências no
-Windows. `BIBLIOTECA_FFMPEG` e `BIBLIOTECA_YTDLP` permitem caminhos explícitos.
-O mapa completo de configuração fica em [ARQUITETURA](docs/ARQUITETURA.md).
+Os pacotes prontos (veja abaixo) já trazem tudo isso junto — inclusive os
+emuladores — e não pedem instalação de Python no Windows.
 
-### SuperHub portátil Windows x64
+## Pacotes prontos
 
-`codigo/ferramentas/montar_superhub.py` monta Python/Tk/Pillow, Azahar,
-DeSmuME, qBittorrent, 7-Zip completo, FFmpeg e yt-dlp com QuickJS-NG em
-uma árvore independente. O yt-dlp oficial em zipapp reutiliza o Python
-do pacote. Ferramentas e dados usam caminhos locais; o manifesto JSON é editável.
+A release privada **v1.0.0** traz dois pacotes Windows x64:
+
+| Variante | O que tem | Para quem |
+|---|---|---|
+| **essencial** | Sem Chromium: o YouTube abre no navegador do sistema | Quer o pacote menor e leve |
+| **completo** | Com QtWebEngine e QtMultimedia: YouTube embutido e vídeo interno | Quer tudo dentro do hub |
+
+Os dois incluem Python, Tk, Pillow, PySide6, 7-Zip, FFmpeg, yt-dlp,
+QuickJS-NG, qBittorrent, Azahar e DeSmuME. A coleção começa vazia; para
+trazer a sua, use **exportar/importar pacote de coleção** dentro do hub.
+
+Para gerar você mesmo (na máquina de build, com os emuladores instalados):
 
 ```powershell
-py -3.14 codigo/ferramentas/montar_superhub.py --extras essencial --formato zip
-py -3.14 codigo/ferramentas/montar_superhub.py --extras completo --formato zip
+py -3.14 codigo/ferramentas/montar_superhub.py --extras essencial --revisao <SHA>
+py -3.14 codigo/ferramentas/montar_superhub.py --extras completo  --revisao <SHA>
 ```
 
-Os bundles são locais, para uso pessoal. Extraia o ZIP e abra `TucoTeca.bat`. A coleção é
-mantida em `dados/`; o runtime novo inicia com perfis vazios. Coleções podem
-ser transferidas pelo pacote de coleção do Hub. Preserve `dados/` em atualizações.
-O pacote não leva executáveis de jogos ou ROMs. As variantes usam árvores de
-build distintas; `superhub-verificacao-<variante>.json` e `SHA256SUMS-<variante>.txt`
-documentam as provas e a integridade. Não há workflow de release pública.
+O builder monta o runtime, executa provas reais nele (tkinter, Qt, áudio MCI,
+Chromium com rede bloqueada, qBittorrent) e repete as provas no pacote
+extraído. Nada disso é simulado: se a prova falha, o pacote não sai.
 
-**Essencial** não inclui WebEngine nem QtMultimedia; **completo** inclui ambos.
-Nenhum inclui navegação por gamepad. Áudio interno Windows usa MCI/FFmpeg nas
-duas variantes; caminhos longos têm cache temporário curto, sem mover a mídia.
-SmartScreen pode alertar: assinatura Windows e entrega macOS estão adiadas.
+Para montar a pasta da release (fontes + bundles + notas + checksums):
 
-As entregas atuais ficam em `dist/windows/`; os ZIPs de código, em
-`dist/fontes/`; versões anteriores, em `dist/historico/`.
-Os artefatos congelados da sessão R5 ficam localmente em
-`dist/marco-s0-s8/r5/` e correspondem ao commit `b35bac9`.
+```powershell
+py -3.14 codigo/ferramentas/preparar_release.py --revisao <SHA> --saida dist/release/v1.0.0
+```
+
+Esse comando confere hash por hash, garante que nenhum dado pessoal entrou e
+escreve as notas da release. **Ele não publica nada** — a publicação no GitHub
+é um passo separado e explícito.
 
 O repositório [Projeto-Launcher](https://github.com/Artur-Lucena/Projeto-Launcher)
-é privado e reúne apenas fontes, testes, documentação e recursos de build.
-Coleção, jogos, ROMs, saves, perfis pessoais, backups e runtimes locais não
-entram no Git. O push dos fontes não cria nem publica uma release.
-Veja [a reconciliação dos históricos](docs/RECONCILIACAO_GITHUB.md).
+é privado e guarda apenas fontes, testes, documentação e o necessário para
+build. Coleção, jogos, ROMs, saves, perfis pessoais e runtimes não entram no
+Git. O histórico está explicado em
+[docs/RECONCILIACAO_GITHUB.md](docs/RECONCILIACAO_GITHUB.md).
 
-## Estrutura resumida
+## Como o código está organizado
 
 ```text
 codigo/
-  bib_core.py          fachada de compatibilidade para o núcleo
-  bib_nucleo/         regras, persistência e adaptadores do sistema
-    rede/              integrações remotas explícitas
-  frontends/          GUI/TUI e dispatcher de callbacks
-    qml/secoes/        telas Qt Quick por seção
-  ferramentas/        diagnóstico, entrega de fontes, builders e testes
-docs/                 mapa técnico e relatório da revisão
-.github/workflows/    testes automatizados Windows/Linux
-midia/fontes-capas/   opcional: placeholders gerados localmente
-dados/                coleção e estado local (ignorado)
-dist/                 entregas geradas (ignorado)
+  bib_nucleo/          regras, persistência e adaptadores do sistema
+    rede/              integrações de internet (sempre sob ação do usuário)
+  frontends/           interface Qt Quick, clássica (tkinter) e TUI
+    qml/secoes/        telas da interface Qt
+  ferramentas/         diagnóstico, provas, empacotamento e testes
+docs/                  arquitetura, revisões, decisões e responsabilidades
+dados/                 sua coleção (nunca vai para o Git)
+dist/                  pacotes gerados (também fora do Git)
 ```
 
-## Verificação
+A explicação completa, com o mapa de módulos, está em
+[docs/ARQUITETURA.md](docs/ARQUITETURA.md). As decisões de produto e o que
+ainda falta estão em [docs/VISAO_OS.md](docs/VISAO_OS.md).
+
+## Testes
 
 ```powershell
-py -3.14 codigo/ferramentas/testes/executar.py
-py -3.14 -m pytest --cobertura
-py -3.14 codigo/ferramentas/testes/executar.py --modulo test_baixar
-py -3.14 codigo/ferramentas/testes/executar.py --caso test_player.py teste_player_transporte
-py -3.14 codigo/ferramentas/diagnosticar.py --json
+py -3.14 codigo/ferramentas/testes/executar.py    # suíte completa
+py -3.14 -m pytest --cobertura                    # com pytest e cobertura
 ```
 
-Cada caso roda em subprocesso/sandbox próprio; escrita fora dela, rede e
-processos externos são bloqueados. Os pulos por SO/display/privilégio
-aparecem como `SKIP`. `--json arquivo.json` grava um relatório da suíte.
-Pytest usa o mesmo isolamento por processo; `--cobertura` mede os processos
-dos casos, não apenas o coletor. Relatórios HTML/JSON ficam em `.provas/cobertura/`.
-As provas nativas de Chromium/player usam conteúdo sintético, separado da
-coleção pessoal: `codigo/ferramentas/provar_qt_runtime.py`.
+Cada teste roda em processo e pasta temporária próprios, com rede, escrita
+fora da sandbox e processos externos bloqueados. Nenhum teste toca a sua
+coleção, abre jogo ou acessa a internet. Casos que dependem de Linux, macOS ou
+display são marcados como `SKIP`, não como falha.
 
-## Entrega ao engenheiro
+A mesma suíte roda na CI do GitHub em Windows e Linux, Python 3.10 e 3.14, com
+e sem Qt, mais uma verificação de segredos no histórico. O guia de colaboração
+é o [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```powershell
-py -3.14 codigo/ferramentas/empacotar_fontes.py
-```
+## Privacidade e legal
 
-Gera **`dist/fontes/tucoteca-fontes-revisadas.zip`** com a árvore de trabalho atual,
-documentação, testes e manifesto SHA-256. Inclui módulos ainda não
-commitados; exclui coleção, caches, histórico local, atalhos e outros
-artefatos de build. O engenheiro pode extrair, seguir `CONTRIBUTING.md` e
-executar a suíte sem receber seus dados pessoais.
+- O hub é um **gerenciador local**: organiza o que você já tem. Ele não
+  distribui, não hospedeia e não incentiva pirataria.
+- Toda ação de rede (buscar capa, consultar catálogo, baixar letra) é disparada
+  por você, com tempo limite e cache local. Se a rede falhar, você recebe um
+  aviso e a biblioteca continua funcionando.
+- `BIBLIOTECA_REDE=0` desliga todas as ações remotas do hub.
+- A API local de leitura é opt-in, só aceita conexões da própria máquina e
+  exige token.
+- Capas, letras e metadados de terceiros pertencem a quem os fez; o hub só
+  os exibe na sua biblioteca pessoal.
+- Nenhuma capa comercial é versionada neste repositório.
 
-Os installers de usuário continuam em `montar_portatil.py`,
-`montar_linux.py`, `montar_mac.py` e `montar_universal.py`. Gerar um bundle
-completo pode baixar componentes; instalar o bundle completo é offline.
-Os instaladores e o porte macOS exigem também validação em seus SOs reais.
+O texto completo está em [docs/LEGAL.md](docs/LEGAL.md).
 
 ## Licença
 
-Código do Hub: MIT, [LICENSE](LICENSE). Emuladores/ferramentas distribuídos
-separadamente mantêm suas licenças e notas de origem nos bundles.
+O código do hub é [MIT](LICENSE). Emuladores e ferramentas que vêm nos pacotes
+mantêm suas próprias licenças, com os textos e as fontes dentro de cada
+pacote (`manifesto-runtime.json`, `FONTE.txt`, `COPYING.txt`).

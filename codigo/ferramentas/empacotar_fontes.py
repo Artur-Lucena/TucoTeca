@@ -13,14 +13,15 @@ import zipfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git"}
+IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git", ".provas",
+             ".pytest_cache", ".ruff_cache", ".venv"}
 RAIZ_ARQUIVOS = {"README.md", "CONTRIBUTING.md", "LICENSE", ".gitignore", ".gitattributes",
                  "BibliotecaHub.bat", "BibliotecaHub.sh", "BibliotecaHubMac.command",
                   "Montar-Universal.bat", "requirements-ui.txt"}
 RAIZ_ARQUIVOS.update({"TucoTeca.bat", "VERSION", "CHANGELOG.md", "SECURITY.md",
                       "pyproject.toml", "conftest.py", "requirements-extras.txt"})
 EXTENSOES = {"codigo": {".py", ".iss", ".qml"}, "docs": {".md"},
-             ".github": {".yml", ".yaml"}, "midia": {".png", ".jpg", ".jpeg"}}
+              ".github": {".yml", ".yaml", ".md"}, "midia": {".png", ".jpg", ".jpeg"}}
 
 
 def _link(path: Path) -> bool:
@@ -46,9 +47,11 @@ def listar_fontes(repo: Path = REPO) -> list[Path]:
     return sorted(arquivos, key=lambda p: p.relative_to(repo).as_posix())
 
 
-def empacotar_fontes(destino: Path, repo: Path = REPO) -> dict:
+def empacotar_fontes(destino: Path, repo: Path = REPO, revisao: str | None = None) -> dict:
     """Inclui a árvore de trabalho atual, inclusive módulos ainda não commitados."""
     repo, destino = Path(repo), Path(destino)
+    if revisao is not None and (len(revisao) != 40 or any(c not in "0123456789abcdef" for c in revisao)):
+        raise ValueError("A revisão deve ser o SHA Git completo (40 caracteres hexadecimais).")
     arquivos = listar_fontes(repo)
     if not (repo / "codigo/bib_core.py").is_file():
         raise ValueError("pasta não contém os fontes da TucoTeca")
@@ -56,8 +59,12 @@ def empacotar_fontes(destino: Path, repo: Path = REPO) -> dict:
     sys.path.insert(0, str(repo / "codigo"))
     from bib_nucleo.arquivos import destino_temporario
     manifesto = {"esquema": 1, "projeto": "TucoTeca", "origem": "árvore de trabalho",
-                 "gerado_em": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                 "arquivos": {}}
+                  "gerado_em": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                  "arquivos": {}}
+    if (repo / "VERSION").is_file():
+        manifesto["versao"] = (repo / "VERSION").read_text(encoding="utf-8").strip()
+    if revisao is not None:
+        manifesto["revisao_git"] = revisao
     with destino_temporario(destino) as tmp, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as out:
         for path in arquivos:
             relativo = path.relative_to(repo).as_posix()
@@ -78,9 +85,10 @@ def empacotar_fontes(destino: Path, repo: Path = REPO) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Empacota fontes para colaboração técnica.")
     ap.add_argument("--saida", type=Path, default=REPO / "dist/fontes/tucoteca-fontes-revisadas.zip")
+    ap.add_argument("--revisao", help="SHA completo do checkout limpo/congelado; não valida o Git por conta própria")
     args = ap.parse_args(argv)
     try:
-        r = empacotar_fontes(args.saida)
+        r = empacotar_fontes(args.saida, revisao=args.revisao)
     except (OSError, ValueError) as e:
         print(f"ERRO: {e}", file=sys.stderr)
         return 1

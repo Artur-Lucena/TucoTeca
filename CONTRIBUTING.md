@@ -103,8 +103,8 @@ py -3.14 codigo/ferramentas/testes/executar.py
 ```powershell
 py -3.14 -B codigo/ferramentas/provar_qt_runtime.py --extras completo --saida .provas/qt --ffmpeg C:\caminho\ffmpeg.exe
 py -3.14 -B codigo/ferramentas/provar_integracoes_locais.py --saida .provas/locais
-py -3.14 -B codigo/ferramentas/montar_superhub.py --extras essencial --formato zip
-py -3.14 -B codigo/ferramentas/montar_superhub.py --extras completo --formato zip
+py -3.14 -B codigo/ferramentas/montar_superhub.py --extras essencial --formato zip --revisao <SHA>
+py -3.14 -B codigo/ferramentas/montar_superhub.py --extras completo --formato zip --revisao <SHA>
 ```
 
 Chromium recebe HTML local com rede bloqueada; áudio/vídeo são sintéticos.
@@ -112,6 +112,11 @@ O builder confere hashes, presença/ausência real dos Addons, perfis vazios,
 reprodução e API local na árvore montada e no ZIP extraído. Não pula a prova
 de áudio quando MCI falha. Smokes remotos ficam fora da suíte e registram
 versão/data/limites; contrato mockado não prova disponibilidade de um host.
+
+`--revisao` espera o SHA completo do checkout congelado; ele é gravado no
+manifesto do runtime, em `VERSION` e em `VERSAO.txt`. Sem ele, o pacote fica
+marcado como “árvore de trabalho não identificada” — aceitável para iteração,
+não para release.
 
 Lint: `ruff check codigo conftest.py` completo está **limpo** (revisão R4).
 O gate crítico continua como exigência mínima:
@@ -139,6 +144,26 @@ Revise status/diff e execute os testes sobre uma versão estável da árvore.
 Registre no relatório/PR: problema reproduzido, alteração, verificações e
 limites ainda existentes. Use commits focados e revisão do diff completo;
 uma alteração na UI não deve absorver silenciosamente trabalho paralelo.
+
+## Preparar uma release privada
+
+1. Congele os fontes: árvore limpa, gates verdes e SHA completo do commit.
+2. Gere os dois bundles com `--revisao <SHA>` (o builder executa as provas na
+   árvore montada e no pacote extraído).
+3. Monte a pasta da release:
+
+   ```powershell
+   py -3.14 codigo/ferramentas/preparar_release.py --revisao <SHA> --saida dist/release/v1.0.0
+   ```
+
+   Sai o pacote de fontes, os bundles, os relatórios de verificação,
+   `NOTAS-RELEASE.md`, `SHA256SUMS.txt` e `release.json`.
+4. Crie a release no GitHub (repo privado) com `gh release create`, anexando
+   os arquivos da pasta. Essa publicação é sempre explícita — nenhum script
+   deste repositório publica sozinho.
+
+O pacote de coleção do Hub continua sendo o caminho para levar a biblioteca
+pessoal entre máquinas; a release nunca a inclui.
 
 A entrega ZIP representa **arquivos atuais**, não só o HEAD do Git. Para
 comparar uma entrega, verifique `MANIFESTO-FONTES.json`; para inspecionar
