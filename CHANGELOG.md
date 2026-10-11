@@ -6,6 +6,19 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 ## [Não lançado]
 
 ### Adicionado
+- **YouTube embutido** (variante completa): seção `YouTube` (Ctrl+8) com navegador
+  QtWebEngine off-the-record, navegação restrita a https e hosts YouTube e download
+  sempre explícito (⬇ Baixar este), validado no Python.
+- Variante essencial sem Addons: a seção mostra o aviso e usa a busca/baixar
+  existente; `webDisponivel` detecta a presença do motor web.
+- `requirements-extras.txt` (PySide6-Addons==6.10.2) e `incluir_qt` que inclui
+  os Addons quando `--extras completo`; `validar_runtime` prova o `webengine`
+  nessa variante.
+- Testes: 4 de validação de URL/hosts/baixar no bridge (hermético).
+- Validado: selftest com Addons e simulação de variante essencial (import
+  bloqueado) — ambos carregam o `Main.qml`.
+
+### Adicionado
 - **Tema claro e densidade** (`Theme.qml` + `bib_nucleo/aparencia_usuario.py`):
   escuro/claro e compacto/conforto/bigpicture, persistidos em
   `dados/aparencia.json` e aplicados pelo bridge ao vivo.

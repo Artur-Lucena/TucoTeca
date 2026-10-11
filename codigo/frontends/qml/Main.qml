@@ -30,18 +30,21 @@ ApplicationWindow {
         {key: "inicio", title: "Início"}, {key: "jogos", title: "Jogos"},
         {key: "musicas", title: "Músicas"}, {key: "desejos", title: "Desejos"},
         {key: "downloads", title: "Downloads"}, {key: "integracoes", title: "Integrações"},
-        {key: "videos", title: "Vídeos"}
+        {key: "videos", title: "Vídeos"}, {key: "youtube", title: "YouTube"}
     ]
     property var titles: ({inicio: "Boas-vindas ao seu hub.", jogos: "Sua próxima aventura.",
                           musicas: "Dê o play no seu mundo.", desejos: "O que vem a seguir.",
-                          downloads: "A caminho da sua coleção.", integracoes: "Seu hub, conectado.", videos: "Sua videoteca, no mesmo lugar."})
+                          downloads: "A caminho da sua coleção.", integracoes: "Seu hub, conectado.",
+                          videos: "Sua videoteca, no mesmo lugar.",
+                          youtube: "Assista e baixe sem sair do Hub."})
     property var subtitles: ({inicio: "Continuar, buscar e cuidar da coleção — sem sair do lugar.",
         jogos: "Todos os seus jogos. Um lugar para começar.",
         musicas: "Sua coleção local, com música em todas as telas.",
         desejos: "Guarde os títulos que você quer jogar.",
         downloads: "Progresso do qBittorrent, sem sair do Hub.",
         integracoes: "Catálogos, emuladores e serviços com responsabilidades independentes.",
-        videos: "Importe arquivos locais, pesquise YouTube e abra no reprodutor escolhido."})
+        videos: "Importe arquivos locais, pesquise YouTube e abra no reprodutor escolhido.",
+        youtube: "Navegue no YouTube aqui dentro; baixar é sempre ação sua."})
 
     function toggleImmersive() {
         if (!immersive) {
@@ -127,6 +130,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+5"; onActivated: hub.navegar("downloads") }
     Shortcut { sequence: "Ctrl+6"; onActivated: hub.navegar("integracoes") }
     Shortcut { sequence: "Ctrl+7"; onActivated: hub.navegar("videos") }
+    Shortcut { sequence: "Ctrl+8"; onActivated: hub.navegar("youtube") }
     Connections {
         target: hub
         function onAviso(message, error) { window.notify(message, error) }
@@ -360,6 +364,27 @@ ApplicationWindow {
                 onClicked: musicDownloads.open()
             }
             ActionButton { visible: hub.secao === "videos"; text: "Pesquisar YouTube…"; implicitHeight: 36; onClicked: youtube.open() }
+            TextField {
+                id: youtubeQuery
+                objectName: "youtubeNavQuery"
+                visible: hub.secao === "youtube" && hub.webDisponivel
+                placeholderText: "Pesquisar no YouTube"; implicitWidth: 240; implicitHeight: 36
+                color: Theme.text
+                onAccepted: youtubeLoader.item ? youtubeLoader.item.irPara(text) : youtube.open()
+            }
+            ActionButton {
+                visible: hub.secao === "youtube" && hub.webDisponivel
+                text: "Ir"; implicitHeight: 36
+                onClicked: youtubeLoader.item ? youtubeLoader.item.irPara(youtubeQuery.text) : youtube.open()
+            }
+            ActionButton {
+                visible: hub.secao === "youtube" && hub.webDisponivel
+                text: "⬇ Baixar este"; primary: true; implicitHeight: 36
+                enabled: !hub.ocupado
+                onClicked: {
+                    youtubeLoader.item.urlAtualAsync(function(u) { hub.youtubeBaixarUrl(u) })
+                }
+            }
             ComboBox { id: videoPlayer; visible: hub.secao === "videos"; model: ["Automático", "VLC", "MPV", "MPC-HC"]; implicitWidth: 130; implicitHeight: 36 }
             ActionButton { visible: hub.secao === "videos"; text: "Ferramentas…"; implicitHeight: 36; onClicked: mediaTools.open() }
             ActionButton {
@@ -403,6 +428,30 @@ ApplicationWindow {
 
         Item {
             Layout.fillWidth: true; Layout.fillHeight: true
+            // Seção YouTube: navegador embutido (variante completa) ou
+            // diálogo clássico (variante essencial, sem QtWebEngine).
+            Loader {
+                id: youtubeLoader
+                anchors.fill: parent
+                active: hub.secao === "youtube" && hub.webDisponivel
+                source: "NavegadorEmbed.qml"
+                onLoaded: { if (item) item.irPara("https://www.youtube.com/") }
+            }
+            Connections {
+                target: youtubeLoader.item
+                ignoreUnknownSignals: true
+                function onPedirDownload(url) { hub.youtubeBaixarUrl(url) }
+                function onPedirAbrirExterno(url) { hub.abrirUrl(url) }
+            }
+            ColumnLayout {
+                anchors.centerIn: parent
+                visible: hub.secao === "youtube" && !hub.webDisponivel
+                spacing: 14
+                Text { text: "◇"; color: Theme.accent; font.pixelSize: 54; Layout.alignment: Qt.AlignHCenter }
+                Text { text: "Navegador embutido não disponível"; color: Theme.text; font.pixelSize: 21; Layout.alignment: Qt.AlignHCenter }
+                Text { text: "Esta é a variante essencial (sem QtWebEngine). Use a busca e o download abaixo — o vídeo abre no seu navegador."; color: Theme.muted; font.pixelSize: 13; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                ActionButton { text: "Pesquisar e baixar…"; primary: true; Layout.alignment: Qt.AlignHCenter; onClicked: youtube.open() }
+            }
             GridView {
                 id: games
                 objectName: "gamesGrid"
