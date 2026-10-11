@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Catálogo SteamRip no Hub: buscar, listar hosts e baixar p/ `Piratas/`.
+"""Catálogo SteamRip no Hub: buscar, listar hosts e baixar p/ `Meus Jogos Locais/`.
 
 Fonte já conhecida do projeto (vigília Hydra); aqui vira catálogo digital:
 `?s=` acha o post, o post lista GOFILE/MegaDB/FileDitch/etc. FileDitch é
 direto; Gofile resolve via API guest; MegaDB segue redirect com HEAD.
-O `.rar` cai em `Piratas/` e o fluxo repack existente importa depois.
+O `.rar` cai em `Meus Jogos Locais/` e o fluxo repack existente importa depois.
 Tudo com `urllib` stdlib; rede falhou = erro claro, nunca levanta cru.
 """
 from __future__ import annotations
@@ -416,7 +416,7 @@ def _nome_saida(titulo: str, url: str) -> str:
 
 def baixar_steamrip(url_pagina: str, destino=None, host: str = "",
                     progresso=None, timeout: int = 30) -> dict:
-    """Baixa o jogo p/ `Piratas/` (FileDitch direto → gofile → megadb).
+    """Baixa o jogo p/ `Meus Jogos Locais/` (FileDitch direto → gofile → megadb).
 
     `host`: nome preferido (senão ordem `BIBLIOTECA_STEAMRIP_HOSTS`).
     Nunca levanta cru: erro vira {'ok': False, 'erro', 'tentados': [...]}.
@@ -468,8 +468,8 @@ def _mesmo_host(url: str, final: str) -> bool:
 
 def _descer(url: str, titulo: str, destino, progresso,
             timeout: int = 60) -> dict:
-    from bib_nucleo.rede.repacks import pasta_piratas
-    base = Path(destino) if destino else pasta_piratas()
+    from bib_nucleo.rede.repacks import pasta_jogos
+    base = Path(destino) if destino else pasta_jogos()
     try:
         base.mkdir(parents=True, exist_ok=True)
     except OSError as e:

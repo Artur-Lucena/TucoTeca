@@ -5,6 +5,28 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
+### Alterado
+- **Capas comerciais removidas do repositório e do histórico.** `midia/fontes-capas/`
+  agora contém apenas placeholders neutros gerados por
+  `codigo/ferramentas/gerar_placeholders.py`. O histórico foi reescrito
+  (filter-branch) e os blobs antigos foram purgados. Publicar exige
+  `git push --force` e um novo clone para quem já tinha cópia local.
+- **Integrações de rede isoladas em `bib_nucleo/rede/`** (fontes, repacks,
+  torrents, videos_youtube, musica_online, spotify, online). Nomes antigos
+  continuam resolvendo por import preguiçoso.
+- **Flag `BIBLIOTECA_REDE=0`** (modo avião): busca de capas, músicas online e
+  vídeos devolve erro claro sem tocar a rede.
+- **Pasta padrão de downloads: `Meus Jogos Locais`** (antes `Piratas`).
+  `BIBLIOTECA_JOGOS_DIR` define a pasta; `BIBLIOTECA_PIRATAS` segue aceito.
+  Pasta antiga existente é mantida automaticamente (nada é movido). Funções
+  renomeadas com alias legado: `pasta_jogos`, `dentro_do_destino`,
+  `organizar_no_destino`, `foraDoDestino` (QML).
+- `docs/LEGAL.md`: aviso legal e responsabilidades de uso.
+
+### Corrigido (adicional)
+- `app_win.py` importava `bib_nucleo.repacks` (caminho antigo); o botão de
+  organizar do clássico quebraria em runtime. Corrigido.
+
 ### Corrigido
 - `repacks.achar_exe`: exe pequeno em subpasta tinha nota negativa
   (tamanho vale ≤1 ponto, profundidade cobra 3) e desaparecia da lista de

@@ -76,7 +76,7 @@ def _perfil_texto(destino: Path) -> str:
 
 
 def migrar_save_path(texto: str, destino: Path) -> str:
-    """Garante DefaultSavePath=Piratas em perfil existente, sem tocar no resto."""
+    """Garante DefaultSavePath=Meus Jogos Locais em perfil existente, sem tocar no resto."""
     alvo = "Session\\DefaultSavePath=" + destino.as_posix()
     linhas = texto.splitlines()
     for i, linha in enumerate(linhas):
@@ -91,9 +91,9 @@ def migrar_save_path(texto: str, destino: Path) -> str:
 
 
 def qbit_preparar_perfil() -> Path:
-    """Cria o perfil do Hub ou migra o existente (destino sempre Piratas/)."""
-    from bib_nucleo.rede.repacks import pasta_piratas
-    destino = pasta_piratas().resolve()
+    """Cria o perfil do Hub ou migra o existente (destino sempre Meus Jogos Locais/)."""
+    from bib_nucleo.rede.repacks import pasta_jogos
+    destino = pasta_jogos().resolve()
     cfg = qbit_config_path()
     destino.mkdir(parents=True, exist_ok=True)
     cfg.parent.mkdir(parents=True, exist_ok=True)
@@ -112,9 +112,9 @@ def qbit_preparar_perfil() -> Path:
 
 
 def qbit_adicionar(url: str) -> dict:
-    """Adiciona magnet/URL ao qBittorrent do Hub, sempre com destino Piratas/.
+    """Adiciona magnet/URL ao qBittorrent do Hub, sempre com destino Meus Jogos Locais/.
 
-    Nunca entrega ao cliente do SO (era assim que jogos caíam fora de Piratas).
+    Nunca entrega ao cliente do SO (era assim que jogos caíam fora de Meus Jogos Locais).
     Exige o cliente do Hub ligado (Downloads → Iniciar cliente).
     """
     url = (url or "").strip()
@@ -126,8 +126,8 @@ def qbit_adicionar(url: str) -> dict:
                     "erro": "Inicie o qBittorrent do Hub primeiro (Downloads → Iniciar cliente)."}
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
-    from bib_nucleo.rede.repacks import pasta_piratas
-    destino = pasta_piratas().resolve()
+    from bib_nucleo.rede.repacks import pasta_jogos
+    destino = pasta_jogos().resolve()
     try:
         destino.mkdir(parents=True, exist_ok=True)
         resposta = qbit_request("torrents/add", {"urls": url, "savepath": str(destino),
@@ -144,8 +144,8 @@ def qbit_iniciar(url: str = "") -> dict:
     exe = localizar_ferramenta("qbittorrent")
     if not exe:
         return {"ok": False, "erro": "qBittorrent não encontrado no pacote"}
-    from bib_nucleo.rede.repacks import pasta_piratas
-    destino = pasta_piratas().resolve()
+    from bib_nucleo.rede.repacks import pasta_jogos
+    destino = pasta_jogos().resolve()
     try:
         qbit_preparar_perfil()
         cmd = [exe, "--profile=" + str(perfil_qbit().resolve()), "--configuration=tucoteca",

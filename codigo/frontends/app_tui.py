@@ -1326,7 +1326,7 @@ class Tui:
         if not res.get("ok"):
             self.msg = f"Falha: {res.get('erro')}"
             return
-        self.msg = f"Em Piratas/: {Path(res['path']).name}"
+        self.msg = f"Em Meus Jogos Locais/: {Path(res['path']).name}"
         if self.confirmar("Importar para o Hub agora?"):
             self._importar_arquivo(res["path"])
 
@@ -1357,7 +1357,7 @@ class Tui:
             e = links[h]
             if e["tipo"] == "magnet":
                 r = core.qbit_adicionar(e["url"])
-                self.msg = (f"No Hub → {r.get('destino', 'Piratas/')}"
+                self.msg = (f"No Hub → {r.get('destino', 'Meus Jogos Locais/')}"
                             if r.get("ok") else f"Falha: {r.get('erro')}")
             else:
                 r = core.abrir_url(e["url"])
@@ -1575,7 +1575,7 @@ class Tui:
                 self.menu_fitgirl()
 
     def menu_steamrip(self):
-        """Catálogo SteamRip: buscar → hosts → Piratas/ → importar."""
+        """Catálogo SteamRip: buscar → hosts → Meus Jogos Locais/ → importar."""
         r = self.perguntar("Buscar no SteamRip: ")
         if r is None or not r.strip():
             return
@@ -1623,7 +1623,7 @@ class Tui:
         if not res.get("ok"):
             self.msg = f"Falha: {res.get('erro')}"
             return
-        self.msg = f"Em Piratas/: {Path(res['path']).name}"
+        self.msg = f"Em Meus Jogos Locais/: {Path(res['path']).name}"
         if self.confirmar("Importar para o Hub agora?"):
             self._importar_arquivo(res["path"])
 
@@ -1675,7 +1675,7 @@ class Tui:
             e = links[h]
             if e["tipo"] == "magnet":
                 r = core.qbit_adicionar(e["url"])
-                self.msg = (f"No Hub → {r.get('destino', 'Piratas/')}"
+                self.msg = (f"No Hub → {r.get('destino', 'Meus Jogos Locais/')}"
                             if r.get("ok") else f"Falha: {r.get('erro')}")
             else:
                 r = core.abrir_url(e["url"])

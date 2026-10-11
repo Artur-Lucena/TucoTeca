@@ -66,7 +66,7 @@ Python continua no domínio. Qt Quick continua na apresentação. O que muda
 | HowLongToBeat / IGDB via chave do usuário | metadados | Tempo estimado, capa fallback | Timeout curto, falha = aviso |
 | Jellyfin/Plex local | mídia | Filmes/séries no mesmo shell | Cliente loopback, sem exposição externa |
 | Syncthing / rclone (BYOB) | sync | Saves/músicas entre máquinas | Perfil próprio, como qBittorrent; nunca pasta do SO |
-| qBittorrent (já) + RSS local | download | Séries/mods | Filtros explícitos, destino em `Piratas/` |
+| qBittorrent (já) + RSS local | download | Séries/mods | Filtros explícitos, destino em `Meus Jogos Locais/` |
 | Discord Rich Presence (opt-in) | social | “Jogando X” | Processo lateral, desliga por padrão |
 | Voice/Gamepad (SDL) | entrada | Controle total no sofá | Mapeamento visível, sem hook global |
 | IA local (Whisper/llama.cpp BYOB) | assistência | “Ache RPG <20h”, organizar etiquetas | Modelo baixado sob ação, inferência em worker |

@@ -1047,22 +1047,22 @@ class HubBridge(QObject):
     @Slot(str)
     def baixarTorrent(self, url):
         def pronto(r):
-            self.aviso.emit(f"Torrent no cliente do Hub → {r.get('destino', 'Piratas/')}.", False)
+            self.aviso.emit(f"Torrent no cliente do Hub → {r.get('destino', 'Meus Jogos Locais/')}.", False)
             self._atualizar_downloads()
         self.executar("Adicionando torrent no Hub…", lambda: self.servico.baixar_torrent_hub(url), pronto)
 
     @Slot(str, result=bool)
-    def foraDePiratas(self, caminho):
-        return self.servico.fora_de_piratas(caminho)
+    def foraDoDestino(self, caminho):
+        return self.servico.fora_do_destino(caminho)
 
     @Slot(str)
     def organizarDownload(self, caminho):
         def pronto(r):
-            msg = "Já estava em Piratas/." if not r.get("movido") else \
-                f"Movido p/ Piratas. {r.get('aviso', '')}"
+            msg = "Já estava em Meus Jogos Locais/." if not r.get("movido") else \
+                f"Movido p/ Meus Jogos Locais. {r.get('aviso', '')}"
             self.aviso.emit(msg, False)
             self._atualizar_downloads()
-        self.executar("Organizando em Piratas…", lambda: self.servico.organizar_download(caminho), pronto)
+        self.executar("Organizando em Meus Jogos Locais…", lambda: self.servico.organizar_download(caminho), pronto)
 
     @Slot()
     def iniciarDownloads(self):

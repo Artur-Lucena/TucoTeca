@@ -421,18 +421,18 @@ def teste_qt_torrent_hub_organizar_e_botao_magnet():
         janela = engine.rootObjects()[0]
         bridge.atualizar()
         _aguardar(app, lambda: not bridge.ocupado)
-        afirmar(bridge.foraDePiratas("C:/Downloads/Jogo") and not bridge.foraDePiratas(""), "foraDePiratas")
+        afirmar(bridge.foraDoDestino("C:/Downloads/Jogo") and not bridge.foraDoDestino(""), "foraDoDestino")
         msgs = []
         bridge.aviso.connect(lambda m, e: msgs.append((m, e)))
         magnet = "magnet:?xt=urn:btih:" + "b" * 40
         with patch.object(bridge.servico, "baixar_torrent_hub",
-                          return_value={"ok": True, "destino": "P:/Piratas"}) as add:
+                          return_value={"ok": True, "destino": "P:/Meus Jogos Locais"}) as add:
             bridge.baixarTorrent(magnet)
             _aguardar(app, lambda: not bridge.ocupado)
             afirmar(add.call_args.args == (magnet,), add.call_args)
-            afirmar(any("P:/Piratas" in m for m, _e in msgs), msgs)
+            afirmar(any("P:/Meus Jogos Locais" in m for m, _e in msgs), msgs)
         with patch.object(bridge.servico, "organizar_download",
-                          return_value={"ok": True, "path": "P:/Piratas/Jogo", "movido": True}):
+                          return_value={"ok": True, "path": "P:/Meus Jogos Locais/Jogo", "movido": True}):
             bridge.organizarDownload("C:/Downloads/Jogo")
             _aguardar(app, lambda: not bridge.ocupado)
             afirmar(any("Movido" in m for m, _e in msgs), msgs)

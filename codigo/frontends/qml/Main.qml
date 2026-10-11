@@ -504,9 +504,9 @@ ApplicationWindow {
                             onClicked: hub.controlarDownload(row.item.hash, "retomar")
                         }
                         ActionButton {
-                            visible: hub.secao === "downloads" && hub.foraDePiratas(row.item.save_path || "")
+                            visible: hub.secao === "downloads" && hub.foraDoDestino(row.item.save_path || "")
                             text: "Organizar"; enabled: !hub.ocupado
-                            ToolTip.visible: hovered; ToolTip.text: "Mover p/ Piratas/ (padrão do Hub)"
+                            ToolTip.visible: hovered; ToolTip.text: "Mover p/ Meus Jogos Locais/ (padrão do Hub)"
                             onClicked: hub.organizarDownload(row.item.save_path)
                         }
                         ActionButton {
@@ -942,7 +942,7 @@ ApplicationWindow {
                     }
                 }
             }
-            Text { text: "A pesquisa acessa a fonte somente quando solicitada. Magnets vão ao qBittorrent do Hub (Piratas/); o resto abre no navegador."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 14 }
+            Text { text: "A pesquisa acessa a fonte somente quando solicitada. Magnets vão ao qBittorrent do Hub (Meus Jogos Locais/); o resto abre no navegador."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 14 }
         }
     }
     Dialog {

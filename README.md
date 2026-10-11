@@ -112,7 +112,7 @@ capas, backups, saves, mods e músicas; permanece fora do Git. A trava
   intervalo. Sem peças registradas, ocupação em disco é apenas uma estimativa.
   **Iniciar cliente** usa um perfil da coleção; API local mostra velocidade,
   ETA, pausa/retomada. Magnets do Hub vão ao cliente do Hub com destino
-  Piratas/ (nunca ao cliente do SO); o que caiu fora pode voltar com Organizar.
+  Meus Jogos Locais/ (nunca ao cliente do SO); o que caiu fora pode voltar com Organizar.
 - **Sanear pasta:** localiza o jogo antes da limpeza, preserva instaladores
   ainda necessários e compara redistribuíveis por conteúdo. Na GUI, roda em
   segundo plano; setups redundantes vão para `.hub-lixo/`.

@@ -798,7 +798,7 @@ def analisar_arquivo(caminho: str) -> dict:
     Retorna {"tipo", "item", "provedor", "detalhe", "aviso"} onde tipo é
     'pasta' | 'rom' | 'jogo' | 'json' | 'pacote' | 'arquivo-jogo' |
     'desconhecido'. 'pacote' é só o portátil do Hub (com biblioteca.json);
-    outro .zip/.rar/.7z/.iso é repack (extrai p/ Piratas e importa).
+    outro .zip/.rar/.7z/.iso é repack (extrai p/ Meus Jogos Locais e importa).
     Emulador ausente NÃO bloqueia: a ROM importa e o aviso orienta (⬇).
     """
     vazio = {"tipo": "desconhecido", "item": None, "provedor": None,
@@ -818,7 +818,7 @@ def analisar_arquivo(caminho: str) -> dict:
                 "detalhe": "pacote portátil (.zip) — tenta restaurar."}
     if ext in ARQUIVO_EXTS:
         return {**vazio, "tipo": "arquivo-jogo",
-                "detalhe": (f"repack ({p.name}): extrai p/ Piratas, organiza, "
+                "detalhe": (f"repack ({p.name}): extrai p/ Meus Jogos Locais, organiza, "
                             "acha o exe e importa.")}
     prov = provedor_por_extensao(ext)
     if prov is not None:

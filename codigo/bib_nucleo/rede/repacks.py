@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Repacks baixados (.rar/.zip/.7z/.iso…): extrai, organiza, acha o exe e importa.
 
-Procedimento padrão do Hub (ex-Piratas, agora em código): extrair com 7z
+Procedimento padrão do Hub (antiga pasta Meus Jogos Locais, agora em código): extrair com 7z
 (Win) ou stdlib (zip), limpar sobras (Read_Me, .url, _redist, setup
 redundante), achar o executável principal e importar sem duplicar.
 O archive é apagado após verificação do exe. Sem rede, darwin-safe.
@@ -27,36 +27,67 @@ _LIXO_NOMES = re.compile(
 _SETUP_RE = re.compile(r"(?i)^setup")
 
 
-def pasta_piratas() -> Path:
-    """Destino padrão dos repacks (override `BIBLIOTECA_PIRATAS`)."""
+NOME_PASTA_JOGOS = "Meus Jogos Locais"
+NOME_PASTA_LEGADA = "Piratas"
+JOGOS_DIR_ENV = "BIBLIOTECA_JOGOS_DIR"
+JOGOS_DIR_ENV_LEGADO = "BIBLIOTECA_PIRATAS"
+
+
+def _raiz_padrao_jogos() -> Path:
+    """Pasta-pai onde a pasta padrão de jogos é criada (`Games/` do SO)."""
     from bib_nucleo.base import LINUX_ROOT, MAC_ROOT, WIN_ROOT, eh_mac
-    env = os.environ.get("BIBLIOTECA_PIRATAS")
-    if env:
-        return Path(env)
     from bib_nucleo.ferramentas import raiz_runtime, runtime_portatil
     if runtime_portatil():
-        return raiz_runtime() / "Piratas"
+        return raiz_runtime()
     if eh_mac():
-        return Path(MAC_ROOT) / "Games" / "Piratas"
+        return Path(MAC_ROOT) / "Games"
     if os.name == "nt":
-        return Path(f"{str(WIN_ROOT).rstrip(chr(92))}\\Games\\Piratas")
-    return Path(f"{str(LINUX_ROOT).rstrip('/')}/Games/Piratas")
+        return Path(f"{str(WIN_ROOT).rstrip(chr(92))}\\Games")
+    return Path(f"{str(LINUX_ROOT).rstrip('/')}/Games")
 
 
-def dentro_de_piratas(caminho: str | os.PathLike) -> bool:
-    """O caminho já está sob Piratas/ (critério padrão de todos os downloads)?"""
+def pasta_jogos() -> Path:
+    """Destino padrão dos downloads de jogos.
+
+    Ordem: `BIBLIOTECA_JOGOS_DIR`, depois `BIBLIOTECA_PIRATAS` (nome legado,
+    ainda aceito). Sem override: "Meus Jogos Locais". Se a pasta antiga
+    `Piratas` já existe e a nova não, continua usando a antiga: nada é movido
+    e os downloads não se dividem entre duas pastas.
+    """
+    env = os.environ.get(JOGOS_DIR_ENV) or os.environ.get(JOGOS_DIR_ENV_LEGADO)
+    if env:
+        return Path(env)
+    base = _raiz_padrao_jogos()
+    nova, antiga = base / NOME_PASTA_JOGOS, base / NOME_PASTA_LEGADA
+    if not nova.exists() and antiga.exists():
+        return antiga
+    return nova
+
+
+def pasta_piratas() -> Path:
+    """Alias legado de `pasta_jogos()`."""
+    return pasta_jogos()
+
+
+def dentro_do_destino(caminho: str | os.PathLike) -> bool:
+    """O caminho já está sob a pasta de jogos (critério padrão de todo download)?"""
     try:
-        base = pasta_piratas().resolve()
+        base = pasta_jogos().resolve()
         alvo = Path(caminho).resolve()
         return alvo == base or base in alvo.parents
     except OSError:
         return False
 
 
-def organizar_em_piratas(caminho: str | os.PathLike) -> dict:
-    """Move pasta/arquivo de jogo p/ Piratas/ (padrão p/ todo download fora do lugar).
+def dentro_de_piratas(caminho: str | os.PathLike) -> bool:
+    """Alias legado de `dentro_do_destino()`."""
+    return dentro_do_destino(caminho)
 
-    Não move o que já está em Piratas. Colisão de nome ganha sufixo -2, -3…
+
+def organizar_no_destino(caminho: str | os.PathLike) -> dict:
+    """Move pasta/arquivo de jogo p/ a pasta de jogos (padrão p/ todo download fora do lugar).
+
+    Não move o que já está lá. Colisão de nome ganha sufixo -2, -3…
     Aviso honesto: o cliente torrent original perde o rastro (reaponte nele).
     """
     p = Path(caminho)
@@ -64,11 +95,11 @@ def organizar_em_piratas(caminho: str | os.PathLike) -> dict:
         return {"ok": False, "erro": "caminho inválido"}
     if not p.exists():
         return {"ok": False, "erro": "caminho sumiu do disco"}
-    if dentro_de_piratas(p):
+    if dentro_do_destino(p):
         return {"ok": True, "path": str(p), "movido": False}
-    base = pasta_piratas().resolve()
+    base = pasta_jogos().resolve()
     if p.resolve() in base.parents or not p.name or p.resolve() == Path(p.anchor):
-        return {"ok": False, "erro": "A origem é uma raiz/pasta ancestral de Piratas; não pode ser movida para dentro dela."}
+        return {"ok": False, "erro": f"A origem é uma raiz/pasta ancestral de {NOME_PASTA_JOGOS}; não pode ser movida para dentro dela."}
     try:
         base.mkdir(parents=True, exist_ok=True)
         dest = base / p.name
@@ -78,10 +109,14 @@ def organizar_em_piratas(caminho: str | os.PathLike) -> dict:
             dest = base / f"{p.stem}-{n}{p.suffix}" if p.is_file() else base / f"{p.name}-{n}"
         shutil.move(str(p), str(dest))
     except (OSError, ValueError) as e:
-        return {"ok": False, "erro": f"não movi p/ Piratas: {e}"}
+        return {"ok": False, "erro": f"não movi p/ {NOME_PASTA_JOGOS}: {e}"}
     return {"ok": True, "path": str(dest), "movido": True,
             "aviso": "Reaponte o torrent no cliente original (ele perdeu o rastro)."}
 
+
+def organizar_em_piratas(caminho: str | os.PathLike) -> dict:
+    """Alias legado de `organizar_no_destino()`."""
+    return organizar_no_destino(caminho)
 
 def ferramenta_7z() -> Path | None:
     """7z p/ rar/7z/iso (override `BIBLIOTECA_7Z`; None = sem extrator)."""
@@ -449,7 +484,7 @@ def importar_repack(con: sqlite3.Connection, arquivo: str | os.PathLike,
     if src.suffix.lower() not in ARQUIVO_EXTS:
         return {"ok": False,
                 "erro": f"extensão '{src.suffix}' não é pacote de jogo."}
-    raiz = Path(destino_raiz) if destino_raiz else pasta_piratas()
+    raiz = Path(destino_raiz) if destino_raiz else pasta_jogos()
     nome = slugify(src.stem) or "jogo"
     dest = raiz / nome
     if dest.exists():
@@ -545,7 +580,8 @@ def _capa_automatica(con: sqlite3.Connection, gid: int, titulo: str) -> bool:
         return False
 
 
-__all__ = ['ARQUIVO_EXTS', 'pasta_piratas', 'dentro_de_piratas', 'organizar_em_piratas',
+__all__ = ['ARQUIVO_EXTS', 'pasta_jogos', 'pasta_piratas', 'dentro_do_destino',
+           'dentro_de_piratas', 'organizar_no_destino', 'organizar_em_piratas',
            'ferramenta_7z', 'eh_pacote_hub',
            'extrair_arquivo', 'organizar_extraido', 'achar_exe',
            'sanear_pasta', 'importar_repack']

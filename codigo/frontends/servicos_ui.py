@@ -557,14 +557,14 @@ class ServicoBiblioteca:
 
     def organizar_download(self, caminho):
         core.fazer_backup(self.db_path)
-        r = core.organizar_em_piratas(caminho)
+        r = core.organizar_no_destino(caminho)
         if not r.get("ok"):
             raise ValueError(r.get("erro", "Não foi possível organizar."))
         return r
 
-    def fora_de_piratas(self, caminho):
+    def fora_do_destino(self, caminho):
         try:
-            return bool(caminho) and not core.dentro_de_piratas(caminho)
+            return bool(caminho) and not core.dentro_do_destino(caminho)
         except (OSError, ValueError):
             return False
 

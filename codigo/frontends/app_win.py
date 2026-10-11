@@ -1655,11 +1655,11 @@ class App:
                 for t in prontos:
                     alvo = Path(t["save_path"])
                     try:
-                        if not core.dentro_de_piratas(alvo):
-                            org = core.organizar_em_piratas(alvo)
+                        if not core.dentro_do_destino(alvo):
+                            org = core.organizar_no_destino(alvo)
                             if org.get("ok"):
                                 alvo = Path(org["path"])
-                                linhas.append(f"'{t['nome']}': movido p/ Piratas/")
+                                linhas.append(f"'{t['nome']}': movido p/ Meus Jogos Locais/")
                             else:
                                 linhas.append(f"'{t['nome']}': {org.get('erro')}")
                                 continue
@@ -2668,7 +2668,7 @@ class App:
             fr_btn.adicionar("Abrir página", lambda: abrir())
             fr_btn.adicionar("Importar arquivo…", lambda: importar_arquivo())
         else:
-            fr_btn.adicionar("⬇ Baixar p/ Piratas", lambda: baixar())
+            fr_btn.adicionar("⬇ Baixar p/ Meus Jogos Locais", lambda: baixar())
             fr_btn.adicionar("Abrir página", lambda: abrir())
             fr_btn.adicionar("Importar último", lambda: importar_ultimo())
         fr_btn.adicionar("Fechar", win.destroy)
@@ -2828,7 +2828,7 @@ class App:
                 messagebox.showwarning(marca, res.get("erro", "falha"))
                 return
             self._sr_ultimo = res["path"]
-            estado(f"Em Piratas/: {Path(res['path']).name}")
+            estado(f"Em Meus Jogos Locais/: {Path(res['path']).name}")
             if messagebox.askyesno(marca,
                                    "Baixado. Importar para o Hub agora?"):
                 importar_ultimo()
@@ -2857,7 +2857,7 @@ class App:
             if not e or not str(e.get("url") or "").startswith("magnet:?"):
                 messagebox.showinfo(marca, "Escolha um magnet p/ baixar no Hub.")
                 return
-            estado("Adicionando no qBittorrent do Hub (Piratas/)…")
+            estado("Adicionando no qBittorrent do Hub (Meus Jogos Locais/)…")
 
             def trabalho(url_fx=e["url"]):
                 try:
@@ -2870,16 +2870,16 @@ class App:
 
         def fim_hub(res):
             if res.get("ok"):
-                estado(f"No Hub → {res.get('destino', 'Piratas/')}")
-                messagebox.showinfo(marca, f"Torrent no cliente do Hub.\nDestino: {res.get('destino', 'Piratas/')}")
+                estado(f"No Hub → {res.get('destino', 'Meus Jogos Locais/')}")
+                messagebox.showinfo(marca, f"Torrent no cliente do Hub.\nDestino: {res.get('destino', 'Meus Jogos Locais/')}")
             else:
                 estado(f"Falha: {res.get('erro', 'falha')}")
                 messagebox.showwarning(marca, res.get("erro", "falha"))
 
         def importar_arquivo():
             try:
-                from bib_nucleo.repacks import pasta_piratas
-                ini = str(pasta_piratas())
+                from bib_nucleo.rede.repacks import pasta_jogos
+                ini = str(pasta_jogos())
             except Exception:
                 ini = ""
             arq = filedialog.askopenfilename(
@@ -4214,7 +4214,7 @@ class App:
             "Escolha uma PASTA (varre jogos de PC + ROMs de uma vez), um "
             "ARQUIVO (exe, ROM, JSON, pacote .zip ou repack .rar/.7z/.iso) ou LEIA DO DISCO "
             "(Hydra + Steam + Epic + GOG + Riot + programas instalados).\n"
-            "Repack extrai p/ Piratas, organiza, acha o exe e importa sozinho; "
+            "Repack extrai p/ Meus Jogos Locais, organiza, acha o exe e importa sozinho; "
             "ROMs são ligadas no emulador sozinhas; sem emulador, importam "
             "mesmo assim e o play orienta.")).pack(anchor="w", padx=14, pady=12)
 
@@ -4374,7 +4374,7 @@ class App:
         _titulo_escuro(prog)
         prog.title("Importar repack")
         prog.transient(self.root)
-        ttk.Label(prog, text="Extraindo p/ Piratas e importando...").pack(
+        ttk.Label(prog, text="Extraindo p/ Meus Jogos Locais e importando...").pack(
             padx=24, pady=24)
         try:
             prog.update()

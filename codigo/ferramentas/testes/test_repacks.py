@@ -76,15 +76,15 @@ def teste_repack_caminhos_padrao_win():
     import os as _os
     from bib_nucleo import repacks as RP
     from pathlib import Path as _P
-    pir = RP.pasta_piratas()
+    pir = RP.pasta_jogos()
     if _os.name == "nt":
-        afirmar("\\Games\\Piratas" in str(pir), pir)
+        afirmar("\\Games\\Meus Jogos Locais" in str(pir), pir)
     else:
-        afirmar(str(pir).endswith("/Games/Piratas"), pir)
+        afirmar(str(pir).endswith("/Games/Meus Jogos Locais"), pir)
     velho = _os.environ.get("BIBLIOTECA_PIRATAS")
     _os.environ["BIBLIOTECA_PIRATAS"] = str(_P("x"))
     try:
-        afirmar(RP.pasta_piratas() == _P("x"))
+        afirmar(RP.pasta_jogos() == _P("x"))
     finally:
         if velho is None:
             _os.environ.pop("BIBLIOTECA_PIRATAS", None)
@@ -92,30 +92,30 @@ def teste_repack_caminhos_padrao_win():
             _os.environ["BIBLIOTECA_PIRATAS"] = velho
 
 
-def teste_repack_organizar_em_piratas_padrao_todos():
+def teste_repack_organizar_no_destino_padrao_todos():
     import os as _os
     from bib_nucleo import repacks as RP
     from pathlib import Path as _P
     tmp = _P(tempfile.mkdtemp(prefix="suite-rp-org-"))
-    pir = tmp / "Piratas"
+    pir = tmp / "Meus Jogos Locais"
     velho = _os.environ.get("BIBLIOTECA_PIRATAS")
     _os.environ["BIBLIOTECA_PIRATAS"] = str(pir)
     try:
         fora = tmp / "Downloads" / "Hell Clock [FitGirl Repack]"
         fora.mkdir(parents=True)
         (fora / "setup.exe").write_bytes(b"S")
-        afirmar(not RP.dentro_de_piratas(fora))
-        r = RP.organizar_em_piratas(fora)
+        afirmar(not RP.dentro_do_destino(fora))
+        r = RP.organizar_no_destino(fora)
         afirmar(r["ok"] and r["movido"] and not fora.exists(), r)
         afirmar((_P(r["path"]) / "setup.exe").is_file())
-        afirmar(RP.dentro_de_piratas(r["path"]))
-        r2 = RP.organizar_em_piratas(r["path"])
+        afirmar(RP.dentro_do_destino(r["path"]))
+        r2 = RP.organizar_no_destino(r["path"])
         afirmar(r2["ok"] and not r2["movido"], r2)
         outra = tmp / "outra" / "Hell Clock [FitGirl Repack]"
         outra.mkdir(parents=True)
-        r3 = RP.organizar_em_piratas(outra)
+        r3 = RP.organizar_no_destino(outra)
         afirmar(r3["ok"] and _P(r3["path"]).name == "Hell Clock [FitGirl Repack]-2", r3)
-        r4 = RP.organizar_em_piratas(tmp / "sumiu")
+        r4 = RP.organizar_no_destino(tmp / "sumiu")
         afirmar(not r4["ok"], r4)
     finally:
         if velho is None:
@@ -444,3 +444,30 @@ def teste_repack_nome_canonico_e_capa():
         B.salvar_capa_bytes = orig_salvar_b
         S.salvar_capa_bytes = orig_salvar_s
         con.close()
+
+
+def teste_repack_pasta_jogos_env_legado_e_migracao():
+    import os
+    import tempfile
+    from pathlib import Path
+    from unittest.mock import patch
+    from bib_nucleo.rede import repacks as RP
+    tmp = Path(tempfile.mkdtemp(prefix="suite-jogos-"))
+    with patch.dict(os.environ, {"BIBLIOTECA_JOGOS_DIR": str(tmp / "novo"),
+                                 "BIBLIOTECA_PIRATAS": str(tmp / "legado")}):
+        afirmar(RP.pasta_jogos() == tmp / "novo", "a env nova deve vencer a legada")
+    with patch.dict(os.environ, {"BIBLIOTECA_PIRATAS": str(tmp / "legado")}):
+        os.environ.pop("BIBLIOTECA_JOGOS_DIR", None)
+        afirmar(RP.pasta_jogos() == tmp / "legado", "a env legada continua valendo")
+    base = tmp / "Games"
+    base.mkdir()
+    with patch.dict(os.environ):
+        os.environ.pop("BIBLIOTECA_JOGOS_DIR", None)
+        os.environ.pop("BIBLIOTECA_PIRATAS", None)
+        with patch.object(RP, "_raiz_padrao_jogos", return_value=base):
+            afirmar(RP.pasta_jogos() == base / "Meus Jogos Locais", "padrão novo")
+            (base / "Piratas").mkdir()
+            afirmar(RP.pasta_jogos() == base / "Piratas", "pasta antiga existente é mantida")
+            (base / "Meus Jogos Locais").mkdir()
+            afirmar(RP.pasta_jogos() == base / "Meus Jogos Locais", "pasta nova existente vence")
+            afirmar(RP.pasta_piratas() == RP.pasta_jogos(), "alias legado aponta para a mesma pasta")

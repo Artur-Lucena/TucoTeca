@@ -181,7 +181,9 @@ São contratos distintos: consumidores devem usar suas chaves exatas.
 | `BIBLIOTECA_AZAHAR_DIR/DESMUME_DIR` | instalação/bundle por provider |
 | `BIBLIOTECA_EMULADOR_3DS/EMULADOR_NDS` | executável explícito |
 | `BIBLIOTECA_AZAHAR_FLAGS/DESMUME_FLAGS` | opções de lançamento |
-| `BIBLIOTECA_PIRATAS/7Z` | destino de repacks/extrator |
+| `BIBLIOTECA_JOGOS_DIR` (alias legado `BIBLIOTECA_PIRATAS`) | pasta dos downloads de jogos (padrão `Meus Jogos Locais`; se a antiga `Piratas` já existir e a nova não, continua usando a antiga) |
+| `BIBLIOTECA_7Z` | caminho explícito do 7-Zip |
+| `BIBLIOTECA_REDE` | `0` desliga todas as integrações de rede (modo avião) |
 | `BIBLIOTECA_MUSICA_DIR` | origem de áudio local/Harmoni |
 | `BIBLIOTECA_YTDLP/FFMPEG` | ferramentas externas |
 | `BIBLIOTECA_CAPA_MUSICA_AUTO` | auto-capa; `0` desliga |

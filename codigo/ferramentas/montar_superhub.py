@@ -322,7 +322,7 @@ def validar_runtime(raiz: Path) -> dict:
             raise ValueError("conversão MP3 não funcionou no FFmpeg empacotado")
         resultados["audio-mp3"] = {"bytes": mp3.stat().st_size, "ok": True}
         env["BIBLIOTECA_QBIT_PROFILE"] = str(Path(tmp) / "perfis")
-        env["BIBLIOTECA_PIRATAS"] = str(Path(tmp) / "downloads")
+        env["BIBLIOTECA_JOGOS_DIR"] = str(Path(tmp) / "downloads")
         r = subprocess.run([str(py), str(REPO / "codigo/ferramentas/provar_qbit_runtime.py"),
                             "--configurar-offline"], env=env, cwd=tmp,
                            capture_output=True, text=True, encoding="utf-8", timeout=60)

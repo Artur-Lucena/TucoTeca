@@ -28,7 +28,7 @@ def teste_runtime_local_sem_dependencia_do_pc():
         afirmar(not procura.called)
         afirmar(F.emulador_local_dir("Azahar") == p / "emuladores/Azahar")
         from bib_nucleo import repacks
-        afirmar(repacks.pasta_piratas() == p / "Piratas")
+        afirmar(repacks.pasta_jogos() == p / "Meus Jogos Locais")
 
 
 def teste_runtime_manifesto_e_override_editaveis():
@@ -82,31 +82,31 @@ def teste_qbit_perfil_independente_e_comando():
         afirmar("personalizado" in Q.qbit_config_path().read_text(encoding="utf-8"), "perfil foi sobrescrito")
 
 
-def teste_qbit_destino_piratas_em_novos_e_perfil_antigo():
+def teste_qbit_destino_jogos_em_novos_e_perfil_antigo():
     from bib_nucleo import repacks
-    piratas = Path(tempfile.mkdtemp(prefix="piratas-"))
+    jogos = Path(tempfile.mkdtemp(prefix="jogos-"))
     magnet = "magnet:?xt=urn:btih:" + "a" * 40
     with patch.object(Q, "qbit_api_url", return_value=""), \
-            patch.dict(os.environ, {"BIBLIOTECA_PIRATAS": str(piratas)}):
+            patch.dict(os.environ, {"BIBLIOTECA_PIRATAS": str(jogos)}):
         r = Q.qbit_adicionar(magnet)
         afirmar(not r["ok"] and "Iniciar cliente" in r["erro"], r)
         for ruim in ("", "https://example.com/pagina", "C:/jogo.torrent"):
             afirmar(not Q.qbit_adicionar(ruim)["ok"], ruim)
     with patch.object(Q, "qbit_api_url", return_value="http://127.0.0.1:9999"), \
             patch.object(Q, "qbit_request", return_value="") as req, \
-            patch.dict(os.environ, {"BIBLIOTECA_PIRATAS": str(piratas)}):
+            patch.dict(os.environ, {"BIBLIOTECA_PIRATAS": str(jogos)}):
         r = Q.qbit_adicionar(magnet)
-        afirmar(r["ok"] and r["destino"] == str(piratas.resolve()), r)
+        afirmar(r["ok"] and r["destino"] == str(jogos.resolve()), r)
         ep, dados = req.call_args.args
         afirmar(ep == "torrents/add", ep)
         afirmar(dados["urls"] == magnet and dados["category"] == "tucoteca", dados)
-        afirmar(Path(dados["savepath"]).resolve() == piratas.resolve(), dados)
+        afirmar(Path(dados["savepath"]).resolve() == jogos.resolve(), dados)
     velho = "[BitTorrent]\nSession\\DefaultSavePath=C:/Downloads\nOutro=1\n"
-    novo = Q.migrar_save_path(velho, piratas)
-    afirmar(f"Session\\DefaultSavePath={piratas.as_posix()}" in novo and "Outro=1" in novo, novo)
-    sem_secao = Q.migrar_save_path("[GUI]\nA=1\n", piratas)
-    afirmar("[BitTorrent]" in sem_secao and piratas.as_posix() in sem_secao, sem_secao)
-    afirmar(Q.migrar_save_path(novo, piratas) == novo, "migração não é idempotente")
+    novo = Q.migrar_save_path(velho, jogos)
+    afirmar(f"Session\\DefaultSavePath={jogos.as_posix()}" in novo and "Outro=1" in novo, novo)
+    sem_secao = Q.migrar_save_path("[GUI]\nA=1\n", jogos)
+    afirmar("[BitTorrent]" in sem_secao and jogos.as_posix() in sem_secao, sem_secao)
+    afirmar(Q.migrar_save_path(novo, jogos) == novo, "migração não é idempotente")
 
 
 def teste_qbit_api_progresso_estado_e_controle():
