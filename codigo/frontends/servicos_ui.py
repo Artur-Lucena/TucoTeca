@@ -378,6 +378,14 @@ class ServicoBiblioteca:
                                             "spotify_client_id": spotify_id,
                                             "spotify_client_secret": spotify_secret})
 
+    def aparencia(self):
+        from bib_nucleo import aparencia_usuario
+        return aparencia_usuario.ler_aparencia()
+
+    def definir_aparencia(self, tema="", densidade="", auto_backup=None):
+        from bib_nucleo import aparencia_usuario
+        return aparencia_usuario.salvar_aparencia(tema, densidade, auto_backup)
+
     def enfileirar_musicas(self, itens):
         metas = online.ler_json(core.DADOS_DIR / "musicas-online/faixas.json", {})
         metas = metas if isinstance(metas, dict) else {}

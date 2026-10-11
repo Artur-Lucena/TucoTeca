@@ -64,6 +64,7 @@ class HubBridge(QObject):
     downloadMusicaMudou = Signal()
     midiasMudou = Signal()
     videoMudou = Signal()
+    diagnosticoPronto = Signal(str)
     _progressoVideo = Signal(object)
     _progressoMusica = Signal(object)
     aviso = Signal(str, bool)
@@ -117,6 +118,7 @@ class HubBridge(QObject):
         self._modo_audio = "sequencia"
         self._selecionado = {}
         self._tarefas, self._numero = {}, 0
+        self._aparencia = {"tema": "escuro", "densidade": "conforto"}
         self._geracao = 0
         self._catalogo_geracao = 0
         self._fechado = False
@@ -655,12 +657,43 @@ class HubBridge(QObject):
     def volume(self):
         return self._volume
 
+    @Property("QVariantMap", notify=mudou)
+    def aparencia(self):
+        return self.servico.aparencia()
+
+    @Slot(str, str, bool)
+    def definirAparencia(self, tema, densidade, auto_backup=True):
+        def pronto(r):
+            self._aparencia = r
+            self.mudou.emit()
+        self.executar("Salvando aparência…",
+                      lambda: self.servico.definir_aparencia(tema, densidade, auto_backup),
+                      pronto)
+
     @Slot()
     def consultarVolume(self):
         if self._fechado:
             return
         self._volume = core.ler_volume_pc()
         self.volumeMudou.emit()
+
+    @Slot()
+    def rodarDiagnostico(self):
+        """Diagnostico somente-leitura; resultado vira texto no relatorio."""
+        import json as _json
+        from pathlib import Path as _P
+        from ferramentas.diagnosticar import diagnosticar
+
+        def trabalho():
+            try:
+                d = diagnosticar(_P(core.__file__).resolve().parents[1],
+                                 _P(self.servico.db_path))
+                return _json.dumps(d, ensure_ascii=False, indent=2)
+            except Exception as e:  # diagnostico nunca deve derrubar a UI
+                return _json.dumps({"erro": str(e)}, ensure_ascii=False, indent=2)
+
+        self.executar("Diagnosticando a instalacao", trabalho,
+                      lambda texto: self.diagnosticoPronto.emit(texto))
 
     @Slot(float)
     def definirVolume(self, nivel):
@@ -961,14 +994,29 @@ class HubBridge(QObject):
     def _fim_jogo(self, gid, horas, rastreado):
         self._em_jogo = False
         self._atualizar_conquistas()
-        self._jogo_gid = 0
+        jogo_gid, self._jogo_gid = self._jogo_gid, 0
         if rastreado:
             self.executar("Registrando sessão…", lambda: self.servico.registrar_sessao(gid, horas),
                           lambda _r: self.atualizar())
             self.jogoTerminou.emit()
+            self._auto_backup_sessao(jogo_gid or gid)
         else:
             self.aviso.emit("Sessão sem rastreio: registre as horas nas ferramentas clássicas.", False)
         self.mudou.emit()
+
+    def _auto_backup_sessao(self, gid):
+        """Backup da coleção ao encerrar sessão rastreada (opt-in, default ligado)."""
+        if self._fechado or not gid:
+            return
+        if self.aparencia.get("auto_backup", True) is False:
+            return
+
+        def pronto(_r):
+            if not self._fechado:
+                self.aviso.emit("Backup da coleção criado após a sessão.", False)
+
+        self.executar("Guardando backup pós-sessão…",
+                      lambda: core.fazer_backup(self.servico.db_path), pronto)
 
     @Slot(int)
     def tocar(self, mid):
