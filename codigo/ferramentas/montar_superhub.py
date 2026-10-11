@@ -42,12 +42,17 @@ emuladores/   Azahar e DeSmuME com perfis novos
 dados/        sua coleção e perfis; criada/usada localmente
 manifesto-runtime.json  componentes, versões, tamanhos e SHA-256
 
+Variantes: a "completa" inclui QtWebEngine (YouTube dentro do Hub, player
+interno, gamepad) e ocupa ~250 MB a mais. A "essencial" é leve e abre o
+YouTube no navegador do sistema. Veja o nome do arquivo baixado.
+
 Downloads > Iniciar cliente abre o qBittorrent do Hub em um perfil independente.
 Magnets abertos no catálogo são encaminhados a ele, sem associação do Windows.
 Velocidade, ETA, pausar e retomar usam sua API local em 127.0.0.1.
 
 O programa, ferramentas, imagens locais e emulação funcionam sem rede.
 Obter conteúdo, buscar catálogos/capas e atualizar componentes usa a internet.
+BIBLIOTECA_REDE=0 desliga toda a rede (modo avião).
 
 Saves, ROMs, mods e sua coleção viajam pelo pacote de coleção do próprio Hub.
 Este runtime começa com dados/perfis novos. Para atualizar, preserve dados/.
@@ -271,12 +276,14 @@ def criar_manifesto(raiz: Path, componentes: dict, versoes: dict) -> dict:
     return manifesto
 
 
-def validar_runtime(raiz: Path) -> dict:
+def validar_runtime(raiz: Path, extras="essencial") -> dict:
     """Executa exclusivamente binários do pacote em uma casa vazia e sem PATH externo."""
     py = raiz / "python/python.exe"
     env = {k: v for k, v in os.environ.items() if not k.startswith("BIBLIOTECA_")}
     env["PATH"] = str(Path(os.environ.get("SystemRoot", "C:/Windows")) / "System32")
     env["PYTHONIOENCODING"] = "utf-8"
+    if extras == "completo":
+        env["TUCOTECA_EXTRAS"] = "completo"
     serie = json.loads((raiz / "manifesto-runtime.json").read_text(encoding="utf-8"))["versoes"]["serie_tk"]
     env["TCL_LIBRARY"] = str(raiz / "python/tcl" / ("tcl" + serie))
     env["TK_LIBRARY"] = str(raiz / "python/tcl" / ("tk" + serie))
@@ -341,12 +348,13 @@ def validar_runtime(raiz: Path) -> dict:
     return resultados
 
 
-def empacotar(raiz: Path, formato="todos") -> list[Path]:
+def empacotar(raiz: Path, formato="todos", extras="essencial") -> list[Path]:
     DIST.mkdir(parents=True, exist_ok=True)
     hoje = datetime.date.today().strftime("%Y%m%d")
+    tag = "completo" if extras == "completo" else "essencial"
     saidas = []
     if formato in ("zip", "todos"):
-        p = DIST / f"tucoteca-superhub-windows-x64-{hoje}.zip"
+        p = DIST / f"tucoteca-superhub-windows-x64-{tag}-{hoje}.zip"
         with zipfile.ZipFile(p, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
             for f in sorted(raiz.rglob("*")):
                 z.write(f, f.relative_to(raiz))
@@ -355,7 +363,7 @@ def empacotar(raiz: Path, formato="todos") -> list[Path]:
                 raise ValueError("ZIP gerado está corrompido")
         saidas.append(p)
     if formato in ("7z", "todos"):
-        p = DIST / f"tucoteca-superhub-windows-x64-{hoje}.7z"
+        p = DIST / f"tucoteca-superhub-windows-x64-{tag}-{hoje}.7z"
         if p.exists():
             p.unlink()
         exe = raiz / "ferramentas/7zip/7z.exe"
@@ -373,9 +381,11 @@ def empacotar(raiz: Path, formato="todos") -> list[Path]:
     return saidas
 
 
-def montar(formato="todos", reutilizar=False):
+def montar(formato="todos", reutilizar=False, extras="essencial"):
     anterior = MP.BUILD
     MP.BUILD = BUILD
+    if extras not in ("completo", "essencial"):
+        raise SystemExit(f"--extras deve ser completo|essencial (veio {extras!r})")
     try:
         if reutilizar:
             raiz = BUILD
@@ -387,18 +397,19 @@ def montar(formato="todos", reutilizar=False):
             componentes = incluir_componentes(raiz)
             incluir_pillow(raiz)
         v["qt"] = incluir_qt(raiz)
+        v["extras"] = "completo" if extras == "completo" else "essencial"
         (raiz / "README-PORTATIL.txt").write_text(LEIAME, encoding="utf-8")
         shutil.copy2(REPO / "LICENSE", raiz / "LICENSE-TucoTeca.txt")
         MP.podar_dieta(raiz)
         m = criar_manifesto(raiz, componentes, v)
-        provas = validar_runtime(raiz)
+        provas = validar_runtime(raiz, extras=extras)
         componentes["qbittorrent"]["versao"] = provas["qbittorrent"]["versao"].lstrip("v")
         m = criar_manifesto(raiz, componentes, v)
         rel = {"bytes_runtime": m["bytes_runtime"], "provas": provas,
-               "componentes": componentes}
+               "componentes": componentes, "extras": extras}
         (DIST / "superhub-verificacao.json").parent.mkdir(parents=True, exist_ok=True)
         (DIST / "superhub-verificacao.json").write_text(json.dumps(rel, ensure_ascii=False, indent=2), encoding="utf-8")
-        saidas = empacotar(raiz, formato)
+        saidas = empacotar(raiz, formato, extras)
         # Prova da distribuição, não só da árvore usada para gerar o arquivo.
         rel["arquivos"] = []
         for arquivo in saidas:
@@ -426,8 +437,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--formato", choices=("zip", "7z", "todos"), default="todos")
     ap.add_argument("--reutilizar", action="store_true", help="atualiza fontes no runtime já montado")
+    ap.add_argument("--extras", choices=("completo", "essencial"), default="essencial",
+                    help="completo = QtWebEngine/Multimedia/Gamepad (+~250 MB); "
+                         "essencial = leve, abre YouTube no navegador do sistema")
     args = ap.parse_args()
-    montar(args.formato, args.reutilizar)
+    montar(args.formato, args.reutilizar, args.extras)
 
 
 if __name__ == "__main__":

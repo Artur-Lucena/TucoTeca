@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      formato:
+        description: "Variante do bundle"
+        required: true
+        default: "essencial"
+        type: choice
+        options: [completo, essencial]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Dependencias (UI + variante completa)
+        run: python -m pip install -r requirements-ui.txt
+      - name: Variante completa (QtWebEngine/Multimedia)
+        if: ${{ github.event.inputs.formato != 'essencial' }}
+        run: py -3.14 codigo/ferramentas/montar_superhub.py --extras completo --formato zip
+      - name: Variante essencial (leve, sem Chromium)
+        if: ${{ github.event.inputs.formato == 'essencial' || github.event_name == 'push' }}
+        run: py -3.14 codigo/ferramentas/montar_superhub.py --extras essencial --formato zip
+      - name: Checksums
+        shell: bash
+        run: |
+          cd dist/windows
+          sha256sum tucoteca-*.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/windows/tucoteca-*.zip
+            dist/windows/SHA256SUMS.txt
+          body_path: CHANGELOG.md
+          fail_on_unmatched_files: true
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Dependencias
+        run: python -m pip install -r requirements-ui.txt
+      - name: Payload Linux
+        run: py -3.14 codigo/ferramentas/montar_linux.py
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/linux/*
+          fail_on_unmatched_files: false
