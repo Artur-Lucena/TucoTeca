@@ -242,10 +242,11 @@ def incluir_pillow(raiz: Path):
             shutil.copytree(info / "licenses", raiz / "python/LICENSES-Pillow", dirs_exist_ok=True)
 
 
-def incluir_qt(raiz: Path):
+def incluir_qt(raiz: Path, extras="essencial"):
     """Qt Quick completo, plugins e licenças das wheels fixadas no requirements."""
     from importlib.metadata import distribution
-    for nome in ("PySide6-Essentials", "shiboken6"):
+    nomes = ("PySide6-Essentials", "shiboken6") + (("PySide6-Addons",) if extras == "completo" else ())
+    for nome in nomes:
         dist = distribution(nome)
         if dist.version != "6.10.2":
             raise ValueError("Instale requirements-ui.txt antes de montar o runtime Qt.")
@@ -305,6 +306,9 @@ def validar_runtime(raiz: Path, extras="essencial") -> dict:
                     "7zip": [str(raiz / "ferramentas/7zip/7z.exe"), "i"],
                     "ytdlp": [str(py), str(raiz / "ferramentas/yt-dlp/yt-dlp.pyz"), "--version"],
                     "quickjs": [str(raiz / "ferramentas/quickjs/qjs.exe"), "-e", "console.log(1+1)"]}
+        if extras == "completo":
+            comandos["webengine"] = [str(py), "-c",
+                                     "import PySide6.QtWebEngineQuick as q; print('webengine ok', q.__name__)"]
         for nome, comando in comandos.items():
             inicio = time.monotonic()
             r = subprocess.run(comando, env=env, cwd=tmp, capture_output=True, text=True,
@@ -396,7 +400,7 @@ def montar(formato="todos", reutilizar=False, extras="essencial"):
             raiz, v = MP.montar_base(sem_azahar=True)
             componentes = incluir_componentes(raiz)
             incluir_pillow(raiz)
-        v["qt"] = incluir_qt(raiz)
+        v["qt"] = incluir_qt(raiz, extras)
         v["extras"] = "completo" if extras == "completo" else "essencial"
         (raiz / "README-PORTATIL.txt").write_text(LEIAME, encoding="utf-8")
         shutil.copy2(REPO / "LICENSE", raiz / "LICENSE-TucoTeca.txt")

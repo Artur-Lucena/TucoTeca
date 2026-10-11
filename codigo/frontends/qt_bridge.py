@@ -1,6 +1,7 @@
 """View-model Qt: sinais, modelos e tarefas; QML não acessa banco ou processos."""
 from __future__ import annotations
 
+import importlib.util
 import threading
 from pathlib import Path
 
@@ -660,6 +661,48 @@ class HubBridge(QObject):
     @Property("QVariantMap", notify=mudou)
     def aparencia(self):
         return self.servico.aparencia()
+
+    @Property(bool, constant=True)
+    def webDisponivel(self):
+        """QtWebEngine instalado? (variante completa do bundle)."""
+        try:
+            return importlib.util.find_spec("PySide6.QtWebEngineQuick") is not None
+        except Exception:
+            return False
+
+    @Slot(str)
+    def youtubeBuscar(self, termo):
+        """Valida e devolve a URL de resultados do YouTube (o QML navega)."""
+        import urllib.parse
+        termo = (termo or "").strip()
+        if len(termo) < 2:
+            self.aviso.emit("Digite ao menos 2 caracteres para buscar.", False)
+            return ""
+        return "https://www.youtube.com/results?search_query=" + urllib.parse.quote(termo)
+
+    @Slot(str, str)
+    def youtubeIr(self, url, termo=""):
+        """Normaliza/valida destino antes de navegar (só https/hosts YouTube)."""
+        import urllib.parse
+        texto = (url or "").strip()
+        if not texto and termo:
+            return self.youtubeBuscar(termo)
+        alvo = urllib.parse.urlsplit(texto if "://" in texto else "https://" + texto)
+        if alvo.scheme != "https" or (alvo.hostname or "").lower() not in (
+                "www.youtube.com", "youtube.com", "m.youtube.com", "youtu.be"):
+            self.aviso.emit("Só é possível navegar em endereços do YouTube.", False)
+            return ""
+        return alvo.geturl()
+
+    @Slot(str)
+    def youtubeBaixarUrl(self, url):
+        """Baixa o vídeo da URL informada (valida no Python, nunca confia no JS)."""
+        from bib_nucleo.rede.videos_youtube import identificar_youtube
+        vid = identificar_youtube(url or "")
+        if not vid:
+            self.aviso.emit("Link do YouTube inválido.", False)
+            return
+        self.baixarVideo(vid)
 
     @Slot(str, str, bool)
     def definirAparencia(self, tema, densidade, auto_backup=True):

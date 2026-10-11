@@ -66,7 +66,7 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 | Sincronizar wishlist, importar torrent concluído, baixar de hosts | Ferramentas clássicas | Sim |
 | Registrar horas manualmente nos detalhes e encerrar sessão pendente no Sistema | Sim | Sim |
 | Bibliotecas sem credencial, catálogo Spotify, download/conversão/importação de músicas | Sim | CSV/import local |
-| Videoteca, YouTube, reprodutores, editores e EQ por cópia | Sim | — |
+| Videoteca, YouTube (embutido na variante completa; link externo na essencial), reprodutores, editores e EQ por cópia | Sim | — |
 | Atalhos personalizados em Integrações | Sim | — |
 | Exportar/importar pacotes | Ferramentas clássicas | Sim |
 | Navegação por gamepad | Ainda não | Ainda não |
