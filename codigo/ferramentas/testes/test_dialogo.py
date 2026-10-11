@@ -505,8 +505,10 @@ def teste_dialogo_volume_pc_global_e_sincronizado():
             root.update()
             afirmar(app.var_volume_pct.get() == "63%")
             afirmar(app.btn_volume_mudo.cget("text") == "Ativar som")
-            afirmar(app.btn_volume_mudo.master.winfo_reqwidth() <= 180,
-                    "controles de volume devem caber na barra lateral")
+            volume = app.btn_volume_mudo.master.master
+            disponivel = int(app.sidebar.cget("width")) - 2 * int(volume.pack_info()["padx"])
+            afirmar(app.btn_volume_mudo.master.winfo_reqwidth() <= disponivel,
+                     "controles de volume devem caber na barra lateral")
             afirmar(escritas == [], "sincronizar não pode sobrescrever o PC")
             app.btn_volume_mais.invoke()
             afirmar(estado["nivel"] == 68 and not estado["mudo"])

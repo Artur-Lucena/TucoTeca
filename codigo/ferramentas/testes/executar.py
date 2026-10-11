@@ -73,7 +73,7 @@ def isolar(raiz: Path):
     })
     tempfile.tempdir = str(raiz)
 
-    def dentro(p, dir_fd=-1):
+    def dentro(p, dir_fd=-1, seguir=True):
         if isinstance(p, int) or p is None:
             return
         if str(p) == ":memory:":
@@ -85,7 +85,10 @@ def isolar(raiz: Path):
             except OSError:
                 return
             pp = Path(base) / pp
-        alvo = pp.resolve()
+        # unlink/rmdir removem a entrada, não o alvo do último symlink.
+        # Os pais ainda são resolvidos para impedir escapes por links de pasta;
+        # abspath normaliza também um componente final '..' sem seguir links.
+        alvo = pp.resolve() if seguir else Path(os.path.abspath(pp.parent.resolve() / pp.name))
         if alvo != raiz and raiz not in alvo.parents:
             raise PermissionError(f"Teste tentou escrever fora do sandbox: {alvo}")
 
@@ -96,7 +99,7 @@ def isolar(raiz: Path):
                     isinstance(flags, int) and flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC)):
                 dentro(path)
         elif event in ("os.remove", "os.unlink", "os.rmdir"):
-            dentro(args[0], args[1] if len(args) > 1 else -1)
+            dentro(args[0], args[1] if len(args) > 1 else -1, seguir=False)
         elif event in ("os.mkdir", "os.chmod"):
             dentro(args[0], args[2] if len(args) > 2 else -1)
         elif event == "os.utime":

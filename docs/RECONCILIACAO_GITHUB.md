@@ -18,8 +18,9 @@ Na comparação de 11/10/2026:
 A reconciliação parte do remoto e incorpora a linha local como segundo
 histórico do merge. Nenhum commit existente é reescrito. Antes dos ajustes
 documentais, a árvore resultante foi conferida contra a árvore de `b35bac9`
-(`8c93323f881473664491e68bae5c888cf9efce4d`). Os fontes em `codigo/` continuam
-idênticos aos da R5; apenas a documentação dessa integração é atualizada.
+(`8c93323f881473664491e68bae5c888cf9efce4d`). No commit de reconciliação
+`a50edac`, os fontes em `codigo/` são idênticos aos da R5; apenas a documentação
+dessa integração foi atualizada.
 
 O merge torna as duas linhas ancestrais da revisão final. Assim, `main`,
 `feat/s7b`, `feat/youtube-embed`, `qa/testes` e `os/windows` podem ser alinhadas
@@ -85,3 +86,29 @@ vazios e seguir as licenças dos componentes de terceiros.
 Os ZIPs R5 em `dist/marco-s0-s8/r5/` permanecem apenas locais, associados a
 `b35bac9`. Não devem ser apresentados como builds de um commit posterior
 sem nova geração e validação.
+
+## Complemento: portabilidade dos testes na CI
+
+A primeira execução da `main` em `a50edac` foi
+[38152335953](https://github.com/Artur-Lucena/Projeto-Launcher/actions/runs/38152335953).
+Qt Linux e Gitleaks passaram; os quatro jobs stdlib e Qt Windows apontaram
+quatro pressupostos dos testes: tamanho máximo do desktop virtual, ausência
+de gerenciador de janelas no Xvfb, largura fixa em vez da largura disponível
+da sidebar e resolução de symlinks em loop ao removê-los no Python 3.10.
+
+O complemento altera apenas o harness, testes e configuração de CI. As
+asserções de fullscreen/layout são mantidas, com espera limitada; Openbox
+fornece fullscreen real no Linux. O sandbox verifica os pais resolvidos ao
+remover uma entrada, mas continua seguindo o alvo de escritas e SQLite.
+Quatro testes adicionais garantem remoção segura e veto a escapes, inclusive
+por `..` ou links nos pais, sem realizar operações reais fora do sandbox.
+Outro teste simula explicitamente o máximo de um desktop de 1024×768 para
+garantir que ele não limite as geometrias da prova visual.
+
+Os fontes de runtime e os artefatos R5 não mudam; a instalação pessoal não
+recebe esse complemento de infraestrutura de testes.
+
+Gates locais do complemento: runner com 424 casos, zero falhas e seis pulos;
+pytest com 418 testes aprovados, seis pulos e 63% de cobertura real. Ruff
+configurado, actionlint 1.7.12 e Gitleaks limpos. A conclusão da execução remota
+deve ser conferida no GitHub Actions, não presumida a partir desses gates.

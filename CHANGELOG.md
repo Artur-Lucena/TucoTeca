@@ -5,6 +5,26 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
+### Portabilidade dos testes na CI (11/10/2026)
+
+- A primeira CI da reconciliação revelou quatro pressupostos de ambiente,
+  afetando os quatro jobs stdlib e Qt Windows; Qt Linux e Gitleaks passaram.
+- Sandbox remove a entrada de symlinks sem seguir o último componente,
+  inclusive loops no Python 3.10; pais continuam resolvidos e escritas,
+  SQLite, remoções externas e caminhos com `..` seguem bloqueados.
+  Quatro regressões novas verificam essas proteções sem escrever fora do sandbox.
+- Testes visuais permitem as geometrias solicitadas mesmo em desktops virtuais
+  pequenos e aguardam os estados de layout/fullscreen com limite de tempo.
+  A largura do volume é confrontada com a sidebar real, descontando suas margens.
+  Uma regressão simula explicitamente o limite de um desktop de 1024×768.
+- A suíte Tk Linux roda com Openbox no Xvfb, para que exista suporte real
+  a fullscreen; nenhuma asserção foi removida e nenhum caso foi desativado.
+- Somente harness, testes e configuração de CI alterados; fontes de runtime,
+  instalação pessoal, coleção e bundles R5 permanecem intactos.
+- Gates locais: runner 424 casos, zero falhas e seis pulos; pytest 418 passes,
+  seis pulos e 63% de cobertura real. Ruff configurado, actionlint e Gitleaks
+  limpos. Esses resultados locais não substituem a nova execução da CI.
+
 ### Reconciliação com o repositório GitHub (11/10/2026)
 
 - Base remota `6466dbe` reconciliada com a revisão local `b35bac9`, mantendo

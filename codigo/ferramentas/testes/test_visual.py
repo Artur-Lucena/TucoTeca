@@ -13,6 +13,9 @@ def _montar(escala=None):
 
         import app_win
         root = tk.Tk()
+        # O desktop virtual pode ter só 1024 px. As geometrias sob teste não
+        # devem ser limitadas pelo maxsize implícito do gerenciador de janelas.
+        root.maxsize(max(1600, root.winfo_screenwidth()), max(1000, root.winfo_screenheight()))
         if escala is not None:
             root.tk.call("tk", "scaling", escala)
     except (ImportError, RuntimeError):
@@ -45,6 +48,16 @@ def _bombear(root):
         time.sleep(0.01)
 
 
+def _aguardar(root, pronto, limite=3):
+    fim = time.monotonic() + limite
+    while time.monotonic() < fim:
+        root.update()
+        if pronto():
+            return True
+        time.sleep(0.01)
+    return False
+
+
 def teste_visual_resize_e_grade_sem_reentrada():
     root, app = _montar()
     if root is None:
@@ -75,8 +88,9 @@ def teste_visual_big_picture_teclado_e_retorno():
         root.geometry("1280x800")
         _bombear(root)
         app._alternar_big_picture()
+        afirmar(_aguardar(root, lambda: app.big_picture and root.attributes("-fullscreen")),
+                "não entrou em tela cheia")
         _bombear(root)
-        afirmar(app.big_picture and root.attributes("-fullscreen"), "não entrou em tela cheia")
         afirmar(not app.sidebar.winfo_ismapped(), "sidebar ocupou o modo imersivo")
         afirmar(not app.det_painel.winfo_ismapped(), "painel ocupou o modo imersivo")
         afirmar(not app.filtros_area.winfo_ismapped(), "filtros ocuparam o modo imersivo")
@@ -117,8 +131,9 @@ def teste_visual_big_picture_teclado_e_retorno():
         app._navegar_grade(SimpleNamespace(keysym="Right"))
         afirmar(app.sel == 1, "setas não navegaram")
         app._sair_big_picture()
+        afirmar(_aguardar(root, lambda: not app.big_picture and not root.attributes("-fullscreen")),
+                "não saiu da tela cheia")
         _bombear(root)
-        afirmar(not app.big_picture and not root.attributes("-fullscreen"), "não saiu da tela cheia")
         afirmar(app.sidebar.winfo_ismapped() and app.filtros_area.winfo_ismapped(), "layout não restaurado")
         afirmar(not app.destaque.winfo_ismapped(), "destaque permaneceu aberto")
         afirmar(not app._erros_visuais_teste, app._erros_visuais_teste)
@@ -198,6 +213,8 @@ def teste_visual_detalhes_compactos_e_navegacao():
         afirmar(app._det_replicas[1][0].cget("text") == "Primeiro desejo")
         app._fechar_detalhe()
         root.geometry("1280x800")
+        afirmar(_aguardar(root, lambda: root.winfo_width() == 1280 and app.det_painel.winfo_ismapped()),
+                f"layout largo não aplicado: largura={root.winfo_width()}")
         _bombear(root)
         afirmar(app.det_painel.winfo_ismapped(), "detalhes não voltaram ao layout largo")
         filhos = len(root.winfo_children())
@@ -212,6 +229,37 @@ def teste_visual_detalhes_compactos_e_navegacao():
                        if w.winfo_class() == "TButton" and "Configurações" in w.cget("text")]
         afirmar(configurar and configurar[0].winfo_rooty() >= app.nav_area.canvas.winfo_rooty(),
                 "Configurações não ficou alcançável ao rolar")
+        afirmar(not app._erros_visuais_teste, app._erros_visuais_teste)
+    finally:
+        root.destroy()
+
+
+def teste_visual_geometria_larga_em_desktop_pequeno():
+    try:
+        import tkinter as tk
+    except ImportError:
+        print("(sem tkinter: skip)")
+        return
+    from unittest.mock import patch
+    criar_root = tk.Tk
+
+    def desktop_pequeno():
+        root = criar_root()
+        root.maxsize(1024, 768)
+        return root
+
+    with patch.object(tk, "Tk", side_effect=desktop_pequeno):
+        root, app = _montar()
+    if root is None:
+        return
+    try:
+        root.geometry("960x600")
+        afirmar(_aguardar(root, lambda: root.winfo_width() == 960 and app.btn_detalhes.winfo_ismapped()),
+                "layout compacto não aplicado")
+        afirmar(not app.det_painel.winfo_ismapped(), "painel ocupou o compacto")
+        root.geometry("1280x800")
+        afirmar(_aguardar(root, lambda: root.winfo_width() == 1280 and app.det_painel.winfo_ismapped()),
+                f"desktop pequeno limitou o layout de teste: {root.winfo_width()}")
         afirmar(not app._erros_visuais_teste, app._erros_visuais_teste)
     finally:
         root.destroy()

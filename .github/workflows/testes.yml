@@ -21,13 +21,19 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Display virtual Linux
         if: runner.os == 'Linux'
-        run: sudo apt-get update -qq && sudo apt-get install -y xvfb
+        run: sudo apt-get update -qq && sudo apt-get install -y xvfb openbox
       - name: Suíte Windows
         if: runner.os == 'Windows'
         run: python -B codigo/ferramentas/testes/executar.py --json resultados-testes.json
       - name: Suíte Linux
         if: runner.os == 'Linux'
-        run: xvfb-run -a python -B codigo/ferramentas/testes/executar.py --json resultados-testes.json
+        run: |
+          xvfb-run -a --server-args="-screen 0 1920x1080x24" bash -c '
+            openbox >"$RUNNER_TEMP/tucoteca-openbox.log" 2>&1 &
+            wm_pid=$!
+            trap "kill $wm_pid 2>/dev/null || true" EXIT
+            python -B codigo/ferramentas/testes/executar.py --json resultados-testes.json
+          '
       - name: Launchers e instalador Linux em sandbox
         if: runner.os == 'Linux'
         run: python -B codigo/ferramentas/provar_linux_shell.py
