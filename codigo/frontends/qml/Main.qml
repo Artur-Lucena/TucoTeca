@@ -32,6 +32,10 @@ ApplicationWindow {
         {key: "downloads", title: "Downloads"}, {key: "integracoes", title: "Integrações"},
         {key: "videos", title: "Vídeos"}, {key: "youtube", title: "YouTube"}
     ]
+    // Modo simples (Isa): só as telas do dia a dia no menu; atalhos continuam válidos.
+    readonly property var navSections: hub.aparencia.modo_simples
+        ? sections.filter(function(s) { return s.key === "inicio" || s.key === "jogos" || s.key === "musicas" })
+        : sections
     property var titles: ({inicio: "Boas-vindas ao seu hub.", jogos: "Sua próxima aventura.",
                           musicas: "Dê o play no seu mundo.", desejos: "O que vem a seguir.",
                           downloads: "A caminho da sua coleção.", integracoes: "Seu hub, conectado.",
@@ -119,6 +123,11 @@ ApplicationWindow {
             notify("Concluindo a operação atual. Aguarde para fechar.", false)
         }
     }
+    FolderDialog {
+        id: exportFolder
+        title: "Escolha a pasta de destino (ex.: pendrive)"
+        onAccepted: hub.exportarColecao(selectedFolder)
+    }
     Shortcut { sequence: "F11"; onActivated: window.toggleImmersive() }
     Shortcut { sequence: "Escape"; onActivated: { if (window.immersive) window.toggleImmersive() } }
     Shortcut { sequence: "Ctrl+F"; onActivated: { if (search.visible) { search.forceActiveFocus(); search.selectAll() } else window.openPalette() } }
@@ -183,7 +192,7 @@ ApplicationWindow {
                 Layout.rightMargin: 28
             }
             Repeater {
-                model: window.sections
+                model: window.navSections
                 ActionButton {
                     required property var modelData
                     objectName: "nav_" + modelData.key
@@ -896,6 +905,24 @@ ApplicationWindow {
             ActionButton { objectName: "registerGameHoursButton"; Layout.fillWidth: true; text: "Registrar horas…"; enabled: !hub.ocupado && !hub.emJogo && !!hub.selecionado.id; onClicked: window.registerHours(hub.selecionado, "") }
             ActionButton { Layout.fillWidth: true; text: "Remover da biblioteca"; enabled: !hub.ocupado; onClicked: { window.deleteItem("jogos", hub.selecionado); details.close() } }
             Item { Layout.fillHeight: true }
+            Text { text: "Notas pessoais"; color: Theme.muted; font { pixelSize: 13; letterSpacing: 2 } }
+            TextArea {
+                id: notasJogo
+                objectName: "gameNotesArea"
+                Layout.fillWidth: true
+                Layout.preferredHeight: 120
+                wrapMode: TextEdit.Wrap
+                placeholderText: "Diário, impressões, onde parei…"
+                color: Theme.text
+                text: hub.selecionado.observacoes || ""
+                background: Rectangle { radius: Theme.radiusSmall; color: Theme.bg; border.color: Theme.line }
+            }
+            ActionButton {
+                objectName: "gameNotesSave"
+                Layout.fillWidth: true
+                text: "Salvar notas"; enabled: !hub.ocupado && !!hub.selecionado.id
+                onClicked: hub.salvarObservacoes(hub.selecionado.id, notasJogo.text)
+            }
             Text { text: "Mods, presets, cheats e saves estão nas ferramentas clássicas, em Configurações."; color: Theme.muted; font.pixelSize: 14; Layout.fillWidth: true; wrapMode: Text.WordWrap }
         }
         }
@@ -929,7 +956,7 @@ ApplicationWindow {
                     ActionButton {
                         required property var modelData
                         text: modelData.t; selected: hub.aparencia.tema === modelData.k; quiet: true
-                        onClicked: hub.definirAparencia(modelData.k, hub.aparencia.densidade, hub.aparencia.auto_backup)
+                        onClicked: hub.definirAparencia(modelData.k, hub.aparencia.densidade, hub.aparencia.auto_backup, hub.aparencia.modo_simples)
                     }
                 }
             }
@@ -941,7 +968,7 @@ ApplicationWindow {
                     ActionButton {
                         required property var modelData
                         text: modelData.t; selected: hub.aparencia.densidade === modelData.k; quiet: true
-                        onClicked: hub.definirAparencia(hub.aparencia.tema, modelData.k, hub.aparencia.auto_backup)
+                        onClicked: hub.definirAparencia(hub.aparencia.tema, modelData.k, hub.aparencia.auto_backup, hub.aparencia.modo_simples)
                     }
                 }
             }
@@ -951,8 +978,23 @@ ApplicationWindow {
                 ActionButton {
                     text: hub.aparencia.auto_backup ? "Automático ao fim da sessão" : "Somente manual"
                     selected: hub.aparencia.auto_backup; quiet: true
-                    onClicked: hub.definirAparencia(hub.aparencia.tema, hub.aparencia.densidade, !hub.aparencia.auto_backup)
+                    onClicked: hub.definirAparencia(hub.aparencia.tema, hub.aparencia.densidade, !hub.aparencia.auto_backup, hub.aparencia.modo_simples)
                 }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Text { text: "Modo"; color: Theme.muted; font.pixelSize: 14; Layout.preferredWidth: 90 }
+                ActionButton {
+                    objectName: "modoSimplesButton"
+                    text: hub.aparencia.modo_simples ? "Simples (Isa) — ligado" : "Completo — ligado"
+                    selected: hub.aparencia.modo_simples; quiet: true
+                    onClicked: hub.definirAparencia(hub.aparencia.tema, hub.aparencia.densidade, hub.aparencia.auto_backup, !hub.aparencia.modo_simples)
+                }
+            }
+            ActionButton {
+                objectName: "exportarColecaoButton"
+                text: "Exportar coleção para pasta ou pendrive…"; Layout.fillWidth: true; enabled: !hub.ocupado
+                onClicked: exportFolder.open()
             }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
             Text { text: "DIAGNÓSTICO"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
