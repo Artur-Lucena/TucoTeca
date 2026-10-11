@@ -837,8 +837,15 @@ class HubBridge(QObject):
                 itens.sort(key=lambda j: j["titulo"].casefold())
         palavras = self._busca.casefold().split()
         if palavras:
-            itens = [j for j in itens if all(p in " ".join(str(j.get(k) or "") for k in
-                     ("titulo", "nome", "artista", "album", "etiquetas", "canal")).casefold() for p in palavras)]
+            import unicodedata
+
+            def _sem(s):
+                return "".join(c for c in unicodedata.normalize(
+                    "NFD", str(s or "").casefold()) if unicodedata.category(c) != "Mn")
+
+            alvos = [_sem(p) for p in palavras]
+            itens = [j for j in itens if all(p in _sem(" ".join(str(j.get(k) or "") for k in
+                     ("titulo", "nome", "artista", "album", "etiquetas", "canal"))) for p in alvos)]
         anterior = self._selecionado.get("id", self._selecionado.get("hash"))
         self.modelo.substituir(itens)
         self._selecionado = next((j for j in itens if j.get("id", j.get("hash")) == anterior),

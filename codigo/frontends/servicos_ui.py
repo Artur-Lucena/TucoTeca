@@ -229,13 +229,23 @@ def saude_colecao(jogos, limite=8):
             "ids_pendentes": ids_pendentes, "ok": len(jogos) - len(ids_pendentes)}
 
 
+def _sem_acento(s: str) -> str:
+    """Minúsculas sem diacriticos (para busca tolerante, sem depender de ICU)."""
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", str(s or "").casefold())
+                   if unicodedata.category(c) != "Mn")
+
+
 def busca_global(jogos, musicas, desejos, downloads, termo, limite=12):
-    """Paleta de comandos OS: filtra coleção em memória, sem I/O. Retorna DTOs."""
-    palavras = (termo or "").casefold().split()
+    """Paleta de comandos OS: filtra coleção em memória, sem I/O. Retorna DTOs.
+
+    Busca tolerante a acentos e sem ordem obrigatória das palavras.
+    """
+    palavras = _sem_acento(termo).split()
     if not palavras:
         return []
     def casa(item, campos):
-        texto = " ".join(str(item.get(k) or "") for k in campos).casefold()
+        texto = _sem_acento(" ".join(str(item.get(k) or "") for k in campos))
         return all(p in texto for p in palavras)
     out = []
     for j in jogos:
