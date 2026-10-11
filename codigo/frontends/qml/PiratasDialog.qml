@@ -6,7 +6,7 @@ import QtQuick.Layouts
 Dialog {
     id: dialog
     objectName: "piratasDialog"
-    title: "Pacotes em Piratas · extrair, instalar e importar"
+    title: "Pacotes locais · extrair, instalar e importar"
     anchors.centerIn: parent
     width: Math.min(860, ApplicationWindow.window ? ApplicationWindow.window.width - 60 : parent.width - 60)
     height: Math.min(680, ApplicationWindow.window ? ApplicationWindow.window.height - 40 : parent.height - 40)
@@ -34,7 +34,8 @@ Dialog {
             model: hub.pacotesPiratas
             ScrollBar.vertical: ScrollBar {}
             delegate: Rectangle {
-                required property var item
+                required property var modelData
+                readonly property var item: modelData
                 width: ListView.view.width - 12
                 implicitHeight: 92; radius: 10; color: Theme.surface
                 RowLayout {
@@ -52,6 +53,7 @@ Dialog {
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 4
                         Text {
+                            objectName: "pacoteNome"
                             text: item.nome
                             color: Theme.text; font { pixelSize: 15; weight: Font.DemiBold }
                             Layout.fillWidth: true; elide: Text.ElideRight
@@ -96,6 +98,7 @@ Dialog {
                         onClicked: hub.abrirInstaladorPacote(item.setup)
                     }
                     ActionButton {
+                        objectName: "pacoteImportarButton"
                         visible: item.estado === "pronta" || (item.estado === "instalar" && item.setup.length > 0)
                         text: item.estado === "pronta" ? "Importar" : "Já instalei…"
                         primary: true; enabled: !hub.ocupado
@@ -103,6 +106,7 @@ Dialog {
                             pacoteAlvo.pasta = item.pasta
                             pacoteAlvo.estado = item.estado
                             pacoteAlvo.nome = item.nome
+                            pacoteExe.text = item.exe || ""
                             pacoteExeDialog.open()
                         }
                     }
@@ -111,7 +115,7 @@ Dialog {
         }
         Text {
             visible: hub.pacotesPiratas.length === 0
-            text: "Nada pendente em Piratas/: pacote compacto só aparece aqui depois de baixar, e o que entra na coleção sai da lista."
+            text: "Nenhuma pasta pendente no destino local. Pastas já cadastradas saem da lista; arquivos compactados são preservados."
             color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true
         }
     }

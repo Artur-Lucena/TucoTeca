@@ -581,16 +581,19 @@ def importar_pasta(con: sqlite3.Connection, pasta: str | os.PathLike,
                    exe: str = "") -> dict:
     """Importa um jogo já instalado (exe escolhido ou achado na pasta).
 
-    Diferente de `importar_repack`, não mexe em disco além da quarentena dos
-    instaladores dentro da própria pasta do jogo.
+    Preserva arquivos do jogo instalado. Só quarentena instaladores depois de
+    cadastrar com sucesso um executável dentro da própria pasta. Se o jogo foi
+    instalado fora dela, preserva também os instaladores da pasta original.
     """
     base = Path((str(pasta) or "").strip())
     if not base.is_dir():
         return {"ok": False, "erro": "pasta não encontrada."}
     if exe:
-        alvo = Path(str(exe))
+        alvo = Path(str(exe).strip())
         if not alvo.is_file():
             return {"ok": False, "erro": "executável não encontrado."}
+        if alvo.suffix.lower() != ".exe" or _pontuar_exe(alvo, base) < 0:
+            return {"ok": False, "erro": "escolha o executável do jogo, não um instalador."}
     else:
         ach = achar_exe(base)
         if not ach.get("ok"):
@@ -598,12 +601,13 @@ def importar_pasta(con: sqlite3.Connection, pasta: str | os.PathLike,
                     "precisa_instalar": bool(ach.get("precisa_instalar")),
                     "pasta": str(base)}
         alvo = Path(ach["exe"])
-    org = organizar_extraido(base)
-    avisos = list(org.get("avisos") or [])
-    n = _quarentenar_setups(base)
+    out = _importar_exe(con, base, alvo, [])
+    if not out.get("ok"):
+        return out
+    n = _quarentenar_setups(base) if _dentro(base, alvo) else 0
     if n:
-        avisos.append(f"{n} installer(s) em .hub-lixo (reversível).")
-    return _importar_exe(con, base, alvo, avisos)
+        out["avisos"].append(f"{n} installer(s) em .hub-lixo (reversível).")
+    return out
 
 
 def _estado_pasta(pasta: Path) -> str:
@@ -658,7 +662,7 @@ def listar_pacotes_piratas(con: sqlite3.Connection | None = None) -> list[dict]:
             if entrada.suffix.lower() not in ARQUIVO_EXTS:
                 continue
             item["tipo"] = "arquivo"
-            item["estado"] = "compactado" if tem_7z else "falta-7z"
+            item["estado"] = "compactado" if entrada.suffix.lower() == ".zip" or tem_7z else "falta-7z"
             try:
                 item["tamanho_mb"] = round(entrada.stat().st_size / 1048576, 1)
             except OSError:
@@ -696,7 +700,8 @@ def preparar_pacote(arquivo: str | os.PathLike,
     """Extrai um pacote para o nome canônico em Piratas/ e organiza.
 
     Idempotente: se a pasta de destino já existe (extração anterior), apenas
-    organiza e reaproveita. O archive **não** é apagado: a importação o remove.
+    organiza e reaproveita. O archive **não** é apagado, nem na importação da
+    pasta preparada; só `importar_repack` remove o archive após o cadastro.
     """
     from bib_nucleo.base import slugify
     src = Path((str(arquivo) or "").strip())

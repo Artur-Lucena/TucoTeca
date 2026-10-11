@@ -455,6 +455,143 @@ def teste_repack_nome_canonico_e_capa():
         con.close()
 
 
+def teste_pacotes_lista_prepara_importa_sem_apagar_archive():
+    from unittest.mock import patch
+
+    from bib_nucleo import scans as S
+    from bib_nucleo.rede import repacks as RP
+    tmp = Path(tempfile.mkdtemp(prefix="suite-pacotes-"))
+    destino = tmp / "Meus Jogos Locais"
+    destino.mkdir()
+    arq = _repack_zip(destino)
+    setup = destino / "SoSetup"
+    setup.mkdir()
+    (setup / "setup.exe").write_bytes(b"MZ-setup")
+    (destino / "outro.rar").write_bytes(b"Rar!")
+    (destino / "assets").mkdir()
+    con = core.get_db(tmp / "p.db")
+    try:
+        with patch.dict(os.environ, {"BIBLIOTECA_JOGOS_DIR": str(destino)}), \
+                patch.object(RP, "ferramenta_7z", return_value=None), \
+                patch.object(S, "canonizar_steam", return_value=("", "")), \
+                patch.object(RP, "_capa_automatica", return_value=False):
+            itens = {i["nome"]: i for i in RP.listar_pacotes_piratas(con)}
+            afirmar(itens[arq.name]["estado"] == "compactado", itens)
+            afirmar(itens["outro.rar"]["estado"] == "falta-7z", itens)
+            afirmar(itens["SoSetup"]["estado"] == "instalar" and "assets" not in itens, itens)
+            antes = arq.read_bytes()
+            preparado = RP.preparar_pacote(arq, destino)
+            afirmar(preparado["ok"] and preparado["estado"] == "pronta", preparado)
+            novamente = RP.preparar_pacote(arq, destino)
+            afirmar(novamente["ok"] and novamente["reaproveitou"], novamente)
+            afirmar(novamente["exe"] == preparado["exe"])
+            afirmar(arq.read_bytes() == antes, "preparar modificou o archive")
+            imp = RP.importar_pasta(con, preparado["pasta"])
+            afirmar(imp["ok"] and imp["novos"] == 1, imp)
+            afirmar(Path(imp["exe"]).is_file() and arq.read_bytes() == antes)
+            duplicado = RP.importar_pasta(con, preparado["pasta"])
+            afirmar(duplicado["ok"] and duplicado["novos"] == 0 and duplicado["ignorados"] == 1,
+                    duplicado)
+            afirmar(not duplicado["capa_pendente"])
+            afirmar(not any(i["pasta"] == preparado["pasta"] for i in RP.listar_pacotes_piratas(con)))
+    finally:
+        con.close()
+
+
+def teste_importar_pasta_escolhida_preserva_dados_e_capa():
+    from unittest.mock import patch
+
+    from bib_nucleo import scans as S
+    from bib_nucleo.rede import repacks as RP
+    tmp = Path(tempfile.mkdtemp(prefix="suite-pasta-exe-"))
+    pasta = tmp / "Jogo [Repack]"
+    pasta.mkdir()
+    exe = pasta / "Game.exe"
+    exe.write_bytes(b"MZ" + b"0" * 1000)
+    originais = {"Read_Me.txt": b"instrucoes", "site.url": b"[x]", "saves/save.dat": b"save",
+                 "OST/faixa.ogg": b"audio", "perfil.ini": b"perfil"}
+    for nome, data in originais.items():
+        alvo = pasta / nome
+        alvo.parent.mkdir(parents=True, exist_ok=True)
+        alvo.write_bytes(data)
+    (pasta / "setup.exe").write_bytes(b"installer")
+    con = core.get_db(tmp / "p.db")
+    try:
+        with patch.object(S, "canonizar_steam", return_value=("123", "Jogo canônico")), \
+                patch.object(RP, "_capa_automatica", return_value=True) as capa:
+            imp = RP.importar_pasta(con, pasta, str(exe))
+            afirmar(imp["ok"] and imp["novos"] == 1 and imp["capa_auto"], imp)
+            afirmar(not imp["capa_pendente"] and "capa Steam" in " ".join(imp["avisos"]), imp)
+            jogos = core.listar_jogos(con)
+            afirmar(len(jogos) == 1 and jogos[0]["titulo"] == "Jogo canônico", jogos)
+            afirmar(jogos[0]["object_id"] == "123" and capa.call_args.args[1] == jogos[0]["id"])
+        afirmar(exe.read_bytes().startswith(b"MZ"))
+        afirmar((pasta / ".hub-lixo/setup.exe").read_bytes() == b"installer")
+        afirmar(all((pasta / nome).read_bytes() == data for nome, data in originais.items()),
+                "importar jogo instalado limpou arquivos do usuário")
+    finally:
+        con.close()
+
+
+def teste_importar_pasta_exe_externo_e_falha_preservam_instaladores():
+    from unittest.mock import patch
+
+    from bib_nucleo import scans as S
+    from bib_nucleo.rede import repacks as RP
+    tmp = Path(tempfile.mkdtemp(prefix="suite-pasta-externa-"))
+    pasta = tmp / "Pacote"
+    pasta.mkdir()
+    (pasta / "setup.exe").write_bytes(b"setup")
+    (pasta / "Read_Me.txt").write_bytes(b"instrucoes")
+    instalado = tmp / "instalado/Jogo.exe"
+    instalado.parent.mkdir()
+    instalado.write_bytes(b"MZ-game")
+    con = core.get_db(tmp / "p.db")
+    try:
+        imp = RP.importar_pasta(con, pasta)
+        afirmar(not imp["ok"] and imp["precisa_instalar"], imp)
+        for escolhido in (pasta / "setup.exe", pasta / "Read_Me.txt", pasta / "sumiu.exe"):
+            afirmar(not RP.importar_pasta(con, pasta, str(escolhido))["ok"])
+        with patch.object(S, "canonizar_steam", return_value=("", "")), \
+                patch.object(RP, "_capa_automatica", return_value=False):
+            imp = RP.importar_pasta(con, pasta, str(instalado))
+            afirmar(imp["ok"] and imp["novos"] == 1, imp)
+            exe_local = pasta / "JogoLocal.exe"
+            exe_local.write_bytes(b"MZ-local")
+            with patch.object(S, "importar_lista", return_value={"erros": ["falha simulada"]}):
+                afirmar(not RP.importar_pasta(con, pasta, str(exe_local))["ok"])
+                arq = _repack_zip(tmp)
+                afirmar(not RP.importar_repack(con, arq, tmp / "extraido")["ok"])
+                afirmar(arq.is_file(), "apagou archive após falha de cadastro")
+        afirmar((pasta / "setup.exe").read_bytes() == b"setup", "quarentenou sem jogo nesta pasta")
+        afirmar((pasta / "Read_Me.txt").read_bytes() == b"instrucoes")
+        afirmar(instalado.read_bytes() == b"MZ-game" and exe_local.read_bytes() == b"MZ-local")
+    finally:
+        con.close()
+
+
+def teste_pacotes_abrir_instalador_windows_linux_sem_execucao_real():
+    from types import SimpleNamespace
+    from unittest.mock import Mock, patch
+
+    from bib_nucleo.rede import repacks as RP
+    tmp = Path(tempfile.mkdtemp(prefix="suite-pacote-setup-"))
+    setup = tmp / "setup.exe"
+    setup.write_bytes(b"MZ-setup")
+    for plataforma in ("nt", "posix"):
+        iniciar = Mock()
+        proxy = SimpleNamespace(**{**vars(os), "name": plataforma, "startfile": iniciar})
+        with patch.object(RP, "os", proxy), patch.object(RP.subprocess, "Popen") as pop:
+            afirmar(RP.abrir_instalador(str(setup))["ok"])
+            if plataforma == "nt":
+                afirmar(iniciar.call_args.args == (str(setup),) and not pop.called)
+            else:
+                afirmar(pop.call_args.args == ([str(setup)],) and not iniciar.called)
+                afirmar(pop.call_args.kwargs["cwd"] == str(tmp))
+        afirmar(not RP.abrir_instalador(str(tmp / "sumiu.exe"))["ok"])
+    afirmar(RP.instaladores_pacote(tmp) == [str(setup)])
+
+
 def teste_repack_pasta_jogos_env_legado_e_migracao():
     import os
     import tempfile

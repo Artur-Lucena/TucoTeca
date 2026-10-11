@@ -476,8 +476,8 @@ ApplicationWindow {
             ActionButton {
                 objectName: "pacotesButton"
                 visible: hub.secao === "downloads"
-                text: "Pacotes em Piratas…"; implicitHeight: 36
-                onClicked: { pacotes.open(); hub.atualizarPacotes() }
+                text: "Pacotes locais…"; implicitHeight: 36
+                onClicked: pacotes.open()
             }
             ActionButton { visible: hub.secao === "videos"; text: "Pesquisar YouTube…"; implicitHeight: 36; onClicked: youtube.open() }
             TextField {

@@ -510,6 +510,80 @@ def teste_qt_musica_online_busca_seleciona_enfileira():
         qInstallMessageHandler(anterior)
 
 
+def teste_qt_pacotes_renderiza_itens_e_limpa_exe_entre_importacoes():
+    app, bridge = _qt()
+    if app is None:
+        return
+    from unittest.mock import patch
+
+    from app_qt import criar_engine
+    from PySide6.QtCore import QMetaObject, QObject, qInstallMessageHandler
+    from shiboken6 import delete
+    itens = [
+        {"nome": "Jogo pronto", "caminho": "P:/Jogo", "tipo": "pasta", "estado": "pronta",
+         "exe": "P:/Jogo/Jogo.exe", "setup": "", "pasta": "P:/Jogo", "tamanho_mb": 0},
+        {"nome": "Instalador", "caminho": "P:/Instalador", "tipo": "pasta", "estado": "instalar",
+         "exe": "", "setup": "P:/Instalador/setup.exe", "pasta": "P:/Instalador", "tamanho_mb": 0},
+        {"nome": "Arquivo.zip", "caminho": "P:/Arquivo.zip", "tipo": "arquivo", "estado": "compactado",
+         "exe": "", "setup": "", "pasta": "", "tamanho_mb": 2},
+    ]
+    avisos = []
+    anterior = qInstallMessageHandler(lambda t, c, m: avisos.append(m))
+    engine = criar_engine(bridge)
+
+    def encontrar_todos(item, nome):
+        encontrados = [item] if item.objectName() == nome else []
+        for filho in item.childItems():
+            encontrados.extend(encontrar_todos(filho, nome))
+        return encontrados
+
+    try:
+        afirmar(engine.rootObjects(), avisos)
+        janela = engine.rootObjects()[0]
+        bridge.atualizar()
+        _aguardar(app, lambda: not bridge.ocupado)
+        bridge.navegar("downloads")
+        dialogo = janela.findChild(QObject, "piratasDialog")
+        afirmar(dialogo is not None, "diálogo de pacotes ausente")
+        with patch.object(bridge.servico, "pacotes_piratas", return_value=itens) as listar:
+            botao = _encontrar(janela.contentItem(), "pacotesButton")
+            afirmar(botao is not None and botao.property("visible"))
+            QMetaObject.invokeMethod(botao, "clicked")
+            _aguardar(app, lambda: not bridge.ocupado)
+            afirmar(listar.call_count == 1, "abrir o diálogo disparou duas leituras")
+        nomes = encontrar_todos(janela.contentItem(), "pacoteNome")
+        afirmar({p.property("text") for p in nomes} == {i["nome"] for i in itens}, avisos)
+        botoes = encontrar_todos(janela.contentItem(), "pacoteImportarButton")
+        afirmar(len(botoes) == 3, "delegates da lista não foram criados")
+        campo = janela.findChild(QObject, "pacoteExeField")
+        confirmar = janela.findChild(QObject, "pacoteExeDialog")
+        campo.setProperty("text", "P:/ExeAntigo.exe")
+        QMetaObject.invokeMethod(botoes[0], "clicked")
+        app.processEvents()
+        afirmar(campo.property("text") == itens[0]["exe"], "não preencheu o exe detectado")
+        with patch.object(bridge.servico, "importar_pacote", return_value={"titulo": "Jogo pronto"}) as importar, \
+                patch.object(bridge.servico, "pacotes_piratas", return_value=itens):
+            QMetaObject.invokeMethod(confirmar, "accepted")
+            _aguardar(app, lambda: not bridge.ocupado)
+            afirmar(importar.call_args.args == (itens[0]["pasta"], itens[0]["exe"]), importar.call_args)
+        QMetaObject.invokeMethod(confirmar, "close")
+        app.processEvents()
+        botoes = encontrar_todos(janela.contentItem(), "pacoteImportarButton")
+        QMetaObject.invokeMethod(botoes[1], "clicked")
+        app.processEvents()
+        afirmar(campo.property("text") == "", "reutilizou o executável de outro pacote")
+        QMetaObject.invokeMethod(confirmar, "close")
+        QMetaObject.invokeMethod(dialogo, "close")
+        problemas = [m for m in avisos if any(x in m for x in
+                     ("ReferenceError", "TypeError", "Unable to assign", "Binding loop",
+                      "is not defined", "Required property", "Cannot create delegate"))]
+        afirmar(not problemas, "\n".join(problemas))
+    finally:
+        bridge.fechar()
+        delete(engine)
+        qInstallMessageHandler(anterior)
+
+
 def teste_qt_fontes_e_builders_incluem_recursos_qml():
     import sys
     sys.path.insert(0, str(Path(__file__).parents[1]))
@@ -525,7 +599,7 @@ def teste_qt_fontes_e_builders_incluem_recursos_qml():
     afirmar((dest / "qml/Main.qml").is_file() and (dest / "qml/qmldir").is_file())
     afirmar((dest / "qt_bridge.py").is_file() and (dest / "desktop.py").is_file())
     for nome in ("VolumeControl", "ProvidersDialog", "CoversDialog", "AchievementsDialog",
-                 "SpotifyDialog", "MusicDownloadsDialog"):
+                  "SpotifyDialog", "MusicDownloadsDialog", "PiratasDialog"):
         afirmar((dest / "qml" / (nome + ".qml")).is_file(), "bundle sem " + nome)
     for nome in ("capas", "conquistas"):
         afirmar((dest / "bib_nucleo" / (nome + ".py")).is_file(), "bundle sem domínio " + nome)

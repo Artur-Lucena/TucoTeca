@@ -5,14 +5,35 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
+### Correções e regressões da revisão R5 (11/10/2026)
+
+- Diálogo de pacotes usa o papel `modelData` do Qt, sem delegates vazios;
+  abrir dispara uma única leitura. O executável detectado é preenchido na
+  confirmação e o campo é limpo ao trocar para outro pacote.
+- ZIP continua extraível sem 7-Zip. A interface usa `Pacotes locais…`, sem
+  mudar o destino configurado ou mover a pasta legada `D:\Games\Piratas`.
+- Importar jogo já instalado preserva instruções, mídias, saves e perfis;
+  não aplica a limpeza de archives a pastas pessoais. Instaladores só vão
+  para quarentena após cadastro bem-sucedido de um jogo dentro dessa pasta.
+  Um executável externo é aceito; escolher o próprio setup é rejeitado.
+- Processos de download com progresso, extração de mods e sondagem da GPU
+  usam as opções sem console no Windows; Linux mantém o grupo de processos
+  para timeout. Emuladores e aplicativos visíveis não são ocultados.
+- Importação pela UI segue o mesmo lock de escrita e backup das demais
+  alterações da coleção. Archives preparados são preservados.
+- Regressões dedicadas usam apenas arquivos sintéticos e mocks; prova da
+  instalação usa cópia SQLite consistente e configurações pequenas, sem
+  copiar jogos ou saves. A prova inicial preservou 27 jogos, 68 músicas,
+  2 desejos e 18 downloads; o SHA-256 do banco real permaneceu idêntico.
+
 ### Portado da instalação real (revisão R5, 11/10/2026)
 
 A instalação em `D:\Tuco-Compartilhado\Jogos\biblioteca` estava em `051e716`
-com trabalho local **não commitado** e divergente de `main`. Todo ele foi
-preservado antes de qualquer atualização: patch completo e cópia dos fontes
+com trabalho local **não commitado** e divergente de `main`. Os fontes locais
+e o diff rastreado foram preservados antes da atualização: patch e cópia dos fontes
 em `dist/marco-s0-s8/backup-instalacao-real/` (103 arquivos, 1,57 MB).
 
-Portado para o `main` — nada foi descartado:
+Funcionalidades portadas para o `main`:
 
 - `bib_nucleo/processos.opcoes_sem_janela()`: processos de fundo (yt-dlp,
   FFmpeg, 7z, busca) sobem sem janela de console, porque uma GUI iniciada
@@ -34,9 +55,11 @@ Portado para o `main` — nada foi descartado:
 Verificado: `ruff` limpo, fachada `bib_core` intacta (380 exportados) e
 51 casos de repacks/UI/visual sem falha.
 
-Os diálogos QML da instalação diferiam apenas em estilo e acentuação (uma
-ferramenta havia reintroduzido `?` no lugar de `…`). Os contratos `hub.*` são
-idênticos nos dois lados, portanto essa diferença não foi copiada.
+Os demais diálogos QML mantêm os contratos `hub.*` usados na instalação.
+Diferenças de apresentação não foram copiadas automaticamente; os fontes
+originais permanecem no backup para comparação, que não inclui runtime,
+cache, jogos ou saves. A revisão R5 dos pacotes corrige também os problemas
+de integração encontrados após a portação inicial.
 
 ### Higienizacao de lint (revisao R4, 11/10/2026)
 - `ruff check codigo conftest.py` **limpo**: 246 achados → 0. Nenhuma regra

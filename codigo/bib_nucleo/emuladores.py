@@ -444,11 +444,14 @@ def _tem_nvidia() -> str:
     """Nome da GPU NVIDIA discreta ou ''. Só liga o PRIME+DXVK se houver."""
     import shutil
     import subprocess
+
+    from bib_nucleo.processos import opcoes_sem_janela
     try:
         if shutil.which("nvidia-smi") is not None:
             out = subprocess.run(["nvidia-smi", "--query-gpu=name",
                                   "--format=csv,noheader"],
-                                 capture_output=True, text=True, timeout=10)
+                                 capture_output=True, text=True, timeout=10,
+                                 **opcoes_sem_janela())
             nomes = (out.stdout or "").strip().splitlines()
             if out.returncode == 0 and nomes:
                 return nomes[0].strip()
@@ -1367,8 +1370,10 @@ def _extrair_arquivo(arq: str, destino: Path) -> None:
     if not sete:
         raise OSError("archive precisa do 7z (só .zip sem ele"
                       + ("; no Linux instale o p7zip" if os.name != "nt" else "") + ")")
+    from bib_nucleo.processos import opcoes_sem_janela
     r = subprocess.run([sete, "x", arq, f"-o{destino}", "-y"],
-                       capture_output=True, text=True, timeout=600)
+                       capture_output=True, text=True, timeout=600,
+                       **opcoes_sem_janela())
     if r.returncode != 0:
         raise OSError(f"7z falhou ({r.returncode}): {(r.stderr or '').strip()[:200]}")
 

@@ -216,6 +216,35 @@ def teste_linux_player_parado_retoma_antes_terminate_e_recolhe_kill():
     b.stop()  # idempotente após encerrar
 
 
+def teste_processos_fundo_windows_sem_console_linux_mantem_grupo():
+    for plataforma in ("nt", "posix"):
+        proc = _Proc(io.StringIO("[download] 42%\n"))
+        linhas = []
+        proxy = SimpleNamespace(**{**vars(os), "name": plataforma})
+        with patch.object(processos, "os", proxy), \
+                patch.object(processos.subprocess, "Popen", return_value=proc) as pop:
+            esperado = (getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                        if plataforma == "nt" else 0)
+            afirmar(processos.opcoes_sem_janela().get("creationflags", 0) == esperado)
+            afirmar(processos.executar_com_progresso(["fake"], linhas.append, timeout=5) == 0)
+            afirmar(pop.call_args.kwargs.get("creationflags", 0) == esperado, pop.call_args)
+            afirmar(pop.call_args.kwargs["start_new_session"] == (plataforma == "posix"))
+        afirmar(linhas == ["[download] 42%\n"] and proc.stdout.closed, linhas)
+
+
+def teste_emuladores_sondagem_e_extracao_usam_opcoes_de_fundo():
+    with patch.object(processos, "opcoes_sem_janela", return_value={"creationflags": 123}), \
+            patch.object(emuladores, "_bin_7z", return_value="fake7z"), \
+            patch.object(emuladores.shutil, "which", return_value="nvidia-smi"), \
+            patch.object(emuladores.subprocess, "run", return_value=SimpleNamespace(
+                returncode=0, stdout="GPU fake\n", stderr="")) as executar:
+        afirmar(emuladores._tem_nvidia() == "GPU fake")
+        afirmar(executar.call_args.kwargs["creationflags"] == 123)
+        emuladores._extrair_arquivo("fake.7z", Path(tempfile.mkdtemp()))
+        afirmar(executar.call_args.kwargs["creationflags"] == 123)
+        afirmar(executar.call_args.kwargs["timeout"] == 600)
+
+
 def teste_processo_mudo_timeout_encerra_recolhe_e_fecha_pipe():
     liberado = threading.Event()
     class Pipe:

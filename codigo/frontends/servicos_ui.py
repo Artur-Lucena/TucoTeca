@@ -779,12 +779,12 @@ class ServicoBiblioteca:
         return r
 
     def importar_pacote(self, pasta, exe=""):
-        core.fazer_backup(self.db_path)
-        with closing(core.get_db(self.db_path)) as con:
+        def importar(con):
             r = core.importar_pasta(con, pasta, exe)
-        if not r.get("ok"):
-            raise ValueError(r.get("erro", "Não foi possível importar o pacote."))
-        return r
+            if not r.get("ok"):
+                raise ValueError(r.get("erro", "Não foi possível importar o pacote."))
+            return r
+        return self.alterar(importar)
 
     def estatisticas(self):
         from bib_nucleo.estatisticas import resumo_ano
