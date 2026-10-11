@@ -14,6 +14,7 @@ ApplicationWindow {
     color: Theme.bg
     font.family: Theme.family
     font.pixelSize: Theme.subtitle
+    Component.onCompleted: { Theme.tema = hub.aparencia.tema; Theme.densidade = hub.aparencia.densidade }
     palette {
         window: Theme.bg; windowText: Theme.text; base: Theme.surface
         text: Theme.text; button: Theme.raised; buttonText: Theme.text
@@ -132,6 +133,8 @@ ApplicationWindow {
         function onMudou() {
             if (search.text !== hub.busca) search.text = hub.busca
             if (sistema.visible && !hub.ocupado) sistema.refresh()
+            Theme.tema = hub.aparencia.tema
+            Theme.densidade = hub.aparencia.densidade
             if (hub.secao === "jogos") {
                 if (games.currentIndex !== hub.indiceSelecionado) games.currentIndex = hub.indiceSelecionado
             } else if (hub.secao !== "integracoes" && hub.secao !== "inicio") {
@@ -777,6 +780,44 @@ ApplicationWindow {
         }
     }
 
+    Dialog {
+        id: diagnostico
+        objectName: "diagnosticoDialog"
+        title: "Diagnóstico da instalação"
+        anchors.centerIn: parent
+        width: Math.min(760, ApplicationWindow.window.width - 60)
+        height: Math.min(620, ApplicationWindow.window.height - 40)
+        modal: true; standardButtons: Dialog.Close
+        contentItem: ColumnLayout {
+            spacing: 12
+            Connections {
+                target: hub
+                function onDiagnosticoPronto(texto) { relatorio.text = texto }
+            }
+            ScrollView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                TextArea {
+                    id: relatorio
+                    objectName: "diagnosticoTexto"
+                    readOnly: true
+                    selectByMouse: true
+                    wrapMode: TextEdit.WrapAnywhere
+                    color: Theme.text
+                    font.family: "Consolas"
+                    font.pixelSize: 12
+                    text: "Gerando…"
+                    background: Rectangle { radius: Theme.radiusSmall; color: Theme.bg }
+                }
+            }
+            RowLayout {
+                ActionButton {
+                    text: "Copiar relatório"; Layout.fillWidth: true
+                    onClicked: { relatorio.selectAll(); relatorio.copy(); relatorio.deselect() }
+                }
+            }
+        }
+    }
+
     Drawer {
         id: details
         objectName: "gameDetails"
@@ -828,6 +869,46 @@ ApplicationWindow {
             Text { text: "Interface Qt Quick, biblioteca local e integrações independentes."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             ActionButton { text: window.immersive ? "Sair do Big Picture" : "Entrar no Big Picture"; Layout.fillWidth: true; onClicked: { settings.close(); window.toggleImmersive() } }
             ActionButton { text: "Criar backup da coleção"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: hub.backup() }
+            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
+            Text { text: "APARÊNCIA"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "Tema e densidade ficam salvos nesta coleção."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            RowLayout {
+                Layout.fillWidth: true
+                Text { text: "Tema"; color: Theme.muted; font.pixelSize: 14; Layout.preferredWidth: 90 }
+                Repeater {
+                    model: [{k: "escuro", t: "Escuro"}, {k: "claro", t: "Claro"}]
+                    ActionButton {
+                        required property var modelData
+                        text: modelData.t; selected: hub.aparencia.tema === modelData.k; quiet: true
+                        onClicked: hub.definirAparencia(modelData.k, hub.aparencia.densidade, hub.aparencia.auto_backup)
+                    }
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Text { text: "Densidade"; color: Theme.muted; font.pixelSize: 14; Layout.preferredWidth: 90 }
+                Repeater {
+                    model: [{k: "compacto", t: "Compacto"}, {k: "conforto", t: "Conforto"}, {k: "bigpicture", t: "Big Picture"}]
+                    ActionButton {
+                        required property var modelData
+                        text: modelData.t; selected: hub.aparencia.densidade === modelData.k; quiet: true
+                        onClicked: hub.definirAparencia(hub.aparencia.tema, modelData.k, hub.aparencia.auto_backup)
+                    }
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Text { text: "Backup"; color: Theme.muted; font.pixelSize: 14; Layout.preferredWidth: 90 }
+                ActionButton {
+                    text: hub.aparencia.auto_backup ? "Automático ao fim da sessão" : "Somente manual"
+                    selected: hub.aparencia.auto_backup; quiet: true
+                    onClicked: hub.definirAparencia(hub.aparencia.tema, hub.aparencia.densidade, !hub.aparencia.auto_backup)
+                }
+            }
+            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
+            Text { text: "DIAGNÓSTICO"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "Relatório somente-leitura da instalação. Útil para anexar em um issue."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            ActionButton { text: "Gerar diagnóstico"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: { hub.rodarDiagnostico(); diagnostico.open() } }
             ActionButton { text: "Sistema: backups, sessões e logs"; Layout.fillWidth: true; onClicked: { settings.close(); sistema.open() } }
             ActionButton { text: "Provedores online: capas, conquistas e Spotify"; Layout.fillWidth: true; onClicked: providers.open() }
             ActionButton { text: "Ferramentas de mídia: imagem, áudio e vídeo"; Layout.fillWidth: true; onClicked: mediaTools.open() }

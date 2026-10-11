@@ -5,6 +5,20 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
+### Adicionado
+- **Tema claro e densidade** (`Theme.qml` + `bib_nucleo/aparencia_usuario.py`):
+  escuro/claro e compacto/conforto/bigpicture, persistidos em
+  `dados/aparencia.json` e aplicados pelo bridge ao vivo.
+- **Diagnóstico no Hub**: `rodarDiagnostico()` reusa `ferramentas/diagnosticar.py`
+  (somente-leitura) em worker e mostra o relatório em diálogo com “Copiar
+  relatório”. `diagnosticar.py` passou a inserir o próprio diretório no
+  `sys.path` (import de `empacotar_fontes` funcionava só no CLI).
+- **Auto-backup pós-sessão** (opt-in, default ligado): ao encerrar sessão
+  rastreada, o Hub cria backup da coleção e avisa. Configurável na mesma tela
+  de aparência.
+- Busca FTS5 (§ anterior) e testes novos: 4 de FTS5, 2 de aparência, 2 de
+  bridge Qt (aparência/diagnóstico/auto-backup), 1 da paleta.
+
 ### Alterado
 - **Capas comerciais removidas do repositório e do histórico.** `midia/fontes-capas/`
   agora contém apenas placeholders neutros gerados por

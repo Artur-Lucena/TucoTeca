@@ -396,6 +396,59 @@ def get_db(db_path: Path) -> sqlite3.Connection:
     return con
 
 
+FTS_DDL = """
+CREATE VIRTUAL TABLE IF NOT EXISTS jogos_fts USING fts5(
+    titulo, etiquetas, executable_path,
+    content='jogos', content_rowid='id',
+    tokenize='unicode61 remove_diacritics 2'
+);
+CREATE TRIGGER IF NOT EXISTS jogos_fts_ai AFTER INSERT ON jogos BEGIN
+    INSERT INTO jogos_fts(rowid, titulo, etiquetas, executable_path)
+    VALUES (new.id, new.titulo, COALESCE(new.etiquetas, ''), new.executable_path);
+END;
+CREATE TRIGGER IF NOT EXISTS jogos_fts_ad AFTER DELETE ON jogos BEGIN
+    INSERT INTO jogos_fts(jogos_fts, rowid, titulo, etiquetas, executable_path)
+    VALUES ('delete', old.id, old.titulo, COALESCE(old.etiquetas, ''), old.executable_path);
+END;
+CREATE TRIGGER IF NOT EXISTS jogos_fts_au AFTER UPDATE ON jogos BEGIN
+    INSERT INTO jogos_fts(jogos_fts, rowid, titulo, etiquetas, executable_path)
+    VALUES ('delete', old.id, old.titulo, COALESCE(old.etiquetas, ''), old.executable_path);
+    INSERT INTO jogos_fts(rowid, titulo, etiquetas, executable_path)
+    VALUES (new.id, new.titulo, COALESCE(new.etiquetas, ''), new.executable_path);
+END;
+"""
+
+
+def _fts_disponivel(con: sqlite3.Connection) -> bool:
+    """FTS5 compilado neste SQLite? ( builds antigos podem não ter)."""
+    try:
+        con.execute("CREATE VIRTUAL TABLE IF NOT EXISTS _fts5_probe USING fts5(t)")
+        con.execute("DROP TABLE _fts5_probe")
+        return True
+    except sqlite3.Error:
+        return False
+
+
+def garantir_fts(con: sqlite3.Connection) -> bool:
+    """Cria índice FTS5 + triggers e popula (rebuild). False se indisponível.
+
+    Índice de conteúdo externo (content='jogos'): ocupa espaço pequeno e
+    reflete a tabela via triggers; `rebuild` reindexa a coleção inteira.
+    """
+    if not _fts_disponivel(con):
+        return False
+    con.executescript(FTS_DDL)
+    con.execute("INSERT INTO jogos_fts(jogos_fts) VALUES('rebuild')")
+    con.commit()
+    return True
+
+
+def _termo_fts(termo: str) -> str:
+    """Termo do usuário → consulta FTS5 segura (prefixo, sem sintaxe do usuário)."""
+    limpo = (termo or "").replace('"', " ").strip()
+    return f'"{limpo}"*' if limpo else ""
+
+
 def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     con.row_factory = sqlite3.Row
     # DELETE (não WAL): sem sidecars -wal/-shm, portátil no NTFS compartilhado.
@@ -423,6 +476,7 @@ def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     _garantir_tabela_downloads(con)
     _garantir_tabela_desejos(con)
     _garantir_tabela_videos(con)
+    garantir_fts(con)
     con.commit()
 
 
@@ -598,9 +652,24 @@ def listar_jogos(con: sqlite3.Connection, q: str = "", status: str = "",
     sql = "SELECT * FROM jogos WHERE 1=1"
     params: list = []
     if q:
-        sql += " AND (titulo LIKE ? ESCAPE '\\' OR executable_path LIKE ? ESCAPE '\\')"
-        like = f"%{_like_esc(q)}%"
-        params += [like, like]
+        termo = _termo_fts(q)
+        ids = None
+        if termo:
+            try:
+                ids = [r[0] for r in con.execute(
+                    "SELECT rowid FROM jogos_fts WHERE jogos_fts MATCH ?",
+                    (termo,)).fetchall()]
+            except sqlite3.Error:
+                ids = None  # FTS5 ausente/consult falhou: cai no LIKE abaixo
+        if ids is not None:
+            if not ids:
+                return []
+            sql += f" AND id IN ({','.join('?' * len(ids))})"
+            params += ids
+        else:
+            sql += " AND (titulo LIKE ? ESCAPE '\\' OR executable_path LIKE ? ESCAPE '\\')"
+            like = f"%{_like_esc(q)}%"
+            params += [like, like]
     if status:
         sql += " AND status = ?"
         params.append(status)

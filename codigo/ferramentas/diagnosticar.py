@@ -12,6 +12,13 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
+from pathlib import Path
+import sys
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))  # importa empacotar_fontes (módulo irmão)
+
 from empacotar_fontes import REPO, listar_fontes
 
 
