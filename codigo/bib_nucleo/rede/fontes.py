@@ -402,7 +402,7 @@ def resolver_megadb(url: str, timeout: int = 20) -> dict:
 
 
 def _nome_saida(titulo: str, url: str) -> str:
-    from bib_nucleo.repacks import ARQUIVO_EXTS
+    from bib_nucleo.rede.repacks import ARQUIVO_EXTS
     parsed = urllib.parse.urlsplit(url)
     query = urllib.parse.parse_qs(parsed.query)
     caminho = (query.get("f") or [parsed.path])[0]
@@ -468,7 +468,7 @@ def _mesmo_host(url: str, final: str) -> bool:
 
 def _descer(url: str, titulo: str, destino, progresso,
             timeout: int = 60) -> dict:
-    from bib_nucleo.repacks import pasta_piratas
+    from bib_nucleo.rede.repacks import pasta_piratas
     base = Path(destino) if destino else pasta_piratas()
     try:
         base.mkdir(parents=True, exist_ok=True)

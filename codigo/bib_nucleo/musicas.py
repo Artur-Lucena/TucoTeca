@@ -374,7 +374,7 @@ def baixar_capa_album(con: sqlite3.Connection, mid: int,
             return {"ok": False, "capa_pendente": True,
                     "erro": "sem arte/offline"}
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        from bib_nucleo.online import cache_path
+        from bib_nucleo.rede.online import cache_path
         cache = cache_path("imagens", url, ".img")
         if cache.is_file():
             raw = cache.read_bytes()

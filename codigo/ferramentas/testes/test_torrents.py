@@ -17,7 +17,7 @@ def _bt(tmp: Path) -> Path:
 
 
 def teste_bencode_basico():
-    from bib_nucleo.torrents import _bdecodificar
+    from bib_nucleo.rede.torrents import _bdecodificar
     obj, pos = _bdecodificar(b"d4:infod6:lengthi100e4:name6:ARCIVOee")
     afirmar(obj == {b"info": {b"length": 100, b"name": b"ARCIVO"}}, obj)
     obj, _p = _bdecodificar(b"l4:spam4:eggse")

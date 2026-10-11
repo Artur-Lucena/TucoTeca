@@ -812,7 +812,7 @@ def analisar_arquivo(caminho: str) -> dict:
     ext = p.suffix.lower()
     if ext == ".json":
         return {**vazio, "tipo": "json", "detalhe": "lista de jogos (JSON)."}
-    from bib_nucleo.repacks import ARQUIVO_EXTS, eh_pacote_hub  # sem ciclo
+    from bib_nucleo.rede.repacks import ARQUIVO_EXTS, eh_pacote_hub  # sem ciclo
     if ext == ".zip" and eh_pacote_hub(p):
         return {**vazio, "tipo": "pacote",
                 "detalhe": "pacote portátil (.zip) — tenta restaurar."}

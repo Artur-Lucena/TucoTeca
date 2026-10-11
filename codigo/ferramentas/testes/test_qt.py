@@ -527,8 +527,14 @@ def teste_qt_fontes_e_builders_incluem_recursos_qml():
     for nome in ("VolumeControl", "ProvidersDialog", "CoversDialog", "AchievementsDialog",
                  "SpotifyDialog", "MusicDownloadsDialog"):
         afirmar((dest / "qml" / (nome + ".qml")).is_file(), "bundle sem " + nome)
-    for nome in ("online", "capas", "conquistas", "spotify"):
+    for nome in ("capas", "conquistas"):
         afirmar((dest / "bib_nucleo" / (nome + ".py")).is_file(), "bundle sem domínio " + nome)
+    afirmar((dest / "bib_nucleo" / "rede" / "__init__.py").is_file(), "bundle sem bib_nucleo/rede")
+    for nome in ("online", "spotify"):
+        afirmar((dest / "bib_nucleo" / "rede" / (nome + ".py")).is_file(),
+                "bundle sem domínio de rede " + nome)
+    afirmar(any(p == "codigo/bib_nucleo/rede/online.py" for p in fontes),
+            "entrega sem bib_nucleo/rede/online.py")
 
 
 def teste_servico_saude_total_real_e_idade_backup():
@@ -787,7 +793,7 @@ def teste_qt_provedores_dialogos_e_spotify_enfileira_sem_bloquear_ui():
     from PySide6.QtCore import QMetaObject, QObject, qInstallMessageHandler
     from shiboken6 import delete
     from app_qt import criar_engine
-    from bib_nucleo.spotify import normalizar_faixa
+    from bib_nucleo.rede.spotify import normalizar_faixa
     from unittest.mock import patch
     avisos = []
     anterior = qInstallMessageHandler(lambda t, c, m: avisos.append(m))

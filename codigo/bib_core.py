@@ -13,7 +13,7 @@ from bib_nucleo import banco, base, baixar, cheats, controles, editores_imagem, 
 from bib_nucleo.banco import *
 from bib_nucleo.base import *
 from bib_nucleo.baixar import *
-from bib_nucleo.fontes import *
+from bib_nucleo.rede.fontes import *
 from bib_nucleo.ferramentas import *
 from bib_nucleo.qbit import *
 from bib_nucleo.player import *
@@ -22,16 +22,16 @@ from bib_nucleo.controles import *
 from bib_nucleo.emuladores import *
 from bib_nucleo.musicas import *
 from bib_nucleo.pacotes import *
-from bib_nucleo.repacks import *
+from bib_nucleo.rede.repacks import *
 from bib_nucleo.scans import *
 from bib_nucleo.texturas import *
-from bib_nucleo.torrents import *
+from bib_nucleo.rede.torrents import *
 from bib_nucleo.volume import *
 from bib_nucleo.editores_imagem import *
 from bib_nucleo.equalizadores import *
 from bib_nucleo.reprodutores_video import *
 from bib_nucleo.videos import *
-from bib_nucleo.videos_youtube import *
+from bib_nucleo.rede.videos_youtube import *
 
 __all__ = sorted(set(base.__all__ + banco.__all__ + scans.__all__
                      + emuladores.__all__ + pacotes.__all__

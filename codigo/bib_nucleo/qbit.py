@@ -92,7 +92,7 @@ def migrar_save_path(texto: str, destino: Path) -> str:
 
 def qbit_preparar_perfil() -> Path:
     """Cria o perfil do Hub ou migra o existente (destino sempre Piratas/)."""
-    from bib_nucleo.repacks import pasta_piratas
+    from bib_nucleo.rede.repacks import pasta_piratas
     destino = pasta_piratas().resolve()
     cfg = qbit_config_path()
     destino.mkdir(parents=True, exist_ok=True)
@@ -126,7 +126,7 @@ def qbit_adicionar(url: str) -> dict:
                     "erro": "Inicie o qBittorrent do Hub primeiro (Downloads → Iniciar cliente)."}
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
-    from bib_nucleo.repacks import pasta_piratas
+    from bib_nucleo.rede.repacks import pasta_piratas
     destino = pasta_piratas().resolve()
     try:
         destino.mkdir(parents=True, exist_ok=True)
@@ -144,7 +144,7 @@ def qbit_iniciar(url: str = "") -> dict:
     exe = localizar_ferramenta("qbittorrent")
     if not exe:
         return {"ok": False, "erro": "qBittorrent não encontrado no pacote"}
-    from bib_nucleo.repacks import pasta_piratas
+    from bib_nucleo.rede.repacks import pasta_piratas
     destino = pasta_piratas().resolve()
     try:
         qbit_preparar_perfil()

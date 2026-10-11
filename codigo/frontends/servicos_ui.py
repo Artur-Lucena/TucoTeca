@@ -330,9 +330,13 @@ class ServicoBiblioteca:
         return dict(row)
 
     def buscar_capas(self, categoria, ident, provedor, atualizar=False):
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Buscar capas")
         return capas.buscar_capas(categoria, self.item_capa(categoria, ident), provedor, atualizar)
 
     def buscar_musicas_online(self, termo, fonte="todas", atualizar=False):
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Buscar músicas online")
         from bib_nucleo import musica_online
         if fonte == "spotify":
             link = spotify.identificar_spotify(termo)
@@ -482,6 +486,8 @@ class ServicoBiblioteca:
                 "eq_presets": sorted(core.PRESETS_EQ)}
 
     def buscar_videos_online(self, termo, limite=10, atualizar=False):
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Buscar vídeos no YouTube")
         return core.buscar_youtube(termo, limite=limite, atualizar=atualizar)
 
     def baixar_video_online(self, video_id, progresso=None):
