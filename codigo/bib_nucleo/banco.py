@@ -430,11 +430,15 @@ def _fts_disponivel(con: sqlite3.Connection) -> bool:
 
 
 def garantir_fts(con: sqlite3.Connection) -> bool:
-    """Cria índice FTS5 + triggers e popula (rebuild). False se indisponível.
+    """Cria/popula uma vez; as triggers mantêm o índice nas aberturas seguintes.
 
     Índice de conteúdo externo (content='jogos'): ocupa espaço pequeno e
     reflete a tabela via triggers; `rebuild` reindexa a coleção inteira.
     """
+    existentes = {r[0] for r in con.execute(
+        "SELECT name FROM sqlite_master WHERE name IN ('jogos_fts','jogos_fts_ai','jogos_fts_ad','jogos_fts_au')")}
+    if len(existentes) == 4:
+        return True
     if not _fts_disponivel(con):
         return False
     con.executescript(FTS_DDL)
@@ -445,8 +449,8 @@ def garantir_fts(con: sqlite3.Connection) -> bool:
 
 def _termo_fts(termo: str) -> str:
     """Termo do usuário → consulta FTS5 segura (prefixo, sem sintaxe do usuário)."""
-    limpo = (termo or "").replace('"', " ").strip()
-    return f'"{limpo}"*' if limpo else ""
+    palavras = re.findall(r"\w+", str(termo or ""), flags=re.UNICODE)
+    return " AND ".join('"' + p + '"*' for p in palavras)
 
 
 def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
@@ -651,6 +655,7 @@ def listar_jogos(con: sqlite3.Connection, q: str = "", status: str = "",
                  plataformas: list[str] | None = None) -> list[dict]:
     sql = "SELECT * FROM jogos WHERE 1=1"
     params: list = []
+    fallback = False
     if q:
         termo = _termo_fts(q)
         ids = None
@@ -667,9 +672,7 @@ def listar_jogos(con: sqlite3.Connection, q: str = "", status: str = "",
             sql += f" AND id IN ({','.join('?' * len(ids))})"
             params += ids
         else:
-            sql += " AND (titulo LIKE ? ESCAPE '\\' OR executable_path LIKE ? ESCAPE '\\')"
-            like = f"%{_like_esc(q)}%"
-            params += [like, like]
+            fallback = True  # substring sem acento; não interpreta sintaxe SQL
     if status:
         sql += " AND status = ?"
         params.append(status)
@@ -677,6 +680,14 @@ def listar_jogos(con: sqlite3.Connection, q: str = "", status: str = "",
         sql += " AND favorito = 1"
     sql += " ORDER BY favorito DESC, titulo COLLATE NOCASE"
     jogos = [row_to_dict(r) for r in con.execute(sql, params).fetchall()]
+    if fallback:
+        import unicodedata
+        def sem_acento(texto):
+            return "".join(c for c in unicodedata.normalize("NFD", str(texto).casefold())
+                           if unicodedata.category(c) != "Mn")
+        termos = sem_acento(q).split()
+        jogos = [j for j in jogos if all(t in sem_acento(" ".join(
+            str(j.get(k) or "") for k in ("titulo", "etiquetas", "executable_path"))) for t in termos)]
     if etiquetas:
         alvos = [e.casefold() for e in etiquetas if (e or "").strip()]
         if alvos:
@@ -871,122 +882,9 @@ def _garantir_tabela_downloads(con: sqlite3.Connection) -> None:
     con.execute(SCHEMA_DOWNLOADS)
 
 
-SCHEMA_DESEJOS = """
-CREATE TABLE IF NOT EXISTS desejos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    appid TEXT NOT NULL,
-    titulo TEXT NOT NULL,
-    ordem INTEGER DEFAULT 0,
-    manual INTEGER DEFAULT 0,
-    criado_em TEXT,
-    atualizado_em TEXT,
-    UNIQUE(appid)
-);
-"""
-
-
-def _garantir_coluna_desejo_manual(con: sqlite3.Connection) -> None:
-    """v17: `manual` em desejos pré-Adicionar (aditivo, sem backup)."""
-    try:
-        cols = {r["name"] for r in con.execute("PRAGMA table_info(desejos)")}
-    except sqlite3.Error:
-        return
-    if cols and "manual" not in cols:
-        con.execute("ALTER TABLE desejos ADD COLUMN manual INTEGER DEFAULT 0")
-
-
-def _garantir_tabela_desejos(con: sqlite3.Connection) -> None:
-    """v16: wishlist Steam espelhada. Idempotente; preserva linhas."""
-    con.execute(SCHEMA_DESEJOS)
-    _garantir_coluna_desejo_manual(con)
-
-
-def desejo_to_dict(r: sqlite3.Row) -> dict:
-    return dict(r)
-
-
-def listar_desejos(con: sqlite3.Connection, q: str = "") -> list[dict]:
-    q = (q or "").strip().lower()
-    rows = con.execute("SELECT * FROM desejos ORDER BY ordem, titulo").fetchall()
-    out = [desejo_to_dict(r) for r in rows]
-    if q:
-        out = [d for d in out if q in (d.get("titulo") or "").lower()]
-    return out
-
-
-def sincronizar_desejos(con: sqlite3.Connection, itens: list[dict]) -> dict:
-    """Espelha a wishlist: insere novos, atualiza títulos, apaga saídos.
-
-    A wishlist é a fonte da verdade (igual restore por uuid), mas linhas
-    `manual=1` (➕ Adicionar) nunca são apagadas pelo espelho.
-    """
-    novos = atualizados = removidos = 0
-    agora = agora_iso()
-    vistos: set[str] = set()
-    for pos, item in enumerate(itens or []):
-        if not isinstance(item, dict):
-            continue
-        appid = str(item.get("appid") or "").strip()
-        titulo = _txt(item.get("titulo"))
-        if not appid.isdigit() or not titulo or appid in vistos:
-            continue
-        vistos.add(appid)
-        row = con.execute("SELECT * FROM desejos WHERE appid=?",
-                          (appid,)).fetchone()
-        if row is None:
-            con.execute("INSERT INTO desejos (appid, titulo, ordem, manual,"
-                        " criado_em, atualizado_em) VALUES (?,?,?,?,?,?)",
-                        (appid, titulo, pos, 0, agora, agora))
-            novos += 1
-        elif dict(row).get("titulo") != titulo or dict(row).get("ordem") != pos:
-            con.execute("UPDATE desejos SET titulo=?, ordem=?,"
-                        " atualizado_em=? WHERE appid=?",
-                        (titulo, pos, agora, appid))
-            atualizados += 1
-    for r in con.execute("SELECT appid, manual FROM desejos").fetchall():
-        if r["appid"] not in vistos and not r["manual"]:
-            con.execute("DELETE FROM desejos WHERE appid=?", (r["appid"],))
-            removidos += 1
-    con.commit()
-    return {"novos": novos, "atualizados": atualizados,
-            "removidos": removidos}
-
-
-def adicionar_desejo(con: sqlite3.Connection, appid: str, titulo: str) -> dict:
-    """➕ Adicionar manual: insere (ou protege) sem apagar nada.
-
-    Linha nasce `manual=1`: o espelho da wishlist nunca a remove.
-    """
-    appid = str(appid or "").strip()
-    titulo = _txt(titulo)
-    if not appid.isdigit() or not titulo:
-        raise ValueError("appid e título são obrigatórios")
-    agora = agora_iso()
-    row = con.execute("SELECT * FROM desejos WHERE appid=?",
-                      (appid,)).fetchone()
-    if row is None:
-        try:
-            pos = con.execute("SELECT COALESCE(MAX(ordem), -1) + 1 AS p"
-                              " FROM desejos").fetchone()["p"]
-        except (sqlite3.Error, TypeError, KeyError):
-            pos = 0
-        con.execute("INSERT INTO desejos (appid, titulo, ordem, manual,"
-                    " criado_em, atualizado_em) VALUES (?,?,?,?,?,?)",
-                    (appid, titulo, pos, 1, agora, agora))
-        con.commit()
-        return {"ok": True, "novo": True}
-    con.execute("UPDATE desejos SET titulo=?, manual=1, atualizado_em=?"
-                " WHERE appid=?", (titulo, agora, appid))
-    con.commit()
-    return {"ok": True, "novo": False}
-
-
-def remover_desejo(con: sqlite3.Connection, did: int) -> None:
-    row = con.execute("SELECT id FROM desejos WHERE id=?", (did,)).fetchone()
-    if not row:
-        raise LookupError("desejo não encontrado")
-    con.execute("DELETE FROM desejos WHERE id=?", (did,))
-    con.commit()
+from bib_nucleo.banco_desejos import (SCHEMA_DESEJOS, _garantir_coluna_desejo_manual,
+    _garantir_tabela_desejos, desejo_to_dict, listar_desejos, sincronizar_desejos,
+    adicionar_desejo, marcar_desejo_obtido, remover_desejo)
 
 
 def download_to_dict(r: sqlite3.Row) -> dict:
@@ -1354,4 +1252,4 @@ def selo_confianca(j: dict) -> str:
     return f" · ◎{conf:.2f}" if conf > 0 else ""
 
 __all__ = ['STATUS_VALIDOS', 'SCHEMA', 'MIGRACOES', 'CAMPOS_EDITAVEIS', 'ETIQUETA_MAX', 'ETIQUETAS_MAX', 'normalizar_etiquetas', 'etiquetas_de', 'MODS_MAX_NOME', 'MODS_MAX_QTD', 'normalizar_mods', 'mods_de', 'plataforma_de_origem', 'plataforma_jogo', 'get_db', 'row_to_dict', 'validar_dados', 'chave_dedup', 'listar_jogos', 'listar_etiquetas', 'criar_jogo', 'atualizar_jogo', 'excluir_jogo', 'SCHEMA_MUSICAS', 'musica_to_dict', 'criar_musica', 'listar_musicas', 'excluir_musica', 'salvar_capa_musica_bytes', 'ESTADOS_DOWNLOAD', 'SCHEMA_DOWNLOADS', 'download_to_dict', 'enfileirar_downloads', 'listar_downloads', 'marcar_download', 'limpar_downloads', 'SCHEMA_DESEJOS', 'desejo_to_dict', 'listar_desejos',
- 'sincronizar_desejos', 'adicionar_desejo', 'remover_desejo', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca', 'SCHEMA_VIDEOS', 'video_to_dict', 'criar_video', 'listar_videos', 'excluir_video']
+ 'sincronizar_desejos', 'adicionar_desejo', 'marcar_desejo_obtido', 'remover_desejo', 'CAPA_EXTS', 'CAPA_LARG', 'CAPA_ALT', 'salvar_capa', 'salvar_capa_bytes', 'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem', 'selo_confianca', 'SCHEMA_VIDEOS', 'video_to_dict', 'criar_video', 'listar_videos', 'excluir_video']

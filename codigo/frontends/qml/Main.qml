@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import QtQuick.Window
+import "secoes" as Secoes
 
 ApplicationWindow {
     id: window
@@ -22,6 +23,9 @@ ApplicationWindow {
         placeholderText: Theme.muted; mid: Theme.line; dark: Theme.surface
     }
     property bool immersive: false
+    readonly property var games: hub.secao === "jogos" ? sectionLoader.item : null
+    readonly property var collection: ["musicas", "videos", "desejos", "downloads"].indexOf(hub.secao) >= 0 ? sectionLoader.item : null
+    readonly property var youtubeLoader: sectionLoader
     property string previousVisibility: "window"
     property string currentSection: hub.secao
     property var notificationQueue: []
@@ -59,8 +63,8 @@ ApplicationWindow {
             immersive = false
             if (previousVisibility === "maximized") showMaximized(); else showNormal()
         }
-        if (hub.secao === "jogos") games.forceActiveFocus()
-        else if (hub.secao !== "integracoes" && hub.secao !== "inicio") collection.forceActiveFocus()
+        if (games) games.forceActiveFocus()
+        else if (collection) collection.forceActiveFocus()
     }
     function notify(message, error) {
         notificationQueue = notificationQueue.concat([{message: message, error: error}])
@@ -117,6 +121,27 @@ ApplicationWindow {
         deleteDialog.itemTitle = item.titulo
         deleteDialog.open()
     }
+    function playVideo(id) {
+        if (videoPlayer.currentText === "Interno") hub.prepararVideoInterno(id)
+        else hub.reproduzirVideo(id, ({"Automático": "auto", "VLC": "vlc", "MPV": "mpv", "MPC-HC": "mpchc"})[videoPlayer.currentText] || "auto")
+    }
+    function showDetails() { details.open() }
+    function showSystem() { sistema.open() }
+    function showYoutubeSearch() { youtube.open() }
+    function showLyrics(item) {
+        hub.buscarLetras(item.artista || "", item.titulo || "", item.album || "", item.duracao_s || Math.floor((item.duracao_ms || 0) / 1000))
+        letrasDialog.open()
+    }
+    function findSources(item) { hub.buscarFontesDesejo(item.titulo); fontesDialog.abrir(item.id, item.titulo) }
+    function useIntegration(item) {
+        if (item.url && item.url.indexOf("{q}") >= 0) { integrationQuery.chave = item.chave; integrationQuery.title = item.nome; customQuery.clear(); integrationQuery.open() }
+        else if (item.url) hub.abrirIntegracao(item.chave, "")
+        else if (item.tipo === "catalogo") { catalogDialog.provider = item.chave; catalogDialog.title = item.nome; catalogQuery.clear(); catalogDialog.open() }
+        else if (item.tipo === "download") hub.navegar("downloads")
+        else if (item.tipo === "musicas_online") spotifyCatalog.open()
+        else if (item.tipo === "provedores") providers.open()
+        else settings.open()
+    }
     onClosing: function(close) {
         if (hub.ocupado) {
             close.accepted = false
@@ -128,18 +153,93 @@ ApplicationWindow {
         title: "Escolha a pasta de destino (ex.: pendrive)"
         onAccepted: hub.exportarColecao(selectedFolder)
     }
-    Shortcut { sequence: "F11"; onActivated: window.toggleImmersive() }
+    Dialog {
+        id: letrasDialog
+        objectName: "letrasDialog"
+        title: "Letra"
+        anchors.centerIn: parent
+        width: Math.min(640, window.width - 80)
+        height: Math.min(560, window.height - 80)
+        modal: true; standardButtons: Dialog.Close
+        contentItem: ColumnLayout {
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true
+                visible: hub.letras.sincronizadas
+                model: hub.letras.linhas || []; clip: true; spacing: 10
+                currentIndex: hub.letraIndice
+                onCurrentIndexChanged: { if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Center) }
+                ScrollBar.vertical: ScrollBar {}
+                delegate: Text {
+                    required property var modelData
+                    required property int index
+                    width: ListView.view.width - 16
+                    text: modelData.texto; wrapMode: Text.WordWrap
+                    color: index === hub.letraIndice ? Theme.accent : Theme.text
+                    font.bold: index === hub.letraIndice; font.pixelSize: 18
+                }
+            }
+            ScrollView {
+                visible: !hub.letras.sincronizadas
+                Layout.fillWidth: true; Layout.fillHeight: true
+                clip: true; contentWidth: availableWidth
+                TextArea { readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap; color: Theme.text; text: hub.letras.ok ? hub.letras.texto : (hub.letras.erro || "Buscando letra…") }
+            }
+        }
+    }
+
+    Dialog {
+        id: fontesDialog
+        objectName: "fontesDialog"
+        property int did: 0
+        property string titulo: ""
+        function abrir(id, t) { did = id; titulo = t; open() }
+        title: "Fontes para: " + titulo
+        anchors.centerIn: parent
+        width: Math.min(720, window.width - 80)
+        height: Math.min(600, window.height - 80)
+        modal: true; standardButtons: Dialog.Close
+        contentItem: ScrollView {
+            clip: true; contentWidth: availableWidth
+            ColumnLayout {
+                width: parent.width; spacing: 10
+                Text { text: "SteamRip — download direto (host automático)"; color: Theme.accent; font.pixelSize: 13; visible: hub.fontesDesejo.steamrip.length > 0 }
+                Repeater {
+                    model: hub.fontesDesejo.steamrip
+                    RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Text { text: modelData.titulo; color: Theme.text; Layout.fillWidth: true; elide: Text.ElideRight }
+                        ActionButton { text: "Baixar e importar"; primary: true; enabled: !hub.ocupado; onClicked: hub.baixarDesejoSteamRip(modelData.url, fontesDialog.did) }
+                        ActionButton { text: "Abrir ↗"; onClicked: hub.abrirUrl(modelData.url) }
+                    }
+                }
+                Text { text: "FitGirl — abre a página para escolher os links"; color: Theme.accent; font.pixelSize: 13; visible: hub.fontesDesejo.fitgirl.length > 0 }
+                Repeater {
+                    model: hub.fontesDesejo.fitgirl
+                    RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Text { text: modelData.titulo; color: Theme.text; Layout.fillWidth: true; elide: Text.ElideRight }
+                        ActionButton { text: "Abrir página ↗"; onClicked: hub.abrirUrl(modelData.url) }
+                    }
+                }
+                Text { text: hub.fontesDesejo.erros.join("; "); color: Theme.warning; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 13; visible: hub.fontesDesejo.erros.length > 0 }
+            }
+        }
+    }
+
+    Shortcut { sequence: hub.preferencias.atalhos.tela_cheia; onActivated: window.toggleImmersive() }
     Shortcut { sequence: "Escape"; onActivated: { if (window.immersive) window.toggleImmersive() } }
-    Shortcut { sequence: "Ctrl+F"; onActivated: { if (search.visible) { search.forceActiveFocus(); search.selectAll() } else window.openPalette() } }
-    Shortcut { sequence: "Ctrl+K"; onActivated: window.openPalette() }
-    Shortcut { sequence: "Ctrl+1"; onActivated: hub.navegar("inicio") }
-    Shortcut { sequence: "Ctrl+2"; onActivated: hub.navegar("jogos") }
-    Shortcut { sequence: "Ctrl+3"; onActivated: hub.navegar("musicas") }
-    Shortcut { sequence: "Ctrl+4"; onActivated: hub.navegar("desejos") }
-    Shortcut { sequence: "Ctrl+5"; onActivated: hub.navegar("downloads") }
-    Shortcut { sequence: "Ctrl+6"; onActivated: hub.navegar("integracoes") }
-    Shortcut { sequence: "Ctrl+7"; onActivated: hub.navegar("videos") }
-    Shortcut { sequence: "Ctrl+8"; onActivated: hub.navegar("youtube") }
+    Shortcut { sequence: hub.preferencias.atalhos.buscar; onActivated: { if (search.visible) { search.forceActiveFocus(); search.selectAll() } else window.openPalette() } }
+    Shortcut { sequence: hub.preferencias.atalhos.paleta; onActivated: window.openPalette() }
+    Shortcut { sequence: hub.preferencias.atalhos.inicio; onActivated: hub.navegar("inicio") }
+    Shortcut { sequence: hub.preferencias.atalhos.jogos; onActivated: hub.navegar("jogos") }
+    Shortcut { sequence: hub.preferencias.atalhos.musicas; onActivated: hub.navegar("musicas") }
+    Shortcut { sequence: hub.preferencias.atalhos.desejos; onActivated: hub.navegar("desejos") }
+    Shortcut { sequence: hub.preferencias.atalhos.downloads; onActivated: hub.navegar("downloads") }
+    Shortcut { sequence: hub.preferencias.atalhos.integracoes; onActivated: hub.navegar("integracoes") }
+    Shortcut { sequence: hub.preferencias.atalhos.videos; onActivated: hub.navegar("videos") }
+    Shortcut { sequence: hub.preferencias.atalhos.youtube; onActivated: hub.navegar("youtube") }
     Connections {
         target: hub
         function onAviso(message, error) { window.notify(message, error) }
@@ -149,12 +249,13 @@ ApplicationWindow {
             Theme.tema = hub.aparencia.tema
             Theme.densidade = hub.aparencia.densidade
             if (hub.secao === "jogos") {
-                if (games.currentIndex !== hub.indiceSelecionado) games.currentIndex = hub.indiceSelecionado
+                if (games && games.currentIndex !== hub.indiceSelecionado) games.currentIndex = hub.indiceSelecionado
             } else if (hub.secao !== "integracoes" && hub.secao !== "inicio") {
-                if (collection.currentIndex !== hub.indiceSelecionado) collection.currentIndex = hub.indiceSelecionado
+                if (collection && collection.currentIndex !== hub.indiceSelecionado) collection.currentIndex = hub.indiceSelecionado
             }
         }
         function onJogoIniciado() { window.showMinimized() }
+        function onVideoLocalPronto(video) { internalVideo.video = video; internalVideo.open() }
         function onJogoTerminou() {
             if (window.immersive) window.showFullScreen(); else window.showNormal()
             window.requestActivate()
@@ -266,7 +367,7 @@ ApplicationWindow {
                 background: Rectangle { radius: 12; color: Theme.surface; border.color: search.activeFocus ? Theme.accent : Theme.line }
                 onTextEdited: hub.pesquisar(text)
                 onAccepted: {
-                    if (hub.secao === "jogos") games.forceActiveFocus(); else collection.forceActiveFocus()
+                    if (games) games.forceActiveFocus(); else if (collection) collection.forceActiveFocus()
                 }
                 ToolButton { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "×"; visible: search.text.length > 0; onClicked: { search.clear(); hub.pesquisar("") } }
             }
@@ -394,11 +495,16 @@ ApplicationWindow {
                     youtubeLoader.item.urlAtualAsync(function(u) { hub.youtubeBaixarUrl(u) })
                 }
             }
-            ComboBox { id: videoPlayer; visible: hub.secao === "videos"; model: ["Automático", "VLC", "MPV", "MPC-HC"]; implicitWidth: 130; implicitHeight: 36 }
+            ActionButton {
+                visible: hub.secao === "youtube" && hub.webDisponivel
+                text: "MP3 deste"; implicitHeight: 36; enabled: !hub.ocupado
+                onClicked: { if (youtubeLoader.item) youtubeLoader.item.urlAtualAsync(function(u) { hub.baixarMp3Url(u) }) }
+            }
+            ComboBox { id: videoPlayer; visible: hub.secao === "videos"; model: hub.multimediaDisponivel ? ["Interno", "Automático", "VLC", "MPV", "MPC-HC"] : ["Automático", "VLC", "MPV", "MPC-HC"]; implicitWidth: 130; implicitHeight: 36 }
             ActionButton { visible: hub.secao === "videos"; text: "Ferramentas…"; implicitHeight: 36; onClicked: mediaTools.open() }
             ActionButton {
                 objectName: "collectionAddButton"
-                visible: hub.secao !== "integracoes"
+                visible: hub.secao !== "integracoes" && hub.secao !== "youtube"
                 text: hub.secao === "jogos" ? "+ Adicionar" : hub.secao === "musicas" ? "+ Importar pasta" :
                       hub.secao === "desejos" ? "+ Adicionar desejo" : hub.secao === "videos" ? "+ Importar vídeos" : "Iniciar cliente"
                 implicitHeight: 36; enabled: !hub.ocupado
@@ -437,360 +543,18 @@ ApplicationWindow {
 
         Item {
             Layout.fillWidth: true; Layout.fillHeight: true
-            // Seção YouTube: navegador embutido (variante completa) ou
-            // diálogo clássico (variante essencial, sem QtWebEngine).
             Loader {
-                id: youtubeLoader
+                id: sectionLoader
                 anchors.fill: parent
-                active: hub.secao === "youtube" && hub.webDisponivel
-                source: "NavegadorEmbed.qml"
-                onLoaded: { if (item) item.irPara("https://www.youtube.com/") }
-            }
-            Connections {
-                target: youtubeLoader.item
-                ignoreUnknownSignals: true
-                function onPedirDownload(url) { hub.youtubeBaixarUrl(url) }
-                function onPedirAbrirExterno(url) { hub.abrirUrl(url) }
-            }
-            ColumnLayout {
-                anchors.centerIn: parent
-                visible: hub.secao === "youtube" && !hub.webDisponivel
-                spacing: 14
-                Text { text: "◇"; color: Theme.accent; font.pixelSize: 54; Layout.alignment: Qt.AlignHCenter }
-                Text { text: "Navegador embutido não disponível"; color: Theme.text; font.pixelSize: 21; Layout.alignment: Qt.AlignHCenter }
-                Text { text: "Esta é a variante essencial (sem QtWebEngine). Use a busca e o download abaixo — o vídeo abre no seu navegador."; color: Theme.muted; font.pixelSize: 13; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true; wrapMode: Text.WordWrap }
-                ActionButton { text: "Pesquisar e baixar…"; primary: true; Layout.alignment: Qt.AlignHCenter; onClicked: youtube.open() }
-            }
-            GridView {
-                id: games
-                objectName: "gamesGrid"
-                anchors.fill: parent
-                visible: hub.secao === "jogos"
-                model: hub.itens
-                clip: true
-                cellWidth: width / Math.max(1, Math.floor(width / (window.immersive ? 235 : 190)))
-                cellHeight: Math.min(window.height < 740 ? Math.max(200, height - 8) : 370, cellWidth * 1.32 + 55)
-                cacheBuffer: cellHeight * 2
-                keyNavigationEnabled: true
-                activeFocusOnTab: true
-                highlightMoveDuration: 160
-                highlightRangeMode: GridView.ApplyRange
-                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-                Keys.onReturnPressed: { if (hub.selecionado.id && !hub.ocupado) hub.jogar(hub.selecionado.id) }
-                Keys.onSpacePressed: { if (hub.selecionado.id) details.open() }
-                onCurrentIndexChanged: { if (activeFocus) hub.selecionar(currentIndex) }
-                delegate: PosterCard {
-                    required property var item
-                    required property int index
-                    width: games.cellWidth - 8; height: games.cellHeight - 10
-                    game: item
-                    selected: hub.selecionado.id === item.id
-                    onChosen: { games.currentIndex = index; games.forceActiveFocus(); hub.selecionar(index) }
-                    onActivated: { if (!hub.ocupado) hub.jogar(item.id) }
-                    onDetails: details.open()
-                }
-            }
-
-            ListView {
-                id: collection
-                objectName: "collectionList"
-                anchors.fill: parent
-                visible: hub.secao !== "jogos" && hub.secao !== "integracoes" && hub.secao !== "inicio"
-                model: hub.itens
-                clip: true; spacing: 8
-                activeFocusOnTab: true
-                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-                Keys.onReturnPressed: { if (hub.secao === "musicas" && hub.selecionado.id) hub.tocar(hub.selecionado.id); else if (hub.secao === "videos" && hub.selecionado.id) hub.reproduzirVideo(hub.selecionado.id, ["auto", "vlc", "mpv", "mpchc"][videoPlayer.currentIndex]) }
-                onCurrentIndexChanged: { if (activeFocus) hub.selecionar(currentIndex) }
-                delegate: Rectangle {
-                    id: row
-                    required property var item
-                    required property int index
-                    width: collection.width - 12
-                    height: hub.secao === "downloads" ? 104 : 82
-                    radius: 12
-                    color: rowHover.hovered ? Theme.raised : Theme.surface
-                    border.color: collection.activeFocus && collection.currentIndex === index ? Theme.accent : "transparent"
-                    HoverHandler { id: rowHover }
-                    TapHandler { onTapped: { collection.currentIndex = index; hub.selecionar(index); collection.forceActiveFocus() } }
-                    RowLayout {
-                        anchors.fill: parent; anchors.margins: 14; spacing: 16
-                        Rectangle {
-                            width: 50; height: 50; radius: 10; color: Theme.raised
-                            Text { anchors.centerIn: parent; text: hub.secao === "musicas" ? "♫" : hub.secao === "desejos" ? "☆" : hub.secao === "videos" ? "▶" : "↓"; color: Theme.accent; font.pixelSize: 26 }
-                            Image { anchors.fill: parent; source: row.item.capa_url || ""; fillMode: Image.PreserveAspectCrop; asynchronous: true; sourceSize: Qt.size(100, 100) }
-                        }
-                        ColumnLayout {
-                            Layout.fillWidth: true; spacing: 6
-                            Text {
-                                Layout.fillWidth: true; elide: Text.ElideRight
-                                text: row.item.titulo || row.item.nome || ""
-                                color: Theme.text; font { pixelSize: 15; weight: Font.DemiBold }
-                            }
-                            Text {
-                                Layout.fillWidth: true; elide: Text.ElideRight
-                                text: hub.secao === "musicas" ? (row.item.artista || "Artista desconhecido") + "  ·  " + (row.item.album || "Álbum local") :
-                                      hub.secao === "videos" ? (row.item.canal || "Arquivo local") + "  ·  " + Math.floor((row.item.duracao_s || 0) / 60) + " min  ·  " + (row.item.origem || "local") :
-                                      hub.secao === "desejos" ? "Steam  ·  " + row.item.appid :
-                                      Number(row.item.pct || 0).toFixed(1) + "%  ·  " + (row.item.estado || "Histórico local") +
-                                      (row.item.fonte_progresso === "estimativa" ? "  ·  estimativa em disco" : "") +
-                                      (row.item.velocidade ? "  ·  " + (row.item.velocidade / 1048576).toFixed(1) + " MB/s" : "") +
-                                       (row.item.eta ? "  ·  ETA " + Math.floor(row.item.eta / 60) + "min" : "")
-                                color: Theme.muted; font.pixelSize: 14
-                            }
-                            ProgressBar { visible: hub.secao === "downloads"; Layout.fillWidth: true; from: 0; to: 100; value: row.item.pct || 0 }
-                        }
-                        ActionButton {
-                            text: hub.secao === "musicas" ? "▶ Tocar" : hub.secao === "desejos" ? "Abrir na Steam ↗" : hub.secao === "videos" ? "▶ Assistir" : "Abrir pasta"
-                            onClicked: {
-                                if (hub.secao === "musicas") hub.tocar(row.item.id)
-                                else if (hub.secao === "desejos") hub.abrirUrl("https://store.steampowered.com/app/" + row.item.appid)
-                                else if (hub.secao === "videos") hub.reproduzirVideo(row.item.id, ["auto", "vlc", "mpv", "mpchc"][videoPlayer.currentIndex])
-                                else hub.abrirPasta(row.item.save_path || "")
-                            }
-                        }
-                        ActionButton {
-                            visible: hub.secao === "musicas"
-                            text: "Capas…"; enabled: !hub.ocupado
-                            onClicked: window.openCovers("musicas", row.item)
-                        }
-                        ActionButton {
-                            visible: hub.secao === "downloads" && row.item.fonte_progresso === "api"
-                            text: "Pausar"; enabled: !hub.ocupado
-                            onClicked: hub.controlarDownload(row.item.hash, "pausar")
-                        }
-                        ActionButton {
-                            visible: hub.secao === "downloads" && row.item.fonte_progresso === "api"
-                            text: "Retomar"; enabled: !hub.ocupado
-                            onClicked: hub.controlarDownload(row.item.hash, "retomar")
-                        }
-                        ActionButton {
-                            visible: hub.secao === "downloads" && hub.foraDoDestino(row.item.save_path || "")
-                            text: "Organizar"; enabled: !hub.ocupado
-                            ToolTip.visible: hovered; ToolTip.text: "Mover p/ Meus Jogos Locais/ (padrão do Hub)"
-                            onClicked: hub.organizarDownload(row.item.save_path)
-                        }
-                        ActionButton {
-                            visible: hub.secao !== "downloads"
-                            text: "×"; Accessible.name: "Remover da coleção"; enabled: !hub.ocupado
-                            onClicked: window.deleteItem(hub.secao, row.item)
-                        }
-                    }
-                }
-            }
-
-            ScrollView {
-                id: home
-                objectName: "homeView"
-                anchors.fill: parent
-                visible: hub.secao === "inicio"
-                clip: true
-                contentWidth: availableWidth
-                ColumnLayout {
-                    width: parent.width
-                    spacing: 18
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 18
-                        Rectangle {
-                            Layout.fillWidth: true; Layout.preferredHeight: 190
-                            radius: Theme.radius; color: Theme.surface; border.color: Theme.line
-                            ColumnLayout {
-                                anchors.fill: parent; anchors.margins: 22; spacing: 8
-                                Text { text: "CONTINUAR"; color: Theme.accent; font { pixelSize: 12; weight: Font.Bold; letterSpacing: 2 } }
-                                Text {
-                                    text: hub.recentes.length > 0 ? hub.recentes[0].titulo : "Nada por aqui ainda"
-                                    color: Theme.text; font { pixelSize: 22; weight: Font.Bold }
-                                    elide: Text.ElideRight; Layout.fillWidth: true
-                                }
-                                Text { text: hub.recentes.length > 0 ? (hub.recentes[0].plataforma || "PC") + "  ·  " + Number(hub.recentes[0].horas || 0).toFixed(1) + " h" : "Jogue algo e ele aparece aqui."; color: Theme.muted; font.pixelSize: 14 }
-                                Item { Layout.fillHeight: true }
-                                ActionButton { text: "▶  Continuar jogando"; primary: true; enabled: hub.recentes.length > 0 && !hub.ocupado && !hub.emJogo; onClicked: hub.jogar(hub.recentes[0].id) }
-                            }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true; Layout.preferredHeight: 190
-                            radius: Theme.radius; color: Theme.surface; border.color: Theme.line
-                            ColumnLayout {
-                                anchors.fill: parent; anchors.margins: 22; spacing: 8
-                                Text { text: "COLEÇÃO"; color: Theme.accent; font { pixelSize: 12; weight: Font.Bold; letterSpacing: 2 } }
-                                Text { text: hub.sistema.jogos + " jogos  ·  " + hub.sistema.musicas + " músicas"; color: Theme.text; font { pixelSize: 20; weight: Font.DemiBold } }
-                                Text {
-                                    objectName: "backupStatus"
-                                    text: hub.sistema.backup
-                                    color: hub.sistema.backup_estado === "ausente" || hub.sistema.backup_estado === "antigo" ? Theme.warning : Theme.muted
-                                    font.pixelSize: Theme.subtitle
-                                    Layout.fillWidth: true; elide: Text.ElideRight
-                                }
-                                Text { text: hub.sistema.pendentes + " sessão(ões) pendente(s)  ·  " + hub.sistema.disco_livre_gb + " GB livres"; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                                Item { Layout.fillHeight: true }
-                                RowLayout {
-                                    ActionButton { text: "Ver jogos  →"; onClicked: hub.navegar("jogos") }
-                                    ActionButton { text: "Backup agora"; enabled: !hub.ocupado; onClicked: hub.backup() }
-                                }
-                            }
-                        }
-                    }
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: saudeCol.implicitHeight + 44
-                        radius: Theme.radius; color: Theme.surface; border.color: Theme.line
-                        ColumnLayout {
-                            id: saudeCol
-                            anchors.fill: parent; anchors.margins: 22; spacing: 10
-                            Text { text: "SAÚDE DA COLEÇÃO"; color: Theme.accent; font { pixelSize: 12; weight: Font.Bold; letterSpacing: 2 } }
-                            Text {
-                                objectName: "healthSummary"
-                                text: !hub.saude.verificada ? "Verificando coleção…" : hub.saude.total > 0 ? hub.saude.ok + " de " + hub.saude.total + " jogos sem pendência de exe/ROM" : "Nenhum jogo cadastrado ainda."
-                                color: Theme.text; font { pixelSize: 15; weight: Font.DemiBold }
-                                wrapMode: Text.WordWrap; Layout.fillWidth: true
-                            }
-                            Repeater {
-                                model: hub.saude.problemas.slice(0, 5)
-                                Text {
-                                    required property var modelData
-                                    text: "• " + modelData.titulo + " — " + modelData.motivo
-                                    color: Theme.muted; font.pixelSize: 14; elide: Text.ElideRight; Layout.fillWidth: true
-                                }
-                            }
-                            Text {
-                                objectName: "healthMore"
-                                visible: hub.saude.pendentes > 5
-                                text: "+" + Math.max(0, hub.saude.pendentes - 5) + " outros jogos com pendências"
-                                color: Theme.warning; font.pixelSize: Theme.subtitle
-                            }
-                            RowLayout {
-                                ActionButton { objectName: "viewProblemsButton"; visible: hub.saude.pendentes > 0; text: "Ver pendências  →"; onClicked: hub.verPendencias() }
-                                ActionButton { text: "Ver biblioteca  →"; onClicked: hub.navegar("jogos") }
-                                ActionButton { text: "Abrir sistema"; onClicked: sistema.open() }
-                            }
-                        }
-                    }
-                    Text { text: "ACESSO RÁPIDO"; color: Theme.muted; font { pixelSize: 13; letterSpacing: 2 } }
-                    GridLayout {
-                        Layout.fillWidth: true
-                        columns: window.width >= 1250 ? 3 : 2
-                        columnSpacing: 18; rowSpacing: 18
-                        Repeater {
-                            model: [{key: "jogos", nome: "Jogos", desc: "Grade, filtros e detalhes."}, {key: "musicas", nome: "Músicas", desc: "Player que atravessa telas."}, {key: "desejos", nome: "Desejos", desc: "O que entra na coleção."}, {key: "downloads", nome: "Downloads", desc: "qBittorrent local."}, {key: "integracoes", nome: "Integrações", desc: "Catálogos e emuladores."}, {key: "paleta", nome: "Busca global", desc: "Tudo com Ctrl+K."}]
-                            Rectangle {
-                                required property var modelData
-                                Layout.fillWidth: true; Layout.preferredHeight: 118
-                                radius: Theme.radius; color: Theme.surface; border.color: Theme.line
-                                RowLayout {
-                                    anchors.fill: parent; anchors.margins: 20; spacing: 14
-                                    ColumnLayout {
-                                        Layout.fillWidth: true; spacing: 6
-                                        Text { text: modelData.nome; color: Theme.text; font { pixelSize: 17; weight: Font.DemiBold } }
-                                        Text { text: modelData.desc; color: Theme.muted; font.pixelSize: 14 }
-                                    }
-                                    ActionButton {
-                                        text: "Abrir  →"
-                                        onClicked: {
-                                            if (modelData.key === "paleta") window.openPalette()
-                                            else hub.navegar(modelData.key)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Text {
-                        text: "JOGADOS RECENTEMENTE"; color: Theme.muted; font { pixelSize: 13; letterSpacing: 2 }
-                        visible: hub.recentes.length > 0
-                    }
-                    GridLayout {
-                        Layout.fillWidth: true
-                        columns: window.width >= 1250 ? 4 : 2
-                        columnSpacing: 18; rowSpacing: 18
-                        visible: hub.recentes.length > 0
-                        Repeater {
-                            model: hub.recentes
-                            Rectangle {
-                                required property var modelData
-                                Layout.fillWidth: true; Layout.preferredHeight: 96
-                                radius: Theme.radius; color: Theme.surface; border.color: Theme.line
-                                RowLayout {
-                                    anchors.fill: parent; anchors.margins: 14; spacing: 12
-                                    Rectangle {
-                                        width: 52; height: 68; radius: 8; color: Theme.raised
-                                        Image { anchors.fill: parent; source: modelData.capa_url || ""; fillMode: Image.PreserveAspectCrop; asynchronous: true }
-                                    }
-                                    ColumnLayout {
-                                        Layout.fillWidth: true; spacing: 4
-                                        Text {
-                                            text: modelData.titulo; color: Theme.text; font { pixelSize: 14; weight: Font.DemiBold }
-                                            elide: Text.ElideRight; Layout.fillWidth: true
-                                        }
-                                        Text { text: (modelData.plataforma || "PC") + "  ·  " + Number(modelData.horas || 0).toFixed(1) + " h"; color: Theme.muted; font.pixelSize: 13 }
-                                    }
-                                    ActionButton { text: "▶"; Accessible.name: "Jogar recente"; enabled: !hub.ocupado && !hub.emJogo; onClicked: hub.jogar(modelData.id) }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            ScrollView {
-                anchors.fill: parent
-                visible: hub.secao === "integracoes"
-                clip: true
-                contentWidth: availableWidth
-                GridLayout {
-                    width: parent.width
-                    columns: window.width >= 1250 ? 3 : 2
-                    columnSpacing: 18; rowSpacing: 18
-                    Repeater {
-                        model: hub.integracoes
-                        Rectangle {
-                            required property var modelData
-                            Layout.fillWidth: true; Layout.preferredHeight: 238
-                            radius: Theme.radius; color: Theme.surface; border.color: Theme.line
-                            ColumnLayout {
-                                anchors.fill: parent; anchors.margins: 23; spacing: 12
-                                RowLayout {
-                                    Rectangle {
-                                        width: 44; height: 44; radius: 13; color: Theme.raised
-                                        Text { anchors.centerIn: parent; text: modelData.inicial; color: modelData.cor; font { pixelSize: 18; weight: Font.Bold } }
-                                    }
-                                    Item { Layout.fillWidth: true }
-                                    Text { text: modelData.personalizada ? "SUA" : modelData.tipo === "catalogo" ? "SOB DEMANDA" : modelData.tipo === "link" ? "ATALHO" : "LOCAL"; color: Theme.muted; font { pixelSize: 12; letterSpacing: 1 } }
-                                }
-                                Text { text: modelData.nome; color: Theme.text; font { pixelSize: 21; weight: Font.DemiBold } }
-                                Text { text: modelData.descricao; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.muted; font.pixelSize: 14 }
-                                Item { Layout.fillHeight: true }
-                                ActionButton {
-                                    text: modelData.url ? "Abrir  →" : modelData.tipo === "catalogo" ? "Explorar catálogo  →" : modelData.tipo === "download" ? "Ver downloads  →" : modelData.tipo === "musicas_online" ? "Escolher músicas  →" : modelData.tipo === "provedores" ? "Configurar provedores  →" : "Gerenciar emulador  →"
-                                    Layout.fillWidth: true
-                                    onClicked: {
-                                        if (modelData.url && modelData.url.indexOf("{q}") >= 0) { integrationQuery.chave = modelData.chave; integrationQuery.title = modelData.nome; customQuery.clear(); integrationQuery.open() }
-                                        else if (modelData.url) hub.abrirIntegracao(modelData.chave, "")
-                                        else if (modelData.tipo === "catalogo") {
-                                            catalogDialog.provider = modelData.chave
-                                            catalogDialog.title = modelData.nome
-                                            catalogQuery.clear()
-                                            catalogDialog.open()
-                                        } else if (modelData.tipo === "download") hub.navegar("downloads")
-                                        else if (modelData.tipo === "musicas_online") spotifyCatalog.open()
-                                        else if (modelData.tipo === "provedores") providers.open()
-                                        else settings.open()
-                                    }
-                                }
-                                ActionButton {
-                                    visible: modelData.personalizada
-                                    text: "Remover"; quiet: true; Layout.fillWidth: true
-                                    onClicked: hub.removerIntegracao(modelData.chave)
-                                }
-                            }
-                        }
-                    }
-                }
+                sourceComponent: hub.secao === "inicio" ? inicioComponent : hub.secao === "jogos" ? jogosComponent :
+                    hub.secao === "musicas" ? musicasComponent : hub.secao === "videos" ? videosComponent :
+                    hub.secao === "youtube" ? youtubeComponent : hub.secao === "integracoes" ? integracoesComponent : colecaoComponent
+                onLoaded: { if (item && (hub.secao === "jogos" || item.objectName === "collectionList")) item.currentIndex = hub.indiceSelecionado }
             }
 
             ColumnLayout {
                 anchors.centerIn: parent
-                visible: hub.secao !== "integracoes" && hub.secao !== "inicio" && hub.quantidade === 0
+                visible: hub.secao !== "integracoes" && hub.secao !== "inicio" && hub.secao !== "youtube" && hub.quantidade === 0
                 spacing: 14
                 Text { text: hub.ocupado ? "◌" : "◇"; color: Theme.accent; font.pixelSize: 54; Layout.alignment: Qt.AlignHCenter }
                 Text { text: hub.ocupado ? "Preparando sua coleção…" : hub.busca ? "Nenhum resultado por aqui." : "Este espaço está esperando por você."; color: Theme.text; font.pixelSize: 21; Layout.alignment: Qt.AlignHCenter }
@@ -798,6 +562,14 @@ ApplicationWindow {
             }
         }
     }
+
+    Component { id: inicioComponent; Secoes.Inicio { shell: window } }
+    Component { id: jogosComponent; Secoes.Jogos { shell: window } }
+    Component { id: musicasComponent; Secoes.Musicas { shell: window } }
+    Component { id: videosComponent; Secoes.Videos { shell: window } }
+    Component { id: youtubeComponent; Secoes.YouTube { shell: window } }
+    Component { id: integracoesComponent; Secoes.Integracoes { shell: window } }
+    Component { id: colecaoComponent; Secoes.Colecao { shell: window } }
 
     footer: Rectangle {
         height: 90
@@ -901,8 +673,10 @@ ApplicationWindow {
             ActionButton { Layout.fillWidth: true; text: hub.selecionado.favorito ? "★  Remover dos favoritos" : "☆  Adicionar aos favoritos"; enabled: !hub.ocupado; onClicked: hub.favorito(hub.selecionado.id) }
             ActionButton { Layout.fillWidth: true; text: "Editar jogo"; enabled: !hub.ocupado; onClicked: window.editGame(hub.selecionado) }
             ActionButton { objectName: "gameCoversButton"; Layout.fillWidth: true; text: "Buscar capas nas bibliotecas…"; enabled: !hub.ocupado; onClicked: window.openCovers("jogos", hub.selecionado) }
+            ActionButton { objectName: "gameLibretroButton"; Layout.fillWidth: true; text: "Capa offline (LibRetro)"; enabled: !hub.ocupado && (hub.selecionado.plataforma === "3DS" || hub.selecionado.plataforma === "NDS"); onClicked: hub.buscarCapaLibretro(hub.selecionado.id) }
             ActionButton { objectName: "gameAchievementsButton"; Layout.fillWidth: true; text: "Conquistas do Hub…"; enabled: !!hub.selecionado.id; onClicked: window.openAchievements(hub.selecionado) }
             ActionButton { objectName: "registerGameHoursButton"; Layout.fillWidth: true; text: "Registrar horas…"; enabled: !hub.ocupado && !hub.emJogo && !!hub.selecionado.id; onClicked: window.registerHours(hub.selecionado, "") }
+            ActionButton { objectName: "gameToolsButton"; Layout.fillWidth: true; text: "Saves, screenshots e organização…"; enabled: !hub.ocupado; onClicked: { gameTools.gid = hub.selecionado.id; gameTools.open() } }
             ActionButton { Layout.fillWidth: true; text: "Remover da biblioteca"; enabled: !hub.ocupado; onClicked: { window.deleteItem("jogos", hub.selecionado); details.close() } }
             Item { Layout.fillHeight: true }
             Text { text: "Notas pessoais"; color: Theme.muted; font { pixelSize: 13; letterSpacing: 2 } }
@@ -996,6 +770,10 @@ ApplicationWindow {
                 text: "Exportar coleção para pasta ou pendrive…"; Layout.fillWidth: true; enabled: !hub.ocupado
                 onClicked: exportFolder.open()
             }
+            ActionButton { objectName: "importarColecaoButton"; text: "Importar pacote de coleção…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: packageFile.open() }
+            ActionButton { text: "Importar pasta de jogos locais…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: gamesFolder.open() }
+            ActionButton { text: "Importar pacote de jogo (.zip/.rar/.7z)…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: repackFile.open() }
+            ActionButton { objectName: "personalToolsButton"; text: "Perfis, atalhos, vigia, estatísticas e API local…"; Layout.fillWidth: true; onClicked: personalTools.open() }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
             Text { text: "DIAGNÓSTICO"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
             Text { text: "Relatório somente-leitura da instalação. Útil para anexar em um issue."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
@@ -1056,6 +834,20 @@ ApplicationWindow {
     FileDialog { id: executableDialog; title: "Escolha o executável"; onAccepted: gameExe.text = decodeURIComponent(selectedFile.toString().replace(Qt.platform.os === "windows" ? /^file:\/\/\// : /^file:\/\//, "")) }
     FolderDialog { id: musicFolder; title: "Importar pasta de músicas"; onAccepted: hub.importarMusicas(selectedFolder) }
     FolderDialog { id: videoFolder; title: "Importar pasta de vídeos"; onAccepted: hub.importarVideos(selectedFolder) }
+    FolderDialog { id: gamesFolder; title: "Importar jogos locais"; onAccepted: hub.importarJogos(selectedFolder) }
+    FileDialog { id: repackFile; title: "Pacote de jogo"; nameFilters: ["Pacotes (*.zip *.rar *.7z)"]; onAccepted: hub.importarRepack(selectedFile) }
+    FileDialog { id: packageFile; title: "Pacote da coleção"; nameFilters: ["TucoTeca (*.zip)"]; onAccepted: packageConfirm.open() }
+    Dialog {
+        id: packageConfirm
+        anchors.centerIn: parent; width: Math.min(520, window.width - 60)
+        modal: true; title: "Importar coleção?"; standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: hub.importarColecao(packageFile.selectedFile, restoreSaves.checked)
+        ColumnLayout {
+            width: parent.width; spacing: 12
+            Label { text: "A coleção atual recebe um backup antes da importação. Jogos com a mesma identidade podem ter o progresso atualizado."; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            CheckBox { id: restoreSaves; checked: false; text: "Também restaurar saves de emuladores (sobrescreve os atuais)"; Layout.fillWidth: true }
+        }
+    }
     Dialog {
         id: wishDialog
         anchors.centerIn: parent; width: 470; modal: true; title: "Adicionar desejo"
@@ -1335,6 +1127,23 @@ ApplicationWindow {
     MusicDownloadsDialog { id: musicDownloads }
     YouTubeDialog { id: youtube }
     MediaToolsDialog { id: mediaTools }
+    GameToolsDialog { id: gameTools }
+    PersonalToolsDialog { id: personalTools }
+    Dialog {
+        id: internalVideo
+        property var video: ({url: "", sha: "", posicao: 0})
+        title: video.titulo || "Vídeo interno"
+        anchors.centerIn: parent; modal: true
+        width: Math.min(960, window.width - 60); height: Math.min(700, window.height - 60)
+        standardButtons: Dialog.Close
+        onClosed: { if (videoContent.item) videoContent.item.parar(); video = {url: "", sha: "", posicao: 0} }
+        contentItem: Loader {
+            id: videoContent
+            active: !!internalVideo.video.url && hub.multimediaDisponivel
+            source: "PlayerVideo.qml"
+            onLoaded: item.video = internalVideo.video
+        }
+    }
     Dialog {
         id: integrationQuery
         property string chave: ""

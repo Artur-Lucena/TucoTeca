@@ -4,7 +4,10 @@
 
 ```mermaid
 flowchart TD
-  GUI[app_win.py / tkinter] --> Compat[bib_core / APIs públicas]
+  Qt[app_qt / QML por seção] --> Bridge[qt_bridge / modelos e workers]
+  Bridge --> Services[servicos_ui / casos de uso]
+  Services --> Compat[bib_core / APIs públicas]
+  GUI[app_win.py / tkinter clássico] --> Compat
   TUI[app_tui.py / curses] --> Compat
   GUI --> Dispatch[despacho / fila para thread da UI]
   Compat --> DB[banco / SQLite]
@@ -12,7 +15,8 @@ flowchart TD
   Compat --> Emu[emuladores / providers e processos]
   Compat --> Music[musicas + baixar + player]
   Compat --> System[volume + controles / adaptadores do SO]
-  Compat --> Network[fontes + atualizacao / ações remotas]
+  Compat --> Network[rede / adaptadores remotos explícitos]
+  Services --> Personal[saves / perfis / estatísticas / arquivos]
   DB --> Dados[dados / estado do usuário]
   Builders[montar_* / copiar_app] --> Dist[dist / artefatos]
 ```
@@ -25,11 +29,12 @@ locais deliberados para desfazer ciclos entre banco, scanners e providers.
 ## Árvore comentada
 
 ```text
-biblioteca/
+Tucoteca/
 ├── README.md                         entrada funcional e técnica
 ├── CONTRIBUTING.md                   ambiente, testes e colaboração
 ├── LICENSE                           licença do código do Hub
-├── BibliotecaHub.bat/.sh/.command     launchers do checkout
+├── TucoTeca.bat                       entrada Windows; BibliotecaHub.bat é alias
+├── BibliotecaHub.sh/Mac.command       entradas Linux/macOS legadas
 ├── Montar-Universal.bat               entrada de empacotamento
 ├── .github/workflows/                matriz de testes
 ├── docs/
@@ -37,12 +42,14 @@ biblioteca/
 │   └── REVISAO_TECNICA.md             achados e evidência da revisão
 ├── codigo/
 │   ├── bib_core.py                   fachada de compatibilidade
-│   ├── bib_nucleo/                   núcleo e integrações
-│   ├── frontends/                    GUI/TUI e callbacks
+│   ├── bib_nucleo/                   núcleo e domínios pessoais
+│   │   └── rede/                     adaptadores com BIBLIOTECA_REDE
+│   ├── frontends/                    Qt, clássico e TUI
+│   │   └── qml/secoes/               telas carregadas por Loader
 │   ├── ferramentas/                  diagnóstico, entrega e builders
 │   │   └── testes/                   casos e runner em sandbox
 │   └── historico/                    arquivo local, ignorado
-├── midia/fontes-capas/                artes de referência versionadas
+├── midia/fontes-capas/                placeholders neutros versionados
 ├── dados/                            coleção local, ignorada
 └── dist/                             gerados, ignorados
 ```
@@ -58,12 +65,13 @@ de entrega seleciona somente fontes/documentos por allowlist.
 |---|---|
 | `base.py` | casa, raízes Win/Linux/Mac, tradução de caminhos, lock, texto, logs |
 | `banco.py` | schema, migrações por colunas, CRUD jogos/músicas/fila, capas |
-| `scans.py` | Hydra/lojas/disco/ROMs, metadados/ícones, preview, dedup e restore |
+| `banco_desejos.py` | wishlist local, sincronização preservadora e histórico obtido |
+| `scans.py` / `scans_hydra.py` | lojas/disco/ROMs e adaptador Hydra, preview, dedup e restore |
 | `emuladores.py` | Azahar/DeSmuME, processos/sessões, presets e overlay de mods |
 | `atualizacao.py` | download e atualização transacional, manifesto, rollback |
 | `pacotes.py` | JSON, ZIP de coleção e backups versionados |
 | `arquivos.py` | temporário no mesmo disco + publicação atômica |
-| `repacks.py` | extrair, organizar, selecionar exe, importar e confirmar archive |
+| `rede/repacks.py` (alias `repacks.py`) | extrair, organizar, selecionar exe, importar e confirmar archive |
 | `cheats.py` | texto Gateway com liga/desliga e TID canônico |
 | `texturas.py` | instalar/toggle/estado de packs por TID |
 | `controles.py` | detecção de gamepads, formatos de binds e presets `[Controls]` |
@@ -71,10 +79,19 @@ de entrega seleciona somente fontes/documentos por allowlist.
 | `baixar.py` | Exportify, yt-dlp/FFmpeg, staging, conversão e fila persistente |
 | `player.py` | playlist/transporte e backends MCI/afplay/players Linux |
 | `volume.py` | volume geral Windows Core Audio; COM com vida limitada |
-| `fontes.py` | catálogo SteamRip, identificação de hosts e downloads |
-| `torrents.py` | leitura local de `.torrent/.fastresume`, caminhos e peças recebidas |
+| `rede/fontes.py` | catálogos SteamRip/FitGirl, seleção de hosts e downloads |
+| `rede/metadados.py` / `rede/binarios.py` | Steam de referência e instalação verificada de ferramentas |
+| `rede/letras.py` / `rede/capas_libretro.py` / `rede/sponsorblock.py` | LRCLIB/LRC, capas e segmentos opt-in |
+| `rede/torrents.py` (alias `torrents.py`) | leitura local de `.torrent/.fastresume`, sem depender da rede |
 | `ferramentas.py` | manifesto editável, resolução relativa e comandos de sidecars/zipapps |
 | `qbit.py` | perfil independente e Web API local do qBittorrent |
+| `saves.py` | origens explícitas, snapshots SHA-256 e restauração com backup anterior |
+| `sessoes_manuais.py` / `estatisticas.py` | reconciliação idempotente e histórico de sessões novas |
+| `preferencias_pessoais.py` | Tuco/Isa, favoritos/filtros, atalhos e recursos opt-in |
+| `screenshots.py` / `pastas_vigiadas.py` | imagens locais e detecção de arquivos estáveis |
+| `organizacao_local.py` / `patches_rom.py` | cópia/hardlinks explícitos e IPS/BPS em uma nova ROM |
+| `everything.py` | `es.exe` BYOB, limitado às raízes escolhidas; scanner como fallback |
+| `api_local.py` | leitura HTTP opt-in, loopback, token, Host/Origin, sem rotas de execução |
 
 ### Frontends e ferramentas
 
@@ -85,7 +102,7 @@ de entrega seleciona somente fontes/documentos por allowlist.
 | `frontends/app_qt.py` | Shell Qt Quick, lock, selftest e screenshot |
 | `frontends/qt_bridge.py` | Modelos, seções, workers, player, paleta e sistema |
 | `frontends/servicos_ui.py` | Casos de uso desktop, `resumo_sistema`, `busca_global`, registro |
-| `frontends/qml/` | `Main.qml`, componentes, `Theme.qml`, HUD + Início + paleta |
+| `frontends/qml/` | shell `Main.qml`, `secoes/`, componentes, diálogos, navegador/player opcionais |
 | `frontends/app_tui.py` | Tui, desenho, prompts, menus e loop de terminal |
 | `frontends/despacho.py` | callbacks de workers entregues pela thread Tk |
 | `frontends/aparencia.py` | tema local, elementos nine-slice, barras adaptáveis e painéis roláveis |
@@ -95,8 +112,10 @@ de entrega seleciona somente fontes/documentos por allowlist.
 | `ferramentas/montar_linux.py` | payload Linux + stub `.run`, desktop e desinstalação |
 | `ferramentas/montar_mac.py` | payload + oficiais macOS, completo/leve |
 | `ferramentas/montar_universal.py` | agrega artefatos dos 3 SOs |
-| `ferramentas/montar_superhub.py` | runtime completo Windows x64; poda, manifesto e provas pós-extração |
+| `ferramentas/montar_superhub.py` | variantes Windows x64; poda, revisão exata dos fontes, manifesto e provas pós-extração |
 | `ferramentas/provar_qbit_runtime.py` | prova nativa do perfil/API com torrent local artificial |
+| `ferramentas/provar_qt_runtime.py` | capturas, áudio/LRC em caminho longo, Chromium local e vídeo/retomada |
+| `ferramentas/provar_integracoes_locais.py` | API HTTP real, snapshots, hardlinks, screenshots e vigia em casa descartável |
 
 ## Estado e modelo de dados
 
@@ -109,7 +128,9 @@ e a remoção de Citron foi incorporada. Não há um gerenciador externo de ORM.
 | `jogos` | id local + uuid estável; título, caminhos por SO, opções, progresso, tags, mods, save_path |
 | `musicas` | id local + `musica_sha` único; artista/título/álbum, path, capa, origem |
 | `downloads` | id local; metadados CSV, estado, vídeo, staging, hash e erro |
-| `desejos` | AppID Steam único; título, ordem e proteção da inclusão manual |
+| `desejos` | AppID Steam único; título, ordem, inclusão manual e estado/data obtido |
+| `jogos_fts` | FTS5 com triggers; rebuild só se índice/triggers estiverem ausentes |
+| `sessoes_historico` / `sessoes_reconciliadas` | horas novas por jogo/perfil e marcadores já aplicados |
 
 `jogos` tem unicidade por título/executável/opções e índice de uuid. Scans
 adicionam dedup por caminho normalizado; ROMs consideram também título/ROM
@@ -127,6 +148,10 @@ dados/
   baixados/              staging da fila
   cache-wav/             PCM derivado para player Windows
   saves/                 dados centralizados/prefixo Wine
+  screenshots/           galeria por uuid do jogo
+  saves-config.json      origens de saves configuradas pelo usuário
+  preferencias-pessoais.json  perfis, atalhos e opt-ins
+  videos-posicoes.json   retomada de vídeo por SHA-256
   texturas/              material extra de packs
   erros.log              diagnóstico de falhas do runtime
 ```
@@ -149,11 +174,22 @@ Repacks: arquivo → staging extraído → exe confirmado → catálogo. O archi
 original permanece se a importação falhar. O programa não executa setups
 durante a extração.
 
+Desejo → fonte: SteamRip escolhe o primeiro host compatível disponível;
+importação confirmada marca o desejo como obtido, sem apagar o histórico.
+FitGirl abre a página, não executa instaladores. Steam não é destino de
+lançamento nem sincroniza conquistas/overlay.
+
 ### Áudio
 
 CSV → `pendente` → `baixando` → `baixado` → conversão/importação → `pronta`.
 Falha por faixa entra em `falha`. Finalização de arquivos usa temporários
 onde implementada; staging e cache não viajam no pacote de coleção.
+
+O driver Windows MCI também limita o caminho do WAV. Preparação em worker
+usa cache temporário curto por SHA quando necessário (`Temp/TucoTeca-mci/`,
+teto LRU de 1 GiB), sem renomear/mover o original. Se o TEMP herdado for longo,
+consulta o temporário local real do usuário. Falha de cópia preserva o cache
+anterior e produz erro claro; abertura/controle do dispositivo continuam na UI.
 
 `importar_musicas` retorna `novos/ignorados/erros/capas`;
 `importar_fila_pronta` retorna `novas/ignoradas/erros/avisos/capas`.
@@ -169,6 +205,16 @@ São contratos distintos: consumidores devem usar suas chaves exatas.
 - Tokens invalidam preparações antigas; Stop/fechar não deixam resultado
   atrasado iniciar ou interromper outra faixa.
 - Erro de status é desconhecido, não fim. Auto-avançar exige fim confirmado.
+- Backup pós-sessão aguarda horas/histórico e relê o opt-out persistido.
+
+### Preservação dos saves e pacotes
+
+Snapshots exigem identidade do jogo e as mesmas origens configuradas. Antes
+de restaurar, validam caminhos/tipos/tamanhos e todos os SHA-256; o estado
+atual é guardado mesmo quando parte dos saves foi apagada. Publicação é
+atômica por arquivo, não uma transação de toda a pasta: falha de disco no
+meio exige usar o backup prévio. Pacotes rejeitam links, nomes reservados,
+duplicatas e escapes, com limites de tamanho/arquivos e backup pré-sobrescrita.
 
 ## Configuração por ambiente
 
@@ -183,7 +229,10 @@ São contratos distintos: consumidores devem usar suas chaves exatas.
 | `BIBLIOTECA_AZAHAR_FLAGS/DESMUME_FLAGS` | opções de lançamento |
 | `BIBLIOTECA_JOGOS_DIR` (alias legado `BIBLIOTECA_PIRATAS`) | pasta dos downloads de jogos (padrão `Meus Jogos Locais`; se a antiga `Piratas` já existir e a nova não, continua usando a antiga) |
 | `BIBLIOTECA_7Z` | caminho explícito do 7-Zip |
-| `BIBLIOTECA_REDE` | `0` desliga todas as integrações de rede (modo avião) |
+| `BIBLIOTECA_REDE` | `0` bloqueia ações remotas do Hub; não é firewall dos apps externos nem bloqueio da API loopback |
+| `BIBLIOTECA_WEBENGINE` | `0` força a alternativa sem Chromium |
+| `BIBLIOTECA_WATCH` | pasta de pacotes vigiada; extração automática só com opt-in |
+| `BIBLIOTECA_EVERYTHING` | caminho BYOB do CLI `es.exe` |
 | `BIBLIOTECA_MUSICA_DIR` | origem de áudio local/Harmoni |
 | `BIBLIOTECA_YTDLP/FFMPEG` | ferramentas externas |
 | `BIBLIOTECA_CAPA_MUSICA_AUTO` | auto-capa; `0` desliga |
@@ -205,8 +254,13 @@ também a coleção legada `dados/dados/biblioteca.db` sem movê-la.
 Casos cobrem persistência, identidade, scanners, overlays, rollback,
 downloads simulados, GUI/TUI, áudio e volume. `executar.py` cria sandbox,
 descobre `teste_*` e informa os pulos e falhas por ambiente.
+`conftest.py` coleta por AST e executa os mesmos casos em processos separados;
+`pytest --cobertura` agrega cobertura dos subprocessos. Provas nativas e
+smokes remotos são separados dos casos herméticos e não usam jogos reais.
 
 Os maiores pontos de acoplamento continuam `app_win.py`, `app_tui.py`,
 `emuladores.py` e `scans.py`. A decomposição futura deve seguir domínios
 (catálogo, áudio, diálogos, sessões), mantendo contratos e fixtures antes
-de mover métodos. `despacho.py` e `copiar_app` são fronteiras já extraídas.
+de mover métodos. Desejos, Hydra, sessões manuais e adaptadores remotos já
+foram extraídos; isso não significa decomposição integral dos módulos grandes.
+`despacho.py` e `copiar_app` são fronteiras já extraídas.

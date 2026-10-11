@@ -171,3 +171,39 @@ def teste_runtime_build_sem_perfis_e_com_manifesto():
     m = MS.criar_manifesto(dst, {}, {"python": "prova"})
     afirmar(m["arquivos"]["app.exe"]["sha256"] == MS.sha_arquivo(dst / "app.exe"))
     afirmar(m["bytes_runtime"] == len(b"MZruntime") + len(b"extensao"))
+
+
+def teste_runtime_confere_revisao_e_recusa_fontes_obsoletos():
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    import montar_superhub as MS
+    tmp = Path(tempfile.mkdtemp(prefix="fontes-runtime-"))
+    repo, runtime = tmp / "repo", tmp / "runtime"
+    for origem, _destino in MS.MP.APP_ARQS:
+        p = repo / origem
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("# fonte de prova", encoding="utf-8")
+    (repo / "codigo/bib_nucleo").mkdir()
+    (repo / "codigo/bib_nucleo/__init__.py").write_text("# nucleo", encoding="utf-8")
+    (repo / "codigo/frontends/qml/secoes").mkdir(parents=True)
+    qml = repo / "codigo/frontends/qml/secoes/Inicio.qml"
+    qml.write_text("import QtQuick; Item {}", encoding="utf-8")
+    MS.MP.copiar_app(runtime / "app", repo)
+    r = MS.validar_fontes_runtime(runtime, repo)
+    afirmar(r["arquivos"] == len(MS.MP.APP_ARQS) + 2, r)
+    afirmar(len(r["sha256_arvore_app"]) == 64, r)
+    (runtime / "app/qml/secoes/Inicio.qml").write_text("# divergente", encoding="utf-8")
+    try:
+        MS.validar_fontes_runtime(runtime, repo)
+    except ValueError as e:
+        afirmar("diverge" in str(e), e)
+    else:
+        afirmar(False, "aceitou código divergente")
+    MS.MP.copiar_app(runtime / "app", repo)
+    (runtime / "app/obsoleto.py").write_text("# obsoleto", encoding="utf-8")
+    try:
+        MS.validar_fontes_runtime(runtime, repo)
+    except ValueError as e:
+        afirmar("obsoleto.py" in str(e), e)
+    else:
+        afirmar(False, "aceitou fonte antigo no bundle")

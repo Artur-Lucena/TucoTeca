@@ -13,9 +13,19 @@ def _bridge():
     return HubBridge(":memory:")
 
 
+def _app():
+    try:
+        from PySide6.QtGui import QGuiApplication
+    except ImportError:
+        print("[pula] PySide6 opcional não instalado")
+        return None
+    return QGuiApplication.instance() or QGuiApplication([])
+
+
 def teste_bridge_aparencia_e_diagnostico():
-    from PySide6.QtGui import QGuiApplication
-    app = QGuiApplication.instance() or QGuiApplication([])
+    app = _app()
+    if app is None:
+        return
     bridge = _bridge()
     try:
         ap = bridge.aparencia
@@ -45,6 +55,9 @@ def teste_bridge_aparencia_e_diagnostico():
 
 
 def teste_bridge_auto_backup_opt_out():
+    app = _app()
+    if app is None:
+        return
     bridge = _bridge()
     try:
         # auto_backup desligado: nada de tarefa de backup é criada

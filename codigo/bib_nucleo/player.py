@@ -19,6 +19,7 @@ import shutil
 import signal as _signal
 import subprocess
 import sys
+import tempfile
 import time
 import wave
 from pathlib import Path
@@ -142,7 +143,55 @@ class MciBackend:
             rc = self._decodificar(r["ffmpeg"], path, alvo)
             if not rc.get("ok"):
                 return rc
-        return {"ok": True, "alvo": alvo}
+        return self._preparar_caminho_mci(alvo)
+
+    @staticmethod
+    def _pasta_mci() -> Path:
+        """Cache curto; o TEMP de um bundle profundamente aninhado pode ser longo."""
+        pasta = Path(tempfile.gettempdir()) / "TucoTeca-mci"
+        if len(str(pasta / ("0" * 16 + ".wav")).encode("utf-16-le")) < 256:
+            return pasta
+        import ctypes
+        from ctypes import wintypes
+        # Consulta o diretório real do usuário, sem alterar perfis ou variáveis.
+        shell = ctypes.WinDLL("shell32", use_last_error=True)
+        shell.SHGetFolderPathW.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.HANDLE,
+                                         wintypes.DWORD, wintypes.LPWSTR]
+        shell.SHGetFolderPathW.restype = wintypes.LONG
+        buf = ctypes.create_unicode_buffer(260)
+        if shell.SHGetFolderPathW(None, 0x1C, None, 0, buf) != 0 or not buf.value:
+            raise OSError("não foi possível localizar o temporário local do usuário")
+        pasta = Path(buf.value) / "Temp" / "TucoTeca-mci"
+        if len(str(pasta / ("0" * 16 + ".wav")).encode("utf-16-le")) >= 256:
+            raise OSError("configure TEMP em uma pasta mais curta para o áudio interno")
+        return pasta
+
+    def _preparar_caminho_mci(self, alvo: str) -> dict:
+        """MCI waveaudio limita o nome a 127 unidades UTF-16, mesmo sem parser.
+
+        A GUI faz hash/cópia no worker, antes de abrir o dispositivo na UI.
+        Cache por conteúdo, publicação atômica e teto LRU evitam alterar o
+        original, publicar cópia parcial ou acumular temporários sem limite.
+        """
+        alvo = str(Path(alvo).resolve())
+        if len(alvo.encode("utf-16-le")) < 256:
+            return {"ok": True, "alvo": alvo}
+        from bib_nucleo.musicas import sha_arquivo
+        try:
+            pasta = self._pasta_mci()
+            pasta.mkdir(parents=True, exist_ok=True)
+            self._podar_cache(pasta)
+            sha = sha_arquivo(Path(alvo))
+            curto = pasta / (sha[:16] + ".wav")
+            if not curto.is_file() or sha_arquivo(curto) != sha:
+                with destino_temporario(curto) as tmp:
+                    shutil.copyfile(alvo, tmp)
+                    if sha_arquivo(tmp) != sha:
+                        raise ValueError("o áudio mudou durante a cópia temporária")
+            os.utime(curto, None)
+            return {"ok": True, "alvo": str(curto)}
+        except (OSError, ValueError, AttributeError) as e:
+            return {"ok": False, "erro": f"caminho de áudio MCI: {e}"}
 
     def open_preparado(self, alvo: str) -> dict:
         """Abre WAV na thread que fará play/pause/status/close.
@@ -154,6 +203,10 @@ class MciBackend:
             return {"ok": False, "erro": "MCI é só Windows"}
         if not alvo or not Path(alvo).is_file():
             return {"ok": False, "erro": "arquivo não encontrado."}
+        preparado = self._preparar_caminho_mci(alvo)
+        if not preparado.get("ok"):
+            return preparado
+        alvo = preparado["alvo"]
         self.close()
         self.alias = self._novo_alias()
         erro = self._cmd(f'open "{alvo}" type waveaudio alias {self.alias}')
@@ -220,11 +273,12 @@ class MciBackend:
         except (OSError, EOFError, wave.Error):
             return False
 
-    def _podar_cache(self) -> None:
+    def _podar_cache(self, pasta: Path | None = None) -> None:
         """LRU: apaga wavs antigos até caber no teto (nunca levanta)."""
         try:
             from bib_nucleo.base import CACHE_WAV_DIR
-            arqs = sorted((p for p in CACHE_WAV_DIR.glob("*.wav")
+            pasta = pasta if pasta is not None else CACHE_WAV_DIR
+            arqs = sorted((p for p in pasta.glob("*.wav")
                            if p.is_file()),
                           key=lambda p: p.stat().st_mtime)
             total = sum(p.stat().st_size for p in arqs)

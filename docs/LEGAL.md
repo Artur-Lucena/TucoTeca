@@ -8,8 +8,9 @@
 
 - Um **gerenciador local** de biblioteca de jogos, músicas e vídeos.
 - Organiza arquivos e metadados que **você** já possui ou escolheu baixar.
-- Os dados ficam na sua máquina (`dados/`). Não há conta, servidor próprio
-  nem telemetria.
+- Os dados ficam na sua máquina (`dados/`). Não há conta obrigatória, servidor
+  externo próprio nem telemetria. A API local de leitura é opt-in e somente
+  loopback, com token e sem CORS.
 - Ferramentas de terceiros (yt-dlp, FFmpeg, 7-Zip, qBittorrent, emuladores)
   são **detectadas ou agregadas** como processos independentes, cada uma com
   a sua própria licença, distribuída junto com o runtime.
@@ -19,17 +20,21 @@
 - Consultas a catálogos, capas, letras, vídeos e músicas acontecem **somente
   quando você pede**, com tempo limite e cache local.
 - Falhas de rede viram aviso; nunca bloqueiam o uso offline da biblioteca.
-- `BIBLIOTECA_REDE=0` desliga todas as integrações de rede (modo avião).
+- `BIBLIOTECA_REDE=0` bloqueia consultas/downloads remotos pelo Hub. Controle
+  loopback do qBittorrent e leitura de cache continuam locais. Essa flag não
+  é um firewall: um cliente torrent já aberto ou ferramenta externa pode usar
+  rede independentemente; pause/feche esses programas se necessário.
+- SponsorBlock consulta IDs de vídeos somente depois de ser ativado pelo usuário.
 
 ## Integrações e termos de terceiros
 
 Algumas integrações acessam serviços que têm termos próprios. Ao usá-las, você
 é responsável por respeitar esses termos e a legislação aplicável no seu país:
 
-- **YouTube:** o player embutido usa o player oficial do YouTube; o download
+- **YouTube:** o navegador embutido carrega o site oficial; o download
   de vídeos é uma ação explícita, sujeita aos termos do YouTube.
-- **Spotify, Deezer, iTunes, MusicBrainz, LRCLIB, SponsorBlock, Last.fm,
-  HowLongToBeat e SteamGridDB:** respeitam seus limites de uso e exigem
+- **Spotify, Deezer, iTunes, MusicBrainz, LRCLIB, SponsorBlock e SteamGridDB:**
+  possuem limites de uso e exigem
   identificação do aplicativo quando aplicável.
 - **Catálogos de terceiros e torrents:** o TucoTeca apenas consulta e organiza
   o que você escolhe. A licitude do conteúdo obtido é de responsabilidade do
@@ -49,7 +54,7 @@ Algumas integrações acessam serviços que têm termos próprios. Ao usá-las, 
 
 ## Escopo de uso
 
-- O projeto é **pessoal** e não é distribuído como produto comercial.
+- O projeto é **pessoal**, para Tuco/Isa, sem release pública automatizada.
 - Os bundles gerados contêm componentes de código aberto; suas licenças
   acompanham cada componente (ver `manifesto-runtime.json`, `FONTE.txt` e
   `LICENSE-TucoTeca.txt` dentro do pacote).

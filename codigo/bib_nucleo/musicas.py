@@ -317,40 +317,7 @@ def capa_musica_auto() -> bool:
         not in ("0", "off", "false", "nao", "não", "no")
 
 
-def capa_album_url(artista: str, album: str, titulo: str,
-                   timeout: int = 15) -> str:
-    """Artwork 600px do iTunes (1º resultado; `''` se offline). Nunca levanta."""
-    import urllib.parse
-    import urllib.request
-    art = re.sub(r"\s+", " ", (artista or "")).strip()
-    alb = re.sub(r"\s+", " ", (album or "")).strip()
-    tit = re.sub(r"\s+", " ", (titulo or "")).strip()
-    consultas = []
-    if art and alb:
-        consultas.append(f"{art} {alb}")
-    if art and tit:
-        consultas.append(f"{art} {tit}")
-    if not consultas:
-        return ""
-    try:
-        for q in consultas:
-            qs = urllib.parse.urlencode({"term": q, "media": "music",
-                                         "entity": "album", "limit": 5})
-            req = urllib.request.Request(
-                f"https://itunes.apple.com/search?{qs}",
-                headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                dados = json.loads(r.read(500_000).decode("utf-8"))
-            for item in (dados.get("results") or []):
-                if not isinstance(item, dict):
-                    continue
-                url = str(item.get("artworkUrl100") or "")
-                if url.startswith("http"):
-                    return re.sub(r"\d+x\d+bb", "600x600bb", url)
-    except Exception:
-        pass
-    from bib_nucleo.capas import capa_musica_fallback
-    return capa_musica_fallback(art, alb, tit)
+from bib_nucleo.rede.metadados import capa_album_url
 
 
 def baixar_capa_album(con: sqlite3.Connection, mid: int,
@@ -367,19 +334,20 @@ def baixar_capa_album(con: sqlite3.Connection, mid: int,
         if (CAPAS_DIR / Path(atual).name).is_file():
             return {"ok": True, "capa": atual, "cache": True}
     try:
-        import urllib.request
         url = capa_album_url(d.get("artista") or "", d.get("album") or "",
                              d.get("titulo") or "", timeout=timeout)
         if not url:
             return {"ok": False, "capa_pendente": True,
                     "erro": "sem arte/offline"}
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         from bib_nucleo.rede.online import cache_path
         cache = cache_path("imagens", url, ".img")
         if cache.is_file():
             raw = cache.read_bytes()
         else:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
+            import urllib.request
+            from bib_nucleo.rede import abrir_rede
+            req = urllib.request.Request(url, headers={"User-Agent": "TucoTeca/1.0"})
+            with abrir_rede(req, timeout=timeout) as r:
                 raw = r.read(2_500_000)
         if len(raw) < 1024:
             return {"ok": False, "capa_pendente": True, "erro": "arte vazia"}

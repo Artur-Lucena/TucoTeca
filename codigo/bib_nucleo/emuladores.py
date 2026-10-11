@@ -175,7 +175,8 @@ def azahar_versao_local() -> str:
 def azahar_release_info(timeout: int = 25) -> dict:
     """{'tag','nome','size','sha256','url'} do asset deste SO, ou {'erro':...}."""
     try:
-        with urllib.request.urlopen(AZAHAR_API_LATEST, timeout=timeout) as r:
+        from bib_nucleo.rede import abrir_rede
+        with abrir_rede(AZAHAR_API_LATEST, timeout=timeout) as r:
             rel = json.loads(r.read().decode("utf-8"))
     except Exception as e:
         return {"erro": f"falha de rede: {type(e).__name__}: {e}"}
@@ -319,7 +320,8 @@ def desmume_release_info(timeout: int = 25) -> dict:
                          "No Linux, baixe o AppImage manual para Games/Emuladores/DeSmuME "
                          "ou defina BIBLIOTECA_EMULADOR_NDS.")}
     try:
-        with urllib.request.urlopen(DESMUME_API_LATEST, timeout=timeout) as r:
+        from bib_nucleo.rede import abrir_rede
+        with abrir_rede(DESMUME_API_LATEST, timeout=timeout) as r:
             rel = json.loads(r.read().decode("utf-8"))
     except Exception as e:
         return {"erro": f"falha de rede: {type(e).__name__}: {e}"}
@@ -743,86 +745,8 @@ def executar_monitorado(jogo: dict, ao_fim=None,
     return res
 
 
-def iniciar_sessao_manual(gid: int, titulo: str = "") -> dict:
-    """Abre marcador de sessão não-rastreada (UAC/startfile). Sobrevive a restart."""
-    from bib_nucleo.base import SESSOES_DIR, agora_iso
-    try:
-        SESSOES_DIR.mkdir(parents=True, exist_ok=True)
-        ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        arq = SESSOES_DIR / f"sessao-{int(gid)}-{ts}.json"
-        arq.write_text(json.dumps({"gid": int(gid), "titulo": titulo,
-                                   "inicio": agora_iso(), "modo": "manual"},
-                                  ensure_ascii=False, indent=2), encoding="utf-8")
-        return {"ok": True, "arquivo": str(arq)}
-    except Exception as e:
-        return {"ok": False, "erro": str(e)}
-
-
-def listar_sessoes_pendentes() -> list[dict]:
-    """Sessões manuais ainda não reconciliadas (p/ prompt no próximo abrir)."""
-    from bib_nucleo.base import SESSOES_DIR
-    out: list[dict] = []
-    try:
-        if not SESSOES_DIR.is_dir():
-            return out
-        for arq in sorted(SESSOES_DIR.glob("sessao-*.json")):
-            try:
-                d = json.loads(arq.read_text(encoding="utf-8"))
-                if not isinstance(d, dict):
-                    continue
-                d["_arquivo"] = str(arq)
-                out.append(d)
-            except (OSError, ValueError):
-                continue
-    except OSError:
-        pass
-    return out
-
-
-def encerrar_sessao_manual(arquivo: str, horas: float = 0.0, db_path=None) -> dict:
-    """Fecha marcador depois de validar e registrar horas no banco indicado."""
-    from bib_nucleo.base import SESSOES_DIR
-    from bib_nucleo.banco import adicionar_horas, get_db
-    from bib_nucleo.base import DEFAULT_DB
-    p = Path(arquivo)
-    try:
-        horas = float(horas)
-        import math
-        if not math.isfinite(horas) or horas < 0:
-            raise ValueError("horas inválidas")
-    except (TypeError, ValueError):
-        return {"ok": False, "erro": "horas deve ser número finito >= 0"}
-    gid = 0
-    try:
-        d = json.loads(p.read_text(encoding="utf-8"))
-        if not isinstance(d, dict):
-            raise ValueError("marcador não é objeto")
-        gid = int(d.get("gid") or 0)
-    except (OSError, ValueError, TypeError):
-        try:
-            p.unlink()
-        except OSError:
-            pass
-        return {"ok": False, "erro": "marcador inválido (removido)"}
-    res = {"ok": True, "somado": 0.0}
-    if horas and horas > 0 and gid:
-        try:
-            con = get_db(Path(db_path) if db_path is not None else DEFAULT_DB)
-            try:
-                r = adicionar_horas(con, gid, float(horas))
-            finally:
-                con.close()
-            if r.get("ok"):
-                res["somado"] = r["somado"]
-            else:
-                return {"ok": False, "erro": r.get("erro", "falha")}
-        except Exception as e:
-            return {"ok": False, "erro": f"{type(e).__name__}: {e}"}
-    try:
-        p.unlink()
-    except OSError:
-        pass
-    return res
+from bib_nucleo.sessoes_manuais import (iniciar_sessao_manual, listar_sessoes_pendentes,
+                                      encerrar_sessao_manual)
 
 
 # --------------------------------------------------------------------------

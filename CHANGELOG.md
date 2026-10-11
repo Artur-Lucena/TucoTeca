@@ -5,6 +5,33 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
+### QoL pessoal e correções de contratos
+- Fluxo de desejos com fontes, SteamRip → importação e histórico de obtidos;
+  falhas preservam o desejo/arquivo. FitGirl permanece página externa.
+- LRCLIB com cache local, parsing LRC, solicitações sequenciais e destaque da
+  linha durante a faixa correspondente; LibRetro como provedor de capas 3DS/NDS.
+- Perfis Tuco/Isa, atalhos configuráveis, notas, galeria de screenshots,
+  vigia de pacotes opt-in, API loopback de leitura autenticada e histórico anual.
+- Saves configurados por jogo: snapshots reais e restauração com SHA-256 e
+  cópia prévia dos saves atuais. Backup automático aguarda a gravação das horas.
+- Player MCI prepara cópia em cache temporário curto para WAVs em caminhos
+  longos, com publicação atômica e original preservado. Prova nativa cobre
+  áudio/LRC nesses caminhos. Backup pós-sessão respeita o opt-out persistido.
+- IPS/BPS com CRC/limites, saída nova e original intacto; hardlinks opt-in com
+  fallback de cópia, sem junctions automáticas.
+- QtMultimedia opcional, retomada/velocidade, MP3 por URL/ID e SponsorBlock opt-in.
+- Atualização de yt-dlp/FFmpeg com versões/sha fixados; erro de hash não substitui
+  a instalação anterior. FTS5 não reconstrói o índice a cada abertura.
+- Seções extraídas de `Main.qml` para `qml/secoes/`, carregadas por Loader.
+- Pytest coleta sem importar os testes e executa cada caso no runner sandboxed;
+  cobertura opcional mede os subprocessos. O resultado antigo 333/358 não
+  descreve mais esta implementação.
+- Bundles essencial/completo isolados, provas da variante correta após extração,
+  capturas, Chromium local e reprodução de vídeo sintético (não só import de DLL).
+- Pacotes com exportação atômica, limites de tamanho, recusa de links/nomes
+  Windows reservados e backup dos presets/saves antes de sobrescrevê-los.
+- Workflow de publicação pública removido: builds somente locais para Tuco/Isa.
+
 ### Adicionado
 - **YouTube embutido** (variante completa): seção `YouTube` (Ctrl+8) com navegador
   QtWebEngine off-the-record, navegação restrita a https e hosts YouTube e download
@@ -36,8 +63,8 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 - **Capas comerciais removidas do repositório e do histórico.** `midia/fontes-capas/`
   agora contém apenas placeholders neutros gerados por
   `codigo/ferramentas/gerar_placeholders.py`. O histórico foi reescrito
-  (filter-branch) e os blobs antigos foram purgados. Publicar exige
-  `git push --force` e um novo clone para quem já tinha cópia local.
+   (filter-branch). O remoto não foi alterado; a publicação do histórico
+   divergente exige uma decisão explícita. Nenhum force-push automático.
 - **Integrações de rede isoladas em `bib_nucleo/rede/`** (fontes, repacks,
   torrents, videos_youtube, musica_online, spotify, online). Nomes antigos
   continuam resolvendo por import preguiçoso.
@@ -65,9 +92,8 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
   `tucoteca`, configs de pytest/coverage/ruff.
 - Suíte rodável via pytest (`conftest.py` + `python_functions = teste_*`);
   o runner sandboxed (`executar.py`) continua como fonte da verdade na CI.
-  Nota honesta: sob pytest, 333/358 casos passam; os outros 25 dependem de
-  isolamento por processo (caches de módulo que vazam entre testes no mesmo
-  processo) e são cobertos integralmente pelo runner.
+  Na implementação inicial, pytest e runner diferiam. O coletor foi substituído
+  para usar processos separados e a mesma sandbox (ver correções acima).
 - Governança: `VERSION`, templates de issue e PR, `SECURITY.md`, job de
   varredura de segredos (gitleaks) na CI.
 - `frontends/desktop.py`: garante o próprio diretório no `sys.path`

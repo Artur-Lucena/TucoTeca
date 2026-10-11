@@ -25,7 +25,7 @@ dependencies = []
 
 [project.optional-dependencies]
 ui = ["PySide6-Essentials==6.10.2"]
-extras = ["PySide6-Addons==6.10.2"]  # variante completa: WebEngine/Multimedia/Gamepad
+extras = ["PySide6-Addons==6.10.2"]  # variante completa: WebEngine/Multimedia; sem gamepad
 dev = ["pytest>=8", "coverage>=7", "ruff>=0.6"]
 
 [project.scripts]

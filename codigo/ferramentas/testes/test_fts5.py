@@ -92,3 +92,25 @@ def teste_fts5_termo_estranho_nao_quebra():
         afirmar([j["titulo"] for j in r] == ['Jogo "estranho" (2024)'], r)
     finally:
         con.close()
+
+
+def teste_fts5_abertura_nao_reconstroi_e_recupera_trigger_ausente():
+    con, B, db = _con()
+    try:
+        B.criar_jogo(con, {"titulo": "Pokémon Azul"})
+        trace = []
+        con.set_trace_callback(trace.append)
+        afirmar(B.garantir_fts(con))
+        afirmar(not any("rebuild" in s.lower() for s in trace), trace)
+        con.execute("DROP TRIGGER jogos_fts_ai")
+        con.execute("INSERT INTO jogos(titulo,etiquetas) VALUES('Título atrasado','aventura')")
+        con.commit()
+        trace.clear()
+        afirmar(B.garantir_fts(con))
+        afirmar(any("rebuild" in s.lower() for s in trace), trace)
+        afirmar(len(B.listar_jogos(con, q="aventura atras")) == 1)
+        con.execute("DROP TABLE jogos_fts")
+        con.commit()
+        afirmar([j["titulo"] for j in B.listar_jogos(con, q="azul pokemon")] == ["Pokémon Azul"])
+    finally:
+        con.close()
