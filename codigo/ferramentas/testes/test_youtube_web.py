@@ -14,12 +14,18 @@ def _bridge():
 
 
 def _app():
-    from PySide6.QtGui import QGuiApplication
+    try:
+        from PySide6.QtGui import QGuiApplication
+    except ImportError:
+        print("[pula] PySide6 opcional não instalado")
+        return None
     return QGuiApplication.instance() or QGuiApplication([])
 
 
 def teste_youtube_ir_aceita_so_https_e_hosts_youtube():
-    _app()
+    app = _app()
+    if app is None:
+        return
     bridge = _bridge()
     try:
         ok = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
@@ -36,7 +42,9 @@ def teste_youtube_ir_aceita_so_https_e_hosts_youtube():
 
 
 def teste_youtube_buscar_codifica_e_limita_termo():
-    _app()
+    app = _app()
+    if app is None:
+        return
     bridge = _bridge()
     try:
         url = bridge.youtubeBuscar("pokemon x")
@@ -49,7 +57,9 @@ def teste_youtube_buscar_codifica_e_limita_termo():
 
 
 def teste_youtube_baixar_so_com_id_valido_e_sem_rede():
-    _app()
+    app = _app()
+    if app is None:
+        return
     bridge = _bridge()
     chamadas = []
     bridge.baixarVideo = lambda vid: chamadas.append(vid)  # não toca a rede
@@ -64,7 +74,9 @@ def teste_youtube_baixar_so_com_id_valido_e_sem_rede():
 
 
 def teste_youtube_web_disponivel_reflete_o_bundle():
-    _app()
+    app = _app()
+    if app is None:
+        return
     bridge = _bridge()
     try:
         from importlib.util import find_spec

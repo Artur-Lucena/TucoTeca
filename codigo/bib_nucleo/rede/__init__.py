@@ -26,4 +26,11 @@ def exigir_rede(acao: str = "Esta ação") -> None:
     """Levanta ValueError claro quando a rede está desligada pela flag."""
     if not rede_ativa():
         raise ValueError(f"{acao} precisa de rede, mas BIBLIOTECA_REDE=0 "
-                         "(modo avião). Ligue BIBLIOTECA_REDE=1 para usar.")
+                          "(modo avião). Ligue BIBLIOTECA_REDE=1 para usar.")
+
+
+def abrir_rede(url, **opcoes):
+    """Última barreira antes de HTTP; cobre também interfaces clássicas/scripts."""
+    import urllib.request
+    exigir_rede("Esta consulta/download")
+    return urllib.request.urlopen(url, **opcoes)

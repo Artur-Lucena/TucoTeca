@@ -268,6 +268,8 @@ def instalar(info: dict, dest: Path, progresso=None, plataforma=None,
         return rec
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Atualizar emulador")
         with tempfile.TemporaryDirectory(prefix=".azahar-stage-", dir=dest.parent) as tmp:
             tmp = Path(tmp)
             nome_asset = str(info.get("nome") or urllib.parse.urlsplit(url).path)

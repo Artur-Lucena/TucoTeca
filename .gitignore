@@ -30,3 +30,7 @@ resultados-testes.json
 resultados-qt.json
 pos-*.json
 pos-*.log
+.provas/
+.coverage*
+htmlcov/
+.ruff_cache/

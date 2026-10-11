@@ -12,7 +12,11 @@ from executar import afirmar
 
 
 def _app():
-    from PySide6.QtGui import QGuiApplication
+    try:
+        from PySide6.QtGui import QGuiApplication
+    except ImportError:
+        print("[pula] PySide6 opcional não instalado")
+        return None
     return QGuiApplication.instance() or QGuiApplication([])
 
 
@@ -47,7 +51,9 @@ def _bridge_arquivo():
 
 
 def teste_notas_salvar_pelo_servico_trunca_e_nao_quebra():
-    _app()
+    app = _app()
+    if app is None:
+        return
     bridge = _bridge_arquivo()
     try:
         # texto gigante é cortado para 4000 caracteres, sem exceção
@@ -70,7 +76,9 @@ def teste_notas_salvar_pelo_servico_trunca_e_nao_quebra():
 
 
 def teste_exportar_colecao_para_pasta_gera_zip_valido():
-    _app()
+    app = _app()
+    if app is None:
+        return
     bridge = _bridge_arquivo()
     destino = Path(tempfile.mkdtemp(prefix="suite-export-"))  # simula pendrive
     try:

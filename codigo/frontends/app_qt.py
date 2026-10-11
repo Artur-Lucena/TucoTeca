@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -34,6 +35,13 @@ def main(argv=None):
     parser.add_argument("--screenshot", help="Captura local da janela no selftest")
     args = parser.parse_args(argv)
     QQuickStyle.setStyle("Basic")
+    # Chromium precisa ser inicializado antes de criar QGuiApplication.
+    if os.environ.get("BIBLIOTECA_WEBENGINE", "1") != "0":
+        try:
+            from PySide6.QtWebEngineQuick import QtWebEngineQuick
+            QtWebEngineQuick.initialize()
+        except ImportError:
+            pass  # variante essencial
     app = QGuiApplication.instance() or QGuiApplication([sys.argv[0]])
     app.setApplicationName("TucoTeca")
     app.setOrganizationName("TucoTeca")

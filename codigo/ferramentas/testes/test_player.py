@@ -271,3 +271,55 @@ def teste_cache_wav_parcial_nao_e_publicado():
     afirmar(not r["ok"], r)
     afirmar(destino.read_bytes() == b"cache antigo truncado", "substituiu com saída parcial")
     afirmar(len(list(tmp.iterdir())) == 1, "temporário não foi removido")
+
+
+def teste_player_mci_caminho_longo_preparado_preserva_original():
+    from unittest.mock import patch
+    from bib_nucleo import player as PL
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mci-"))
+    original = tmp / ("audio-longo-" * 9) / "faixa.wav"
+    original.parent.mkdir()
+    _wav_fake(original)
+    dados = original.read_bytes()
+    be = PL.MciBackend()
+    cache = tmp / "mci"
+    comandos = []
+    with patch.object(PL, "_eh_nt", return_value=True), \
+         patch.object(be, "_pasta_mci", return_value=cache):
+        r = be.preparar(str(original))
+        afirmar(r["ok"] and Path(r["alvo"]).parent == cache, r)
+        afirmar(Path(r["alvo"]).read_bytes() == dados)
+        # Uma cópia interrompida não substitui o cache íntegro.
+        Path(r["alvo"]).write_bytes(b"cache parcial")
+        def falhar(_src, dest):
+            Path(dest).write_bytes(b"copia interrompida")
+            raise OSError("copia interrompida")
+        with patch.object(PL.shutil, "copyfile", side_effect=falhar):
+            ruim = be.preparar(str(original))
+        afirmar(not ruim["ok"] and Path(r["alvo"]).read_bytes() == b"cache parcial", ruim)
+        afirmar(len(list(cache.iterdir())) == 1, "deixou arquivo parcial")
+        r = be.preparar(str(original))
+        # O transporte não copia novamente na thread da UI.
+        with patch.object(PL.shutil, "copyfile", side_effect=AssertionError("cópia na UI")), \
+             patch.object(be, "_cmd", side_effect=lambda c: comandos.append(c) or ""):
+            afirmar(be.open_preparado(r["alvo"])["ok"])
+            be.close()
+        afirmar(str(original) not in comandos[0] and r["alvo"] in comandos[0], comandos)
+        afirmar(original.read_bytes() == dados and Path(r["alvo"]).read_bytes() == dados)
+
+
+def teste_player_mci_cache_curto_indisponivel_nao_mexe_no_original():
+    from unittest.mock import patch
+    from bib_nucleo import player as PL
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mci-"))
+    original = tmp / ("audio-longo-" * 9) / "faixa.wav"
+    original.parent.mkdir()
+    _wav_fake(original)
+    dados = original.read_bytes()
+    be = PL.MciBackend()
+    with patch.object(PL, "_eh_nt", return_value=True), \
+         patch.object(be, "_pasta_mci", side_effect=OSError("sem temporário curto")), \
+         patch.object(be, "_cmd", side_effect=AssertionError("MCI não deve abrir")):
+        r = be.open_preparado(str(original))
+    afirmar(not r["ok"] and "temporário curto" in r["erro"], r)
+    afirmar(original.read_bytes() == dados and not be.alias)

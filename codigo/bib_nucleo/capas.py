@@ -10,10 +10,11 @@ from bib_nucleo import online
 
 _mb_lock = threading.Lock()
 _mb_ultimo = 0.0
-PROVEDORES_JOGOS = ("steam", "steamgriddb", "wikipedia")
+PROVEDORES_JOGOS = ("steam", "steamgriddb", "wikipedia", "libretro")
 PROVEDORES_MUSICAS = ("itunes", "musicbrainz", "deezer")
 NOMES = {"steam": "Steam", "steamgriddb": "SteamGridDB", "wikipedia": "Wikipedia",
-         "itunes": "iTunes", "musicbrainz": "MusicBrainz / Cover Art Archive", "deezer": "Deezer"}
+         "itunes": "iTunes", "musicbrainz": "MusicBrainz / Cover Art Archive", "deezer": "Deezer",
+         "libretro": "LibRetro Thumbnails"}
 
 
 def _item(provedor, titulo, url, **extra):
@@ -124,7 +125,16 @@ def _deezer(item):
             str((r.get("artist") or {}).get("name") or "").strip().casefold() == artista.casefold()]
 
 
-_BUSCAS = {"steam": _steam, "steamgriddb": _steamgriddb, "wikipedia": _wikipedia,
+def _libretro(item):
+    from bib_nucleo.banco import plataforma_jogo
+    from bib_nucleo.rede.capas_libretro import url_boxart
+    plataforma = item.get("plataforma") or plataforma_jogo(item)
+    if plataforma not in ("3DS", "NDS"):
+        return []
+    return [_item("libretro", item["titulo"] + " · nome No-Intro", url_boxart(plataforma, item["titulo"]))]
+
+
+_BUSCAS = {"steam": _steam, "steamgriddb": _steamgriddb, "wikipedia": _wikipedia, "libretro": _libretro,
            "itunes": _itunes, "musicbrainz": _musicbrainz, "deezer": _deezer}
 
 

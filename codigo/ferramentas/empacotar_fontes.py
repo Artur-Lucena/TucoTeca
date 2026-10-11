@@ -16,7 +16,9 @@ REPO = Path(__file__).resolve().parents[2]
 IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git"}
 RAIZ_ARQUIVOS = {"README.md", "CONTRIBUTING.md", "LICENSE", ".gitignore", ".gitattributes",
                  "BibliotecaHub.bat", "BibliotecaHub.sh", "BibliotecaHubMac.command",
-                 "Montar-Universal.bat", "requirements-ui.txt"}
+                  "Montar-Universal.bat", "requirements-ui.txt"}
+RAIZ_ARQUIVOS.update({"TucoTeca.bat", "VERSION", "CHANGELOG.md", "SECURITY.md",
+                      "pyproject.toml", "conftest.py", "requirements-extras.txt"})
 EXTENSOES = {"codigo": {".py", ".iss", ".qml"}, "docs": {".md"},
              ".github": {".yml", ".yaml"}, "midia": {".png", ".jpg", ".jpeg"}}
 

@@ -22,8 +22,8 @@ Dialog {
             ComboBox {
                 id: provider
                 Layout.fillWidth: true
-                model: dialog.category === "jogos" ? ["Todas as bibliotecas", "Steam", "SteamGridDB", "Wikipedia"] : ["Todas as bibliotecas", "iTunes", "MusicBrainz / CAA", "Deezer"]
-                property var keys: dialog.category === "jogos" ? ["todos", "steam", "steamgriddb", "wikipedia"] : ["todos", "itunes", "musicbrainz", "deezer"]
+                model: dialog.category === "jogos" ? ["Todas as bibliotecas", "Steam", "SteamGridDB", "Wikipedia", "LibRetro Thumbnails"] : ["Todas as bibliotecas", "iTunes", "MusicBrainz / CAA", "Deezer"]
+                property var keys: dialog.category === "jogos" ? ["todos", "steam", "steamgriddb", "wikipedia", "libretro"] : ["todos", "itunes", "musicbrainz", "deezer"]
                 onActivated: hub.buscarCapas(dialog.category, dialog.ident, keys[currentIndex], false)
             }
             ActionButton { text: "Atualizar pesquisa"; enabled: !hub.ocupado; onClicked: hub.buscarCapas(dialog.category, dialog.ident, provider.keys[provider.currentIndex], true) }

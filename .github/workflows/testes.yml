@@ -57,15 +57,17 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update -qq && sudo apt-get install -y libegl1 libopengl0 libxkbcommon0
       - name: Dependências desktop
-        run: python -m pip install -r requirements-ui.txt
-      - name: Contratos e interface Qt Quick
-        run: python -B codigo/ferramentas/testes/executar.py --modulo test_qt --json resultados-qt.json
+        run: python -m pip install -r requirements-ui.txt pytest coverage ruff
+      - name: Lint crítico
+        run: ruff check codigo conftest.py --select E9,F63,F7,F82
+      - name: Suíte completa com Qt Quick e cobertura dos subprocessos
+        run: python -B -m pytest --cobertura
       - name: Relatório Qt
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: qt-${{ matrix.os }}
-          path: resultados-qt.json
+          path: .provas/cobertura/
 
   segredos:
     runs-on: ubuntu-latest

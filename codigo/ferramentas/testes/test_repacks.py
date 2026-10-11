@@ -226,7 +226,7 @@ def teste_repack_appid_casa_nome_exato():
         def __init__(self, dados):
             self._d = dados
 
-        def read(self):
+        def read(self, n=-1):
             return _json.dumps(self._d).encode()
 
         def __enter__(self):
@@ -370,7 +370,7 @@ def teste_canonizar_steam_exato():
         def __init__(self, dados):
             self._d = dados
 
-        def read(self):
+        def read(self, n=-1):
             return _json.dumps(self._d).encode()
 
         def __enter__(self):
@@ -410,7 +410,7 @@ def teste_repack_nome_canonico_e_capa():
     payload = {"items": [{"id": 2062430, "name": "BALL x PIT"}]}
 
     class _Resp:
-        def read(self):
+        def read(self, n=-1):
             import json as _j
             return _j.dumps(payload).encode()
 

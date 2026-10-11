@@ -129,18 +129,29 @@ def main():
     ap.add_argument("--modulo", action="append", default=[],
                     help="executa só este módulo, ex.: test_baixar (repetível)")
     ap.add_argument("--json", metavar="ARQUIVO", help="salva relatório estruturado")
+    ap.add_argument("--coverage-arquivo", help=argparse.SUPPRESS)
     args = ap.parse_args()
     if args.caso and args.raiz:
         isolar(Path(args.raiz))
         arq, nome = args.caso
         spec = importlib.util.spec_from_file_location("caso", TESTES_DIR / arq)
         mod = importlib.util.module_from_spec(spec)
+        cobertura = None
         try:
+            if args.coverage_arquivo:
+                import coverage
+                cobertura = coverage.Coverage(data_file=args.coverage_arquivo,
+                                               config_file=str(REPO / "pyproject.toml"))
+                cobertura.start()
             spec.loader.exec_module(mod)
             getattr(mod, nome)()
         except Exception:
             traceback.print_exc()
             return 1
+        finally:
+            if cobertura:
+                cobertura.stop()
+                cobertura.save()
         return 0
 
     total = falhas = pulados = 0
@@ -160,7 +171,7 @@ def main():
             total += 1
             inicio = time.monotonic()
             with tempfile.TemporaryDirectory(prefix="hub-teste-", dir=parent) as tmp:
-                env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8")
+                env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8", PYTHONFAULTHANDLER="1")
                 env["PYTHONPATH"] = os.pathsep.join(
                     [str(CODIGO), str(FRONTENDS)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
                 try:
@@ -179,6 +190,7 @@ def main():
             print(f"{status} {arq.stem}.{nome}")
             if r.returncode:
                 falhas += 1
+                print(f"Processo do caso encerrou com código {r.returncode}.")
                 try:
                     print(r.stdout + r.stderr)
                 except UnicodeEncodeError:
