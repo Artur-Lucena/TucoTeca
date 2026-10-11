@@ -1,5 +1,10 @@
 # TucoTeca
 
+[![Testes](https://github.com/Artur-Lucena/Projeto-Launcher/actions/workflows/testes.yml/badge.svg)](https://github.com/Artur-Lucena/Projeto-Launcher/actions/workflows/testes.yml)
+[![Licença: MIT](https://img.shields.io/badge/Licen%C3%A7a-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Versão](https://img.shields.io/badge/vers%C3%A3o-1.0.0-informational)](VERSION)
+
 Aplicativo local de biblioteca de jogos e músicas. Desktop moderno em
 **PySide6 / Qt Quick** (frontend principal), ferramentas clássicas em tkinter
 (**congeladas**: só correções críticas) e TUI curses no Linux.

@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tucoteca"
+version = "1.0.0"
+description = "Hub local-first de jogos, musicas e videos (nucleo Python stdlib + desktop PySide6/Qt Quick)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Tuco" }]
+keywords = ["games", "library", "launcher", "pyside6", "sqlite", "local-first"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Games/Entertainment",
+]
+# Nucleo = somente biblioteca padrao. PySide6 e dependencia da interface.
+dependencies = []
+
+[project.optional-dependencies]
+ui = ["PySide6-Essentials==6.10.2"]
+extras = ["PySide6-Addons==6.10.2"]  # variante completa: WebEngine/Multimedia/Gamepad
+dev = ["pytest>=8", "coverage>=7", "ruff>=0.6"]
+
+[project.scripts]
+tucoteca = "frontends.desktop:main"
+
+[tool.setuptools]
+package-dir = { "" = "codigo" }
+
+[tool.setuptools.packages.find]
+where = ["codigo"]
+
+[tool.pytest.ini_options]
+testpaths = ["codigo/ferramentas/testes"]
+python_functions = ["teste_*"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["codigo/bib_nucleo", "codigo/frontends"]
+omit = ["codigo/ferramentas/testes/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
