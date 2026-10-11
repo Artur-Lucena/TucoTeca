@@ -212,3 +212,16 @@ def teste_pacote_importa_em_thread():
         afirmar(n == 1 and avisos, (n, avisos))
     finally:
         root.destroy()
+
+
+def teste_busca_global_tolerante_a_acentos():
+    from servicos_ui import busca_global
+    jogos = [{"id": 1, "titulo": "Pokemon X", "etiquetas": "rpg", "plataforma": "3DS"}]
+    musicas = [{"id": 2, "titulo": "Asa Branca", "artista": "Luiz Gonzaga", "album": ""}]
+    r = busca_global(jogos, musicas, [], [], "pokemon")
+    afirmar(len(r) == 1 and r[0]["tipo"] == "jogo", r)
+    r = busca_global(jogos, musicas, [], [], "asa")
+    afirmar(len(r) == 1 and r[0]["tipo"] == "musica", r)
+    r = busca_global(jogos, musicas, [], [], "gonzaga asa")
+    afirmar(len(r) == 1 and r[0]["tipo"] == "musica", r)
+    afirmar(busca_global(jogos, musicas, [], [], "zzz") == [], "nao pode achar nada")

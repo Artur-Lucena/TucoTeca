@@ -5,19 +5,32 @@ from __future__ import annotations
 
 import datetime
 import json
+import re
 import sqlite3
+import stat
 import zipfile
 from pathlib import Path
 
-from bib_nucleo.banco import (CAPA_EXTS, criar_musica, get_db,
-                                musica_to_dict, row_to_dict,
-                                salvar_capa_bytes)
-from bib_nucleo.base import (BACKUP_DIR, CAPAS_DIR, DEFAULT_DB, MUSICAS_DIR,
-                               agora_iso, garantir_dirs, nome_arquivo_portatil)
-from bib_nucleo.emuladores import (azahar_versao_local,
-                                     presets_dir, presets_prov_dir, provedores)
+from bib_nucleo.arquivos import destino_temporario, gravar_atomico
+from bib_nucleo.banco import (
+    CAPA_EXTS,
+    criar_musica,
+    get_db,
+    musica_to_dict,
+    row_to_dict,
+    salvar_capa_bytes,
+)
+from bib_nucleo.base import (
+    BACKUP_DIR,
+    CAPAS_DIR,
+    DEFAULT_DB,
+    MUSICAS_DIR,
+    agora_iso,
+    garantir_dirs,
+    nome_arquivo_portatil,
+)
+from bib_nucleo.emuladores import azahar_versao_local, presets_dir, presets_prov_dir, provedores
 from bib_nucleo.scans import importar_lista
-
 
 # --------------------------------------------------------------------------
 # Pacote portátil (.zip): banco + capas + presets + saves 3DS
@@ -67,8 +80,7 @@ def exportar_json(destino, db_path=None) -> dict:
     finally:
         con.close()
     try:
-        destino.write_text(json.dumps(dados, ensure_ascii=False, indent=2),
-                           encoding="utf-8")
+        gravar_atomico(destino, json.dumps(dados, ensure_ascii=False, indent=2).encode("utf-8"))
     except OSError as e:
         return {"ok": False, "erro": f"falha ao gravar: {e}"}
     return {"ok": True, "destino": str(destino), "jogos": len(dados["jogos"])}
@@ -161,7 +173,7 @@ def exportar_pacote(destino, db_path=None, incluir_saves: bool = True) -> dict:
             manifesto[Path(m["musica_capa"]).name] = f"mus:{m['musica_sha']}"
     n = 0
     try:
-        with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as z:
+        with destino_temporario(destino) as tmp, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
             z.writestr(PACOTE_INFO, json.dumps(info, ensure_ascii=False, indent=2))
             z.writestr(PACOTE_JSON, json.dumps(dados, ensure_ascii=False, indent=2))
             z.writestr(PACOTE_MANIFESTO,
@@ -219,6 +231,11 @@ def _membro_pacote_ok(nome: str) -> str | None:
     if (".." in n.split("/") or n.startswith("/") or ":" in n
             or "\\" in nome or any(p in ("", ".") for p in n.split("/"))):
         return None
+    for parte in n.split("/"):
+        if (parte.endswith((".", " ")) or any(ord(c) < 32 for c in parte)
+                or any(c in parte for c in '<>"|?*')
+                or re.fullmatch(r"(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?", parte)):
+            return None
     if n == PACOTE_JSON:
         return "json"
     if n == PACOTE_INFO:
@@ -252,6 +269,50 @@ def _membro_pacote_ok(nome: str) -> str | None:
     return None
 
 
+def destino_seguro(raiz, relativo):
+    """Sem traversal, symlink ou junction em qualquer nível de destino."""
+    raiz = Path(raiz).absolute()
+    relativo = Path(relativo)
+    if relativo.is_absolute() or ".." in relativo.parts:
+        raise ValueError("Destino fora da pasta permitida.")
+    dest = raiz / relativo
+    for p in (raiz, *(raiz.joinpath(*relativo.parts[:i]) for i in range(1, len(relativo.parts) + 1))):
+        if p.is_symlink() or (p.exists() and getattr(p.lstat(), "st_file_attributes", 0) & 0x400):
+            raise ValueError(f"Link/junction no destino: {p}")
+    if raiz.resolve() not in dest.resolve().parents:
+        raise ValueError("Destino fora da pasta permitida.")
+    return dest
+
+
+def _destinos_pacote(cats, restaurar_saves):
+    destinos = {}
+    for nm, cat in cats.items():
+        partes = nm.split("/")
+        if cat == "preset":
+            destinos[nm] = destino_seguro(presets_dir(), Path(*partes[1:]))
+        elif cat == "musica":
+            destinos[nm] = destino_seguro(MUSICAS_DIR, partes[1])
+        elif cat == "save" and restaurar_saves:
+            prov = provedores().get(partes[0][:-5])
+            ud = prov["user_dir"]() if prov else ""
+            if ud:
+                destinos[nm] = destino_seguro(ud, Path(*partes[1:]))
+    return destinos
+
+
+def _backup_sobrescritos(destinos):
+    existentes = {nm: p for nm, p in destinos.items() if p.is_file()}
+    if not existentes:
+        return ""
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    dest = BACKUP_DIR / f"antes-pacote-{stamp}.zip"
+    with destino_temporario(dest) as tmp, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
+        for nm, path in existentes.items():
+            z.write(path, nm)
+        z.writestr("destinos.json", json.dumps({nm: str(p) for nm, p in existentes.items()}, ensure_ascii=False))
+    return str(dest)
+
+
 def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict:
     """Restaura um pacote: valida TODOS os nomes antes de aplicar qualquer
     coisa (nada parcial em pacote hostil). Capas voltam exatas via manifesto
@@ -262,16 +323,24 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
     except (OSError, zipfile.BadZipFile) as e:
         return {"ok": False, "erro": f"pacote inválido: {e}"}
     with zf:
-        nomes = [i.filename for i in zf.infolist() if not i.is_dir()]
-        if len(nomes) != len(set(nomes)):
+        infos = [i for i in zf.infolist() if not i.is_dir()]
+        nomes = [i.filename for i in infos]
+        if len(nomes) != len({nm.casefold() for nm in nomes}):
             return {"ok": False, "erro": "pacote contém nomes duplicados"}
         cats: dict[str, str] = {}
-        for nm in nomes:
+        if len(infos) > 100_000 or sum(i.file_size for i in infos) > 10 * 1024 ** 3:
+            return {"ok": False, "erro": "pacote acima do limite de arquivos/tamanho"}
+        for i in infos:
+            nm = i.filename
             cat = _membro_pacote_ok(nm)
             if cat is None:
                 return {"ok": False,
                         "erro": f"membro proibido no pacote: {nm!r} (nada foi aplicado)"}
             cats[nm] = cat
+            teto = 8_000_000 if cat in ("json", "info", "manifesto") else 512 * 1024 ** 2
+            if (i.file_size > teto or i.flag_bits & 1
+                    or stat.S_ISLNK(i.external_attr >> 16)):
+                return {"ok": False, "erro": f"membro acima do limite, cifrado ou link: {nm}"}
         if PACOTE_JSON not in cats:
             return {"ok": False, "erro": "pacote sem biblioteca.json"}
         try:
@@ -299,6 +368,11 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
             manifesto = {}
         if not isinstance(manifesto, dict):
             manifesto = {}
+        try:
+            destinos = _destinos_pacote(cats, restaurar_saves)
+            backup_arquivos = _backup_sobrescritos(destinos)
+        except (OSError, ValueError) as e:
+            return {"ok": False, "erro": f"Destino/backup inválido: {e}; nada foi aplicado"}
         db = Path(db_path) if db_path else DEFAULT_DB
         backup = fazer_backup(db) if db.is_file() else None
         con = get_db(db)
@@ -340,19 +414,11 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                         dest = presets_prov_dir(partes[1]) / Path(partes[2]).name
                     else:
                         dest = presets_dir() / Path(nm).name
-                    # anti traversal: destino precisa ficar dentro de presets_dir
-                    try:
-                        dentro = dest.resolve().parent == dest.parent.resolve() or \
-                            presets_dir().resolve() in dest.resolve().parents
-                    except OSError:
-                        dentro = False
-                    if not dentro:
-                        res["erros"].append(f"Preset {nm}: fora de presets/")
-                        continue
+                    dest = destino_seguro(presets_dir(), Path(*partes[1:]))
                     dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_bytes(zf.read(nm))
+                    gravar_atomico(dest, zf.read(nm))
                     presets += 1
-                except OSError as e:
+                except (OSError, ValueError) as e:
                     res["erros"].append(f"Preset {nm}: {e}")
             saves, saves_ignorados = 0, 0
             tem_saves = any(c == "save" for c in cats.values())
@@ -367,12 +433,13 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                         saves_ignorados += 1
                         continue
                     try:
-                        dest = Path(ud) / partes[1] / Path(*partes[2:])
+                        dest = destino_seguro(ud, Path(*partes[1:]))
                         dest.parent.mkdir(parents=True, exist_ok=True)
-                        dest.write_bytes(zf.read(nm))
+                        gravar_atomico(dest, zf.read(nm))
                         saves += 1
                     except (OSError, ValueError):
                         saves_ignorados += 1
+                        res["erros"].append(f"Save {nm}: falha na restauração; original no backup de arquivos")
             musicas, musicas_ignoradas = 0, 0
             if lista_mus:
                 from bib_nucleo.base import MUSICAS_DIR
@@ -388,8 +455,8 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                     if not sha or cats.get(membro) != "musica":
                         musicas_ignoradas += 1
                         continue
-                    dest = MUSICAS_DIR / Path(membro).name
                     try:
+                        dest = destino_seguro(MUSICAS_DIR, Path(membro).name)
                         if dest.is_file():
                             from bib_nucleo.musicas import sha_arquivo
                             if sha_arquivo(dest) != sha:
@@ -397,7 +464,6 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
                                 continue
                         else:
                             import hashlib
-                            from bib_nucleo.arquivos import gravar_atomico
                             raw = zf.read(membro)
                             if hashlib.sha256(raw).hexdigest() != sha:
                                 musicas_ignoradas += 1
@@ -445,7 +511,7 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
             con.close()
     return {"ok": True, "novos": res["novos"], "atualizados": res["atualizados"],
             "ignorados": res["ignorados"], "erros": res["erros"],
-            "avisos": avisos, "backup": backup,
+            "avisos": avisos, "backup": backup, "backup_arquivos": backup_arquivos,
             "total_no_banco": res["total_no_banco"],
             "capas": capas, "presets": presets, "saves": saves,
             "saves_ignorados": saves_ignorados, "musicas": musicas,
@@ -453,21 +519,23 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
 
 
 def fazer_backup(db_path: Path, manter: int = 10) -> dict:
+    manter = max(1, int(manter))
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     dest_db = BACKUP_DIR / f"biblioteca-{ts}.db"
     dest_json = BACKUP_DIR / f"biblioteca-{ts}.json"
     con = get_db(db_path)
     try:
         dados = _dados_exportacao(con)
-        dst = sqlite3.connect(str(dest_db))
-        try:
-            con.backup(dst)
-        finally:
-            dst.close()
+        with destino_temporario(dest_db) as tmp:
+            dst = sqlite3.connect(str(tmp))
+            try:
+                con.backup(dst)
+            finally:
+                dst.close()
     finally:
         con.close()
-    dest_json.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
+    gravar_atomico(dest_json, json.dumps(dados, ensure_ascii=False, indent=2).encode("utf-8"))
     # poda: mantém os `manter` mais recentes de cada tipo
     for padrao in ("biblioteca-*.db", "biblioteca-*.json"):
         arqs = sorted(BACKUP_DIR.glob(padrao), key=lambda p: p.name, reverse=True)

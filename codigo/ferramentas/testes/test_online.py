@@ -1,6 +1,5 @@
 """Provedores de capas/configuração com HTTP simulado e persistência real no sandbox."""
 import base64
-import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch

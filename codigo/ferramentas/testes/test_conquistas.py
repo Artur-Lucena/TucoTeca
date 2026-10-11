@@ -6,7 +6,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from bib_nucleo import conquistas as C, online
+from bib_nucleo import conquistas as C
+from bib_nucleo import online
 from executar import afirmar
 
 

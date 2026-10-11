@@ -12,10 +12,10 @@ def teste_qt_video_importa_pesquisa_e_ferramentas_sem_executar_programa():
     app, bridge = _qt()
     if app is None:
         return
+    from app_qt import criar_engine
     from PySide6.QtCore import QMetaObject, QObject, QUrl, qInstallMessageHandler
     from PySide6.QtTest import QTest
     from shiboken6 import delete
-    from app_qt import criar_engine
     avisos = []
     anterior = qInstallMessageHandler(lambda _t, _c, m: avisos.append(m))
     engine = criar_engine(bridge)
@@ -31,7 +31,8 @@ def teste_qt_video_importa_pesquisa_e_ferramentas_sem_executar_programa():
         bridge.navegar("videos")
         afirmar(bridge.quantidade == 1 and bridge.selecionado["titulo"] == "Filme")
         for largura, altura in ((960, 640), (1200, 800), (1440, 920)):
-            window.setWidth(largura); window.setHeight(altura)
+            window.setWidth(largura)
+            window.setHeight(altura)
             QTest.qWait(60)
             for nome in ("nav_videos", "settingsButton"):
                 item = _encontrar(window.contentItem(), nome)
@@ -48,7 +49,8 @@ def teste_qt_video_importa_pesquisa_e_ferramentas_sem_executar_programa():
             _aguardar(app, lambda: not bridge.ocupado)
         afirmar(len(bridge.video_resultados.itens) == 1)
         dialogo = window.findChild(QObject, "youtubeDialog")
-        QMetaObject.invokeMethod(dialogo, "open"); QTest.qWait(50)
+        QMetaObject.invokeMethod(dialogo, "open")
+        QTest.qWait(50)
         QMetaObject.invokeMethod(dialogo, "close")
         with patch.object(bridge.servico, "midias_status", return_value={
                 "imagens": {"krita": {"nome": "Krita", "instalado": True, "site": "https://krita.org", "suportado": True}},
@@ -63,7 +65,9 @@ def teste_qt_video_importa_pesquisa_e_ferramentas_sem_executar_programa():
                  ("ReferenceError", "TypeError", "Unable to assign", "Binding loop", "is not defined"))]
         afirmar(not erros, "\n".join(erros))
     finally:
-        bridge.fechar(); delete(engine); qInstallMessageHandler(anterior)
+        bridge.fechar()
+        delete(engine)
+        qInstallMessageHandler(anterior)
 
 
 def teste_qt_spotify_aparece_e_erros_de_busca_ficam_inline():

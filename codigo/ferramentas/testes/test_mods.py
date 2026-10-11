@@ -310,9 +310,9 @@ def teste_tui_menu_mods_alterna():
     db = tmp / "m.db"
     con = core.get_db(db)
     try:
-        g = core.criar_jogo(con, {"titulo": "J Mod", "executable_path": "",
-                                  "launch_options": str(rom),
-                                  "origem": "rom-3ds", "status": "backlog"})
+        core.criar_jogo(con, {"titulo": "J Mod", "executable_path": "",
+                              "launch_options": str(rom),
+                              "origem": "rom-3ds", "status": "backlog"})
     finally:
         con.close()
     app = _tui_fake(db, [ord("j"), 10, 27])
@@ -340,10 +340,10 @@ def teste_tui_menu_mods_chave():
     db = tmp / "m.db"
     con = core.get_db(db)
     try:
-        g = core.criar_jogo(con, {"titulo": "J Chave", "executable_path": "",
-                                  "launch_options": str(rom),
-                                  "origem": "rom-3ds", "status": "backlog",
-                                  "azahar_mods": ["TK"]})
+        core.criar_jogo(con, {"titulo": "J Chave", "executable_path": "",
+                              "launch_options": str(rom),
+                              "origem": "rom-3ds", "status": "backlog",
+                              "azahar_mods": ["TK"]})
         j = core.listar_jogos(con, q="J Chave")[0]
     finally:
         con.close()
@@ -376,6 +376,7 @@ def teste_tui_menu_mods_sem_tid():
 
 def teste_mod_cache_e_colisao_com_arquivo_local():
     from unittest.mock import patch
+
     from bib_nucleo import emuladores as EMU
     tmp = Path(tempfile.mkdtemp(prefix="suite-mods-"))
     _emu_fake(tmp)

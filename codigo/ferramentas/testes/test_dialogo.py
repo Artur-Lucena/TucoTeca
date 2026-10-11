@@ -559,6 +559,7 @@ def _combos(dlg):
 
 def teste_importar_baixadas_contrato_e_callback():
     from unittest.mock import patch
+
     import app_win
     root, app = _app_oculto("fila-contrato.db")
     if root is None:
@@ -583,6 +584,7 @@ def teste_importar_baixadas_contrato_e_callback():
 
 def teste_json_gui_nao_objeto_nao_trava():
     from unittest.mock import patch
+
     import app_win
     root, app = _app_oculto("json-invalido.db")
     if root is None:
@@ -635,6 +637,7 @@ def teste_dialogo_emulador_autodetect():
 
 def teste_resolver_jogo_cli():
     import tempfile
+
     import app_win
     tmp = Path(tempfile.mkdtemp(prefix="suite-dj-"))
     con = core.get_db(tmp / "j.db")
@@ -807,8 +810,9 @@ def teste_gui_sem_bug_modal_orfao():
     update() de modal sem guarda e Thread sem daemon em app_win.py."""
     import ast
     import builtins
-    import app_win
     from pathlib import Path
+
+    import app_win
     src = Path(app_win.__file__).read_text(encoding="utf-8")
     tree = ast.parse(src)
     globais = set(dir(builtins)) | {"__name__"}

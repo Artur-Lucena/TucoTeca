@@ -23,3 +23,14 @@ codigo/ferramentas/.build/
 # Trava de instância e atalho locais — máquina, não repo
 .biblioteca.lock
 *.lnk
+# Saídas de teste locais
+baseline-testes.json
+pos-fix-repacks.json
+resultados-testes.json
+resultados-qt.json
+pos-*.json
+pos-*.log
+.provas/
+.coverage*
+htmlcov/
+.ruff_cache/

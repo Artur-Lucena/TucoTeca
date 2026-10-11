@@ -179,8 +179,9 @@ def teste_desmume_origem_do_bundle_resolve():
 
 
 def teste_mac_leve_nao_baixa_e_preserva_user():
-    import montar_mac as MM
     from unittest.mock import patch
+
+    import montar_mac as MM
     tmp = Path(tempfile.mkdtemp(prefix="suite-inst-"))
     base, _ = MM.montar_base_mac(tmp / "build")
     with patch.object(MM, "DIST", tmp / "dist"), \

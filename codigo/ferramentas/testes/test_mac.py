@@ -28,7 +28,6 @@ def _mac():
 
 
 def teste_traducao_mac_ida_e_volta():
-    from bib_nucleo import base
     base, mac = _mac()
     win = base._com_barra(str(base.WIN_ROOT)).rstrip("/") + "/Games/Roms 3Ds/x.cci"
     lin = base._com_barra(str(base.LINUX_ROOT)).rstrip("/") + "/Games/Roms 3Ds/x.cci"
@@ -46,7 +45,6 @@ def teste_traducao_mac_ida_e_volta():
 
 
 def teste_traduzir_para_atual_cobre_mac():
-    from bib_nucleo import base
     base, mac = _mac()
     m = base._com_barra(str(mac)).rstrip("/") + "/Games/Jogo/jogo"
     if os.name == "nt":
@@ -58,7 +56,6 @@ def teste_traduzir_para_atual_cobre_mac():
 
 
 def teste_resolver_exe_mac_como_fallback():
-    from bib_nucleo import base
     base, mac = _mac()
     raiz = base.WIN_ROOT if os.name == "nt" else base.LINUX_ROOT
     # no Windows, fallback de outro SO só vale se for executável Win
@@ -235,6 +232,7 @@ def teste_extrair_app_mac_dmg_com_hdiutil_mockado():
 
 def teste_extrair_app_mac_zip_rejeita_macosx():
     import zipfile
+
     from bib_nucleo import atualizacao as ATUAL
     tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
     zf = tmp / "fake.zip"
@@ -362,6 +360,7 @@ def teste_lancar_exe_sem_wine_no_mac_mensagem():
 
 def teste_update_dmg_preserva_sufixo_no_download():
     from unittest.mock import patch
+
     from bib_nucleo import atualizacao as ATUAL
     tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
 
@@ -392,6 +391,7 @@ def teste_update_dmg_preserva_sufixo_no_download():
 def teste_zip_mac_rejeita_link_externo_antes_de_ativar():
     import stat
     import zipfile
+
     from bib_nucleo import atualizacao as ATUAL
     tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
     zip_path = tmp / "app.zip"

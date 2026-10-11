@@ -134,12 +134,14 @@ def aplicar_eq(caminho: str, preset: str = "bass", ffmpeg: str = "") -> dict:
         return {"ok": False, "erro": erro_sem_ffmpeg()}
     try:
         dest = _destino_eq(src, preset)
+        from bib_nucleo.processos import opcoes_sem_janela
         cmd = [binario, "-y", "-v", "error", "-i", str(src), "-map", "0:a:0",
                "-vn", "-af", PRESETS_EQ[preset], str(dest)]
         with destino_temporario(dest) as tmp:
             cmd[-1] = str(tmp)
             r = subprocess.run(cmd, capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=900)
+                               encoding="utf-8", errors="replace", timeout=900,
+                               stdin=subprocess.DEVNULL, **opcoes_sem_janela())
             if r.returncode != 0 or not tmp.is_file() or tmp.stat().st_size == 0:
                 detalhe = (r.stderr or "").strip().splitlines()
                 raise ValueError(detalhe[-1][:200] if detalhe else f"ffmpeg rc={r.returncode}")

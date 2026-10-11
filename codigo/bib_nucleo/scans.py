@@ -13,15 +13,30 @@ import uuid as uuid_mod
 import zlib
 from pathlib import Path
 
-from bib_nucleo.banco import (STATUS_VALIDOS, chave_dedup, normalizar_etiquetas, normalizar_mods,
-                                salvar_capa_bytes)
-from bib_nucleo.base import (LINUX_ROOT, WIN_ROOT, agora_iso,
-                             existe_aqui_ou_traduzido, slugify, traduzir_para_atual,
-                              mac_para_linux, win_para_linux)
-from bib_nucleo.emuladores import (default_emu_3ds, default_emu_nds,
-                                     provedores,
-                                     provedor_por_extensao, provedor_por_origem)
-
+from bib_nucleo.banco import (
+    STATUS_VALIDOS,
+    chave_dedup,
+    normalizar_etiquetas,
+    normalizar_mods,
+    salvar_capa_bytes,
+)
+from bib_nucleo.base import (
+    LINUX_ROOT,
+    WIN_ROOT,
+    agora_iso,
+    existe_aqui_ou_traduzido,
+    mac_para_linux,
+    slugify,
+    traduzir_para_atual,
+    win_para_linux,
+)
+from bib_nucleo.emuladores import (
+    default_emu_3ds,
+    default_emu_nds,
+    provedor_por_extensao,
+    provedor_por_origem,
+    provedores,
+)
 
 # --------------------------------------------------------------------------
 # Confiança (preview de importação)
@@ -122,71 +137,15 @@ def find_hydra_db() -> Path | None:
     return None
 
 
-TITLE_RE = re.compile(r'"title"\s*:\s*"((?:[^"\\]|\\.)+)"')
-
-EXEC_RE = re.compile(r'"executablePath"\s*:\s*(null|"((?:[^"\\]|\\.)*)")')
-
-SHOP_RE = re.compile(r'"shop"\s*:\s*"((?:[^"\\]|\\.)+)"')
-
-OBJID_RE = re.compile(r'"objectId"\s*:\s*"((?:[^"\\]|\\.)+)"')
-
-PLAYTIME_RE = re.compile(r'"playTimeInMilliseconds"\s*:\s*(\d+)')
-
-
-def _unescape(s: str) -> str:
-    try:
-        return json.loads(f'"{s}"')
-    except Exception:
-        return s
-
-
-def scan_hydra_db(db_dir: Path, limite_bytes_por_arquivo: int = 20_000_000) -> list[dict]:
-    """Varredura bruta dos arquivos do LevelDB. Retorna [{'titulo', ...}]."""
-    achados: dict[str, dict] = {}
-    arquivos = [p for p in db_dir.rglob("*") if p.is_file() and p.suffix.lower() in (".log", ".ldb", ".sst", ".db", "")]
-    for arq in arquivos:
-        try:
-            if arq.stat().st_size > limite_bytes_por_arquivo:
-                continue
-            data = arq.read_bytes()
-        except OSError:
-            continue
-        texto = data.decode("utf-8", errors="ignore")
-        matches = list(TITLE_RE.finditer(texto))
-        for i, m in enumerate(matches):
-            fim_janela = m.start() + 8000
-            if i + 1 < len(matches):
-                fim_janela = min(fim_janela, matches[i + 1].start())
-            janela = texto[m.start():fim_janela]
-            if "objectId" not in janela and "executablePath" not in janela and "shop" not in janela:
-                continue
-            titulo = _unescape(m.group(1)).strip()
-            if not titulo or len(titulo) > 200:
-                continue
-            me = EXEC_RE.search(janela)
-            exe = ""
-            if me:
-                exe = "" if me.group(1) == "null" else _unescape(me.group(2) or "")
-            ms = SHOP_RE.search(janela)
-            shop = _unescape(ms.group(1)) if ms else ""
-            mo = OBJID_RE.search(janela)
-            objid = _unescape(mo.group(1)) if mo else ""
-            mp = PLAYTIME_RE.search(janela)
-            horas = round(int(mp.group(1)) / 3_600_000, 2) if mp else 0.0
-            chave = f"{titulo}\x00{exe}"
-            if chave not in achados:
-                achados[chave] = {
-                    "titulo": titulo,
-                    "executable_path": exe or "",
-                    "shop": shop,
-                    "object_id": objid,
-                    "horas": horas,
-                    "origem": "hydra",
-                }
-            elif horas > achados[chave].get("horas", 0):
-                achados[chave]["horas"] = horas
-    return sorted(achados.values(), key=lambda j: j["titulo"].lower())
-
+from bib_nucleo.scans_hydra import (
+    EXEC_RE,
+    OBJID_RE,
+    PLAYTIME_RE,
+    SHOP_RE,
+    TITLE_RE,
+    _unescape,
+    scan_hydra_db,
+)
 
 # Scanner de disco (D:\\Games, SteamLibrary, Riot...) + manifests Steam
 # --------------------------------------------------------------------------
@@ -316,6 +275,14 @@ def scan_discos(roots: list[str], max_arquivos: int = 60_000, prof_max: int = 5,
 def preview_scan(roots: list[str] | None = None) -> tuple[list[str], list[dict], dict]:
     """(raízes_usadas, itens pontuados, info{vistos, truncado, raizes})."""
     roots = roots or default_scan_roots()
+    from bib_nucleo.everything import buscar_executaveis
+    instantaneos = buscar_executaveis(roots)
+    if instantaneos is not None:
+        itens = [{"titulo": _titulo_de_exe(Path(p)), "executable_path": p, "shop": "",
+                  "object_id": "", "horas": 0.0, "origem": "scan-disco"}
+                 for p in instantaneos if not SKIP_EXE_RE.search(Path(p).name)]
+        return roots, [pontuar(j) for j in itens], {"vistos": len(instantaneos),
+                "truncado": len(instantaneos) >= 60_000, "raizes": roots, "motor": "everything"}
     achados, info = scan_discos(roots, retornar_info=True)
     return roots, [pontuar(j) for j in achados], info
 
@@ -798,7 +765,7 @@ def analisar_arquivo(caminho: str) -> dict:
     Retorna {"tipo", "item", "provedor", "detalhe", "aviso"} onde tipo é
     'pasta' | 'rom' | 'jogo' | 'json' | 'pacote' | 'arquivo-jogo' |
     'desconhecido'. 'pacote' é só o portátil do Hub (com biblioteca.json);
-    outro .zip/.rar/.7z/.iso é repack (extrai p/ Piratas e importa).
+    outro .zip/.rar/.7z/.iso é repack (extrai p/ Meus Jogos Locais e importa).
     Emulador ausente NÃO bloqueia: a ROM importa e o aviso orienta (⬇).
     """
     vazio = {"tipo": "desconhecido", "item": None, "provedor": None,
@@ -812,13 +779,13 @@ def analisar_arquivo(caminho: str) -> dict:
     ext = p.suffix.lower()
     if ext == ".json":
         return {**vazio, "tipo": "json", "detalhe": "lista de jogos (JSON)."}
-    from bib_nucleo.repacks import ARQUIVO_EXTS, eh_pacote_hub  # sem ciclo
+    from bib_nucleo.rede.repacks import ARQUIVO_EXTS, eh_pacote_hub  # sem ciclo
     if ext == ".zip" and eh_pacote_hub(p):
         return {**vazio, "tipo": "pacote",
                 "detalhe": "pacote portátil (.zip) — tenta restaurar."}
     if ext in ARQUIVO_EXTS:
         return {**vazio, "tipo": "arquivo-jogo",
-                "detalhe": (f"repack ({p.name}): extrai p/ Piratas, organiza, "
+                "detalhe": (f"repack ({p.name}): extrai p/ Meus Jogos Locais, organiza, "
                             "acha o exe e importa.")}
     prov = provedor_por_extensao(ext)
     if prov is not None:
@@ -877,7 +844,7 @@ def _norm_titulo(t) -> str:
 
 
 def _norm_caminho(c) -> str:
-    """Mesmo arquivo em SOs distintos compara igual (D:\… == /run/media/…)."""
+    """Mesmo arquivo em SOs distintos compara igual."""
     c = (c or "").strip()
     if not c:
         return ""
@@ -888,19 +855,16 @@ def _dobrar_fundido(atual: dict, novo: dict) -> None:
     """Funde `novo` dentro de `atual` (mesmo jogo, outra fonte)."""
     exe_a, exe_n = (atual.get("executable_path") or ""), (novo.get("executable_path") or "")
     # o exe que existe neste ou no outro SO vence; senão, o não-vazio
-    troca = False
     for cand in (exe_n, exe_a):
         if cand and existe_aqui_ou_traduzido(cand)[0]:
             if cand != exe_a:
                 atual["executable_path"] = cand
                 atual["launch_options"] = novo.get("launch_options") or atual.get("launch_options")
-                troca = True
             break
     else:
         if exe_n and not exe_a:
             atual["executable_path"] = exe_n
             atual["launch_options"] = novo.get("launch_options") or atual.get("launch_options")
-            troca = True
     if (novo.get("horas") or 0) > (atual.get("horas") or 0):
         atual["horas"] = novo["horas"]
     for campo in ("shop", "object_id", "game_code", "regiao", "rom_path"):
@@ -1287,23 +1251,7 @@ def icone_rom_para_png(caminho: str, alvo_px: int = 144) -> bytes | None:
 # Importação / backup / capas
 # --------------------------------------------------------------------------
 
-def _capa_steam(appid: str, timeout: int = 15) -> bytes | None:
-    """Baixa o header oficial da Steam (só leitura). None se offline/sem arte."""
-    import urllib.request
-    api = f"https://store.steampowered.com/api/appdetails?appids={appid}"
-    req = urllib.request.Request(api, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        data = json.loads(r.read().decode("utf-8"))
-    info = data.get(str(appid)) or {}
-    if not info.get("success"):
-        return None
-    url = ((info.get("data") or {}).get("header_image") or "").split("?")[0]
-    if not url.startswith("http"):
-        return None
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        raw = r.read(2_500_000)
-    return raw if len(raw) >= 1024 else None
+from bib_nucleo.rede.metadados import _capa_steam, canonizar_steam
 
 
 def _appid_steam_por_titulo(titulo: str, timeout: int = 15) -> str:
@@ -1313,42 +1261,6 @@ def _appid_steam_por_titulo(titulo: str, timeout: int = 15) -> str:
     """
     appid, _nome = canonizar_steam(titulo, timeout=timeout)
     return appid
-
-
-def canonizar_steam(*candidatos: str, timeout: int = 15) -> tuple[str, str]:
-    """(appid, nome_da_loja) pelo primeiro candidato com match exato.
-
-    Compara normalizado contra `storesearch`; no máximo 3 requisições.
-    Sem match ou sem rede: ("", ""). Nunca levanta.
-    """
-    import urllib.parse
-    import urllib.request
-    vistos: set[str] = set()
-    limpos: list[str] = []
-    for cand in candidatos:
-        alvo = re.sub(r"\s+", " ", (cand or "")).strip().lower()
-        if len(alvo) >= 2 and alvo not in vistos:
-            vistos.add(alvo)
-            limpos.append(alvo)
-    for alvo in limpos[:3]:
-        try:
-            q = urllib.parse.urlencode({"term": alvo, "l": "english",
-                                        "cc": "US"})
-            req = urllib.request.Request(
-                f"https://store.steampowered.com/api/storesearch/?{q}",
-                headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                dados = json.loads(r.read().decode("utf-8"))
-            for item in (dados.get("items") or []):
-                if not isinstance(item, dict):
-                    continue
-                nome = re.sub(r"\s+", " ", str(item.get("name") or "")).strip()
-                appid = str(item.get("id") or "").strip()
-                if appid.isdigit() and nome and nome.lower() in vistos:
-                    return appid, nome
-        except Exception:
-            continue
-    return "", ""
 
 
 def importar_lista(con: sqlite3.Connection, itens: list[dict]) -> dict:

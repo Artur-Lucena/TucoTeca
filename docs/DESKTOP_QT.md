@@ -62,13 +62,18 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 | Sistema: backups, registro/encerramento de sessões pendentes, últimos erros | Sim | Parcial |
 | Configurar mods, HD, cheats, controles, presets, atualizar emuladores | Acesso pelo botão de ferramentas clássicas | Sim |
 | Importação avançada de jogos/ROMs, sanar/religar executáveis, UAC | Ferramentas clássicas | Sim |
-| CSV → áudio, fila de downloads de músicas, buscar capas | Ferramentas clássicas | Sim |
-| Sincronizar wishlist, importar torrent concluído, baixar de hosts | Ferramentas clássicas | Sim |
+| CSV → áudio, fila de downloads de músicas, buscar capas | Sim | Sim |
+| Sincronizar wishlist, importar torrent concluído | Ferramentas clássicas | Sim |
+| Desejo → SteamRip → baixar/importar → obtido | Sim | Fluxo manual |
 | Registrar horas manualmente nos detalhes e encerrar sessão pendente no Sistema | Sim | Sim |
 | Bibliotecas sem credencial, catálogo Spotify, download/conversão/importação de músicas | Sim | CSV/import local |
-| Videoteca, YouTube, reprodutores, editores e EQ por cópia | Sim | — |
+| Videoteca, YouTube (embutido na variante completa; link externo na essencial), reprodutores, editores e EQ por cópia | Sim | — |
 | Atalhos personalizados em Integrações | Sim | — |
-| Exportar/importar pacotes | Ferramentas clássicas | Sim |
+| Exportar/importar pacotes | Sim, com confirmação para restaurar saves | Sim |
+| Saves de jogo: configurar, snapshot, restaurar; screenshots | Sim | Backup dos emuladores |
+| Perfis Tuco/Isa, atalhos, vigia e API de leitura | Sim, em Ferramentas pessoais | — |
+| Letras LRCLIB, LibRetro, SponsorBlock e MP3 por URL | Sim | — |
+| IPS/BPS, cópia/hardlinks e uso de disco | Sim, em ferramentas do jogo | — |
 | Navegação por gamepad | Ainda não | Ainda não |
 
 Não se trata ainda de paridade integral: a migração visual preserva acesso
@@ -139,4 +144,19 @@ essas versões no ambiente de build. Portáteis mínimos sem Qt usam tkinter.
 PySide6/Qt possuem licenças próprias (LGPL/GPL/comercial conforme componente);
 a licença MIT do Hub não relicencia Qt. Preserve os avisos/licenças e as
 bibliotecas dinâmicas substituíveis ao redistribuir. O bundle completo novo
-precisa ser reconstruído e validado antes de uma release.
+é gerado apenas localmente, para uso pessoal. As árvores de cada variante
+são isoladas; a prova também roda no ZIP extraído e confere SHA-256.
+
+## Limites e decisões desta etapa
+
+- `qml/secoes/` contém as telas; `Main.qml` mantém o shell/diálogos comuns.
+- Mods, cheats, controles, ROMs/importação avançada, atualização de emuladores,
+  sincronização da wishlist e recuperação de executáveis permanecem no clássico,
+  acessível pelo botão existente. Não se declara paridade visual completa.
+- Estatísticas usam barras Qt Quick, sem exigir QtCharts na variante essencial.
+  Histórico começa nas sessões novas; não são inventadas datas antigas.
+- Hardlinks compartilham mudanças com a origem; a organização não apaga a
+  origem. Junctions automáticas não são usadas.
+- WebEngine não implica gamepad. A API de leitura não tem rotas de lançamento.
+- Provas herméticas não comprovam disponibilidade de serviços externos, matching
+  No-Intro ou download de jogos reais. macOS permanece adiado.

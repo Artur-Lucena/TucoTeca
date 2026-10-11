@@ -30,6 +30,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -47,7 +48,13 @@ APP_ARQS = (("README.md", "README.md"),
                ("codigo/frontends/desktop.py", "desktop.py"),
                ("codigo/frontends/app_qt.py", "app_qt.py"),
                ("codigo/frontends/qt_bridge.py", "qt_bridge.py"),
-               ("codigo/frontends/servicos_ui.py", "servicos_ui.py"))
+                ("codigo/frontends/servicos_ui.py", "servicos_ui.py"),
+                ("codigo/ferramentas/__init__.py", "ferramentas/__init__.py"),
+                ("codigo/ferramentas/diagnosticar.py", "ferramentas/diagnosticar.py"),
+                ("codigo/ferramentas/empacotar_fontes.py", "ferramentas/empacotar_fontes.py"),
+                 ("codigo/ferramentas/provar_qt_runtime.py", "provar_qt_runtime.py"),
+                 ("codigo/ferramentas/provar_integracoes_locais.py", "provar_integracoes_locais.py"),
+                ("codigo/ferramentas/provar_qbit_runtime.py", "provar_qbit_runtime.py"))
 
 BAT_GUI = """@echo off
 setlocal
@@ -324,7 +331,9 @@ def copiar_app(app_dir: Path, repo: Path | None = None) -> None:
         src = repo / origem
         if not src.is_file():
             raise SystemExit(f"arquivo do app ausente no repo: {origem}")
-        shutil.copy2(src, app_dir / destino)
+        alvo = app_dir / destino
+        alvo.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, alvo)
     nucleo = repo / "codigo" / "bib_nucleo"
     if not (nucleo / "__init__.py").is_file():
         raise SystemExit("pacote bib_nucleo ausente no repo.")
@@ -506,6 +515,7 @@ def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
 
     copiar_app(app_dir, repo=REPO)
     (BUILD / "BibliotecaHub.bat").write_text(BAT_GUI.format(serie=serie), encoding="utf-8")
+    (BUILD / "TucoTeca.bat").write_text(BAT_GUI.format(serie=serie), encoding="utf-8")
     (BUILD / "Debug-Console.bat").write_text(BAT_DEBUG.format(serie=serie), encoding="utf-8")
     (BUILD / "Criar-Atalho.bat").write_text(BAT_ATALHO, encoding="utf-8")
     (BUILD / "README-PORTATIL.txt").write_text(LEIAME_PORTATIL, encoding="utf-8")
@@ -527,19 +537,18 @@ def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
     # prova real: o python embutido importa tkinter e monta a UI oculta
     py = py_dir / "python.exe"
     env = dict(os.environ)
-    prova_home = Path(os.environ.get("TEMP", str(CACHE))) / "hub-prova"
-    if prova_home.exists():
-        shutil.rmtree(prova_home)
+    prova_contexto = tempfile.TemporaryDirectory(prefix="hub-prova-", dir=CACHE)
+    prova_home = Path(prova_contexto.name)
     env["BIBLIOTECA_HOME"] = str(prova_home)
     env["TCL_LIBRARY"] = str(py_dir / "tcl" / f"tcl{serie}")
     env["TK_LIBRARY"] = str(py_dir / "tcl" / f"tk{serie}")
-    r = subprocess.run([str(py), "-c",
+    r = subprocess.run([str(py), "-B", "-c",
                         "import tkinter; print('tk', tkinter.TkVersion)"],
                         capture_output=True, text=True, timeout=60, env=env)
     if r.returncode != 0:
         raise SystemExit(f"tkinter não subiu no embutido:\n{r.stderr[-2000:]}")
     print(f"[ok] {r.stdout.strip()} no Python embutido")
-    r = subprocess.run([str(py), str(app_dir / "app_win.py"), "--selftest"],
+    r = subprocess.run([str(py), "-B", str(app_dir / "app_win.py"), "--selftest"],
                        capture_output=True, text=True, timeout=120, env=env)
     if r.returncode != 0 or "[ok] selftest" not in r.stdout:
         raise SystemExit(f"selftest falhou no portátil:\n{r.stdout[-1500:]}\n{r.stderr[-1500:]}")

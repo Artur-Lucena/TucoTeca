@@ -268,6 +268,8 @@ def instalar(info: dict, dest: Path, progresso=None, plataforma=None,
         return rec
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Atualizar emulador")
         with tempfile.TemporaryDirectory(prefix=".azahar-stage-", dir=dest.parent) as tmp:
             tmp = Path(tmp)
             nome_asset = str(info.get("nome") or urllib.parse.urlsplit(url).path)
@@ -277,7 +279,9 @@ def instalar(info: dict, dest: Path, progresso=None, plataforma=None,
             with urllib.request.urlopen(url, timeout=60) as r, pacote.open("wb") as f:
                 total = int(r.headers.get("Content-Length") or info.get("size") or 0)
                 for bloco in iter(lambda: r.read(256 * 1024), b""):
-                    f.write(bloco); h.update(bloco); feito += len(bloco)
+                    f.write(bloco)
+                    h.update(bloco)
+                    feito += len(bloco)
                     if progresso:
                         progresso(feito, total)
             if info.get("size") and feito != info["size"]:

@@ -4,7 +4,6 @@ Também roda em Linux real na CI. Fixtures nativas recebem chmod; sinais,
 PATH, Wine e filhos são injetados. A sandbox continua protegendo a coleção.
 """
 import io
-import json
 import os
 import sqlite3
 import subprocess
@@ -15,9 +14,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import bib_core as core
-from bib_nucleo import base, baixar, emuladores, ferramentas as F, player, processos
-from bib_nucleo import editores_imagem as EI, equalizadores as EQ, reprodutores_video as RV
-from bib_nucleo import videos as VI, videos_youtube as YT
+from bib_nucleo import baixar, base, emuladores, player, processos
+from bib_nucleo import editores_imagem as EI
+from bib_nucleo import equalizadores as EQ
+from bib_nucleo import ferramentas as F
+from bib_nucleo import reprodutores_video as RV
+from bib_nucleo import videos as VI
+from bib_nucleo import videos_youtube as YT
 from executar import afirmar
 
 
@@ -213,6 +216,35 @@ def teste_linux_player_parado_retoma_antes_terminate_e_recolhe_kill():
     b.stop()  # idempotente após encerrar
 
 
+def teste_processos_fundo_windows_sem_console_linux_mantem_grupo():
+    for plataforma in ("nt", "posix"):
+        proc = _Proc(io.StringIO("[download] 42%\n"))
+        linhas = []
+        proxy = SimpleNamespace(**{**vars(os), "name": plataforma})
+        with patch.object(processos, "os", proxy), \
+                patch.object(processos.subprocess, "Popen", return_value=proc) as pop:
+            esperado = (getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                        if plataforma == "nt" else 0)
+            afirmar(processos.opcoes_sem_janela().get("creationflags", 0) == esperado)
+            afirmar(processos.executar_com_progresso(["fake"], linhas.append, timeout=5) == 0)
+            afirmar(pop.call_args.kwargs.get("creationflags", 0) == esperado, pop.call_args)
+            afirmar(pop.call_args.kwargs["start_new_session"] == (plataforma == "posix"))
+        afirmar(linhas == ["[download] 42%\n"] and proc.stdout.closed, linhas)
+
+
+def teste_emuladores_sondagem_e_extracao_usam_opcoes_de_fundo():
+    with patch.object(processos, "opcoes_sem_janela", return_value={"creationflags": 123}), \
+            patch.object(emuladores, "_bin_7z", return_value="fake7z"), \
+            patch.object(emuladores.shutil, "which", return_value="nvidia-smi"), \
+            patch.object(emuladores.subprocess, "run", return_value=SimpleNamespace(
+                returncode=0, stdout="GPU fake\n", stderr="")) as executar:
+        afirmar(emuladores._tem_nvidia() == "GPU fake")
+        afirmar(executar.call_args.kwargs["creationflags"] == 123)
+        emuladores._extrair_arquivo("fake.7z", Path(tempfile.mkdtemp()))
+        afirmar(executar.call_args.kwargs["creationflags"] == 123)
+        afirmar(executar.call_args.kwargs["timeout"] == 600)
+
+
 def teste_processo_mudo_timeout_encerra_recolhe_e_fecha_pipe():
     liberado = threading.Event()
     class Pipe:
@@ -313,6 +345,7 @@ def teste_linux_traducao_exe_windows_e_prioridade_linux():
 
 def teste_tui_selftest_sem_curses_libera_lock():
     import contextlib
+
     import app_tui as tui
     db = Path(tempfile.mkdtemp()) / "tui.db"
     con = core.get_db(db)

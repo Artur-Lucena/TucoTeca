@@ -92,6 +92,7 @@ def teste_steamrip_buscar_e_detalhes():
 
 def teste_steamrip_ordem_hosts():
     import os
+
     from bib_nucleo import fontes as FT
     afirmar(FT.ordem_hosts()[0] == "fileditch")
     velho = os.environ.get("BIBLIOTECA_STEAMRIP_HOSTS")
@@ -107,6 +108,7 @@ def teste_steamrip_ordem_hosts():
 
 def teste_steamrip_gofile_e_megadb():
     import urllib.request
+
     from bib_nucleo import fontes as FT
     conta = json.dumps({"data": {"token": "tok"}}).encode()
     servs = json.dumps({"data": {"servers": [{"name": "store1"}]}}).encode()
@@ -157,6 +159,7 @@ def teste_steamrip_gofile_e_megadb():
 
 def teste_steamrip_baixar_fileditch():
     import urllib.request
+
     from bib_nucleo import fontes as FT
     tmp = Path(tempfile.mkdtemp(prefix="suite-ft-"))
     corpo = b"R" * 1_200_000
@@ -214,6 +217,7 @@ def teste_steamrip_hosts_por_dominio_e_fallback():
 
 def teste_steamrip_expirado_e_404():
     import urllib.request
+
     from bib_nucleo import fontes as FT
     afirmar(FT._mesmo_host("https://a.gofile.io/x", "https://gofile.io/x"))
     afirmar(FT._mesmo_host("https://fileditchfiles.st/f.rar",
@@ -283,6 +287,7 @@ FG_POST_HTML = """
 
 def teste_fitgirl_buscar_e_detalhes():
     import webbrowser
+
     from bib_nucleo import fontes as FT
     velho, _ch = _falso_urlopen([("https://fitgirl-repacks.site/?s=",
                                   (FG_BUSCA_HTML.encode(), "", {}))])

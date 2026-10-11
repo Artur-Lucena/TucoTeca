@@ -99,6 +99,7 @@ def teste_quit_aplica_sessoes():
 
 def teste_log_erro_anexa():
     from unittest.mock import patch
+
     from bib_nucleo import base
     tmp = Path(tempfile.mkdtemp(prefix="suite-al-"))
     with patch.object(base, "DADOS_DIR", tmp):

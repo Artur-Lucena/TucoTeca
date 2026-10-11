@@ -114,6 +114,7 @@ def teste_baixar_v14_idempotente():
 
 def teste_baixar_localizar_e_consulta():
     import os
+
     from bib_nucleo import baixar as BX
     afirmar(BX.consulta_busca("Chico", "Cotidiano") == "ytsearch1:Chico - Cotidiano")
     afirmar(BX.consulta_busca("", "Solo") == "ytsearch1:Solo")
@@ -275,6 +276,7 @@ def _urlopen_binario(dados_ou_erro):
 
 def teste_baixar_converter_ffmpeg_mock():
     import os
+
     from bib_nucleo import baixar as BX
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
     stage = tmp / "stage"
@@ -380,12 +382,17 @@ def teste_baixar_converter_sem_ffmpeg():
 
 
 def teste_baixar_instalar_ffmpeg_mock():
+    import hashlib
     import urllib.request
+
     from bib_nucleo import baixar as BX
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
     velho_min = BX.FFMPEG_ZIP_MIN
+    velho_sha = BX.FFMPEG_SHA256
     BX.FFMPEG_ZIP_MIN = 10
-    velho, chamadas = _urlopen_binario(_zip_ff(b"MZ" + b"0" * 3000))
+    raw = _zip_ff(b"MZ" + b"0" * 3000)
+    BX.FFMPEG_SHA256 = hashlib.sha256(raw).hexdigest()
+    velho, chamadas = _urlopen_binario(raw)
     try:
         r = BX.instalar_ffmpeg(destino=tmp / "fer")
         afirmar(r.get("ok") and (tmp / "fer" / "ffmpeg.exe").is_file(), r)
@@ -393,7 +400,9 @@ def teste_baixar_instalar_ffmpeg_mock():
     finally:
         urllib.request.urlopen = velho
         BX.FFMPEG_ZIP_MIN = velho_min
-    velho, _ch = _urlopen_binario(_zip_ff(b"sem-mz-aqui"))
+    raw = _zip_ff(b"sem-mz-aqui")
+    BX.FFMPEG_SHA256 = hashlib.sha256(raw).hexdigest()
+    velho, _ch = _urlopen_binario(raw)
     BX.FFMPEG_ZIP_MIN = 10
     try:
         r = BX.instalar_ffmpeg(destino=tmp / "fer2")
@@ -407,6 +416,7 @@ def teste_baixar_instalar_ffmpeg_mock():
     with zipfile.ZipFile(buf, "w") as z:
         z.writestr("nada/util.txt", b"x")
     velho, _ch = _urlopen_binario(buf.getvalue())
+    BX.FFMPEG_SHA256 = hashlib.sha256(buf.getvalue()).hexdigest()
     BX.FFMPEG_ZIP_MIN = 10
     try:
         r = BX.instalar_ffmpeg(destino=tmp / "fer3")
@@ -414,13 +424,18 @@ def teste_baixar_instalar_ffmpeg_mock():
     finally:
         urllib.request.urlopen = velho
         BX.FFMPEG_ZIP_MIN = velho_min
+        BX.FFMPEG_SHA256 = velho_sha
 
 
 def teste_baixar_instalar_ytdlp_mock():
+    import hashlib
     import urllib.request
+
     from bib_nucleo import baixar as BX
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
     velho_min = BX.YTDLP_EXE_MIN
+    velho_sha = BX.YTDLP_SHA256
+    BX.YTDLP_SHA256 = hashlib.sha256(b"MZ" + b"1" * 3000).hexdigest()
     BX.YTDLP_EXE_MIN = 10
     velho, chamadas = _urlopen_binario(b"MZ" + b"1" * 3000)
     try:
@@ -430,6 +445,7 @@ def teste_baixar_instalar_ytdlp_mock():
     finally:
         urllib.request.urlopen = velho
         BX.YTDLP_EXE_MIN = velho_min
+        BX.YTDLP_SHA256 = velho_sha
     velho, _ch = _urlopen_binario(OSError("rede"))
     BX.YTDLP_EXE_MIN = 10
     try:
@@ -442,6 +458,7 @@ def teste_baixar_instalar_ytdlp_mock():
 
 def teste_baixar_pronto_e_ferramentas():
     import os
+
     from bib_nucleo import baixar as BX
     from bib_nucleo import base
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))

@@ -8,10 +8,9 @@ from unittest.mock import patch
 import bib_core as core
 from bib_nucleo import editores_imagem as EI
 from bib_nucleo import equalizadores as EQ
-from bib_nucleo import reprodutores_video as RV
-from bib_nucleo import videos as VI
-from bib_nucleo import videos_youtube as YT
 from bib_nucleo import online, spotify
+from bib_nucleo import reprodutores_video as RV
+from bib_nucleo import videos_youtube as YT
 from executar import afirmar
 
 
@@ -255,7 +254,6 @@ def teste_youtube_baixar_run_mockado():
     tmp = tempfile.mkdtemp()
     con = core.get_db(Path(tmp) / "y2.db")
     vid = "dQw4w9WgXcQ"
-    dest_esperado = core.VIDEOS_DIR / f"{vid}.mp4"
 
     class FakeProc:
         def __init__(self, cmd):
@@ -313,6 +311,7 @@ def teste_spotify_paginacao_cache_por_contexto():
 
 def teste_servico_midias_status_e_videos():
     import tempfile as _t
+
     from servicos_ui import ServicoBiblioteca
     db = Path(_t.mkdtemp()) / "s.db"
     svc = ServicoBiblioteca(db)

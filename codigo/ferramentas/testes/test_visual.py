@@ -10,6 +10,7 @@ from executar import afirmar
 def _montar(escala=None):
     try:
         import tkinter as tk
+
         import app_win
         root = tk.Tk()
         if escala is not None:
@@ -245,6 +246,7 @@ def teste_visual_escala_125_e_busca_limpa():
 def teste_visual_cache_imagens_por_interpretador():
     try:
         import tkinter as tk
+
         import app_win
         r1 = tk.Tk()
     except ImportError:

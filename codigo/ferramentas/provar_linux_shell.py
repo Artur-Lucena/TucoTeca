@@ -22,7 +22,7 @@ import wave
 from pathlib import Path
 from unittest.mock import patch
 
-from montar_linux import DESINSTALAR, DESKTOP, SH_LAUNCHER, STUB, REPO, empacotar_run
+from montar_linux import DESINSTALAR, DESKTOP, REPO, SH_LAUNCHER, STUB, empacotar_run
 
 
 def _shell_path(path: Path) -> str:
@@ -134,14 +134,17 @@ def provar(bash: str, ffmpeg=False) -> dict:
 
         if ffmpeg:
             sys.path.insert(0, str(REPO / "codigo"))
-            from bib_nucleo import base, equalizadores as EQ
+            from bib_nucleo import base
+            from bib_nucleo import equalizadores as EQ
             from bib_nucleo.baixar import localizar_ffmpeg
             exe = localizar_ffmpeg()
             if not exe:
                 raise AssertionError("--ffmpeg solicitado, mas FFmpeg não foi localizado")
             src = tmp / "sintetico.wav"
             with wave.open(str(src), "wb") as w:
-                w.setnchannels(1); w.setsampwidth(2); w.setframerate(44100)
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(44100)
                 w.writeframes(b"".join(struct.pack("<h", int(12000 * math.sin(2 * math.pi * 440 * i / 44100)))
                                       for i in range(44100 * 3)))
             antes = src.read_bytes()

@@ -84,6 +84,7 @@ def teste_musica_import_dedup_crud():
 
 def teste_musica_tracks_json_e_migracao_v12():
     import sqlite3
+
     from bib_nucleo import musicas as MUS
     tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))
     src = tmp / "src"
@@ -183,8 +184,9 @@ def teste_pacote_v4_musicas():
 
 
 def teste_musica_capa_auto_env():
-    from bib_nucleo import musicas as MUS
     import os
+
+    from bib_nucleo import musicas as MUS
     afirmar(MUS.capa_musica_auto() is True)
     velho = os.environ.get("BIBLIOTECA_CAPA_MUSICA_AUTO")
     os.environ["BIBLIOTECA_CAPA_MUSICA_AUTO"] = "0"
@@ -227,6 +229,7 @@ def _urlopen_mockado(respostas):
 def teste_musica_capa_busca_e_baixa_mock():
     import json
     import urllib.request
+
     from bib_nucleo import musicas as MUS
     tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))
     src = tmp / "src"
@@ -261,6 +264,7 @@ def teste_musica_capa_busca_e_baixa_mock():
 
 def teste_musica_capa_rede_falha():
     import urllib.request
+
     from bib_nucleo import musicas as MUS
     tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))
     src = tmp / "src"
@@ -342,8 +346,8 @@ def teste_musica_capa_salvar_e_pacote():
 
 
 def teste_pacote_audio_sha_e_capa_em_reimportacao():
-    from bib_nucleo import pacotes as PAC
     from bib_nucleo import musicas as MUS
+    from bib_nucleo import pacotes as PAC
     tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))
     src = tmp / "src"
     src.mkdir()
@@ -368,8 +372,9 @@ def teste_pacote_audio_sha_e_capa_em_reimportacao():
     afirmar(core.listar_musicas(con)[0]["musica_capa"], res)
     con.close()
     # Pacote com áudio adulterado e hash antigo, numa casa sem arquivo existente.
-    from bib_nucleo import base
     from unittest.mock import patch
+
+    from bib_nucleo import base
     adulterado = tmp / "ruim.zip"
     with zipfile.ZipFile(pacote) as original, zipfile.ZipFile(adulterado, "w") as out:
         for info in original.infolist():
@@ -384,6 +389,7 @@ def teste_pacote_audio_sha_e_capa_em_reimportacao():
 
 def teste_resolver_audio_caminho_windows_em_casa_local():
     from unittest.mock import patch
+
     from bib_nucleo import base
     from bib_nucleo import musicas as MUS
     tmp = Path(tempfile.mkdtemp(prefix="suite-mus-"))

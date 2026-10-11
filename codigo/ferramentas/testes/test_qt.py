@@ -187,9 +187,8 @@ def teste_qt_qml_hud_todas_categorias_em_tela_cheia():
     app, bridge = _qt()
     if app is None:
         return
-    from PySide6.QtCore import QMetaObject, qInstallMessageHandler
+    from PySide6.QtCore import QMetaObject, QUrl, qInstallMessageHandler
     from PySide6.QtQml import QQmlApplicationEngine
-    from PySide6.QtCore import QUrl
     from shiboken6 import delete
     erros = []
     anterior = qInstallMessageHandler(lambda t, c, m: erros.append(m))
@@ -361,9 +360,8 @@ def teste_qt_qol_biblioteca_player_sistema():
 
 
 def teste_servico_integracao_personalizada_persiste_e_valida():
-    from servicos_ui import (INTEGRACAO_TIPOS, carregar_personalizadas, integracoes_padrao,
-                             url_integracao)
     from bib_nucleo import online
+    from servicos_ui import INTEGRACAO_TIPOS, carregar_personalizadas
     servico = ServicoBiblioteca(_base())
     n_antes = len(servico.integracoes.listar())
     for ruim in ({"chave": "x", "nome": "N", "descricao": "", "tipo": "link", "url": "https://a.example/"},
@@ -409,10 +407,11 @@ def teste_qt_torrent_hub_organizar_e_botao_magnet():
     app, bridge = _qt()
     if app is None:
         return
+    from unittest.mock import patch
+
+    from app_qt import criar_engine
     from PySide6.QtCore import QMetaObject, QObject, qInstallMessageHandler
     from shiboken6 import delete
-    from app_qt import criar_engine
-    from unittest.mock import patch
     avisos = []
     anterior = qInstallMessageHandler(lambda t, c, m: avisos.append(m))
     engine = criar_engine(bridge)
@@ -421,18 +420,18 @@ def teste_qt_torrent_hub_organizar_e_botao_magnet():
         janela = engine.rootObjects()[0]
         bridge.atualizar()
         _aguardar(app, lambda: not bridge.ocupado)
-        afirmar(bridge.foraDePiratas("C:/Downloads/Jogo") and not bridge.foraDePiratas(""), "foraDePiratas")
+        afirmar(bridge.foraDoDestino("C:/Downloads/Jogo") and not bridge.foraDoDestino(""), "foraDoDestino")
         msgs = []
         bridge.aviso.connect(lambda m, e: msgs.append((m, e)))
         magnet = "magnet:?xt=urn:btih:" + "b" * 40
         with patch.object(bridge.servico, "baixar_torrent_hub",
-                          return_value={"ok": True, "destino": "P:/Piratas"}) as add:
+                          return_value={"ok": True, "destino": "P:/Meus Jogos Locais"}) as add:
             bridge.baixarTorrent(magnet)
             _aguardar(app, lambda: not bridge.ocupado)
             afirmar(add.call_args.args == (magnet,), add.call_args)
-            afirmar(any("P:/Piratas" in m for m, _e in msgs), msgs)
+            afirmar(any("P:/Meus Jogos Locais" in m for m, _e in msgs), msgs)
         with patch.object(bridge.servico, "organizar_download",
-                          return_value={"ok": True, "path": "P:/Piratas/Jogo", "movido": True}):
+                          return_value={"ok": True, "path": "P:/Meus Jogos Locais/Jogo", "movido": True}):
             bridge.organizarDownload("C:/Downloads/Jogo")
             _aguardar(app, lambda: not bridge.ocupado)
             afirmar(any("Movido" in m for m, _e in msgs), msgs)
@@ -461,10 +460,11 @@ def teste_qt_musica_online_busca_seleciona_enfileira():
     app, bridge = _qt()
     if app is None:
         return
+    from unittest.mock import patch
+
+    from app_qt import criar_engine
     from PySide6.QtCore import QMetaObject, QObject, qInstallMessageHandler
     from shiboken6 import delete
-    from app_qt import criar_engine
-    from unittest.mock import patch
     faixas = [{"titulo": "Faixa Grátis", "artista": "Artista", "album": "Álbum",
                "duracao_ms": 200000, "capa_url": "", "url": "https://www.deezer.com/track/9",
                "uri": "deezer:track:9", "fonte": "deezer", "nome_fonte": "Deezer"}]
@@ -510,6 +510,80 @@ def teste_qt_musica_online_busca_seleciona_enfileira():
         qInstallMessageHandler(anterior)
 
 
+def teste_qt_pacotes_renderiza_itens_e_limpa_exe_entre_importacoes():
+    app, bridge = _qt()
+    if app is None:
+        return
+    from unittest.mock import patch
+
+    from app_qt import criar_engine
+    from PySide6.QtCore import QMetaObject, QObject, qInstallMessageHandler
+    from shiboken6 import delete
+    itens = [
+        {"nome": "Jogo pronto", "caminho": "P:/Jogo", "tipo": "pasta", "estado": "pronta",
+         "exe": "P:/Jogo/Jogo.exe", "setup": "", "pasta": "P:/Jogo", "tamanho_mb": 0},
+        {"nome": "Instalador", "caminho": "P:/Instalador", "tipo": "pasta", "estado": "instalar",
+         "exe": "", "setup": "P:/Instalador/setup.exe", "pasta": "P:/Instalador", "tamanho_mb": 0},
+        {"nome": "Arquivo.zip", "caminho": "P:/Arquivo.zip", "tipo": "arquivo", "estado": "compactado",
+         "exe": "", "setup": "", "pasta": "", "tamanho_mb": 2},
+    ]
+    avisos = []
+    anterior = qInstallMessageHandler(lambda t, c, m: avisos.append(m))
+    engine = criar_engine(bridge)
+
+    def encontrar_todos(item, nome):
+        encontrados = [item] if item.objectName() == nome else []
+        for filho in item.childItems():
+            encontrados.extend(encontrar_todos(filho, nome))
+        return encontrados
+
+    try:
+        afirmar(engine.rootObjects(), avisos)
+        janela = engine.rootObjects()[0]
+        bridge.atualizar()
+        _aguardar(app, lambda: not bridge.ocupado)
+        bridge.navegar("downloads")
+        dialogo = janela.findChild(QObject, "piratasDialog")
+        afirmar(dialogo is not None, "diálogo de pacotes ausente")
+        with patch.object(bridge.servico, "pacotes_piratas", return_value=itens) as listar:
+            botao = _encontrar(janela.contentItem(), "pacotesButton")
+            afirmar(botao is not None and botao.property("visible"))
+            QMetaObject.invokeMethod(botao, "clicked")
+            _aguardar(app, lambda: not bridge.ocupado)
+            afirmar(listar.call_count == 1, "abrir o diálogo disparou duas leituras")
+        nomes = encontrar_todos(janela.contentItem(), "pacoteNome")
+        afirmar({p.property("text") for p in nomes} == {i["nome"] for i in itens}, avisos)
+        botoes = encontrar_todos(janela.contentItem(), "pacoteImportarButton")
+        afirmar(len(botoes) == 3, "delegates da lista não foram criados")
+        campo = janela.findChild(QObject, "pacoteExeField")
+        confirmar = janela.findChild(QObject, "pacoteExeDialog")
+        campo.setProperty("text", "P:/ExeAntigo.exe")
+        QMetaObject.invokeMethod(botoes[0], "clicked")
+        app.processEvents()
+        afirmar(campo.property("text") == itens[0]["exe"], "não preencheu o exe detectado")
+        with patch.object(bridge.servico, "importar_pacote", return_value={"titulo": "Jogo pronto"}) as importar, \
+                patch.object(bridge.servico, "pacotes_piratas", return_value=itens):
+            QMetaObject.invokeMethod(confirmar, "accepted")
+            _aguardar(app, lambda: not bridge.ocupado)
+            afirmar(importar.call_args.args == (itens[0]["pasta"], itens[0]["exe"]), importar.call_args)
+        QMetaObject.invokeMethod(confirmar, "close")
+        app.processEvents()
+        botoes = encontrar_todos(janela.contentItem(), "pacoteImportarButton")
+        QMetaObject.invokeMethod(botoes[1], "clicked")
+        app.processEvents()
+        afirmar(campo.property("text") == "", "reutilizou o executável de outro pacote")
+        QMetaObject.invokeMethod(confirmar, "close")
+        QMetaObject.invokeMethod(dialogo, "close")
+        problemas = [m for m in avisos if any(x in m for x in
+                     ("ReferenceError", "TypeError", "Unable to assign", "Binding loop",
+                      "is not defined", "Required property", "Cannot create delegate"))]
+        afirmar(not problemas, "\n".join(problemas))
+    finally:
+        bridge.fechar()
+        delete(engine)
+        qInstallMessageHandler(anterior)
+
+
 def teste_qt_fontes_e_builders_incluem_recursos_qml():
     import sys
     sys.path.insert(0, str(Path(__file__).parents[1]))
@@ -525,14 +599,21 @@ def teste_qt_fontes_e_builders_incluem_recursos_qml():
     afirmar((dest / "qml/Main.qml").is_file() and (dest / "qml/qmldir").is_file())
     afirmar((dest / "qt_bridge.py").is_file() and (dest / "desktop.py").is_file())
     for nome in ("VolumeControl", "ProvidersDialog", "CoversDialog", "AchievementsDialog",
-                 "SpotifyDialog", "MusicDownloadsDialog"):
+                  "SpotifyDialog", "MusicDownloadsDialog", "PiratasDialog"):
         afirmar((dest / "qml" / (nome + ".qml")).is_file(), "bundle sem " + nome)
-    for nome in ("online", "capas", "conquistas", "spotify"):
+    for nome in ("capas", "conquistas"):
         afirmar((dest / "bib_nucleo" / (nome + ".py")).is_file(), "bundle sem domínio " + nome)
+    afirmar((dest / "bib_nucleo" / "rede" / "__init__.py").is_file(), "bundle sem bib_nucleo/rede")
+    for nome in ("online", "spotify"):
+        afirmar((dest / "bib_nucleo" / "rede" / (nome + ".py")).is_file(),
+                "bundle sem domínio de rede " + nome)
+    afirmar(any(p == "codigo/bib_nucleo/rede/online.py" for p in fontes),
+            "entrega sem bib_nucleo/rede/online.py")
 
 
 def teste_servico_saude_total_real_e_idade_backup():
     from unittest.mock import patch
+
     from servicos_ui import resumo_sistema, saude_colecao
     servico = ServicoBiblioteca(_base())
     jogos = servico.snapshot()["jogos"]
@@ -640,10 +721,10 @@ def teste_qt_qol_avisos_fifo_controles_compactos_e_registro_horas():
     app, bridge = _qt()
     if app is None:
         return
+    from app_qt import criar_engine
     from PySide6.QtCore import QMetaObject, QObject, Qt, qInstallMessageHandler
     from PySide6.QtTest import QTest
     from shiboken6 import delete
-    from app_qt import criar_engine
     avisos = []
     anterior = qInstallMessageHandler(lambda t, c, m: avisos.append(m))
     engine = criar_engine(bridge)
@@ -751,10 +832,10 @@ def teste_qt_volume_pc_barra_visivel_teclado_e_polling_sem_sobrescrever():
         app, bridge = _qt()
         if app is None:
             return
+        from app_qt import criar_engine
         from PySide6.QtCore import Qt
         from PySide6.QtTest import QTest
         from shiboken6 import delete
-        from app_qt import criar_engine
         engine = criar_engine(bridge)
         try:
             janela = engine.rootObjects()[0]
@@ -784,18 +865,20 @@ def teste_qt_provedores_dialogos_e_spotify_enfileira_sem_bloquear_ui():
     app, bridge = _qt()
     if app is None:
         return
+    from unittest.mock import patch
+
+    from app_qt import criar_engine
+    from bib_nucleo.rede.spotify import normalizar_faixa
     from PySide6.QtCore import QMetaObject, QObject, qInstallMessageHandler
     from shiboken6 import delete
-    from app_qt import criar_engine
-    from bib_nucleo.spotify import normalizar_faixa
-    from unittest.mock import patch
     avisos = []
     anterior = qInstallMessageHandler(lambda t, c, m: avisos.append(m))
     engine = criar_engine(bridge)
     try:
         afirmar(engine.rootObjects(), avisos)
         janela = engine.rootObjects()[0]
-        janela.setWidth(960); janela.setHeight(640)
+        janela.setWidth(960)
+        janela.setHeight(640)
         bridge.atualizar()
         _aguardar(app, lambda: not bridge.ocupado)
         gid = bridge._dados["jogos"][0]["id"]

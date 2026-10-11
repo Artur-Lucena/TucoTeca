@@ -32,7 +32,7 @@ ASSETS = {
 
 LEIAME = """TUCOTECA SUPERHUB — Windows x64, portátil
 
-Extraia toda a pasta e abra BibliotecaHub.bat. Não precisa instalar Python,
+Extraia toda a pasta e abra TucoTeca.bat (BibliotecaHub.bat é alias legado). Não precisa instalar Python,
 emuladores ou ferramentas no Windows. Tudo usa os caminhos desta pasta.
 
 app/          fontes Python locais, editáveis
@@ -42,14 +42,20 @@ emuladores/   Azahar e DeSmuME com perfis novos
 dados/        sua coleção e perfis; criada/usada localmente
 manifesto-runtime.json  componentes, versões, tamanhos e SHA-256
 
+Variantes: a "completa" inclui QtWebEngine (YouTube dentro do Hub) e player
+interno QtMultimedia. A "essencial" não inclui Chromium e abre o YouTube no
+navegador do sistema. Gamepad não está implementado. Tamanhos no relatório.
+
 Downloads > Iniciar cliente abre o qBittorrent do Hub em um perfil independente.
 Magnets abertos no catálogo são encaminhados a ele, sem associação do Windows.
 Velocidade, ETA, pausar e retomar usam sua API local em 127.0.0.1.
 
 O programa, ferramentas, imagens locais e emulação funcionam sem rede.
 Obter conteúdo, buscar catálogos/capas e atualizar componentes usa a internet.
+BIBLIOTECA_REDE=0 bloqueia ações remotas do Hub; não é firewall de ferramentas externas.
 
-Saves, ROMs, mods e sua coleção viajam pelo pacote de coleção do próprio Hub.
+O pacote de coleção inclui metadados, capas, músicas, presets e saves de
+emuladores selecionados. Ele não inclui os executáveis dos jogos nem as ROMs.
 Este runtime começa com dados/perfis novos. Para atualizar, preserve dados/.
 Licenças e URLs dos fontes ficam junto de cada componente e no manifesto.
 """
@@ -168,7 +174,7 @@ def incluir_componentes(raiz: Path) -> dict:
     trans = dest / "translations"
     if trans.is_dir():
         for p in trans.iterdir():
-            if p.is_file() and not any(l in p.name for l in ("pt_BR", "_en", "_pt.")):
+            if p.is_file() and not any(sufixo in p.name for sufixo in ("pt_BR", "_en", "_pt.")):
                 p.unlink()
     shutil.copy2(gpl, dest / "COPYING.txt")
     _nota(dest, "qBittorrent", "5.2.4", "https://github.com/qbittorrent/qBittorrent", "GPL-2.0-or-later")
@@ -237,10 +243,11 @@ def incluir_pillow(raiz: Path):
             shutil.copytree(info / "licenses", raiz / "python/LICENSES-Pillow", dirs_exist_ok=True)
 
 
-def incluir_qt(raiz: Path):
+def incluir_qt(raiz: Path, extras="essencial"):
     """Qt Quick completo, plugins e licenças das wheels fixadas no requirements."""
     from importlib.metadata import distribution
-    for nome in ("PySide6-Essentials", "shiboken6"):
+    nomes = ("PySide6-Essentials", "shiboken6") + (("PySide6-Addons",) if extras == "completo" else ())
+    for nome in nomes:
         dist = distribution(nome)
         if dist.version != "6.10.2":
             raise ValueError("Instale requirements-ui.txt antes de montar o runtime Qt.")
@@ -252,10 +259,44 @@ def incluir_qt(raiz: Path):
                 destino = raiz / "python/Lib" / str(arquivo)
                 destino.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(origem, destino)
+    # Chromium só precisa das duas línguas usadas neste hub pessoal.
+    for locales in (raiz / "python/Lib/PySide6").rglob("qtwebengine_locales"):
+        for p in locales.glob("*.pak"):
+            if p.stem not in ("en-US", "pt-BR"):
+                p.unlink()
     return "6.10.2"
 
 
-def criar_manifesto(raiz: Path, componentes: dict, versoes: dict) -> dict:
+def validar_fontes_runtime(raiz: Path, repo: Path = REPO) -> dict:
+    """Confere conteúdo e conjunto dos fontes copiados, inclusive ao reutilizar."""
+    esperados = {destino: repo / origem for origem, destino in MP.APP_ARQS}
+    for origem, destino in (("codigo/bib_nucleo", "bib_nucleo"),
+                            ("codigo/frontends/qml", "qml")):
+        base = repo / origem
+        for p in base.rglob("*"):
+            if p.is_file() and "__pycache__" not in p.parts and p.suffix not in (".pyc", ".pyo"):
+                esperados[(Path(destino) / p.relative_to(base)).as_posix()] = p
+    app = raiz / "app"
+    atuais = {p.relative_to(app).as_posix() for p in app.rglob("*") if p.is_file()
+              and "__pycache__" not in p.parts and p.suffix not in (".pyc", ".pyo")}
+    if atuais != set(esperados):
+        raise ValueError("Fontes ausentes/obsoletos no runtime: " +
+                         ", ".join(sorted(atuais ^ set(esperados))))
+    hashes = {}
+    for rel, origem in sorted(esperados.items()):
+        sha = sha_arquivo(origem)
+        if sha_arquivo(app / rel) != sha:
+            raise ValueError("Fonte do runtime diverge da revisão: " + rel)
+        hashes[rel] = sha
+    resultado = {"arquivos": len(hashes), "sha256_arvore_app": hashlib.sha256(
+        json.dumps(hashes, sort_keys=True).encode()).hexdigest()}
+    congelado = repo / "MANIFESTO-FONTES.json"
+    if congelado.is_file():
+        resultado["sha256_manifesto_fontes"] = sha_arquivo(congelado)
+    return resultado
+
+
+def criar_manifesto(raiz: Path, componentes: dict, versoes: dict, fontes=None) -> dict:
     arquivos = {}
     for p in sorted(raiz.rglob("*")):
         if not p.is_file() or p.name == "manifesto-runtime.json":
@@ -267,27 +308,55 @@ def criar_manifesto(raiz: Path, componentes: dict, versoes: dict) -> dict:
     manifesto = {"esquema": 1, "projeto": "TucoTeca SuperHub", "plataforma": "win32",
                  "arquitetura": "x64", "versoes": versoes, "componentes": componentes,
                  "arquivos": arquivos, "bytes_runtime": sum(d["bytes"] for d in arquivos.values())}
+    if fontes is not None:
+        manifesto["fontes"] = fontes
     (raiz / "manifesto-runtime.json").write_text(json.dumps(manifesto, ensure_ascii=False, indent=2), encoding="utf-8")
     return manifesto
 
 
-def validar_runtime(raiz: Path) -> dict:
+def validar_runtime(raiz: Path, extras="essencial") -> dict:
     """Executa exclusivamente binários do pacote em uma casa vazia e sem PATH externo."""
     py = raiz / "python/python.exe"
     env = {k: v for k, v in os.environ.items() if not k.startswith("BIBLIOTECA_")}
     env["PATH"] = str(Path(os.environ.get("SystemRoot", "C:/Windows")) / "System32")
     env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    if extras == "completo":
+        env["TUCOTECA_EXTRAS"] = "completo"
     serie = json.loads((raiz / "manifesto-runtime.json").read_text(encoding="utf-8"))["versoes"]["serie_tk"]
     env["TCL_LIBRARY"] = str(raiz / "python/tcl" / ("tcl" + serie))
     env["TK_LIBRARY"] = str(raiz / "python/tcl" / ("tk" + serie))
     resultados = {}
-    with tempfile.TemporaryDirectory(prefix="superhub-prova-", dir=CACHE) as tmp:
+    manifesto = json.loads((raiz / "manifesto-runtime.json").read_text(encoding="utf-8"))
+    if manifesto["versoes"].get("extras") != extras:
+        raise ValueError("Variante do manifesto não corresponde à prova solicitada.")
+    if "fontes" in manifesto and validar_fontes_runtime(raiz) != manifesto["fontes"]:
+        raise ValueError("Revisão dos fontes não corresponde ao manifesto do runtime.")
+    for rel, info in manifesto["arquivos"].items():
+        p = raiz / rel
+        if raiz.resolve() not in p.resolve().parents or not p.is_file() or sha_arquivo(p) != info["sha256"]:
+            raise ValueError("Arquivo divergente no manifesto: " + rel)
+    # Quarentena curta para os perfis de terceiros: alguns componentes Win32
+    # não resolvem Known Folders quando USERPROFILE/TEMP apontam a uma árvore
+    # artificial profundamente aninhada. A prova de áudio continua criando
+    # deliberadamente um WAV com caminho longo, não pula o transporte MCI.
+    quarentena = Path(tempfile.gettempdir()) / "opencode"
+    quarentena.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="superhub-prova-", dir=quarentena) as tmp:
+        for chave, sub in (("APPDATA", "appdata"), ("LOCALAPPDATA", "localappdata"),
+                           ("HOME", "home"), ("USERPROFILE", "home"), ("TEMP", "temp"), ("TMP", "temp")):
+            pasta = Path(tmp) / sub
+            pasta.mkdir(exist_ok=True)
+            env[chave] = str(pasta)
         env["BIBLIOTECA_HOME"] = str(raiz)  # testa descoberta da própria árvore
         script = ("import bib_core as c; from pathlib import Path; "
                   "assert c.runtime_portatil(); "
                   "assert all(c.localizar_ferramenta(n) for n in ('7z','ffmpeg','ytdlp','quickjs','qbittorrent')); "
                   "assert str(c.default_emu_3ds()).startswith(str(c.HOME_DIR)); "
                   "assert str(c.default_emu_nds()).startswith(str(c.HOME_DIR)); "
+                  "from importlib.util import find_spec; "
+                  f"assert (find_spec('PySide6.QtWebEngineQuick') is not None)=={extras == 'completo'}; "
+                  f"assert (find_spec('PySide6.QtMultimedia') is not None)=={extras == 'completo'}; "
                   "from PIL import Image, ImageTk; import tkinter as tk; "
                   "im=Image.new('RGB',(16,16),'red'); im.save('prova.jpg'); "
                   "im2=Image.open('prova.jpg'); assert im2.size==(16,16); "
@@ -298,7 +367,12 @@ def validar_runtime(raiz: Path) -> dict:
                     "7zip": [str(raiz / "ferramentas/7zip/7z.exe"), "i"],
                     "ytdlp": [str(py), str(raiz / "ferramentas/yt-dlp/yt-dlp.pyz"), "--version"],
                     "quickjs": [str(raiz / "ferramentas/quickjs/qjs.exe"), "-e", "console.log(1+1)"]}
+        if extras == "completo":
+            comandos["webengine"] = [str(py), "-c",
+                                     "import PySide6.QtWebEngineQuick as q; print('webengine ok', q.__name__)"]
         for nome, comando in comandos.items():
+            if comando[0] == str(py):
+                comando.insert(1, "-B")
             inicio = time.monotonic()
             r = subprocess.run(comando, env=env, cwd=tmp, capture_output=True, text=True,
                                encoding="utf-8", errors="replace", timeout=40)
@@ -322,8 +396,8 @@ def validar_runtime(raiz: Path) -> dict:
             raise ValueError("conversão MP3 não funcionou no FFmpeg empacotado")
         resultados["audio-mp3"] = {"bytes": mp3.stat().st_size, "ok": True}
         env["BIBLIOTECA_QBIT_PROFILE"] = str(Path(tmp) / "perfis")
-        env["BIBLIOTECA_PIRATAS"] = str(Path(tmp) / "downloads")
-        r = subprocess.run([str(py), str(REPO / "codigo/ferramentas/provar_qbit_runtime.py"),
+        env["BIBLIOTECA_JOGOS_DIR"] = str(Path(tmp) / "downloads")
+        r = subprocess.run([str(py), "-B", str(raiz / "app/provar_qbit_runtime.py"),
                             "--configurar-offline"], env=env, cwd=tmp,
                            capture_output=True, text=True, encoding="utf-8", timeout=60)
         if r.returncode:
@@ -333,20 +407,40 @@ def validar_runtime(raiz: Path) -> dict:
         env["BIBLIOTECA_HOME"] = tmp
         env["BIBLIOTECA_AZAHAR_DIR"] = str(raiz / "emuladores/Azahar")
         env["BIBLIOTECA_DESMUME_DIR"] = str(raiz / "emuladores/DeSmuME")
-        r = subprocess.run([str(py), str(raiz / "app/desktop.py"), "--selftest"], env=env,
+        r = subprocess.run([str(py), "-B", str(raiz / "app/desktop.py"), "--selftest"], env=env,
                            cwd=tmp, capture_output=True, text=True, encoding="utf-8", timeout=60)
         if r.returncode or "[ok] selftest" not in r.stdout:
             raise ValueError("UI do runtime falhou: " + r.stderr[-1000:])
         resultados["ui"] = {"saida": r.stdout.strip()}
+        # Não basta importar a DLL: renderiza QML e reproduz mídia real gerada
+        # localmente. Chromium usa HTML local com interceptor bloqueando a rede.
+        prova_qt = Path(tmp) / "qt"
+        r = subprocess.run([str(py), "-B", str(raiz / "app/provar_qt_runtime.py"), "--extras", extras,
+                            "--saida", str(prova_qt), "--ffmpeg", str(ff)], env=env, cwd=tmp,
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=150)
+        if r.returncode:
+            raise ValueError("Qt nativo falhou no runtime: " + (r.stdout + r.stderr)[-4000:])
+        resultados["qt-nativo"] = json.loads((prova_qt / "qt-runtime.json").read_text(encoding="utf-8"))
+        r = subprocess.run([str(py), "-B", str(raiz / "app/provar_integracoes_locais.py"), "--saida", str(Path(tmp) / "locais")],
+                           env=env, cwd=tmp, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+        if r.returncode:
+            raise ValueError("Integrações locais falharam no runtime: " + (r.stdout + r.stderr)[-2000:])
+        resultados["integracoes-locais"] = json.loads(r.stdout.strip())
+    pessoais = list((raiz / "dados").rglob("*")) if (raiz / "dados").exists() else []
+    pessoais += list((raiz / "emuladores").rglob("*.dsv"))
+    pessoais += list((raiz / "emuladores").rglob("*.sav"))
+    if any(p.is_file() for p in pessoais):
+        raise ValueError("Prova deixou estado/perfis no runtime; não empacote estes arquivos.")
     return resultados
 
 
-def empacotar(raiz: Path, formato="todos") -> list[Path]:
+def empacotar(raiz: Path, formato="todos", extras="essencial") -> list[Path]:
     DIST.mkdir(parents=True, exist_ok=True)
     hoje = datetime.date.today().strftime("%Y%m%d")
+    tag = "completo" if extras == "completo" else "essencial"
     saidas = []
     if formato in ("zip", "todos"):
-        p = DIST / f"tucoteca-superhub-windows-x64-{hoje}.zip"
+        p = DIST / f"tucoteca-superhub-windows-x64-{tag}-{hoje}.zip"
         with zipfile.ZipFile(p, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
             for f in sorted(raiz.rglob("*")):
                 z.write(f, f.relative_to(raiz))
@@ -355,7 +449,7 @@ def empacotar(raiz: Path, formato="todos") -> list[Path]:
                 raise ValueError("ZIP gerado está corrompido")
         saidas.append(p)
     if formato in ("7z", "todos"):
-        p = DIST / f"tucoteca-superhub-windows-x64-{hoje}.7z"
+        p = DIST / f"tucoteca-superhub-windows-x64-{tag}-{hoje}.7z"
         if p.exists():
             p.unlink()
         exe = raiz / "ferramentas/7zip/7z.exe"
@@ -373,32 +467,39 @@ def empacotar(raiz: Path, formato="todos") -> list[Path]:
     return saidas
 
 
-def montar(formato="todos", reutilizar=False):
+def montar(formato="todos", reutilizar=False, extras="essencial"):
     anterior = MP.BUILD
-    MP.BUILD = BUILD
+    MP.BUILD = BUILD / extras
+    if extras not in ("completo", "essencial"):
+        raise SystemExit(f"--extras deve ser completo|essencial (veio {extras!r})")
     try:
         if reutilizar:
-            raiz = BUILD
+            raiz = MP.BUILD
             manifesto = json.loads((raiz / "manifesto-runtime.json").read_text(encoding="utf-8"))
+            if manifesto["versoes"].get("extras") != extras:
+                raise ValueError("Não reutilize um runtime de outra variante.")
             MP.copiar_app(raiz / "app")
             componentes, v = manifesto["componentes"], manifesto["versoes"]
         else:
             raiz, v = MP.montar_base(sem_azahar=True)
             componentes = incluir_componentes(raiz)
             incluir_pillow(raiz)
-        v["qt"] = incluir_qt(raiz)
+        v["qt"] = incluir_qt(raiz, extras)
+        v["extras"] = "completo" if extras == "completo" else "essencial"
         (raiz / "README-PORTATIL.txt").write_text(LEIAME, encoding="utf-8")
         shutil.copy2(REPO / "LICENSE", raiz / "LICENSE-TucoTeca.txt")
         MP.podar_dieta(raiz)
-        m = criar_manifesto(raiz, componentes, v)
-        provas = validar_runtime(raiz)
+        fontes = validar_fontes_runtime(raiz)
+        m = criar_manifesto(raiz, componentes, v, fontes)
+        provas = validar_runtime(raiz, extras=extras)
         componentes["qbittorrent"]["versao"] = provas["qbittorrent"]["versao"].lstrip("v")
-        m = criar_manifesto(raiz, componentes, v)
+        m = criar_manifesto(raiz, componentes, v, fontes)
         rel = {"bytes_runtime": m["bytes_runtime"], "provas": provas,
-               "componentes": componentes}
-        (DIST / "superhub-verificacao.json").parent.mkdir(parents=True, exist_ok=True)
-        (DIST / "superhub-verificacao.json").write_text(json.dumps(rel, ensure_ascii=False, indent=2), encoding="utf-8")
-        saidas = empacotar(raiz, formato)
+               "componentes": componentes, "extras": extras, "fontes": fontes}
+        verificacao = DIST / f"superhub-verificacao-{extras}.json"
+        verificacao.parent.mkdir(parents=True, exist_ok=True)
+        verificacao.write_text(json.dumps(rel, ensure_ascii=False, indent=2), encoding="utf-8")
+        saidas = empacotar(raiz, formato, extras)
         # Prova da distribuição, não só da árvore usada para gerar o arquivo.
         rel["arquivos"] = []
         for arquivo in saidas:
@@ -412,11 +513,13 @@ def montar(formato="todos", reutilizar=False):
                                         "-o" + str(extraido), "-y", "-bsp0"], capture_output=True, timeout=120)
                     if r.returncode:
                         raise ValueError("não extraiu o 7z gerado")
-                comprovacao = validar_runtime(extraido)
+                comprovacao = validar_runtime(extraido, extras=extras)
                 rel["arquivos"].append({"nome": arquivo.name, "bytes": arquivo.stat().st_size,
                                          "sha256": sha_arquivo(arquivo), "provas_extraido": comprovacao})
                 print(f"[ok] runtime extraído de {arquivo.name}: componentes e API local verificados")
-        (DIST / "superhub-verificacao.json").write_text(json.dumps(rel, ensure_ascii=False, indent=2), encoding="utf-8")
+        verificacao.write_text(json.dumps(rel, ensure_ascii=False, indent=2), encoding="utf-8")
+        (DIST / f"SHA256SUMS-{extras}.txt").write_text("".join(
+            f'{a["sha256"]}  {a["nome"]}\n' for a in rel["arquivos"]), encoding="utf-8")
         return saidas
     finally:
         MP.BUILD = anterior
@@ -426,8 +529,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--formato", choices=("zip", "7z", "todos"), default="todos")
     ap.add_argument("--reutilizar", action="store_true", help="atualiza fontes no runtime já montado")
+    ap.add_argument("--extras", choices=("completo", "essencial"), default="essencial",
+                     help="completo = QtWebEngine/Multimedia (sem gamepad); "
+                         "essencial = leve, abre YouTube no navegador do sistema")
     args = ap.parse_args()
-    montar(args.formato, args.reutilizar)
+    montar(args.formato, args.reutilizar, args.extras)
 
 
 if __name__ == "__main__":

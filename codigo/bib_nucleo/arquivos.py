@@ -1,8 +1,10 @@
 """Publicação atômica de arquivos: nunca substitui um destino com dados parciais."""
 from __future__ import annotations
 
+import json
 import os
 import tempfile
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -32,4 +34,31 @@ def gravar_atomico(destino: str | os.PathLike, dados: bytes) -> None:
         tmp.write_bytes(dados)
 
 
-__all__ = ['destino_temporario', 'gravar_atomico']
+_JSON_LOCK = threading.RLock()
+
+
+def ler_json(alvo: Path, padrao=None, limite=8_000_000):
+    try:
+        with Path(alvo).open("rb") as f:
+            raw = f.read(limite + 1)
+        if len(raw) > limite:
+            raise ValueError("arquivo maior que o limite")
+        return json.loads(raw.decode("utf-8-sig"))
+    except (OSError, ValueError, UnicodeError):
+        return padrao
+
+
+def gravar_json(alvo: Path, dados, backup=False):
+    alvo = Path(alvo)
+    raw = json.dumps(dados, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8")
+    with _JSON_LOCK:
+        if alvo.is_file():
+            antigo = alvo.read_bytes()
+            if antigo == raw:
+                return
+            if backup:
+                gravar_atomico(alvo.with_suffix(alvo.suffix + ".bak"), antigo)
+        gravar_atomico(alvo, raw)
+
+
+__all__ = ['destino_temporario', 'gravar_atomico', 'ler_json', 'gravar_json']

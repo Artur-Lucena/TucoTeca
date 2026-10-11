@@ -99,8 +99,9 @@ def teste_capa_rom_via_launch_sem_rom_path():
 
 
 def teste_lock_nao_apaga_de_outro():
-    from bib_nucleo import base
     import json
+
+    from bib_nucleo import base
     lp = base.lock_path()
     try:
         if lp.is_file():
@@ -421,8 +422,9 @@ def teste_resolver_exe_fantasma_cai_no_provider():
 
 
 def teste_lock_antigo_sem_host_so_libera():
-    from bib_nucleo import base
     import json
+
+    from bib_nucleo import base
     lp = base.lock_path()
     try:
         if lp.is_file():

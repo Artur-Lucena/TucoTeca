@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Catálogo SteamRip no Hub: buscar, listar hosts e baixar p/ `Piratas/`.
+"""Catálogo SteamRip no Hub: buscar, listar hosts e baixar p/ `Meus Jogos Locais/`.
 
 Fonte já conhecida do projeto (vigília Hydra); aqui vira catálogo digital:
 `?s=` acha o post, o post lista GOFILE/MegaDB/FileDitch/etc. FileDitch é
 direto; Gofile resolve via API guest; MegaDB segue redirect com HEAD.
-O `.rar` cai em `Piratas/` e o fluxo repack existente importa depois.
+O `.rar` cai em `Meus Jogos Locais/` e o fluxo repack existente importa depois.
 Tudo com `urllib` stdlib; rede falhou = erro claro, nunca levanta cru.
 """
 from __future__ import annotations
@@ -20,6 +20,7 @@ from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 
 from bib_nucleo.arquivos import destino_temporario
+from bib_nucleo.rede import abrir_rede
 
 STEAM_ID_ENV = "BIBLIOTECA_STEAM_ID"
 
@@ -84,7 +85,7 @@ def ler_wishlist(steamid: str, timeout: int = 20,
             req = urllib.request.Request(
                 "https://store.steampowered.com/wishlist/profiles/"
                 f"{steamid}/wishlistdata/?p={pagina}", headers=_UA)
-            with urllib.request.urlopen(req, timeout=timeout) as r:
+            with abrir_rede(req, timeout=timeout) as r:
                 corpo = r.read(5_000_000).decode("utf-8", "replace")
             if corpo.lstrip()[:1] == "<":
                 return {"itens": [], "erros": [
@@ -170,7 +171,7 @@ def buscar_jogos_steam(termo: str, timeout: int = 20, limite: int = 8) -> dict:
         url = ("https://store.steampowered.com/api/storesearch/?term="
                + urllib.parse.quote(termo) + "&cc=BR&l=english")
         req = urllib.request.Request(url, headers=_UA)
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with abrir_rede(req, timeout=timeout) as r:
             dados = json.loads(r.read(500_000).decode("utf-8", "replace"))
         itens = []
         for it in (dados.get("items") or [])[:max(1, limite)]:
@@ -217,7 +218,7 @@ def ordem_hosts() -> tuple:
 
 def _ler(url: str, timeout: int = 20, limite: int = 2_000_000) -> str:
     req = urllib.request.Request(url, headers=_UA)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with abrir_rede(req, timeout=timeout) as r:
         return r.read(limite).decode("utf-8", "replace")
 
 
@@ -341,14 +342,14 @@ def resolver_gofile(url: str, timeout: int = 30) -> list[dict]:
             "https://api.gofile.io/accounts",
             data=json.dumps({}).encode(), headers={**_UA, "Content-Type":
                                                    "application/json"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with abrir_rede(req, timeout=timeout) as r:
             conta = json.loads(r.read(100_000).decode("utf-8"))
         token = ((conta.get("data") or {}).get("token") or "").strip()
         if not token:
             raise ValueError("gofile sem token guest")
         req = urllib.request.Request("https://api.gofile.io/servers?zone=eu",
                                      headers=_UA)
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with abrir_rede(req, timeout=timeout) as r:
             servs = json.loads(r.read(100_000).decode("utf-8"))
         nomes = [s.get("name") for s in (servs.get("data") or {}).get("servers", [])
                  if isinstance(s, dict) and s.get("name")]
@@ -357,7 +358,7 @@ def resolver_gofile(url: str, timeout: int = 30) -> list[dict]:
         req = urllib.request.Request(
             f"https://{nomes[0]}.gofile.io/contents/{codigo}",
             headers={**_UA, "Authorization": f"Bearer {token}"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with abrir_rede(req, timeout=timeout) as r:
             cont = json.loads(r.read(2_000_000).decode("utf-8"))
         filhos = (cont.get("data") or {}).get("children") or {}
         arquivos: list[dict] = []
@@ -388,7 +389,7 @@ def resolver_megadb(url: str, timeout: int = 20) -> dict:
     """Segue redirect com HEAD (só baixa se for arquivo). Levanta ValueError."""
     try:
         req = urllib.request.Request(url, headers=_UA, method="HEAD")
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with abrir_rede(req, timeout=timeout) as r:
             final = r.geturl()
             tipo = (r.headers.get("Content-Type") or "").lower()
             disp = (r.headers.get("Content-Disposition") or "").lower()
@@ -402,7 +403,7 @@ def resolver_megadb(url: str, timeout: int = 20) -> dict:
 
 
 def _nome_saida(titulo: str, url: str) -> str:
-    from bib_nucleo.repacks import ARQUIVO_EXTS
+    from bib_nucleo.rede.repacks import ARQUIVO_EXTS
     parsed = urllib.parse.urlsplit(url)
     query = urllib.parse.parse_qs(parsed.query)
     caminho = (query.get("f") or [parsed.path])[0]
@@ -416,7 +417,7 @@ def _nome_saida(titulo: str, url: str) -> str:
 
 def baixar_steamrip(url_pagina: str, destino=None, host: str = "",
                     progresso=None, timeout: int = 30) -> dict:
-    """Baixa o jogo p/ `Piratas/` (FileDitch direto → gofile → megadb).
+    """Baixa o jogo p/ `Meus Jogos Locais/` (FileDitch direto → gofile → megadb).
 
     `host`: nome preferido (senão ordem `BIBLIOTECA_STEAMRIP_HOSTS`).
     Nunca levanta cru: erro vira {'ok': False, 'erro', 'tentados': [...]}.
@@ -468,8 +469,8 @@ def _mesmo_host(url: str, final: str) -> bool:
 
 def _descer(url: str, titulo: str, destino, progresso,
             timeout: int = 60) -> dict:
-    from bib_nucleo.repacks import pasta_piratas
-    base = Path(destino) if destino else pasta_piratas()
+    from bib_nucleo.rede.repacks import pasta_jogos
+    base = Path(destino) if destino else pasta_jogos()
     try:
         base.mkdir(parents=True, exist_ok=True)
     except OSError as e:
@@ -483,7 +484,7 @@ def _descer(url: str, titulo: str, destino, progresso,
         alvo = base / f"{original.stem}-{n}{original.suffix}"
     try:
         req = urllib.request.Request(url, headers=_UA)
-        with urllib.request.urlopen(req, timeout=timeout) as r, destino_temporario(alvo) as tmp:
+        with abrir_rede(req, timeout=timeout) as r, destino_temporario(alvo) as tmp:
             final = r.geturl()
             # Host que expira costuma redirecionar para fora (ex.: homepage):
             # HTML fora do host = arquivo morto, não erro de parse.
@@ -612,10 +613,18 @@ def abrir_url(url: str) -> dict:
     """Entrega URL/magnet ao SO (navegador ou cliente torrent)."""
     if not (url or "").strip():
         return {"ok": False, "erro": "URL vazia"}
+    from bib_nucleo.rede import exigir_rede
+    try:
+        exigir_rede("Abrir fonte online")
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
     if url.strip().startswith("magnet:?"):
         from bib_nucleo.qbit import qbit_iniciar
         return qbit_iniciar(url.strip())
     try:
+        p = urllib.parse.urlsplit(url.strip())
+        if p.scheme != "https" or not p.hostname or p.username or p.password or p.port not in (None, 443):
+            return {"ok": False, "erro": "Endereço HTTPS inválido."}
         import webbrowser
         ok = webbrowser.open(url.strip())
         return {"ok": bool(ok)}

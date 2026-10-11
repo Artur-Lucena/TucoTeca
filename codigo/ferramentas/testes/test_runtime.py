@@ -6,7 +6,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 import bib_core as core
-from bib_nucleo import base, ferramentas as F, qbit as Q
+from bib_nucleo import base
+from bib_nucleo import ferramentas as F
+from bib_nucleo import qbit as Q
 from executar import afirmar
 
 
@@ -28,7 +30,7 @@ def teste_runtime_local_sem_dependencia_do_pc():
         afirmar(not procura.called)
         afirmar(F.emulador_local_dir("Azahar") == p / "emuladores/Azahar")
         from bib_nucleo import repacks
-        afirmar(repacks.pasta_piratas() == p / "Piratas")
+        afirmar(repacks.pasta_jogos() == p / "Meus Jogos Locais")
 
 
 def teste_runtime_manifesto_e_override_editaveis():
@@ -82,31 +84,30 @@ def teste_qbit_perfil_independente_e_comando():
         afirmar("personalizado" in Q.qbit_config_path().read_text(encoding="utf-8"), "perfil foi sobrescrito")
 
 
-def teste_qbit_destino_piratas_em_novos_e_perfil_antigo():
-    from bib_nucleo import repacks
-    piratas = Path(tempfile.mkdtemp(prefix="piratas-"))
+def teste_qbit_destino_jogos_em_novos_e_perfil_antigo():
+    jogos = Path(tempfile.mkdtemp(prefix="jogos-"))
     magnet = "magnet:?xt=urn:btih:" + "a" * 40
     with patch.object(Q, "qbit_api_url", return_value=""), \
-            patch.dict(os.environ, {"BIBLIOTECA_PIRATAS": str(piratas)}):
+            patch.dict(os.environ, {"BIBLIOTECA_PIRATAS": str(jogos)}):
         r = Q.qbit_adicionar(magnet)
         afirmar(not r["ok"] and "Iniciar cliente" in r["erro"], r)
         for ruim in ("", "https://example.com/pagina", "C:/jogo.torrent"):
             afirmar(not Q.qbit_adicionar(ruim)["ok"], ruim)
     with patch.object(Q, "qbit_api_url", return_value="http://127.0.0.1:9999"), \
             patch.object(Q, "qbit_request", return_value="") as req, \
-            patch.dict(os.environ, {"BIBLIOTECA_PIRATAS": str(piratas)}):
+            patch.dict(os.environ, {"BIBLIOTECA_PIRATAS": str(jogos)}):
         r = Q.qbit_adicionar(magnet)
-        afirmar(r["ok"] and r["destino"] == str(piratas.resolve()), r)
+        afirmar(r["ok"] and r["destino"] == str(jogos.resolve()), r)
         ep, dados = req.call_args.args
         afirmar(ep == "torrents/add", ep)
         afirmar(dados["urls"] == magnet and dados["category"] == "tucoteca", dados)
-        afirmar(Path(dados["savepath"]).resolve() == piratas.resolve(), dados)
+        afirmar(Path(dados["savepath"]).resolve() == jogos.resolve(), dados)
     velho = "[BitTorrent]\nSession\\DefaultSavePath=C:/Downloads\nOutro=1\n"
-    novo = Q.migrar_save_path(velho, piratas)
-    afirmar(f"Session\\DefaultSavePath={piratas.as_posix()}" in novo and "Outro=1" in novo, novo)
-    sem_secao = Q.migrar_save_path("[GUI]\nA=1\n", piratas)
-    afirmar("[BitTorrent]" in sem_secao and piratas.as_posix() in sem_secao, sem_secao)
-    afirmar(Q.migrar_save_path(novo, piratas) == novo, "migração não é idempotente")
+    novo = Q.migrar_save_path(velho, jogos)
+    afirmar(f"Session\\DefaultSavePath={jogos.as_posix()}" in novo and "Outro=1" in novo, novo)
+    sem_secao = Q.migrar_save_path("[GUI]\nA=1\n", jogos)
+    afirmar("[BitTorrent]" in sem_secao and jogos.as_posix() in sem_secao, sem_secao)
+    afirmar(Q.migrar_save_path(novo, jogos) == novo, "migração não é idempotente")
 
 
 def teste_qbit_api_progresso_estado_e_controle():
@@ -171,3 +172,39 @@ def teste_runtime_build_sem_perfis_e_com_manifesto():
     m = MS.criar_manifesto(dst, {}, {"python": "prova"})
     afirmar(m["arquivos"]["app.exe"]["sha256"] == MS.sha_arquivo(dst / "app.exe"))
     afirmar(m["bytes_runtime"] == len(b"MZruntime") + len(b"extensao"))
+
+
+def teste_runtime_confere_revisao_e_recusa_fontes_obsoletos():
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    import montar_superhub as MS
+    tmp = Path(tempfile.mkdtemp(prefix="fontes-runtime-"))
+    repo, runtime = tmp / "repo", tmp / "runtime"
+    for origem, _destino in MS.MP.APP_ARQS:
+        p = repo / origem
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("# fonte de prova", encoding="utf-8")
+    (repo / "codigo/bib_nucleo").mkdir()
+    (repo / "codigo/bib_nucleo/__init__.py").write_text("# nucleo", encoding="utf-8")
+    (repo / "codigo/frontends/qml/secoes").mkdir(parents=True)
+    qml = repo / "codigo/frontends/qml/secoes/Inicio.qml"
+    qml.write_text("import QtQuick; Item {}", encoding="utf-8")
+    MS.MP.copiar_app(runtime / "app", repo)
+    r = MS.validar_fontes_runtime(runtime, repo)
+    afirmar(r["arquivos"] == len(MS.MP.APP_ARQS) + 2, r)
+    afirmar(len(r["sha256_arvore_app"]) == 64, r)
+    (runtime / "app/qml/secoes/Inicio.qml").write_text("# divergente", encoding="utf-8")
+    try:
+        MS.validar_fontes_runtime(runtime, repo)
+    except ValueError as e:
+        afirmar("diverge" in str(e), e)
+    else:
+        afirmar(False, "aceitou código divergente")
+    MS.MP.copiar_app(runtime / "app", repo)
+    (runtime / "app/obsoleto.py").write_text("# obsoleto", encoding="utf-8")
+    try:
+        MS.validar_fontes_runtime(runtime, repo)
+    except ValueError as e:
+        afirmar("obsoleto.py" in str(e), e)
+    else:
+        afirmar(False, "aceitou fonte antigo no bundle")

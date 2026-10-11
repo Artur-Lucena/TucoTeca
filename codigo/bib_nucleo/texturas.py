@@ -196,6 +196,7 @@ def estado_textura(tid: str) -> dict:
 def flag_custom_textures() -> bool | None:
     """`custom_textures` global do ini live (None se ilegível)."""
     import configparser
+
     from bib_nucleo import emuladores as EMU
     try:
         cfg = EMU.config_atual_emu("azahar")

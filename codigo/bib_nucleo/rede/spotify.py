@@ -112,6 +112,8 @@ class ClienteSpotify:
         return cliente
 
     def iniciar_login(self):
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Conectar Spotify")
         cliente = self._validar_client_id()
         if self._thread and self._thread.is_alive():
             raise ValueError("A autorização Spotify já está aguardando no navegador.")

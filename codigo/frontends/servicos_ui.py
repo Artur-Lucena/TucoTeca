@@ -229,13 +229,23 @@ def saude_colecao(jogos, limite=8):
             "ids_pendentes": ids_pendentes, "ok": len(jogos) - len(ids_pendentes)}
 
 
+def _sem_acento(s: str) -> str:
+    """Minúsculas sem diacriticos (para busca tolerante, sem depender de ICU)."""
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", str(s or "").casefold())
+                   if unicodedata.category(c) != "Mn")
+
+
 def busca_global(jogos, musicas, desejos, downloads, termo, limite=12):
-    """Paleta de comandos OS: filtra coleção em memória, sem I/O. Retorna DTOs."""
-    palavras = (termo or "").casefold().split()
+    """Paleta de comandos OS: filtra coleção em memória, sem I/O. Retorna DTOs.
+
+    Busca tolerante a acentos e sem ordem obrigatória das palavras.
+    """
+    palavras = _sem_acento(termo).split()
     if not palavras:
         return []
     def casa(item, campos):
-        texto = " ".join(str(item.get(k) or "") for k in campos).casefold()
+        texto = _sem_acento(" ".join(str(item.get(k) or "") for k in campos))
         return all(p in texto for p in palavras)
     out = []
     for j in jogos:
@@ -278,6 +288,8 @@ class ServicoBiblioteca:
             j.update(capa_url=capa_url(j.get("capa")), plataforma=core.plataforma_jogo(j))
         for m in musicas:
             m["capa_url"] = capa_url(m.get("musica_capa"))
+        from bib_nucleo.preferencias_pessoais import aplicar_perfil
+        jogos = aplicar_perfil(jogos)
         return {"jogos": jogos, "musicas": musicas, "desejos": desejos, "videos": videos,
                 "fila_musicas": fila_musicas,
                 "sistema": resumo_sistema(jogos, musicas, desejos)}
@@ -330,9 +342,13 @@ class ServicoBiblioteca:
         return dict(row)
 
     def buscar_capas(self, categoria, ident, provedor, atualizar=False):
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Buscar capas")
         return capas.buscar_capas(categoria, self.item_capa(categoria, ident), provedor, atualizar)
 
     def buscar_musicas_online(self, termo, fonte="todas", atualizar=False):
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Buscar músicas online")
         from bib_nucleo import musica_online
         if fonte == "spotify":
             link = spotify.identificar_spotify(termo)
@@ -363,6 +379,79 @@ class ServicoBiblioteca:
         return online.configurar_provedores({"steam_key": steam, "steamgriddb_key": steamgrid,
                                             "spotify_client_id": spotify_id,
                                             "spotify_client_secret": spotify_secret})
+
+    def aparencia(self):
+        from bib_nucleo import aparencia_usuario
+        return aparencia_usuario.ler_aparencia()
+
+    def definir_aparencia(self, tema="", densidade="", auto_backup=None, modo_simples=None):
+        from bib_nucleo import aparencia_usuario
+        return aparencia_usuario.salvar_aparencia(tema, densidade, auto_backup, modo_simples)
+
+    def salvar_observacoes(self, gid, texto):
+        """Notas/diário do jogo (campo `observacoes`, sem migração)."""
+        texto = str(texto or "")[:4000]
+        return self.alterar(lambda con: core.atualizar_jogo(con, gid, {"observacoes": texto}))
+
+    def exportar_colecao_para(self, pasta):
+        """Pacote ZIP da coleção numa pasta escolhida (pendrive, nuvem, etc.)."""
+        from datetime import datetime
+        from pathlib import Path
+        destino = Path(pasta) / f"tucoteca-{datetime.now():%Y%m%d-%H%M%S-%f}.zip"
+        return core.exportar_pacote(destino, self.db_path)
+
+    def buscar_letras(self, artista, titulo, album="", duracao_s=0):
+        from bib_nucleo.rede import letras
+        return letras.buscar_letras(artista, titulo, album, duracao_s)
+
+    def buscar_fontes_desejo(self, titulo):
+        """Procura o título nas fontes de download (SteamRip e FitGirl)."""
+        from bib_nucleo.rede import exigir_rede, fontes
+        exigir_rede("Buscar fontes de download")
+        saida = {"steamrip": [], "fitgirl": [], "erros": []}
+        for chave, buscar in (("steamrip", fontes.buscar_steamrip),
+                              ("fitgirl", fontes.buscar_fitgirl)):
+            try:
+                r = buscar(titulo)
+            except Exception as e:
+                saida["erros"].append(f"{chave}: {e}")
+                continue
+            saida[chave] = [{"titulo": i.get("titulo", ""), "url": i.get("url", "")}
+                            for i in (r.get("itens") or [])]
+            saida["erros"].extend(str(e) for e in (r.get("erros") or []))
+        return saida
+
+    def baixar_fonte_steamrip(self, url, did):
+        """Baixa/importa e marca obtido somente depois da importação bem-sucedida."""
+        from bib_nucleo import banco as B
+        from bib_nucleo.rede import exigir_rede, fontes, repacks
+        exigir_rede("Baixar de fontes")
+        parsed = urllib.parse.urlsplit(url)
+        if (parsed.scheme != "https" or parsed.hostname not in ("steamrip.com", "www.steamrip.com")
+                or parsed.username or parsed.password or parsed.port not in (None, 443)):
+            raise ValueError("Informe a página HTTPS do jogo no SteamRip.")
+        with closing(core.get_db(self.db_path)) as con:
+            if not con.execute("SELECT id FROM desejos WHERE id=? AND obtido_em IS NULL",
+                               (int(did),)).fetchone():
+                raise ValueError("Este desejo já foi obtido ou removido.")
+        res = fontes.baixar_steamrip(url)
+        if not res.get("ok"):
+            return {"ok": False, "erro": res.get("erro") or "download falhou"}
+
+        def importar(con):
+            r = repacks.importar_repack(con, res["path"])
+            if r.get("ok"):
+                B.marcar_desejo_obtido(con, did)
+            return r
+        return self.alterar(importar)
+
+    def buscar_capa_libretro(self, gid):
+        from bib_nucleo.rede import capas_libretro
+        jogo = self.jogo(gid)
+        r = capas_libretro.buscar_capa_libretro(
+            jogo.get("plataforma") or core.plataforma_jogo(jogo), jogo.get("titulo"))
+        return self.alterar(lambda con: core.salvar_capa_bytes(
+            con, gid, f"libretro-{gid}{r['ext']}", r["raw"]))
 
     def enfileirar_musicas(self, itens):
         metas = online.ler_json(core.DADOS_DIR / "musicas-online/faixas.json", {})
@@ -455,8 +544,17 @@ class ServicoBiblioteca:
 
     def favorito(self, gid):
         with self._escrita:
+            from bib_nucleo.preferencias_pessoais import (
+                aplicar_perfil,
+                ler_preferencias,
+                salvar_favorito,
+            )
             jogo = self.jogo(gid)
-            return self.salvar_jogo(gid, {"favorito": not jogo["favorito"]})
+            novo = not aplicar_perfil([jogo])[0]["favorito"]
+            if ler_preferencias()["ativo"] == "Tuco":
+                self.salvar_jogo(gid, {"favorito": novo})
+            salvar_favorito(jogo, novo)
+            return {"ok": True}
 
     def excluir(self, categoria, ident):
         funcoes = {"jogos": core.excluir_jogo, "desejos": core.remover_desejo,
@@ -482,6 +580,8 @@ class ServicoBiblioteca:
                 "eq_presets": sorted(core.PRESETS_EQ)}
 
     def buscar_videos_online(self, termo, limite=10, atualizar=False):
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Buscar vídeos no YouTube")
         return core.buscar_youtube(termo, limite=limite, atualizar=atualizar)
 
     def baixar_video_online(self, video_id, progresso=None):
@@ -544,6 +644,8 @@ class ServicoBiblioteca:
         return r
 
     def baixar_torrent_hub(self, url):
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Adicionar torrent")
         r = core.qbit_adicionar(url)
         if not r.get("ok"):
             raise ValueError(r.get("erro", "Não foi possível adicionar o torrent."))
@@ -551,14 +653,14 @@ class ServicoBiblioteca:
 
     def organizar_download(self, caminho):
         core.fazer_backup(self.db_path)
-        r = core.organizar_em_piratas(caminho)
+        r = core.organizar_no_destino(caminho)
         if not r.get("ok"):
             raise ValueError(r.get("erro", "Não foi possível organizar."))
         return r
 
-    def fora_de_piratas(self, caminho):
+    def fora_do_destino(self, caminho):
         try:
-            return bool(caminho) and not core.dentro_de_piratas(caminho)
+            return bool(caminho) and not core.dentro_do_destino(caminho)
         except (OSError, ValueError):
             return False
 
@@ -593,7 +695,16 @@ class ServicoBiblioteca:
         if not math.isfinite(horas) or horas < 0:
             raise ValueError("Informe um número de horas finito e não negativo.")
         if horas > 0:
-            return self.alterar(lambda con: core.adicionar_horas(con, gid, horas))
+            from bib_nucleo.estatisticas import registrar
+            from bib_nucleo.preferencias_pessoais import ler_preferencias
+            def gravar(con):
+                jogo = self.jogo(gid)
+                registrar(con, jogo, horas, ler_preferencias()["ativo"], commit=False)
+                r = core.adicionar_horas(con, gid, horas)
+                if not r.get("ok"):
+                    con.rollback()
+                return r
+            return self.alterar(gravar)
         return {"ok": True}
 
     def encerrar_sessao(self, arquivo, horas):
@@ -607,4 +718,121 @@ class ServicoBiblioteca:
             core.fazer_backup(self.db_path)
             marcador = Path(sessao["_arquivo"])
             gravar_atomico(core.BACKUP_DIR / "sessoes" / marcador.name, marcador.read_bytes())
-            return core.encerrar_sessao_manual(str(marcador), horas, db_path=self.db_path)
+            r = core.encerrar_sessao_manual(str(marcador), horas, db_path=self.db_path)
+            return r
+
+    def importar_colecao(self, caminho, restaurar_saves=False):
+        with self._escrita:
+            return core.importar_pacote(caminho, self.db_path, restaurar_saves)
+
+    def backup_pos_sessao(self, gid):
+        from bib_nucleo import saves
+        with self._escrita:
+            banco = core.fazer_backup(self.db_path)
+            jogo = self.jogo(gid)
+            r = saves.snapshot_saves(jogo)
+            prov = core.provedor_por_origem(jogo.get("origem", ""))
+            if not r.get("arquivos") and prov:
+                r = core.backup_saves_emu(prov["chave"])
+            return {"ok": r.get("ok", True), "banco": banco, "saves": r,
+                    "erro": r.get("erro", ""), "avisos": [r["aviso"]] if r.get("aviso") else []}
+
+    def ferramentas_jogo(self, gid):
+        from bib_nucleo import saves, screenshots
+        jogo = self.jogo(gid)
+        return {"saves": saves.caminhos_saves(jogo), "snapshots": saves.listar_snapshots(jogo),
+                "screenshots": screenshots.listar_screenshots(jogo),
+                "pasta_screenshots": str(screenshots.pasta_screenshots(jogo))}
+
+    def configurar_saves(self, gid, caminhos):
+        from bib_nucleo.saves import configurar_saves
+        with self._escrita:
+            return configurar_saves(self.jogo(gid), caminhos)
+
+    def restaurar_saves(self, gid, caminho):
+        from bib_nucleo.saves import restaurar_snapshot
+        with self._escrita:
+            return restaurar_snapshot(self.jogo(gid), caminho)
+
+    def importar_jogos(self, pasta):
+        roots, itens, info = core.preview_scan([pasta])
+        return self.alterar(lambda con: core.importar_lista(con, itens))
+
+    def importar_repack_local(self, caminho):
+        return self.alterar(lambda con: core.importar_repack(con, caminho))
+
+    def pacotes_piratas(self):
+        with closing(core.get_db(self.db_path)) as con:
+            return core.listar_pacotes_piratas(con)
+
+    def preparar_pacote(self, arquivo):
+        core.fazer_backup(self.db_path)
+        r = core.preparar_pacote(arquivo)
+        if not r.get("ok"):
+            raise ValueError(r.get("erro", "Não foi possível preparar o pacote."))
+        return r
+
+    def abrir_instalador_pacote(self, exe):
+        r = core.abrir_instalador(exe)
+        if not r.get("ok"):
+            raise ValueError(r.get("erro", "Não foi possível abrir o instalador."))
+        return r
+
+    def importar_pacote(self, pasta, exe=""):
+        def importar(con):
+            r = core.importar_pasta(con, pasta, exe)
+            if not r.get("ok"):
+                raise ValueError(r.get("erro", "Não foi possível importar o pacote."))
+            return r
+        return self.alterar(importar)
+
+    def estatisticas(self):
+        from bib_nucleo.estatisticas import resumo_ano
+        from bib_nucleo.preferencias_pessoais import ler_preferencias
+        with closing(core.get_db(self.db_path)) as con:
+            return resumo_ano(con, perfil=ler_preferencias()["ativo"])
+
+    def disco_jogo(self, gid):
+        from bib_nucleo.estatisticas import tamanho_pasta
+        jogo = self.jogo(gid)
+        exe = Path(core.traduzir_para_atual(jogo.get("executable_path", "")))
+        if not exe.is_file():
+            raise ValueError("Executável local não encontrado.")
+        return tamanho_pasta(exe.parent)
+
+    def baixar_mp3(self, video, progresso=None):
+        return self.alterar(lambda con: core.baixar_audio_youtube(con, video, progresso))
+
+    def video_local(self, ident):
+        from bib_nucleo.reprodutores_video import resolver_video
+        with closing(core.get_db(self.db_path)) as con:
+            row = con.execute("SELECT * FROM videos WHERE id=?", (int(ident),)).fetchone()
+        if row is None:
+            raise ValueError("Vídeo não encontrado.")
+        path = resolver_video(row["video_path"])
+        if not path:
+            raise ValueError("Arquivo de vídeo ausente.")
+        posicoes = online.ler_json(core.DADOS_DIR / "videos-posicoes.json", {})
+        posicoes = posicoes if isinstance(posicoes, dict) else {}
+        try:
+            posicao = max(0, int(posicoes.get(row["video_sha"], 0)))
+        except (TypeError, ValueError):
+            posicao = 0
+        return {"id": ident, "url": Path(path).resolve().as_uri(), "titulo": row["titulo"],
+                "posicao": posicao, "sha": row["video_sha"]}
+
+    def salvar_posicao_video(self, sha, posicao):
+        import re
+        if not re.fullmatch(r"[0-9a-f]{64}", sha):
+            return
+        with self._escrita:
+            alvo = core.DADOS_DIR / "videos-posicoes.json"
+            posicoes = online.ler_json(alvo, {})
+            posicoes = posicoes if isinstance(posicoes, dict) else {}
+            posicoes[sha] = max(0, int(posicao))
+            online.gravar_json(alvo, posicoes)
+
+    def atualizar_audio(self):
+        resultados = [core.instalar_ytdlp(), core.instalar_ffmpeg()]
+        erros = [r.get("erro", "Falha na atualização") for r in resultados if not r.get("ok")]
+        return {"ok": not erros, "erros": erros, "erro": "; ".join(erros)}

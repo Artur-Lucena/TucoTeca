@@ -226,8 +226,8 @@ def _listar_torrents_arquivos(pasta: Path | None = None) -> dict:
 
 
 def listar_torrents() -> dict:
-    from bib_nucleo.qbit import qbit_listar
     from bib_nucleo.ferramentas import runtime_portatil
+    from bib_nucleo.qbit import qbit_listar
     remoto = qbit_listar()
     if remoto.get("ok"):
         todos = {}

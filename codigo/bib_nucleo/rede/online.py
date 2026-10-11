@@ -11,7 +11,7 @@ import urllib.request
 from pathlib import Path
 
 from bib_nucleo import base
-from bib_nucleo.arquivos import gravar_atomico
+from bib_nucleo.arquivos import gravar_atomico, gravar_json, ler_json
 
 USER_AGENT = "TucoTeca/1.5 (https://github.com/Artur-Lucena/Projeto-Launcher)"
 _lock = threading.RLock()
@@ -19,29 +19,6 @@ _ENVS = {"steam_key": "BIBLIOTECA_STEAM_API_KEY",
          "steamgriddb_key": "BIBLIOTECA_STEAMGRIDDB_KEY",
          "spotify_client_id": "BIBLIOTECA_SPOTIFY_CLIENT_ID",
          "spotify_client_secret": "BIBLIOTECA_SPOTIFY_CLIENT_SECRET"}
-
-
-def ler_json(alvo: Path, padrao=None, limite=8_000_000):
-    try:
-        with Path(alvo).open("rb") as f:
-            raw = f.read(limite + 1)
-        if len(raw) > limite:
-            raise ValueError("arquivo maior que o limite")
-        return json.loads(raw.decode("utf-8-sig"))
-    except (OSError, ValueError, UnicodeError):
-        return padrao
-
-
-def gravar_json(alvo: Path, dados, backup=False):
-    raw = json.dumps(dados, ensure_ascii=False, indent=2).encode("utf-8")
-    with _lock:
-        if alvo.is_file():
-            antigo = alvo.read_bytes()
-            if antigo == raw:
-                return
-            if backup:
-                gravar_atomico(alvo.with_suffix(alvo.suffix + ".bak"), antigo)
-        gravar_atomico(alvo, raw)
 
 
 def configurar_provedores(dados: dict):
@@ -78,6 +55,8 @@ def url_https(url: str) -> bool:
 
 
 def requisitar_json(url, *, headers=None, dados=None, timeout=15, limite=4_000_000):
+    from bib_nucleo.rede import exigir_rede
+    exigir_rede("Consultar provedor")
     if not url_https(url):
         raise ValueError("Endereço do provedor inválido.")
     h = {"User-Agent": USER_AGENT, "Accept": "application/json", **(headers or {})}
@@ -96,6 +75,8 @@ def requisitar_json(url, *, headers=None, dados=None, timeout=15, limite=4_000_0
 
 def baixar_texto(url: str, timeout=20, limite=2_000_000) -> str:
     """HTML/texto público de provedor (ex.: Comunidade Steam). Sem login/chave."""
+    from bib_nucleo.rede import exigir_rede
+    exigir_rede("Consultar provedor")
     if not url_https(url):
         raise ValueError("Endereço do provedor inválido.")
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
@@ -128,6 +109,8 @@ def baixar_imagem(url: str, timeout=15) -> tuple[bytes, str, str]:
     if alvo.is_file():
         raw = alvo.read_bytes()
     else:
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Baixar imagem")
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:

@@ -22,7 +22,7 @@ from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI))
-from montar_portatil import REPO, DIST, copiar_app, podar_dieta
+from montar_portatil import DIST, REPO, copiar_app, podar_dieta
 
 MAC_BUILD = AQUI / ".build" / "mac"
 MAC_CACHE = AQUI / ".cache" / "mac"

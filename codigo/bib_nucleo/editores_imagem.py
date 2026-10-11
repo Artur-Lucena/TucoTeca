@@ -93,8 +93,7 @@ def abrir_no_editor(nome: str, caminho: str) -> dict:
 
 def editar_capa_caminho(capa_nome: str, editor: str = "auto") -> dict:
     """Atalho p/ capas do Hub (`dados/capas/<nome>`). `auto` = 1º instalado."""
-    from bib_nucleo.base import CAPAS_DIR
-    from bib_nucleo.base import nome_arquivo_portatil
+    from bib_nucleo.base import CAPAS_DIR, nome_arquivo_portatil
     alvo = (CAPAS_DIR / nome_arquivo_portatil(capa_nome)) if capa_nome else None
     if alvo is None or not alvo.is_file():
         return {"ok": False, "erro": "capa não encontrada."}

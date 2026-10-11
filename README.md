@@ -1,10 +1,19 @@
 # TucoTeca
 
+[![Testes](https://github.com/Artur-Lucena/Projeto-Launcher/actions/workflows/testes.yml/badge.svg)](https://github.com/Artur-Lucena/Projeto-Launcher/actions/workflows/testes.yml)
+[![Licença: MIT](https://img.shields.io/badge/Licen%C3%A7a-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Versão](https://img.shields.io/badge/vers%C3%A3o-1.0.0-informational)](VERSION)
+
 Aplicativo local de biblioteca de jogos e músicas. Desktop moderno em
 **PySide6 / Qt Quick** (frontend principal), ferramentas clássicas em tkinter
 (**congeladas**: só correções críticas) e TUI curses no Linux.
 Núcleo em **Python 3.10+ com biblioteca padrão**, SQLite e arquivos locais.
 Qt é uma dependência da interface desktop, não do núcleo.
+
+**Uso pessoal de Tuco e Isa.** Sem conta obrigatória, telemetria ou publicação
+automática de bundles. Steam é apenas fonte de catálogo/wishlist: os jogos
+são iniciados localmente e as conquistas ficam na coleção.
 
 O catálogo, a importação local e a reprodução local funcionam offline.
 Busca de capas, atualização de ferramentas/emuladores, CSV → áudio e
@@ -28,7 +37,7 @@ para conversão/preview de imagens; ferramentas externas são descritas abaixo.
 
 ## Executar
 
-- **Windows:** `BibliotecaHub.bat` (Qt neste checkout) ou `py -3.14 codigo/frontends/desktop.py`.
+- **Windows:** `TucoTeca.bat` (`BibliotecaHub.bat` é alias legado) ou `py -3.14 codigo/frontends/desktop.py`.
 - **Clássico (congelado):** `BibliotecaHub.bat --classico` ou Configurações → Abrir ferramentas clássicas.
   Recebe só correções críticas; novidades vão para o Qt.
 - **Linux:** `./BibliotecaHub.sh` ou `python3 codigo/frontends/app_tui.py`.
@@ -90,7 +99,8 @@ capas, backups, saves, mods e músicas; permanece fora do Git. A trava
 - **Conquistas do Hub:** Steam fornece referência; o save nativo e regras locais
   determinam desbloqueios persistentes/offline. Saves sem leitor ficam pendentes.
 - **Vídeos:** importa arquivos locais, pesquisa/baixa YouTube via yt-dlp,
-  e abre com VLC/MPV/MPC-HC. Ferramentas de mídia reúne editores de imagem,
+  toca no QtMultimedia opcional (variante completa, com retomada/velocidade)
+  ou abre com VLC/MPV/MPC-HC. Ferramentas de mídia reúne editores de imagem,
   editores/EQ de áudio e reprodutores; presets FFmpeg geram cópias importadas.
 - **Integrações:** + Adicionar registra atalhos HTTPS próprios, incluindo busca
   por `{q}`; cartões personalizados são persistentes e podem ser removidos.
@@ -107,12 +117,24 @@ capas, backups, saves, mods e músicas; permanece fora do Git. A trava
   intervalo. Sem peças registradas, ocupação em disco é apenas uma estimativa.
   **Iniciar cliente** usa um perfil da coleção; API local mostra velocidade,
   ETA, pausa/retomada. Magnets do Hub vão ao cliente do Hub com destino
-  Piratas/ (nunca ao cliente do SO); o que caiu fora pode voltar com Organizar.
+  Meus Jogos Locais/ (nunca ao cliente do SO); o que caiu fora pode voltar com Organizar.
 - **Sanear pasta:** localiza o jogo antes da limpeza, preserva instaladores
   ainda necessários e compara redistribuíveis por conteúdo. Na GUI, roda em
   segundo plano; setups redundantes vão para `.hub-lixo/`.
 - **Coleção portátil:** JSON/ZIP com identidade estável, capas, presets,
   músicas e saves opcionais. Backup versionado guarda os últimos 10 pares.
+- **Desejo → fontes → coleção:** SteamRip oferece download/importação no Qt;
+  FitGirl abre a página. Obtido só após importação bem-sucedida, sem reaparecer
+  no próximo espelho da wishlist. Disponibilidade remota não é garantida.
+- **Ferramentas pessoais:** perfis Tuco/Isa (favoritos/filtros independentes),
+  atalhos da janela, pasta vigiada opt-in, histórico anual local e API de
+  leitura em loopback com token (desligada por padrão).
+- **Saves e arquivos:** configure saves por jogo; snapshot e restauração com
+  SHA-256/backup prévio, galeria local de screenshots e IPS/BPS para uma nova
+  ROM. Cópia/hardlinks são explícitos; hardlinks **não são backup**.
+- **Música/YouTube:** letras LRCLIB em cache, acompanhamento durante a música
+  correspondente, MP3 do vídeo escolhido e SponsorBlock opt-in.
+  Não há sincronização de conquistas, overlay ou lançamento pela Steam.
 
 ## Dependências por funcionalidade
 
@@ -144,15 +166,32 @@ uma árvore independente. O yt-dlp oficial em zipapp reutiliza o Python
 do pacote. Ferramentas e dados usam caminhos locais; o manifesto JSON é editável.
 
 ```powershell
-py -3.14 codigo/ferramentas/montar_superhub.py --formato todos
+py -3.14 codigo/ferramentas/montar_superhub.py --extras essencial --formato zip
+py -3.14 codigo/ferramentas/montar_superhub.py --extras completo --formato zip
 ```
 
-Extraia o arquivo distribuído e abra `BibliotecaHub.bat`. A coleção é
+Os bundles são locais, para uso pessoal. Extraia o ZIP e abra `TucoTeca.bat`. A coleção é
 mantida em `dados/`; o runtime novo inicia com perfis vazios. Coleções podem
 ser transferidas pelo pacote de coleção do Hub. Preserve `dados/` em atualizações.
+O pacote não leva executáveis de jogos ou ROMs. As variantes usam árvores de
+build distintas; `superhub-verificacao-<variante>.json` e `SHA256SUMS-<variante>.txt`
+documentam as provas e a integridade. Não há workflow de release pública.
+
+**Essencial** não inclui WebEngine nem QtMultimedia; **completo** inclui ambos.
+Nenhum inclui navegação por gamepad. Áudio interno Windows usa MCI/FFmpeg nas
+duas variantes; caminhos longos têm cache temporário curto, sem mover a mídia.
+SmartScreen pode alertar: assinatura Windows e entrega macOS estão adiadas.
 
 As entregas atuais ficam em `dist/windows/`; os ZIPs de código, em
 `dist/fontes/`; versões anteriores, em `dist/historico/`.
+Os artefatos congelados da sessão R5 ficam localmente em
+`dist/marco-s0-s8/r5/` e correspondem ao commit `b35bac9`.
+
+O repositório [Projeto-Launcher](https://github.com/Artur-Lucena/Projeto-Launcher)
+é privado e reúne apenas fontes, testes, documentação e recursos de build.
+Coleção, jogos, ROMs, saves, perfis pessoais, backups e runtimes locais não
+entram no Git. O push dos fontes não cria nem publica uma release.
+Veja [a reconciliação dos históricos](docs/RECONCILIACAO_GITHUB.md).
 
 ## Estrutura resumida
 
@@ -160,11 +199,13 @@ As entregas atuais ficam em `dist/windows/`; os ZIPs de código, em
 codigo/
   bib_core.py          fachada de compatibilidade para o núcleo
   bib_nucleo/         regras, persistência e adaptadores do sistema
+    rede/              integrações remotas explícitas
   frontends/          GUI/TUI e dispatcher de callbacks
+    qml/secoes/        telas Qt Quick por seção
   ferramentas/        diagnóstico, entrega de fontes, builders e testes
 docs/                 mapa técnico e relatório da revisão
 .github/workflows/    testes automatizados Windows/Linux
-midia/fontes-capas/   artes-fonte de referência, não consumidas pelo runtime
+midia/fontes-capas/   opcional: placeholders gerados localmente
 dados/                coleção e estado local (ignorado)
 dist/                 entregas geradas (ignorado)
 ```
@@ -173,6 +214,7 @@ dist/                 entregas geradas (ignorado)
 
 ```powershell
 py -3.14 codigo/ferramentas/testes/executar.py
+py -3.14 -m pytest --cobertura
 py -3.14 codigo/ferramentas/testes/executar.py --modulo test_baixar
 py -3.14 codigo/ferramentas/testes/executar.py --caso test_player.py teste_player_transporte
 py -3.14 codigo/ferramentas/diagnosticar.py --json
@@ -181,6 +223,10 @@ py -3.14 codigo/ferramentas/diagnosticar.py --json
 Cada caso roda em subprocesso/sandbox próprio; escrita fora dela, rede e
 processos externos são bloqueados. Os pulos por SO/display/privilégio
 aparecem como `SKIP`. `--json arquivo.json` grava um relatório da suíte.
+Pytest usa o mesmo isolamento por processo; `--cobertura` mede os processos
+dos casos, não apenas o coletor. Relatórios HTML/JSON ficam em `.provas/cobertura/`.
+As provas nativas de Chromium/player usam conteúdo sintético, separado da
+coleção pessoal: `codigo/ferramentas/provar_qt_runtime.py`.
 
 ## Entrega ao engenheiro
 
@@ -188,7 +234,7 @@ aparecem como `SKIP`. `--json arquivo.json` grava um relatório da suíte.
 py -3.14 codigo/ferramentas/empacotar_fontes.py
 ```
 
-Gera **`dist/tucoteca-fontes-revisadas.zip`** com a árvore de trabalho atual,
+Gera **`dist/fontes/tucoteca-fontes-revisadas.zip`** com a árvore de trabalho atual,
 documentação, testes e manifesto SHA-256. Inclui módulos ainda não
 commitados; exclui coleção, caches, histórico local, atalhos e outros
 artefatos de build. O engenheiro pode extrair, seguir `CONTRIBUTING.md` e

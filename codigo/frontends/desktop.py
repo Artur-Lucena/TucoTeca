@@ -3,6 +3,13 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from pathlib import Path
+
+# Entry point instalável (console script) e execução via -m/direta: garante que
+# os módulos irmãos (app_qt/app_win) fiquem importáveis em qualquer cenário.
+_AQUI = Path(__file__).resolve().parent
+if str(_AQUI) not in sys.path:
+    sys.path.insert(0, str(_AQUI))
 
 
 def main(argv=None):

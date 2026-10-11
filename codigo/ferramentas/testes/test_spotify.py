@@ -2,7 +2,6 @@
 import base64
 import hashlib
 import io
-import json
 import tempfile
 import threading
 import time
@@ -211,10 +210,13 @@ def teste_pipeline_spotify_importa_no_hub_cancela_e_retoma_com_dedup():
         arq = core.BAIXAR_DIR / (str(did) + ".wav")
         arq.parent.mkdir(parents=True, exist_ok=True)
         with wave.open(str(arq), "wb") as w:
-            w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000)
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(8000)
             w.writeframes(bytes([did % 255, 0]) * 800)
         core.marcar_download(con, did, "baixado", video_id="teste", musica_path=str(arq))
-        if progresso: progresso(did, 100)
+        if progresso:
+            progresso(did, 100)
         parar.set()
         return {"ok": True}
 
@@ -245,7 +247,10 @@ def teste_conversao_atomica_falha_preserva_staging_e_retoma_sem_ytdlp():
         staging = core.BAIXAR_DIR / "audio.wav"
         staging.parent.mkdir(parents=True, exist_ok=True)
         with wave.open(str(staging), "wb") as w:
-            w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000); w.writeframes(b"\x00\x00" * 800)
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(8000)
+            w.writeframes(b"\x00\x00" * 800)
         core.marcar_download(con, did, "baixado", video_id="teste", musica_path=str(staging))
         def falhar(cmd, **_kwargs):
             Path(cmd[-1]).write_bytes(b"mp3-incompleto")

@@ -4,7 +4,8 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from bib_nucleo import atualizacao as upd, emuladores
+from bib_nucleo import atualizacao as upd
+from bib_nucleo import emuladores
 from executar import afirmar
 
 

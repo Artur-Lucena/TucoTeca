@@ -352,19 +352,19 @@ def higienizar_controles() -> dict:
         return {"ok": False, "erro": f"falha ao ler: {e}"}
     vistas, limpas, removidas = set(), [], 0
     secao = ""
-    for l in linhas:
-        if l.strip().startswith("[") and l.strip().endswith("]"):
-            secao = l.strip()[1:-1]
+    for linha in linhas:
+        if linha.strip().startswith("[") and linha.strip().endswith("]"):
+            secao = linha.strip()[1:-1]
             vistas.clear()
-        if secao != "Controls" or "=" not in l or l.lstrip().startswith(("#", ";")):
-            limpas.append(l)
+        if secao != "Controls" or "=" not in linha or linha.lstrip().startswith(("#", ";")):
+            limpas.append(linha)
             continue
-        k = l.split("=", 1)[0].strip()
+        k = linha.split("=", 1)[0].strip()
         if k.endswith("\\default\\default") or k in vistas:
             removidas += 1
             continue
         vistas.add(k)
-        limpas.append(l)
+        limpas.append(linha)
     if not removidas:
         return {"ok": True, "removidas": 0}
     try:
@@ -427,8 +427,8 @@ def aplicar_preset_controle(nome: str, perfil: int | None = None) -> dict:
             return {"ok": False, "erro": "preset sem binds de perfil."}
         linhas = cfg.read_text(encoding="utf-8").splitlines()
         try:
-            ini_sec = next(i for i, l in enumerate(linhas)
-                           if l.strip() == "[Controls]")
+            ini_sec = next(i for i, linha in enumerate(linhas)
+                           if linha.strip() == "[Controls]")
         except StopIteration:
             linhas.append("[Controls]")
             ini_sec = len(linhas) - 1
@@ -437,8 +437,8 @@ def aplicar_preset_controle(nome: str, perfil: int | None = None) -> dict:
                        len(linhas))
         alvos = {chave for chave, _ in pares}
         alvos |= {ch + "\\default" for ch, _ in pares}
-        corpo = [l for l in linhas[ini_sec + 1:fim_sec]
-                 if l.split("=", 1)[0] not in alvos]
+        corpo = [linha for linha in linhas[ini_sec + 1:fim_sec]
+                 if linha.split("=", 1)[0] not in alvos]
         novas = []
         for chave, valor in pares:
             novas.append(f"{chave}\\default=false")
@@ -448,10 +448,10 @@ def aplicar_preset_controle(nome: str, perfil: int | None = None) -> dict:
         # o Azahar REGENERA no game-boot todo perfil chamado "Default":
         # garante nome próprio p/ não perder os binds aplicados.
         nome_chave = f"profiles\\{ativo}\\name"
-        for i, l in enumerate(linhas):
-            if l.split("=", 1)[0] != nome_chave or "=" not in l:
+        for i, linha in enumerate(linhas):
+            if linha.split("=", 1)[0] != nome_chave or "=" not in linha:
                 continue
-            atual = l.split("=", 1)[1].strip().strip('"')
+            atual = linha.split("=", 1)[1].strip().strip('"')
             if atual in ("", "Default"):
                 linhas[i] = f'{nome_chave}="{slug}"'
                 if f"{nome_chave}\\default" not in {
@@ -463,11 +463,11 @@ def aplicar_preset_controle(nome: str, perfil: int | None = None) -> dict:
             linhas.insert(1, f"{nome_chave}\\default=false")
         # `profile\default=true` trava o perfil 0 p/ sempre (fonte: config.cpp
         # ReadSetting): sem ele com ativo>0, e `profile=<ativo>` garantido.
-        linhas = [l for l in linhas
-                 if l.split("=", 1)[0] != "profile\\default"]
+        linhas = [linha for linha in linhas
+                  if linha.split("=", 1)[0] != "profile\\default"]
         tem_profile = False
-        for i, l in enumerate(linhas):
-            if l.split("=", 1)[0] != "profile" or "=" not in l:
+        for i, linha in enumerate(linhas):
+            if linha.split("=", 1)[0] != "profile" or "=" not in linha:
                 continue
             tem_profile = True
             linhas[i] = f"profile={ativo - 1}"
@@ -475,11 +475,11 @@ def aplicar_preset_controle(nome: str, perfil: int | None = None) -> dict:
         if not tem_profile:
             linhas.insert(0, f"profile={ativo - 1}")
         # o Azahar ignora perfis além de profiles\size: garante cobertura
-        for i, l in enumerate(linhas):
-            if l.split("=", 1)[0] != "profiles\\size" or "=" not in l:
+        for i, linha in enumerate(linhas):
+            if linha.split("=", 1)[0] != "profiles\\size" or "=" not in linha:
                 continue
             try:
-                if int(l.split("=", 1)[1]) < ativo:
+                if int(linha.split("=", 1)[1]) < ativo:
                     linhas[i] = f"profiles\\size={ativo}"
             except ValueError:
                 linhas[i] = f"profiles\\size={ativo}"

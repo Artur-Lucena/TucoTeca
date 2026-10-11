@@ -17,7 +17,7 @@ import tempfile
 from pathlib import Path
 
 from bib_nucleo import online
-from bib_nucleo.processos import executar_com_progresso
+from bib_nucleo.processos import executar_com_progresso, opcoes_sem_janela
 
 VIDEO_ID_RE = re.compile(r"[A-Za-z0-9_-]{11}")
 _YT_HOSTS = ("www.youtube.com", "youtube.com", "youtu.be", "m.youtube.com")
@@ -32,7 +32,7 @@ def identificar_youtube(texto: str):
         import urllib.parse
         p = urllib.parse.urlsplit(texto)
         if (p.scheme != "https" or (p.hostname or "").lower() not in _YT_HOSTS
-                or p.username or p.password):
+                or p.username or p.password or p.port not in (None, 443)):
             return None
         if (p.hostname or "").lower() == "youtu.be":
             cand = p.path.strip("/").split("/")[0] if p.path.strip("/") else ""
@@ -82,6 +82,8 @@ def buscar_youtube(termo: str, limite: int = 10, atualizar: bool = False) -> dic
     cache = online.ler_json(alvo)
     if isinstance(cache, dict) and cache.get("itens") and not atualizar:
         return {"itens": cache["itens"], "erros": [], "cache": True}
+    from bib_nucleo.rede import exigir_rede
+    exigir_rede("Pesquisar no YouTube")
     binario = _ytdlp()
     if not binario:
         if isinstance(cache, dict) and cache.get("itens"):
@@ -94,7 +96,8 @@ def buscar_youtube(termo: str, limite: int = 10, atualizar: bool = False) -> dic
            *_args_js()]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
-                           errors="replace", timeout=120)
+                           errors="replace", timeout=120, stdin=subprocess.DEVNULL,
+                           **opcoes_sem_janela())
     except (OSError, subprocess.SubprocessError) as e:
         if isinstance(cache, dict) and cache.get("itens"):
             return {"itens": cache["itens"], "erros": [f"busca falhou: {e}"], "cache": True}
@@ -130,6 +133,8 @@ def buscar_youtube(termo: str, limite: int = 10, atualizar: bool = False) -> dic
 
 def info_video_youtube(video_id: str) -> dict:
     """Metadados de 1 vídeo (`yt-dlp --dump-json`). Levanta ValueError."""
+    from bib_nucleo.rede import exigir_rede
+    exigir_rede("Consultar vídeo no YouTube")
     video_id = identificar_youtube(video_id) or ""
     if not video_id:
         raise ValueError("Link ou ID do YouTube inválido.")
@@ -142,7 +147,8 @@ def info_video_youtube(video_id: str) -> dict:
            *_args_js()]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
-                           errors="replace", timeout=120)
+                           errors="replace", timeout=120, stdin=subprocess.DEVNULL,
+                           **opcoes_sem_janela())
     except (OSError, subprocess.SubprocessError) as e:
         raise ValueError(f"info falhou: {e}") from None
     if r.returncode != 0:
@@ -195,7 +201,12 @@ def baixar_video_youtube(con, video_id: str, progresso=None) -> dict:
         caminho = resolver_video(existente["video_path"])
         if caminho:
             return {"ok": True, "video_id": vid, "path": caminho,
-                    "titulo": existente["titulo"], "sha": existente["video_sha"], "cache": True}
+                     "titulo": existente["titulo"], "sha": existente["video_sha"], "cache": True}
+    from bib_nucleo.rede import exigir_rede
+    try:
+        exigir_rede("Baixar vídeo do YouTube")
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
     binario = _ytdlp()
     if not binario:
         return {"ok": False, "erro": erro_sem_ytdlp_video()}
@@ -261,5 +272,58 @@ def baixar_video_youtube(con, video_id: str, progresso=None) -> dict:
             "titulo": meta["titulo"], "sha": sha}
 
 
+def baixar_audio_youtube(con, video, progresso=None):
+    """MP3 por URL/ID validado; sem busca aproximada nem configuração externa do yt-dlp."""
+    from bib_nucleo.arquivos import destino_temporario
+    from bib_nucleo.baixar import localizar_ffmpeg
+    from bib_nucleo.banco import criar_musica
+    from bib_nucleo.base import MUSICAS_DIR
+    from bib_nucleo.ferramentas import comando_externo
+    from bib_nucleo.musicas import sha_arquivo
+    from bib_nucleo.rede import exigir_rede
+    vid = identificar_youtube(video)
+    if not vid:
+        return {"ok": False, "erro": "Link/ID do YouTube inválido."}
+    try:
+        exigir_rede("Baixar MP3 do YouTube")
+        binario, ffmpeg = _ytdlp(), localizar_ffmpeg()
+        if not binario or not ffmpeg:
+            raise ValueError("MP3 exige yt-dlp e FFmpeg. Instale as dependências de áudio.")
+        meta = info_video_youtube(vid)
+        MUSICAS_DIR.mkdir(parents=True, exist_ok=True)
+        destino = MUSICAS_DIR / (vid + ".mp3")
+        n = 1
+        while destino.exists():
+            n += 1
+            destino = MUSICAS_DIR / f"{vid}-{n}.mp3"
+        with tempfile.TemporaryDirectory(prefix=".youtube-audio-", dir=MUSICAS_DIR) as tmp, \
+             destino_temporario(destino) as parcial:
+            stage = Path(tmp)
+            cmd = [*comando_externo(binario), f"https://www.youtube.com/watch?v={vid}",
+                   "--ignore-config", "--no-playlist", "--socket-timeout", "20", "--quiet",
+                   "--newline", "--progress", "-f", "bestaudio/best", "--extract-audio",
+                   "--audio-format", "mp3", "--audio-quality", "2", "--ffmpeg-location", ffmpeg,
+                   "-o", str(stage / "%(id)s.%(ext)s"), *_args_js()]
+            def receber(linha):
+                m = re.search(r"\[download\]\s+(\d+(?:\.\d+)?)%", linha or "")
+                if m and progresso:
+                    progresso(vid, float(m.group(1)))
+            rc = executar_com_progresso(cmd, receber, timeout=1800)
+            mp3 = stage / (vid + ".mp3")
+            if rc or not mp3.is_file() or not mp3.stat().st_size:
+                raise ValueError("Download/conversão MP3 não concluído.")
+            mp3.replace(parcial)
+        sha = sha_arquivo(destino)
+        try:
+            criar_musica(con, {"titulo": meta["titulo"], "artista": meta["canal"],
+                         "musica_path": str(destino), "musica_sha": sha, "origem": "youtube"})
+        except Exception:
+            destino.unlink(missing_ok=True)
+            raise
+        return {"ok": True, "path": str(destino), "titulo": meta["titulo"], "sha": sha}
+    except (OSError, ValueError, sqlite3.Error, subprocess.SubprocessError) as e:
+        return {"ok": False, "erro": str(e)}
+
+
 __all__ = ["VIDEO_ID_RE", "identificar_youtube", "erro_sem_ytdlp_video",
-           "buscar_youtube", "info_video_youtube", "baixar_video_youtube"]
+           "buscar_youtube", "info_video_youtube", "baixar_video_youtube", "baixar_audio_youtube"]

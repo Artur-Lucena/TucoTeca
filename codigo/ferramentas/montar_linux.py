@@ -25,9 +25,15 @@ from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI))
-from montar_portatil import (AZAHAR_URL,
-                              AZAHAR_USER_INCLUIR, REPO, DIST, garantir_gpl,
-                              copiar_app, podar_dieta)
+from montar_portatil import (
+    AZAHAR_URL,
+    AZAHAR_USER_INCLUIR,
+    DIST,
+    REPO,
+    copiar_app,
+    garantir_gpl,
+    podar_dieta,
+)
 
 LIN_BUILD = AQUI / ".build" / "lin"
 

@@ -3,12 +3,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import bib_core as core
 from bib_nucleo import musica_online as MO
 from bib_nucleo import online
 from executar import afirmar
 from servicos_ui import ServicoBiblioteca
-
 
 DEEZER = {"data": [{"id": 1, "title": "Faixa", "duration": 200,
                     "link": "https://www.deezer.com/track/1",

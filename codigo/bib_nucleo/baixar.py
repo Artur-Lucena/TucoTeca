@@ -9,6 +9,7 @@ Fase C (depois): mp3/ffmpeg + import p/ `musicas/`.
 from __future__ import annotations
 
 import csv
+import hashlib
 import os
 import re
 import shutil
@@ -120,16 +121,19 @@ def consulta_busca(artista: str, titulo: str) -> str:
 
 def casar_video(ytdlp: str, artista: str, titulo: str) -> dict:
     """1º resultado da busca (automático, tal qual o Harmoni). Levanta ValueError."""
+    from bib_nucleo.rede import exigir_rede
+    exigir_rede("Buscar áudio no YouTube")
     q = consulta_busca(artista, titulo)
     if not q:
         raise ValueError("faixa sem título")
     from bib_nucleo.ferramentas import comando_externo
+    from bib_nucleo.processos import opcoes_sem_janela
     try:
         r = subprocess.run(
-            [*comando_externo(ytdlp), q, "--print", "%(id)s\t%(title)s", "--no-playlist",
+            [*comando_externo(ytdlp), q, "--print", "%(id)s\t%(title)s", "--ignore-config", "--no-playlist",
              "--quiet", "--socket-timeout", "20", *_args_js()],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=120)
+            timeout=120, stdin=subprocess.DEVNULL, **opcoes_sem_janela())
     except (OSError, subprocess.SubprocessError) as e:
         raise ValueError(f"busca falhou: {e}")
     if r.returncode != 0:
@@ -180,7 +184,7 @@ def baixar_faixa(con, did: int, ytdlp: str = "", destino=None,
         return {"ok": False, "erro": f"staging: {e}"}
     from bib_nucleo.ferramentas import comando_externo
     cmd = [*comando_externo(binario), f"https://www.youtube.com/watch?v={casa['video_id']}",
-           "-o", str(base / "%(id)s.%(ext)s"), "--no-playlist", "--quiet",
+           "-o", str(base / "%(id)s.%(ext)s"), "--ignore-config", "--no-playlist", "--quiet",
            "--progress", "--newline", "--socket-timeout", "20",
            "-f", "bestaudio/best", *_args_js()]
     diagnostico = []
@@ -192,10 +196,12 @@ def baixar_faixa(con, did: int, ytdlp: str = "", destino=None,
         if m and progresso:
             progresso(did, float(m.group(1)))
     try:
+        from bib_nucleo.rede import exigir_rede
+        exigir_rede("Baixar áudio do YouTube")
         from bib_nucleo.processos import executar_com_progresso
         # Prazo total: cobre também yt-dlp sem produzir stdout (antes bloqueava).
         rc = executar_com_progresso(cmd, linha_recebida, timeout=1800)
-    except (OSError, subprocess.SubprocessError) as e:
+    except (OSError, subprocess.SubprocessError, ValueError) as e:
         B.marcar_download(con, did, "falha", video_id=casa["video_id"],
                           erro=f"download: {e}")
         return {"ok": False, "erro": f"download: {e}"}
@@ -228,10 +234,10 @@ def baixar_faixa(con, did: int, ytdlp: str = "", destino=None,
 # Dependências de áudio: o Hub baixa ffmpeg/yt-dlp sozinho (molde 7z)
 # --------------------------------------------------------------------------
 
-FFMPEG_URL = ("https://www.gyan.dev/ffmpeg/builds/"
-              "ffmpeg-release-essentials.zip")
-YTDLP_URL = ("https://github.com/yt-dlp/yt-dlp/releases/latest/download/"
-             "yt-dlp.exe")
+FFMPEG_URL = "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.2-essentials_build.zip"
+FFMPEG_SHA256 = "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba"
+YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe"
+YTDLP_SHA256 = "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a"
 FFMPEG_ZIP_MIN = 40_000_000
 YTDLP_EXE_MIN = 10_000_000
 
@@ -278,36 +284,7 @@ def _bin_pronto(cand: str) -> bool:
     return Path(cand).stat().st_size > 1_000_000
 
 
-def _baixar_bin(url: str, minimo: int, progresso=None,
-                timeout: int = 60) -> bytes:
-    """Baixa binário oficial p/ memória (com teto anti-estouro)."""
-    import urllib.request
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        total = int(r.headers.get("Content-Length") or 0)
-        if total and total > 500_000_000:
-            raise ValueError("download grande demais (aborto)")
-        blocos: list[bytes] = []
-        feito = 0
-        while True:
-            parte = r.read(256 * 1024)
-            if not parte:
-                break
-            blocos.append(parte)
-            feito += len(parte)
-            if feito > 500_000_000:
-                raise ValueError("download grande demais (aborto)")
-            if progresso:
-                try:
-                    progresso(feito, total)
-                except Exception:
-                    pass
-    raw = b"".join(blocos)
-    if total and feito != total:
-        raise ValueError(f"download incompleto ({feito}/{total} B)")
-    if len(raw) < minimo:
-        raise ValueError(f"download curto ({len(raw)} B, esperado >{minimo})")
-    return raw
+from bib_nucleo.rede.binarios import _baixar_bin
 
 
 def instalar_ffmpeg(destino=None, progresso=None) -> dict:
@@ -323,6 +300,8 @@ def instalar_ffmpeg(destino=None, progresso=None) -> dict:
         return {"ok": False, "erro": f"pasta ferramentas: {e}"}
     try:
         raw = _baixar_bin(FFMPEG_URL, FFMPEG_ZIP_MIN, progresso=progresso)
+        if hashlib.sha256(raw).hexdigest() != FFMPEG_SHA256:
+            raise ValueError("SHA-256 do FFmpeg divergente; instalação anterior preservada")
     except Exception as e:
         return {"ok": False, "erro": f"download: {e}"}
     import io
@@ -360,6 +339,8 @@ def instalar_ytdlp(destino=None, progresso=None) -> dict:
         return {"ok": False, "erro": f"pasta ferramentas: {e}"}
     try:
         exe = _baixar_bin(YTDLP_URL, YTDLP_EXE_MIN, progresso=progresso)
+        if hashlib.sha256(exe).hexdigest() != YTDLP_SHA256:
+            raise ValueError("SHA-256 do yt-dlp divergente; instalação anterior preservada")
     except Exception as e:
         return {"ok": False, "erro": f"download: {e}"}
     if exe[:2] != b"MZ":
@@ -433,8 +414,10 @@ def converter_faixa(con, did: int, ffmpeg: str = "",
         try:
             with destino_temporario(dest) as tmp:
                 cmd[-1] = str(tmp)
+                from bib_nucleo.processos import opcoes_sem_janela
                 r = subprocess.run(cmd, capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace", timeout=900)
+                                   encoding="utf-8", errors="replace", timeout=900,
+                                   stdin=subprocess.DEVNULL, **opcoes_sem_janela())
                 if r.returncode != 0 or not tmp.is_file() or tmp.stat().st_size == 0:
                     detalhe = (r.stderr or "").strip().splitlines()
                     raise ValueError(detalhe[-1][:200] if detalhe else f"ffmpeg rc={r.returncode}")

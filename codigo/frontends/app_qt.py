@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import bib_core as core
 from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
-from shiboken6 import delete
-
-import bib_core as core
 from qt_bridge import HubBridge
+from shiboken6 import delete
 
 
 def criar_engine(bridge):
@@ -34,6 +34,13 @@ def main(argv=None):
     parser.add_argument("--screenshot", help="Captura local da janela no selftest")
     args = parser.parse_args(argv)
     QQuickStyle.setStyle("Basic")
+    # Chromium precisa ser inicializado antes de criar QGuiApplication.
+    if os.environ.get("BIBLIOTECA_WEBENGINE", "1") != "0":
+        try:
+            from PySide6.QtWebEngineQuick import QtWebEngineQuick
+            QtWebEngineQuick.initialize()
+        except ImportError:
+            pass  # variante essencial
     app = QGuiApplication.instance() or QGuiApplication([sys.argv[0]])
     app.setApplicationName("TucoTeca")
     app.setOrganizationName("TucoTeca")

@@ -1,15 +1,26 @@
 """View-model Qt: sinais, modelos e tarefas; QML não acessa banco ou processos."""
 from __future__ import annotations
 
+import importlib.util
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, Property,
-                            QRunnable, Qt, QThreadPool, QTimer, QUrl, Signal, Slot)
-from PySide6.QtGui import QDesktopServices
-
 import bib_core as core
 from bib_nucleo import online, spotify
+from PySide6.QtCore import (
+    Property,
+    QAbstractListModel,
+    QModelIndex,
+    QObject,
+    QRunnable,
+    Qt,
+    QThreadPool,
+    QTimer,
+    QUrl,
+    Signal,
+    Slot,
+)
+from PySide6.QtGui import QDesktopServices
 from servicos_ui import ServicoBiblioteca
 
 
@@ -64,6 +75,13 @@ class HubBridge(QObject):
     downloadMusicaMudou = Signal()
     midiasMudou = Signal()
     videoMudou = Signal()
+    diagnosticoPronto = Signal(str)
+    letrasMudou = Signal()
+    fontesMudou = Signal()
+    ferramentasMudou = Signal()
+    preferenciasMudou = Signal()
+    videoLocalPronto = Signal(object)
+    sponsorMudou = Signal()
     _progressoVideo = Signal(object)
     _progressoMusica = Signal(object)
     aviso = Signal(str, bool)
@@ -85,6 +103,10 @@ class HubBridge(QObject):
         self._videos_geracao = 0
         self._videos_mensagem = "Busque um vídeo/canal ou importe arquivos locais."
         self._video_progresso = {"rotulo": "", "pct": 0}
+        self._letras = {"ok": False, "sincronizadas": False, "linhas": [], "texto": "", "erro": ""}
+        self._letras_geracao = self._fontes_geracao = 0
+        self._letras_faixa = ("", "")
+        self._fontes_desejo = {"steamrip": [], "fitgirl": [], "erros": []}
         self._midias_status = {"imagens": {}, "equalizadores": {}, "videos": {}, "eq_presets": []}
         self._progressoVideo.connect(self._mostrar_progresso_video, Qt.QueuedConnection)
         self._musica_online_selecao = set()
@@ -107,6 +129,7 @@ class HubBridge(QObject):
         self._progressoMusica.connect(self._mostrar_progresso_musica, Qt.QueuedConnection)
         self._secao, self._busca, self._filtro, self._ordem = "inicio", "", "todos", "titulo"
         self._dados = {"jogos": [], "musicas": [], "desejos": [], "downloads": [], "videos": []}
+        self._pacotes_piratas = []
         self._sistema = {"jogos": 0, "musicas": 0, "desejos": 0, "downloads": 0,
                          "pendentes": 0, "backup": "…", "disco_livre_gb": 0,
                          "backup_idade_dias": None, "backup_estado": "carregando",
@@ -117,6 +140,20 @@ class HubBridge(QObject):
         self._modo_audio = "sequencia"
         self._selecionado = {}
         self._tarefas, self._numero = {}, 0
+        self._aparencia = self.servico.aparencia()
+        from bib_nucleo.preferencias_pessoais import ler_preferencias
+        self._preferencias = ler_preferencias()
+        perfil = self._preferencias["perfis"][self._preferencias["ativo"]]
+        self._filtro = perfil.get("filtro", "todos")
+        self._ordem = perfil.get("ordem", "titulo")
+        self._ferramentas = {"saves": [], "snapshots": [], "screenshots": [], "pasta_screenshots": ""}
+        self._ferramentas_gid = 0
+        self._estatisticas = {"ano": 2026, "meses": [0] * 12, "total_horas": 0, "jogos": []}
+        self._watch_prontos = []
+        self._api = None
+        self._api_estado = {"ativa": False, "url": "", "token": ""}
+        self._sponsor = {"video": "", "segmentos": []}
+        self._vigia = None
         self._geracao = 0
         self._catalogo_geracao = 0
         self._fechado = False
@@ -154,6 +191,14 @@ class HubBridge(QObject):
         self._timer_spotify.setInterval(500)
         self._timer_spotify.timeout.connect(self._callback_spotify)
         self._timer_spotify.start()
+        self._timer_watch = QTimer(self)
+        self._timer_watch.setInterval(15000)
+        self._timer_watch.timeout.connect(self._consultar_watch)
+        self._timer_watch.start()
+        self._timer_screenshots = QTimer(self)
+        self._timer_screenshots.setInterval(5000)
+        self._timer_screenshots.timeout.connect(self._atualizar_screenshots)
+        self._timer_screenshots.start()
 
     @Property(QObject, constant=True)
     def capasResultados(self):
@@ -220,6 +265,10 @@ class HubBridge(QObject):
         caminho = url.toLocalFile()
         if caminho:
             self._alterar("Importando videoteca…", lambda: self.servico.importar_videos(caminho))
+
+    @Slot(QUrl, result=str)
+    def caminhoLocal(self, url):
+        return url.toLocalFile()
 
     @Slot(int, str)
     def reproduzirVideo(self, ident, reprodutor="auto"):
@@ -655,12 +704,485 @@ class HubBridge(QObject):
     def volume(self):
         return self._volume
 
+    @Property("QVariantMap", notify=mudou)
+    def aparencia(self):
+        return self._aparencia
+
+    @Property("QVariantMap", notify=preferenciasMudou)
+    def preferencias(self):
+        return self._preferencias
+
+    @Property("QVariantMap", notify=ferramentasMudou)
+    def ferramentasJogo(self):
+        return self._ferramentas
+
+    @Property("QVariantMap", notify=ferramentasMudou)
+    def estatisticasAno(self):
+        return self._estatisticas
+
+    @Property("QVariantMap", notify=preferenciasMudou)
+    def apiLocal(self):
+        return self._api_estado
+
+    @Property("QVariantList", notify=ferramentasMudou)
+    def watchProntos(self):
+        return self._watch_prontos
+
+    @Property(bool, constant=True)
+    def multimediaDisponivel(self):
+        try:
+            return importlib.util.find_spec("PySide6.QtMultimedia") is not None
+        except (ImportError, ValueError):
+            return False
+
+    @Slot(str)
+    def trocarPerfil(self, nome):
+        from bib_nucleo.preferencias_pessoais import trocar_perfil
+        if self.ocupado or self._em_jogo:
+            self.aviso.emit("Aguarde a operação/sessão para trocar de perfil.", False)
+            return
+        self._preferencias = trocar_perfil(nome)
+        perfil = self._preferencias["perfis"][nome]
+        self._filtro = perfil.get("filtro", "todos")
+        self._ordem = perfil.get("ordem", "titulo")
+        self.preferenciasMudou.emit()
+        self.consultarEstatisticas()
+        self.atualizar()
+
+    @Slot()
+    def salvarFiltroPerfil(self):
+        from bib_nucleo.preferencias_pessoais import salvar_filtro
+        self._preferencias = salvar_filtro(self._filtro, self._ordem)
+        self.preferenciasMudou.emit()
+
+    @Slot(str, str)
+    def salvarAtalho(self, acao, sequencia):
+        from bib_nucleo.preferencias_pessoais import salvar_atalhos
+        try:
+            self._preferencias = salvar_atalhos({**self._preferencias["atalhos"], acao: sequencia})
+            self.preferenciasMudou.emit()
+        except ValueError as e:
+            self.aviso.emit(str(e), True)
+
+    @Slot(int)
+    def consultarFerramentasJogo(self, gid):
+        self._ferramentas_gid = gid
+        if not gid:
+            return
+        def pronto(r):
+            if gid == self._ferramentas_gid:
+                self._ferramentas = r
+                self.ferramentasMudou.emit()
+        self.executar("Lendo ferramentas do jogo…", lambda: self.servico.ferramentas_jogo(gid), pronto)
+
+    def _atualizar_screenshots(self):
+        if not self._fechado and self._ferramentas_gid and not self.ocupado:
+            self.consultarFerramentasJogo(self._ferramentas_gid)
+
+    @Slot(int, str)
+    def configurarSaves(self, gid, texto):
+        self._alterar("Configurando saves…", lambda: self.servico.configurar_saves(
+            gid, [p.strip() for p in texto.splitlines() if p.strip()]))
+
+    @Slot(int)
+    def snapshotSaves(self, gid):
+        self._alterar("Guardando snapshot dos saves…", lambda: self.servico.backup_pos_sessao(gid),
+                      lambda r: self.consultarFerramentasJogo(gid))
+
+    @Slot(int, str)
+    def restaurarSaves(self, gid, caminho):
+        if self._em_jogo:
+            self.aviso.emit("Encerre o jogo antes de restaurar seus saves.", True)
+            return
+        self._alterar("Guardando atuais e restaurando saves…", lambda: self.servico.restaurar_saves(gid, caminho),
+                      lambda r: self.consultarFerramentasJogo(gid))
+
+    @Slot(int)
+    def medirDiscoJogo(self, gid):
+        self.executar("Medindo pasta do jogo…", lambda: self.servico.disco_jogo(gid),
+                      lambda r: self.aviso.emit(f'{r["bytes"] / 1024 ** 3:.2f} GB · {r["arquivos"]} arquivos'
+                          + (" (parcial)" if r["parcial"] else ""), False))
+
+    @Slot(QUrl, bool)
+    def importarColecao(self, url, restaurar_saves=False):
+        self._alterar("Importando pacote de coleção…", lambda: self.servico.importar_colecao(
+            url.toLocalFile(), restaurar_saves))
+
+    @Slot(QUrl)
+    def importarJogos(self, url):
+        self._alterar("Procurando jogos locais…", lambda: self.servico.importar_jogos(url.toLocalFile()))
+
+    @Slot(QUrl)
+    def importarRepack(self, url):
+        self._alterar("Importando pacote de jogo…", lambda: self.servico.importar_repack_local(url.toLocalFile()))
+
+    @Property("QVariantList", notify=mudou)
+    def pacotesPiratas(self):
+        return self._pacotes_piratas
+
+    @Slot()
+    def atualizarPacotes(self):
+        self.executar("Lendo pacotes em Piratas…", self.servico.pacotes_piratas,
+                      self._pacotes_prontos)
+
+    def _pacotes_prontos(self, itens):
+        self._pacotes_piratas = list(itens or [])
+        self.mudou.emit()
+
+    @Slot(result=bool)
+    def tem7z(self):
+        return core.ferramenta_7z() is not None
+
+    @Slot(str)
+    def prepararPacote(self, arquivo):
+        self.executar("Extraindo pacote…", lambda: self.servico.preparar_pacote(arquivo),
+                      self._pacote_preparado)
+
+    def _pacote_preparado(self, r):
+        avisar = r.get("estado") == "sem_exe"
+        if r.get("estado") == "pronta":
+            msg = "Pacote extraído e com executável pronto. Importe para a coleção."
+        elif r.get("estado") == "instalar":
+            msg = "Pacote extraído: só há instalador. Abra o instalador e depois importe."
+        else:
+            msg = "Pacote extraído, mas nenhum executável foi encontrado."
+        self.aviso.emit(msg, avisar)
+        self._recarregar_pacotes()
+
+    @Slot(str)
+    def abrirInstaladorPacote(self, exe):
+        def pronto(_r):
+            self.aviso.emit("Instalador aberto. Conclua a instalação e importe o jogo.", False)
+        self.executar("Abrir instalador…", lambda: self.servico.abrir_instalador_pacote(exe), pronto)
+
+    @Slot(str, str)
+    def importarPacote(self, pasta, exe):
+        def pronto(r):
+            avisos = "; ".join(r.get("avisos") or [])
+            self.aviso.emit(f"'{r.get('titulo', 'Jogo')}' entrou na coleção. {avisos}".strip(), False)
+            self.atualizar()
+            self._recarregar_pacotes()
+        self.executar("Importando pacote…",
+                      lambda: self.servico.importar_pacote(pasta, exe), pronto)
+
+    def _recarregar_pacotes(self):
+        self.executar("Atualizando pacotes…", self.servico.pacotes_piratas,
+                      self._pacotes_prontos)
+
+    @Slot(str, str, str)
+    def aplicarPatchRom(self, rom, patch, destino):
+        from bib_nucleo.patches_rom import aplicar_patch
+        self._alterar("Aplicando patch em uma nova ROM…", lambda: aplicar_patch(rom, patch, destino))
+
+    @Slot(str, str, bool)
+    def copiarJogo(self, origem, destino, hardlinks=False):
+        from bib_nucleo.organizacao_local import copiar_ou_ligar
+        self._alterar("Organizando cópia do jogo…", lambda: copiar_ou_ligar(origem, destino, hardlinks))
+
+    @Slot()
+    def consultarEstatisticas(self):
+        def pronto(r):
+            self._estatisticas = r
+            self.ferramentasMudou.emit()
+        self.executar("Lendo histórico local…", self.servico.estatisticas, pronto)
+
+    @Slot(bool)
+    def definirApiLocal(self, ativa):
+        if self.ocupado:
+            self.aviso.emit("Aguarde a operação atual para alterar a API local.", False)
+            return
+        from bib_nucleo.api_local import ApiLocal
+        def trabalho():
+            if self._api:
+                self._api.fechar()
+                self._api = None
+            if ativa:
+                self._api = ApiLocal(self.servico)
+                return self._api.iniciar()
+            return {"ativa": False, "url": "", "token": ""}
+        def pronto(r):
+            self._api_estado = r
+            self.preferenciasMudou.emit()
+        self.executar("Alterando API local…", trabalho, pronto)
+
+    @Slot(str, bool)
+    def configurarWatch(self, pasta, automatico):
+        from bib_nucleo.preferencias_pessoais import atualizar
+        if self.ocupado or self._em_jogo:
+            self.aviso.emit("Aguarde a operação/sessão para mudar a pasta vigiada.", False)
+            return
+        if pasta and not Path(pasta).is_dir():
+            self.aviso.emit("Pasta vigiada não encontrada.", True)
+            return
+        self._preferencias = atualizar(watch=pasta, watch_auto=automatico)
+        self._vigia = None
+        self.preferenciasMudou.emit()
+
+    def _consultar_watch(self):
+        import os
+
+        from bib_nucleo.pastas_vigiadas import VigiaPasta
+        if self._fechado or self.ocupado or self._em_jogo:
+            return
+        pasta = os.environ.get("BIBLIOTECA_WATCH", "") or self._preferencias["watch"]
+        if not pasta:
+            return
+        if self._vigia is None or str(self._vigia.pasta) != pasta:
+            self._vigia = VigiaPasta(pasta)
+        def trabalho():
+            prontos = self._vigia.consultar()
+            if self._preferencias["watch_auto"]:
+                for item in prontos:
+                    item["resultado"] = self.servico.importar_repack_local(item["path"])
+            return prontos
+        def pronto(itens):
+            if itens:
+                self._watch_prontos.extend(itens)
+                self._watch_prontos = self._watch_prontos[-100:]
+                self.ferramentasMudou.emit()
+                self.aviso.emit(f"Pasta vigiada: {len(itens)} pacote(s) detectado(s). Veja em Ferramentas pessoais.", False)
+                if self._preferencias["watch_auto"]:
+                    self.atualizar()
+        self.executar("Verificando pasta vigiada…", trabalho, pronto)
+
+    @Slot(str)
+    def baixarMp3Url(self, url):
+        def trabalho():
+            try:
+                return self.servico.baixar_mp3(url, lambda vid, pct: self._progressoVideo.emit(
+                    {"rotulo": vid + " · MP3", "pct": pct}))
+            finally:
+                self._progressoVideo.emit({"rotulo": "", "pct": 0})
+        self._alterar("Baixando MP3 para a coleção…", trabalho)
+
+    @Slot(int)
+    def prepararVideoInterno(self, ident):
+        self.executar("Abrindo vídeo interno…", lambda: self.servico.video_local(ident), self.videoLocalPronto.emit)
+
+    @Slot(str, int)
+    def guardarVideoPosicao(self, sha, posicao):
+        self.executar("Guardando posição do vídeo…", lambda: self.servico.salvar_posicao_video(sha, posicao))
+
+    @Slot(bool)
+    def definirSponsorBlock(self, ativa):
+        from bib_nucleo.preferencias_pessoais import atualizar
+        self._preferencias = atualizar(sponsorblock=ativa)
+        self._sponsor = {"video": "", "segmentos": []}
+        self.sponsorMudou.emit()
+        self.preferenciasMudou.emit()
+
+    @Property("QVariantMap", notify=sponsorMudou)
+    def sponsor(self):
+        return self._sponsor
+
+    @Slot(str)
+    def consultarSponsor(self, url):
+        from bib_nucleo.rede.sponsorblock import buscar_segmentos
+        from bib_nucleo.rede.videos_youtube import identificar_youtube
+        vid = identificar_youtube(url)
+        if not vid or not self._preferencias["sponsorblock"] or vid == self._sponsor["video"]:
+            return
+        self._sponsor = {"video": vid, "segmentos": []}
+        def pronto(r):
+            if self._sponsor["video"] == vid and self._preferencias["sponsorblock"]:
+                self._sponsor = {"video": vid, "segmentos": r}
+                self.sponsorMudou.emit()
+        self.executar("Consultando patrocínios…", lambda: buscar_segmentos(vid), pronto,
+                      lambda erro: self.aviso.emit("SponsorBlock indisponível; vídeo não será interrompido. " + erro, False))
+
+    @Slot()
+    def atualizarAudio(self):
+        self._alterar("Atualizando ferramentas com SHA-256 fixado…", self.servico.atualizar_audio)
+
+    @Property(bool, constant=True)
+    def webDisponivel(self):
+        """QtWebEngine instalado? (variante completa do bundle)."""
+        import os
+
+        from bib_nucleo.rede import rede_ativa
+        if os.environ.get("BIBLIOTECA_WEBENGINE", "1") == "0" or not rede_ativa():
+            return False
+        try:
+            return importlib.util.find_spec("PySide6.QtWebEngineQuick") is not None
+        except Exception:
+            return False
+
+    @Slot(str, result=str)
+    def youtubeBuscar(self, termo):
+        """Valida e devolve a URL de resultados do YouTube (o QML navega)."""
+        import urllib.parse
+        termo = (termo or "").strip()
+        if len(termo) < 2:
+            self.aviso.emit("Digite ao menos 2 caracteres para buscar.", False)
+            return ""
+        return "https://www.youtube.com/results?search_query=" + urllib.parse.quote(termo)
+
+    @Slot(str, str, result=str)
+    def youtubeIr(self, url, termo=""):
+        """Normaliza/valida destino antes de navegar (só https/hosts YouTube)."""
+        import urllib.parse
+        texto = (url or "").strip()
+        if not texto and termo:
+            return self.youtubeBuscar(termo)
+        try:
+            alvo = urllib.parse.urlsplit(texto if "://" in texto else "https://" + texto)
+            valido = (alvo.scheme == "https" and (alvo.hostname or "").lower() in (
+                "www.youtube.com", "youtube.com", "m.youtube.com", "youtu.be")
+                and not alvo.username and not alvo.password and alvo.port in (None, 443))
+        except ValueError:
+            valido = False
+        if not valido:
+            self.aviso.emit("Só é possível navegar em endereços do YouTube.", False)
+            return ""
+        return alvo.geturl()
+
+    @Slot(str)
+    def youtubeBaixarUrl(self, url):
+        """Baixa o vídeo da URL informada (valida no Python, nunca confia no JS)."""
+        from bib_nucleo.rede.videos_youtube import identificar_youtube
+        vid = identificar_youtube(url or "")
+        if not vid:
+            self.aviso.emit("Link do YouTube inválido.", False)
+            return
+        self.baixarVideo(vid)
+
+    @Slot(str, str, bool, bool)
+    def definirAparencia(self, tema, densidade, auto_backup=True, modo_simples=False):
+        def pronto(r):
+            self._aparencia = r
+            self.mudou.emit()
+        self.executar("Salvando aparência…",
+                      lambda: self.servico.definir_aparencia(tema, densidade, auto_backup, modo_simples),
+                      pronto)
+
+    @Property("QVariantMap", notify=letrasMudou)
+    def letras(self):
+        return self._letras
+
+    @Property(int, notify=playerMudou)
+    def letraIndice(self):
+        if self._letras_faixa != (self._tocando.get("artista"), self._tocando.get("titulo")):
+            return -1
+        segundos = self.audio["posicao"] / 1000
+        linhas = self._letras.get("linhas", [])
+        return next((i for i in range(len(linhas) - 1, -1, -1)
+                     if linhas[i]["t"] <= segundos), -1)
+
+    @Property("QVariantMap", notify=fontesMudou)
+    def fontesDesejo(self):
+        return self._fontes_desejo
+
+    @Slot(str, str, str, int)
+    def buscarLetras(self, artista, titulo, album, duracao_s):
+        self._letras_geracao += 1
+        geracao = self._letras_geracao
+        self._letras_faixa = (artista, titulo)
+        self._letras = {"ok": False, "sincronizadas": False, "linhas": [], "texto": "",
+                        "erro": "Buscando letra…"}
+        self.letrasMudou.emit()
+
+        def pronto(r):
+            if geracao != self._letras_geracao:
+                return
+            self._letras = r
+            self.letrasMudou.emit()
+
+        def falha(erro):
+            if geracao != self._letras_geracao:
+                return
+            self._letras = {"ok": False, "sincronizadas": False, "linhas": [], "texto": "",
+                            "erro": erro}
+            self.letrasMudou.emit()
+        self.executar("Buscando letra…",
+                      lambda: self.servico.buscar_letras(artista, titulo, album, duracao_s),
+                      pronto, falha)
+
+    @Slot(str)
+    def buscarFontesDesejo(self, titulo):
+        self._fontes_geracao += 1
+        geracao = self._fontes_geracao
+        self._fontes_desejo = {"steamrip": [], "fitgirl": [], "erros": ["Buscando nas fontes…"]}
+        self.fontesMudou.emit()
+
+        def pronto(r):
+            if geracao != self._fontes_geracao:
+                return
+            self._fontes_desejo = r
+            self.fontesMudou.emit()
+
+        def falha(erro):
+            if geracao != self._fontes_geracao:
+                return
+            self._fontes_desejo = {"steamrip": [], "fitgirl": [], "erros": [erro]}
+            self.fontesMudou.emit()
+        self.executar("Buscando fontes…",
+                      lambda: self.servico.buscar_fontes_desejo(titulo), pronto, falha)
+
+    @Slot(str, int)
+    def baixarDesejoSteamRip(self, url, did):
+        if self.ocupado:
+            return
+        def pronto(r):
+            if r.get("ok"):
+                self.aviso.emit("Baixado e importado. Desejo marcado como obtido.", False)
+                self.atualizar()
+            else:
+                self.aviso.emit(r.get("erro") or "Não foi possível importar.", True)
+        self.executar("Baixando e importando…",
+                      lambda: self.servico.baixar_fonte_steamrip(url, did), pronto)
+
+    @Slot(int)
+    def buscarCapaLibretro(self, gid):
+        def pronto(_r):
+            self.aviso.emit("Capa offline salva.", False)
+            self.atualizar()
+        self.executar("Buscando capa offline…",
+                      lambda: self.servico.buscar_capa_libretro(gid), pronto)
+
+    @Slot(int, str)
+    def salvarObservacoes(self, gid, texto):
+        self._alterar("Salvando notas do jogo…", lambda: self.servico.salvar_observacoes(gid, texto))
+
+    @Slot(QUrl)
+    def exportarColecao(self, url):
+        pasta = url.toLocalFile()
+        if not pasta:
+            return
+
+        def pronto(_r):
+            if not _r.get("ok"):
+                raise ValueError(_r.get("erro", "Exportação não concluída."))
+            self.aviso.emit("Coleção exportada para a pasta escolhida (pacote ZIP).", False)
+
+        self.executar("Exportando coleção…",
+                      lambda: self.servico.exportar_colecao_para(pasta), pronto,
+                      lambda erro: self.aviso.emit(f"Exportação falhou: {erro}", True))
+
     @Slot()
     def consultarVolume(self):
         if self._fechado:
             return
         self._volume = core.ler_volume_pc()
         self.volumeMudou.emit()
+
+    @Slot()
+    def rodarDiagnostico(self):
+        """Diagnostico somente-leitura; resultado vira texto no relatorio."""
+        import json as _json
+        from pathlib import Path as _P
+
+        from ferramentas.diagnosticar import diagnosticar
+
+        def trabalho():
+            try:
+                d = diagnosticar(_P(core.__file__).resolve().parents[1],
+                                 _P(self.servico.db_path))
+                return _json.dumps(d, ensure_ascii=False, indent=2)
+            except Exception as e:  # diagnostico nunca deve derrubar a UI
+                return _json.dumps({"erro": str(e)}, ensure_ascii=False, indent=2)
+
+        self.executar("Diagnosticando a instalacao", trabalho,
+                      lambda texto: self.diagnosticoPronto.emit(texto))
 
     @Slot(float)
     def definirVolume(self, nivel):
@@ -732,7 +1254,7 @@ class HubBridge(QObject):
 
     @Slot(str)
     def navegar(self, secao):
-        if secao not in (*self._dados, "integracoes", "inicio") or secao == self._secao:
+        if secao not in (*self._dados, "integracoes", "inicio", "youtube") or secao == self._secao:
             return
         self._secao, self._busca, self._selecionado = secao, "", {}
         self._busca_timer.stop()
@@ -837,8 +1359,15 @@ class HubBridge(QObject):
                 itens.sort(key=lambda j: j["titulo"].casefold())
         palavras = self._busca.casefold().split()
         if palavras:
-            itens = [j for j in itens if all(p in " ".join(str(j.get(k) or "") for k in
-                     ("titulo", "nome", "artista", "album", "etiquetas", "canal")).casefold() for p in palavras)]
+            import unicodedata
+
+            def _sem(s):
+                return "".join(c for c in unicodedata.normalize(
+                    "NFD", str(s or "").casefold()) if unicodedata.category(c) != "Mn")
+
+            alvos = [_sem(p) for p in palavras]
+            itens = [j for j in itens if all(p in _sem(" ".join(str(j.get(k) or "") for k in
+                     ("titulo", "nome", "artista", "album", "etiquetas", "canal"))) for p in alvos)]
         anterior = self._selecionado.get("id", self._selecionado.get("hash"))
         self.modelo.substituir(itens)
         self._selecionado = next((j for j in itens if j.get("id", j.get("hash")) == anterior),
@@ -851,7 +1380,7 @@ class HubBridge(QObject):
             self._selecionado = self.modelo.itens[indice]
             self.mudou.emit()
 
-    def _alterar(self, rotulo, operacao):
+    def _alterar(self, rotulo, operacao, apos=None):
         if self.ocupado:
             self.aviso.emit("Aguarde a operação atual terminar.", False)
             return
@@ -864,6 +1393,8 @@ class HubBridge(QObject):
             mensagem = "; ".join(erros or avisos) if erros or avisos else "Operação concluída."
             self.aviso.emit(mensagem, bool(erros))
             self.atualizar()
+            if apos:
+                apos(resultado)
         self.executar(rotulo, operacao, pronto)
 
     @Slot(int)
@@ -954,14 +1485,41 @@ class HubBridge(QObject):
     def _fim_jogo(self, gid, horas, rastreado):
         self._em_jogo = False
         self._atualizar_conquistas()
-        self._jogo_gid = 0
+        jogo_gid, self._jogo_gid = self._jogo_gid, 0
         if rastreado:
+            def registrada(_r):
+                self.atualizar()
+                self._auto_backup_sessao(jogo_gid or gid)
             self.executar("Registrando sessão…", lambda: self.servico.registrar_sessao(gid, horas),
-                          lambda _r: self.atualizar())
+                          registrada)
             self.jogoTerminou.emit()
         else:
             self.aviso.emit("Sessão sem rastreio: registre as horas nas ferramentas clássicas.", False)
         self.mudou.emit()
+
+    def _auto_backup_sessao(self, gid):
+        """Backup da coleção ao encerrar sessão rastreada (opt-in, default ligado)."""
+        if self._fechado or not gid:
+            return
+        # A configuração pode ter sido alterada pelo serviço/clássico depois
+        # da carga da UI. Releia só neste checkpoint, não em cada binding QML.
+        self._aparencia = self.servico.aparencia()
+        if self.aparencia.get("auto_backup", True) is False:
+            return
+
+        def pronto(_r):
+            if not self._fechado:
+                if not _r.get("ok", True):
+                    self.aviso.emit("Backup dos saves não foi concluído: " + _r.get("erro", "falha"), True)
+                    return
+                saves = _r.get("saves", {})
+                self.aviso.emit("Backup pós-sessão criado. " +
+                                (f'{saves.get("arquivos", 0)} arquivo(s) de saves guardados.'
+                                 if saves.get("ok") and saves.get("arquivos") else
+                                 saves.get("aviso") or saves.get("erro") or "Configure os saves deste jogo."), False)
+
+        self.executar("Guardando backup pós-sessão…",
+                      lambda: self.servico.backup_pos_sessao(gid), pronto)
 
     @Slot(int)
     def tocar(self, mid):
@@ -1047,22 +1605,22 @@ class HubBridge(QObject):
     @Slot(str)
     def baixarTorrent(self, url):
         def pronto(r):
-            self.aviso.emit(f"Torrent no cliente do Hub → {r.get('destino', 'Piratas/')}.", False)
+            self.aviso.emit(f"Torrent no cliente do Hub → {r.get('destino', 'Meus Jogos Locais/')}.", False)
             self._atualizar_downloads()
         self.executar("Adicionando torrent no Hub…", lambda: self.servico.baixar_torrent_hub(url), pronto)
 
     @Slot(str, result=bool)
-    def foraDePiratas(self, caminho):
-        return self.servico.fora_de_piratas(caminho)
+    def foraDoDestino(self, caminho):
+        return self.servico.fora_do_destino(caminho)
 
     @Slot(str)
     def organizarDownload(self, caminho):
         def pronto(r):
-            msg = "Já estava em Piratas/." if not r.get("movido") else \
-                f"Movido p/ Piratas. {r.get('aviso', '')}"
+            msg = "Já estava em Meus Jogos Locais/." if not r.get("movido") else \
+                f"Movido p/ Meus Jogos Locais. {r.get('aviso', '')}"
             self.aviso.emit(msg, False)
             self._atualizar_downloads()
-        self.executar("Organizando em Piratas…", lambda: self.servico.organizar_download(caminho), pronto)
+        self.executar("Organizando em Meus Jogos Locais…", lambda: self.servico.organizar_download(caminho), pronto)
 
     @Slot()
     def iniciarDownloads(self):
@@ -1114,6 +1672,10 @@ class HubBridge(QObject):
 
     @Slot(str)
     def abrirUrl(self, texto):
+        from bib_nucleo.rede import rede_ativa
+        if not rede_ativa():
+            self.aviso.emit("Rede desligada (BIBLIOTECA_REDE=0).", True)
+            return
         url = QUrl(texto)
         if url.scheme() not in ("http", "https") or not url.host():
             self.aviso.emit("Endereço inválido.", True)
@@ -1144,8 +1706,12 @@ class HubBridge(QObject):
         self._timer_volume.stop()
         self._timer_conquistas.stop()
         self._timer_spotify.stop()
+        self._timer_watch.stop()
+        self._timer_screenshots.stop()
         self._busca_timer.stop()
         self._pool.waitForDone()
+        if self._api:
+            self._api.fechar()
         self._player.parar()
         self._player.backend.close()
         self.servico.spotify.fechar()
