@@ -382,9 +382,21 @@ class ServicoBiblioteca:
         from bib_nucleo import aparencia_usuario
         return aparencia_usuario.ler_aparencia()
 
-    def definir_aparencia(self, tema="", densidade="", auto_backup=None):
+    def definir_aparencia(self, tema="", densidade="", auto_backup=None, modo_simples=None):
         from bib_nucleo import aparencia_usuario
-        return aparencia_usuario.salvar_aparencia(tema, densidade, auto_backup)
+        return aparencia_usuario.salvar_aparencia(tema, densidade, auto_backup, modo_simples)
+
+    def salvar_observacoes(self, gid, texto):
+        """Notas/diário do jogo (campo `observacoes`, sem migração)."""
+        texto = str(texto or "")[:4000]
+        return self.alterar(lambda con: core.atualizar_jogo(con, gid, {"observacoes": texto}))
+
+    def exportar_colecao_para(self, pasta):
+        """Pacote ZIP da coleção numa pasta escolhida (pendrive, nuvem, etc.)."""
+        from datetime import datetime
+        from pathlib import Path
+        destino = Path(pasta) / f"tucoteca-{datetime.now():%Y%m%d-%H%M}.zip"
+        return core.exportar_pacote(destino, self.db_path)
 
     def enfileirar_musicas(self, itens):
         metas = online.ler_json(core.DADOS_DIR / "musicas-online/faixas.json", {})

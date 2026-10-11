@@ -21,11 +21,12 @@ def teste_bridge_aparencia_e_diagnostico():
         ap = bridge.aparencia
         afirmar(ap["tema"] in ("escuro", "claro"), ap)
         afirmar(ap["densidade"] in ("compacto", "conforto", "bigpicture"), ap)
-        afirmar(isinstance(ap.get("auto_backup"), bool), ap)
+        afirmar(isinstance(ap.get("modo_simples"), bool), ap)
 
         # definir_aparencia grava e devolve o estado validado
         r = bridge.servico.definir_aparencia("claro", "compacto")
-        afirmar(r == {"tema": "claro", "densidade": "compacto", "auto_backup": ap["auto_backup"]}, r)
+        afirmar(r == {"tema": "claro", "densidade": "compacto", "auto_backup": ap["auto_backup"],
+                      "modo_simples": ap["modo_simples"]}, r)
         r = bridge.servico.definir_aparencia("roxo", "")
         afirmar(r["tema"] == "claro" and r["densidade"] == "compacto", r)
 

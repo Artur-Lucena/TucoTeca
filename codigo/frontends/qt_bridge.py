@@ -661,14 +661,31 @@ class HubBridge(QObject):
     def aparencia(self):
         return self.servico.aparencia()
 
-    @Slot(str, str, bool)
-    def definirAparencia(self, tema, densidade, auto_backup=True):
+    @Slot(str, str, bool, bool)
+    def definirAparencia(self, tema, densidade, auto_backup=True, modo_simples=False):
         def pronto(r):
             self._aparencia = r
             self.mudou.emit()
         self.executar("Salvando aparência…",
-                      lambda: self.servico.definir_aparencia(tema, densidade, auto_backup),
+                      lambda: self.servico.definir_aparencia(tema, densidade, auto_backup, modo_simples),
                       pronto)
+
+    @Slot(int, str)
+    def salvarObservacoes(self, gid, texto):
+        self._alterar("Salvando notas do jogo…", lambda: self.servico.salvar_observacoes(gid, texto))
+
+    @Slot(QUrl)
+    def exportarColecao(self, url):
+        pasta = url.toLocalFile()
+        if not pasta:
+            return
+
+        def pronto(_r):
+            self.aviso.emit("Coleção exportada para a pasta escolhida (pacote ZIP).", False)
+
+        self.executar("Exportando coleção…",
+                      lambda: self.servico.exportar_colecao_para(pasta), pronto,
+                      lambda erro: self.aviso.emit(f"Exportação falhou: {erro}", True))
 
     @Slot()
     def consultarVolume(self):
