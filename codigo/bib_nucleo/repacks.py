@@ -343,7 +343,11 @@ def _pontuar_exe(p: Path, pasta: Path) -> float:
     except ValueError:
         rel = 9
     pontos -= min(9.0, float(max(0, rel - 1)) * 3.0)
-    return pontos
+    # Piso 0: um exe pequeno ou em subpasta não pode desaparecer da lista
+    # (antes, 2 bytes em sub/ davam nota -3 e sumiam). Instaladores e lixo
+    # continuam barrados por SKIP_EXE_RE; o ranking segue preferindo exe
+    # grande na raiz.
+    return max(0.0, pontos)
 
 
 def achar_exe(pasta: str | os.PathLike) -> dict:
