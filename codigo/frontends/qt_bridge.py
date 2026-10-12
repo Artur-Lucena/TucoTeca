@@ -97,6 +97,7 @@ class HubBridge(QObject):
     jogoIniciado = Signal()
     jogoTerminou = Signal()
     pedirClassico = Signal()
+    previewMudou = Signal()
     _sessao = Signal(int, float, bool)
     controleAcao = Signal(str)
     controleMudou = Signal()
@@ -211,6 +212,7 @@ class HubBridge(QObject):
         self._timer_screenshots.timeout.connect(self._atualizar_screenshots)
         self._timer_screenshots.start()
         self._emulacao = FerramentasEmulador(self)
+        self._preview = {"itens": [], "info": {}, "raizes": [], "origem": "", "erro": ""}
         self._controles: list[str] = []
         self._navegador = Navegador()
         self._navegador.bloquear_ate_neutro()
@@ -846,6 +848,79 @@ class HubBridge(QObject):
     @Slot(QUrl)
     def importarRepack(self, url):
         self._alterar("Importando pacote de jogo…", lambda: self.servico.importar_repack_local(url.toLocalFile()))
+
+    @Property("QVariantMap", notify=previewMudou)
+    def previewImportacao(self):
+        return self._preview
+
+    def _preview_pronta(self, r):
+        r = dict(r or {})
+        self._preview = {"itens": list(r.get("itens") or []),
+                         "info": dict(r.get("info") or {}),
+                         "raizes": list(r.get("raizes") or []),
+                         "origem": str(r.get("origem") or ""),
+                         "erro": str(r.get("erro") or "")}
+        self.previewMudou.emit()
+        if not r.get("ok"):
+            self.aviso.emit(self._preview["erro"] or "Falha na varredura.", True)
+
+    @Slot(QUrl)
+    def preverPasta(self, url):
+        pasta = url.toLocalFile()
+        self.executar("Varrendo pasta…",
+                      lambda: dict(self.servico.prever_pasta(pasta), origem="pasta"),
+                      self._preview_pronta)
+
+    @Slot(QUrl)
+    def analisarArquivo(self, url):
+        caminho = url.toLocalFile()
+
+        def trabalho():
+            ana = self.servico.analisar_arquivo(caminho)
+            if not ana.get("ok"):
+                return dict(ana, origem="arquivo")
+            tipo = ana.get("tipo")
+            if tipo == "pasta":
+                return dict(self.servico.prever_pasta(caminho), origem="pasta")
+            if tipo in ("rom", "jogo") and isinstance(ana.get("item"), dict):
+                item = dict(ana["item"])
+                return {"ok": True, "raizes": [], "itens": [item],
+                        "info": {"vistos": 1, "truncado": False,
+                                 "raizes": [], "origem": "arquivo"},
+                        "erro": "", "origem": "arquivo",
+                        "detalhe": ana.get("detalhe", ""),
+                        "aviso": ana.get("aviso")}
+            return {"ok": True, "raizes": [], "itens": [],
+                    "info": {"vistos": 0, "truncado": False, "raizes": []},
+                    "erro": "", "origem": "arquivo",
+                    "detalhe": ana.get("detalhe", ""),
+                    "aviso": ana.get("aviso"),
+                    "tipo": tipo}
+        self.executar("Analisando arquivo…", trabalho, self._preview_pronta)
+
+    @Slot("QVariantList")
+    def importarSelecionados(self, indices):
+        try:
+            idx = [int(i) for i in (indices or [])]
+        except (TypeError, ValueError):
+            self.aviso.emit("Seleção inválida.", True)
+            return
+        itens = self._preview.get("itens") or []
+        sel = [itens[i] for i in idx if 0 <= i < len(itens)]
+        if not sel:
+            self.aviso.emit("Nada selecionado para importar.", False)
+            return
+
+        def apos(_r):
+            self._preview = {"itens": [], "info": {}, "raizes": [], "origem": "", "erro": ""}
+            self.previewMudou.emit()
+        self._alterar("Importando selecionados…",
+                      lambda: self.servico.importar_selecionados(sel), apos)
+
+    @Slot()
+    def limparPreview(self):
+        self._preview = {"itens": [], "info": {}, "raizes": [], "origem": "", "erro": ""}
+        self.previewMudou.emit()
 
     @Property("QVariantList", notify=mudou)
     def pacotesPiratas(self):

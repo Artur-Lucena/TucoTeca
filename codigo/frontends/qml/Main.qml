@@ -796,6 +796,7 @@ ApplicationWindow {
             }
             ActionButton { objectName: "importarColecaoButton"; text: "Importar pacote de coleção…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: packageFile.open() }
             ActionButton { text: "Importar pasta de jogos locais…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: gamesFolder.open() }
+            ActionButton { text: "Importar arquivo (exe/ROM) com preview…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: singleGameFile.open() }
             ActionButton { text: "Importar pacote de jogo (.zip/.rar/.7z)…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: repackFile.open() }
             ActionButton { objectName: "personalToolsButton"; text: "Perfis, atalhos, vigia, estatísticas e API local…"; Layout.fillWidth: true; onClicked: personalTools.open() }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
@@ -860,7 +861,8 @@ ApplicationWindow {
     FileDialog { id: executableDialog; title: "Escolha o executável"; onAccepted: gameExe.text = decodeURIComponent(selectedFile.toString().replace(Qt.platform.os === "windows" ? /^file:\/\/\// : /^file:\/\//, "")) }
     FolderDialog { id: musicFolder; title: "Importar pasta de músicas"; onAccepted: hub.importarMusicas(selectedFolder) }
     FolderDialog { id: videoFolder; title: "Importar pasta de vídeos"; onAccepted: hub.importarVideos(selectedFolder) }
-    FolderDialog { id: gamesFolder; title: "Importar jogos locais"; onAccepted: hub.importarJogos(selectedFolder) }
+    FolderDialog { id: gamesFolder; title: "Importar jogos locais"; onAccepted: { hub.preverPasta(selectedFolder); importPreview.open() } }
+    FileDialog { id: singleGameFile; title: "Arquivo de jogo (exe/ROM)"; nameFilters: ["Jogos (*.exe *.lnk *.bat *.cmd *.3ds *.3dsx *.cci *.cxi *.elf *.app *.axf *.nds *.dsi)", "Todos (*.*)"]; onAccepted: { hub.analisarArquivo(selectedFile); importPreview.open() } }
     FileDialog { id: repackFile; title: "Pacote de jogo"; nameFilters: ["Pacotes (*.zip *.rar *.7z)"]; onAccepted: hub.importarRepack(selectedFile) }
     FileDialog { id: wishlistFile; title: "Wishlist salva (JSON)"; nameFilters: ["JSON (*.json)"]; onAccepted: hub.importarWishlist(selectedFile) }
     FileDialog { id: packageFile; title: "Pacote da coleção"; nameFilters: ["TucoTeca (*.zip)"]; onAccepted: packageConfirm.open() }
@@ -874,6 +876,77 @@ ApplicationWindow {
             Label { text: "A coleção atual recebe um backup antes da importação. Jogos com a mesma identidade podem ter o progresso atualizado."; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             CheckBox { id: restoreSaves; checked: false; text: "Também restaurar saves de emuladores (sobrescreve os atuais)"; Layout.fillWidth: true }
         }
+    }
+    Dialog {
+        id: importPreview
+        objectName: "importPreviewDialog"
+        property var selecao: []
+        anchors.centerIn: parent
+        width: Math.min(760, window.width - 80); height: Math.min(580, window.height - 100)
+        modal: true; title: "Importar — preview"; standardButtons: Dialog.Cancel
+        onOpened: recarregarSelecao()
+        onRejected: hub.limparPreview()
+        function recarregarSelecao() {
+            var itens = hub.previewImportacao.itens || [];
+            var nova = [];
+            for (var i = 0; i < itens.length; i++)
+                nova.push((itens[i].score || 0) >= 0.3);
+            selecao = nova;
+        }
+        function indicesMarcados() {
+            var out = [];
+            for (var i = 0; i < selecao.length; i++)
+                if (selecao[i]) out.push(i);
+            return out;
+        }
+        contentItem: ColumnLayout {
+            spacing: 12
+            Label {
+                objectName: "importPreviewResumo"
+                Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.muted
+                text: {
+                    var n = (hub.previewImportacao.itens || []).length;
+                    var t = n + " achado(s). Pré-marcados: score ≥ 0.3.";
+                    if (hub.previewImportacao.info && hub.previewImportacao.info.truncado)
+                        t += " LISTA PARCIAL — refine a pasta.";
+                    if (hub.previewImportacao.info && !hub.previewImportacao.info.emu)
+                        t += " ROMs importam sem executável (emulador ausente).";
+                    return t;
+                }
+            }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 6
+                model: hub.previewImportacao.itens
+                ScrollBar.vertical: ScrollBar {}
+                delegate: RowLayout {
+                    required property var modelData
+                    required property int index
+                    width: ListView.view.width - 12; spacing: 10
+                    CheckBox {
+                        checked: importPreview.selecao.length > index ? importPreview.selecao[index] : false
+                        onToggled: {
+                            var s = importPreview.selecao.slice();
+                            s[index] = checked;
+                            importPreview.selecao = s;
+                        }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 2
+                        Text { text: modelData.titulo || "(sem título)"; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true; elide: Text.ElideRight }
+                        Text { text: (modelData.fonte || modelData.origem || "") + " · " + (modelData.score || 0).toFixed(2); color: Theme.muted; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                    }
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 10
+                ActionButton { text: "Marcar todos"; enabled: !hub.ocupado; onClicked: { var s = []; for (var i = 0; i < (hub.previewImportacao.itens || []).length; i++) s.push(true); importPreview.selecao = s; } }
+                ActionButton { text: "Limpar"; enabled: !hub.ocupado; onClicked: { var s = []; for (var i = 0; i < (hub.previewImportacao.itens || []).length; i++) s.push(false); importPreview.selecao = s; } }
+                Item { Layout.fillWidth: true }
+                ActionButton { objectName: "importPreviewConfirm"; text: "Importar selecionados"; primary: true; enabled: !hub.ocupado && importPreview.indicesMarcados().length > 0; onClicked: { hub.importarSelecionados(importPreview.indicesMarcados()); importPreview.close(); } }
+            }
+            Label { visible: (hub.previewImportacao.itens || []).length === 0; text: "Nada por aqui ainda — escolha uma pasta ou arquivo para ver o preview antes de importar."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+        }
+        Connections { target: hub; function onPreviewMudou() { importPreview.recarregarSelecao(); } }
     }
     Dialog {
         id: wishDialog

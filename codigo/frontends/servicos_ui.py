@@ -780,6 +780,45 @@ class ServicoBiblioteca:
         roots, itens, info = core.preview_scan([pasta])
         return self.alterar(lambda con: core.importar_lista(con, itens))
 
+    def prever_pasta(self, pasta):
+        """Preview só-leitura de pasta (PC + ROMs). Sem backup, sem escrita."""
+        pasta = (pasta or "").strip()
+        if not pasta:
+            return {"ok": False, "raizes": [], "itens": [], "info": {},
+                    "erro": "Escolha uma pasta para varrer."}
+        try:
+            raizes, itens, info = core.preview_pasta([pasta])
+        except Exception as e:
+            return {"ok": False, "raizes": [], "itens": [], "info": {},
+                    "erro": f"falha na varredura: {e}"}
+        return {"ok": True, "raizes": list(raizes or []),
+                "itens": [dict(it) for it in (itens or [])],
+                "info": dict(info or {}), "erro": ""}
+
+    def analisar_arquivo(self, caminho):
+        """Classifica um caminho sem importar. Só leitura."""
+        caminho = (caminho or "").strip()
+        if not caminho:
+            return {"ok": False, "tipo": "desconhecido", "item": None,
+                    "provedor": None, "detalhe": "caminho vazio.", "aviso": None}
+        try:
+            ana = core.analisar_arquivo(caminho)
+        except Exception as e:
+            return {"ok": False, "tipo": "desconhecido", "item": None,
+                    "provedor": None, "detalhe": f"falha na análise: {e}",
+                    "aviso": None}
+        return {"ok": True, "tipo": ana.get("tipo"), "item": ana.get("item"),
+                "provedor": ana.get("provedor"), "detalhe": ana.get("detalhe", ""),
+                "aviso": ana.get("aviso")}
+
+    def importar_selecionados(self, itens):
+        """Importa a seleção do preview, com backup. Nada antes da seleção."""
+        sel = [dict(it) for it in (itens or [])
+               if isinstance(it, dict) and (it.get("titulo") or it.get("executable_path"))]
+        if not sel:
+            raise ValueError("Nada selecionado para importar.")
+        return self.alterar(lambda con: core.importar_lista(con, sel))
+
     def importar_repack_local(self, caminho):
         return self.alterar(lambda con: core.importar_repack(con, caminho))
 
