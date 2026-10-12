@@ -115,7 +115,15 @@ def teste_assistente2_everything_filtra_raizes_e_recusa_symlink():
 def teste_assistente2_everything_recusa_raiz_com_aspas_sem_executar():
     raiz, pasta, _, cli = _fixture()
     com_aspas = raiz / 'pasta"com-aspas'
-    com_aspas.mkdir()
+    try:
+        com_aspas.mkdir()
+    except OSError:
+        # Windows proíbe `"` em nomes: a raiz nem chega a existir, então
+        # nada há para consultar — sem executar a CLI, sem consumir índice.
+        with _windows(cli), patch.object(E.subprocess, "run") as run:
+            afirmar(E.buscar_executaveis([com_aspas]) == [])
+            run.assert_not_called()
+        return
     with _windows(cli), patch.object(E.subprocess, "run") as run:
         afirmar(E.buscar_executaveis([com_aspas]) is None)
         run.assert_not_called()
