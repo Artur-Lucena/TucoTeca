@@ -13,6 +13,15 @@ def _montar(escala=None):
 
         import app_win
         root = tk.Tk()
+        # Suíte roda em segundo plano: janela estacionada fora da área
+        # visível e totalmente transparente. withdraw() não serve aqui —
+        # o gerenciador só calcula a grade real com a janela mapeada —
+        # mas nestas coordenadas nada pisca na tela.
+        root.geometry("+10000+10000")
+        try:
+            root.attributes("-alpha", 0.0)
+        except tk.TclError:
+            pass
         # O desktop virtual pode ter só 1024 px. As geometrias sob teste não
         # devem ser limitadas pelo maxsize implícito do gerenciador de janelas.
         root.maxsize(max(1600, root.winfo_screenwidth()), max(1000, root.winfo_screenheight()))
@@ -297,6 +306,7 @@ def teste_visual_cache_imagens_por_interpretador():
 
         import app_win
         r1 = tk.Tk()
+        r1.withdraw()
     except ImportError:
         print("(sem tkinter: skip)")
         return
@@ -314,6 +324,7 @@ def teste_visual_cache_imagens_por_interpretador():
     finally:
         r1.destroy()
     r2 = tk.Tk()
+    r2.withdraw()
     try:
         b = app_win.carregar_miniatura(arq, master=r2)
         afirmar(b is not a and b.tk is r2.tk, "imagem pertence à janela destruída")

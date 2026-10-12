@@ -12,6 +12,11 @@ from pathlib import Path
 
 import pytest
 
+# A suíte nunca abre janela na tela (ver executar.fundo_segundo_plano).
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("QT_QUICK_BACKEND", "software")
+os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
+
 RAIZ = Path(__file__).resolve().parent
 RUNNER = RAIZ / "codigo/ferramentas/testes/executar.py"
 
