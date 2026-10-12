@@ -46,6 +46,37 @@ def estado_provedores() -> dict:
     return {chave: bool(chave_provedor(chave)) for chave in _ENVS}
 
 
+# Formato usual de cada credencial (para aviso de conferência, não para validar).
+_FORMATO = {"steam_key": 32, "steamgriddb_key": 32,
+            "spotify_client_id": 32, "spotify_client_secret": 32}
+
+
+def dicas_provedores() -> dict:
+    """Avisos de conferência por credencial, **sem expor nenhum valor**.
+
+    Não valida a chave contra o provedor: apenas compara o tamanho com o
+    formato usual e orienta o usuário a regrará-la em "Provedores online".
+    Uma chave pode ter tamanho diferente e ainda assim ser válida; por isso
+    o texto é de conferência, nunca de reprovação.
+    """
+    saida = {}
+    for chave in _ENVS:
+        valor = chave_provedor(chave)
+        if not valor:
+            saida[chave] = {"configurada": False, "tamanho": 0, "aviso": ""}
+            continue
+        esperado = _FORMATO[chave]
+        divergente = len(valor) != esperado
+        saida[chave] = {
+            "configurada": True,
+            "tamanho": len(valor),
+            "aviso": (f"Confira esta credencial: tem {len(valor)} caracteres e o "
+                      f"formato usual de {esperado}. Gere uma nova em "
+                      f"'Provedores online'.") if divergente else "",
+        }
+    return saida
+
+
 def url_https(url: str) -> bool:
     try:
         p = urllib.parse.urlsplit(url)
