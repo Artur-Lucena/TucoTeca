@@ -25,6 +25,8 @@ QtObject {
     readonly property int pad: densidade === "compacto" ? 12 : 18
     readonly property int gap: densidade === "compacto" ? 9 : 14
     readonly property int title: densidade === "bigpicture" ? 38 : 30
+    readonly property int display: densidade === "bigpicture" ? 44 : densidade === "compacto" ? 32 : 36
+    readonly property int headline: densidade === "bigpicture" ? 32 : densidade === "compacto" ? 22 : 25
     readonly property int subtitle: densidade === "compacto" ? 13 : 14
     readonly property int card: densidade === "compacto" ? 14 : 15
     readonly property int meta: densidade === "compacto" ? 12 : 13
