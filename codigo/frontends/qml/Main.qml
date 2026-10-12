@@ -347,7 +347,7 @@ ApplicationWindow {
                 Text {
                     text: window.titles[hub.secao]
                     color: Theme.text
-                    font { pixelSize: window.width < 1100 ? 25 : 30; weight: Font.Bold }
+                    font { pixelSize: window.width < 1100 ? Theme.headline : Theme.display; weight: Font.Bold }
                 }
                 Text {
                     text: window.subtitles[hub.secao]
@@ -408,7 +408,7 @@ ApplicationWindow {
                     Text { text: "DA SUA COLEÇÃO"; color: Theme.accent; font { pixelSize: 12; weight: Font.Bold; letterSpacing: 2 } }
                     Text {
                         text: hub.selecionado.titulo || "Escolha seu próximo jogo"
-                        color: Theme.text; font { pixelSize: window.immersive ? 30 : 25; weight: Font.Bold }
+                        color: Theme.text; font { pixelSize: window.immersive ? Theme.display : Theme.headline; weight: Font.Bold }
                         Layout.fillWidth: true; elide: Text.ElideRight; maximumLineCount: 1
                     }
                     Text {
@@ -566,8 +566,22 @@ ApplicationWindow {
                 visible: hub.secao !== "integracoes" && hub.secao !== "inicio" && hub.secao !== "youtube" && hub.quantidade === 0
                 spacing: 14
                 Text { text: hub.ocupado ? "◌" : "◇"; color: Theme.accent; font.pixelSize: 54; Layout.alignment: Qt.AlignHCenter }
-                Text { text: hub.ocupado ? "Preparando sua coleção…" : hub.busca ? "Nenhum resultado por aqui." : "Este espaço está esperando por você."; color: Theme.text; font.pixelSize: 21; Layout.alignment: Qt.AlignHCenter }
-                Text { text: hub.busca ? "Experimente outro nome ou limpe os filtros." : "Use as ações acima para começar."; color: Theme.muted; font.pixelSize: 13; Layout.alignment: Qt.AlignHCenter }
+                Text { text: hub.ocupado ? "Preparando sua coleção…" : hub.busca ? "Nenhum resultado por aqui." : "Este espaço está esperando por você."; color: Theme.text; font.pixelSize: Theme.headline; Layout.alignment: Qt.AlignHCenter }
+                Text { text: hub.busca ? "Experimente outro nome ou limpe os filtros." : "Use a ação abaixo para começar."; color: Theme.muted; font.pixelSize: 13; Layout.alignment: Qt.AlignHCenter }
+                ActionButton {
+                    objectName: "emptyStateAction"
+                    visible: !hub.ocupado && !hub.busca && (hub.secao === "jogos" || hub.secao === "musicas" || hub.secao === "desejos" || hub.secao === "videos" || hub.secao === "downloads")
+                    text: hub.secao === "jogos" ? "+ Adicionar jogo" : hub.secao === "musicas" ? "+ Importar pasta" :
+                          hub.secao === "desejos" ? "+ Adicionar desejo" : hub.secao === "videos" ? "+ Importar vídeos" : "Iniciar cliente"
+                    primary: true; Layout.alignment: Qt.AlignHCenter
+                    onClicked: {
+                        if (hub.secao === "jogos") window.editGame({})
+                        else if (hub.secao === "musicas") musicFolder.open()
+                        else if (hub.secao === "desejos") wishDialog.open()
+                        else if (hub.secao === "videos") videoFolder.open()
+                        else hub.iniciarDownloads()
+                    }
+                }
             }
         }
     }

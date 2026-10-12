@@ -33,7 +33,7 @@ ListView {
             }
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 6
-                Text { Layout.fillWidth: true; elide: Text.ElideRight; text: row.item.titulo || row.item.nome || ""; color: Theme.text; font { pixelSize: 15; weight: Font.DemiBold } }
+                Text { Layout.fillWidth: true; elide: Text.ElideRight; text: row.item.titulo || row.item.nome || ""; color: Theme.text; font { pixelSize: Theme.card; weight: Font.DemiBold } }
                 Text {
                     Layout.fillWidth: true; elide: Text.ElideRight
                     text: hub.secao === "musicas" ? (row.item.artista || "Artista desconhecido") + "  ·  " + (row.item.album || "Álbum local") :
@@ -43,7 +43,7 @@ ListView {
                           (row.item.fonte_progresso === "estimativa" ? "  ·  estimativa em disco" : "") +
                           (row.item.velocidade ? "  ·  " + (row.item.velocidade / 1048576).toFixed(1) + " MB/s" : "") +
                           (row.item.eta ? "  ·  ETA " + Math.floor(row.item.eta / 60) + "min" : "")
-                    color: Theme.muted; font.pixelSize: 14
+                    color: Theme.muted; font.pixelSize: Theme.subtitle
                 }
                 ProgressBar { visible: hub.secao === "downloads"; Layout.fillWidth: true; from: 0; to: 100; value: row.item.pct || 0 }
             }

@@ -673,6 +673,9 @@ class HubBridge(QObject):
         if self._secao == "jogos" and self._filtro != "todos":
             resumo += " · " + {"favoritos": "Favoritos", "jogando": "Jogando",
                                 "pendencias": "Com pendências"}.get(self._filtro, self._filtro)
+        if self._secao == "jogos":
+            resumo += " · " + {"titulo": "Nome", "recentes": "Recentes",
+                                "horas": "Mais jogados"}.get(self._ordem, self._ordem)
         if self._busca.strip():
             resumo += f" · busca “{self._busca.strip()}”"
         return resumo
