@@ -124,8 +124,14 @@ def ler_wishlist_arquivo(caminho) -> dict:
     {appid, name/titulo}. Erro vira `erros`, nunca levanta.
     """
     try:
-        texto = Path(caminho).read_text(encoding="utf-8", errors="replace")
-    except OSError as e:
+        alvo = Path(caminho)
+        try:
+            if alvo.is_file() and alvo.stat().st_size > 8_000_000:
+                return {"itens": [], "erros": ["arquivo grande demais (>8 MB)"]}
+        except OSError:
+            pass
+        texto = alvo.read_text(encoding="utf-8-sig", errors="replace")
+    except (OSError, ValueError, TypeError) as e:
         return {"itens": [], "erros": [f"arquivo ilegível: {e}"]}
     if texto.lstrip()[:1] == "<":
         return {"itens": [], "erros": [
