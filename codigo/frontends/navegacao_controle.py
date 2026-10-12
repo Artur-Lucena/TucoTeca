@@ -6,7 +6,7 @@ import time
 LIMIAR_ANALOGICO = 16000
 ATRASO_REPETICAO = 0.45
 INTERVALO_REPETICAO = 0.12
-REPETIVEIS = frozenset({"cima", "baixo", "esquerda", "direita", "anterior", "proxima"})
+REPETIVEIS = frozenset({"cima", "baixo", "esquerda", "direita"})
 BOTOES = {0: "cima", 1: "baixo", 2: "esquerda", 3: "direita", 4: "menu",
           8: "anterior", 9: "proxima", 12: "confirmar", 13: "voltar"}
 
@@ -32,9 +32,20 @@ class Navegador:
         self._relogio = relogio
         self._antes: frozenset[str] = frozenset()
         self._proxima: dict[str, float] = {}
+        self._aguarda_neutro = False
+
+    def bloquear_ate_neutro(self):
+        """Conexão/retorno de foco não transforma botão já segurado em clique."""
+        self._antes = frozenset()
+        self._proxima.clear()
+        self._aguarda_neutro = True
 
     def atualizar(self, acoes) -> list[str]:
         agora, atuais = self._relogio(), frozenset(acoes)
+        if self._aguarda_neutro:
+            if not atuais:
+                self._aguarda_neutro = False
+            return []
         novas = sorted(atuais - self._antes)
         saida = list(novas)
         for acao in novas:

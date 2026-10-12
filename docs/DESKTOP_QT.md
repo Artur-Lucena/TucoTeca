@@ -65,7 +65,7 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 | Atualizar emuladores | Ferramentas clássicas | Sim |
 | Importação avançada de jogos/ROMs, sanar/religar executáveis, UAC | Ferramentas clássicas | Sim |
 | CSV → áudio, fila de downloads de músicas, buscar capas | Sim | Sim |
-| Sincronizar wishlist Steam e importar JSON salvo | Sim | Sim |
+| Wishlist por JSON salvo; leitura Steam com erro explícito se endpoint indisponível | Sim | Sim |
 | Importar torrent concluído | Ferramentas clássicas | Sim |
 | Desejo → SteamRip → baixar/importar → obtido | Sim | Fluxo manual |
 | Registrar horas manualmente nos detalhes e encerrar sessão pendente no Sistema | Sim | Sim |
@@ -82,6 +82,16 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 Não se trata ainda de paridade integral: a migração visual preserva acesso
 explícito aos fluxos avançados existentes. Distribuições anteriores em `dist/`
 não são atualizadas ao editar os fontes.
+
+### Everything opcional no Windows
+
+O scanner usa `es.exe` do PATH ou de `programa/ferramentas/everything/cli/`.
+O cliente local consulta a instância `TucoTeca`; uma configuração externa pode
+usar `BIBLIOTECA_EVERYTHING` e `BIBLIOTECA_EVERYTHING_INSTANCIA`.
+Everything deve estar aberto e com o volume/pasta indexado. Erro, timeout ou
+índice vazio mantêm o scanner normal como fallback; o Hub não instala o serviço
+automaticamente nem envia o índice ao GitHub. A exportação temporária usa UTF-8
+com BOM, é removida após a consulta e restringe os resultados às raízes pedidas.
 
 ## Contratos e integrações
 

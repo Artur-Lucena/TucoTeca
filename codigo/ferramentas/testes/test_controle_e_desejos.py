@@ -52,12 +52,30 @@ def teste_bundle_inclui_navegacao_e_leitura_xinput_sem_hardware():
     afirmar(isinstance(ler_estados_xinput(), dict))
 
 
+def teste_navegador_exige_neutro_apos_hotplug_ou_retorno_de_foco():
+    nav = Navegador()
+    afirmar(nav.atualizar({"confirmar"}) == ["confirmar"])
+    nav.bloquear_ate_neutro()
+    afirmar(nav.atualizar({"confirmar", "baixo"}) == [])
+    afirmar(nav.atualizar({"baixo"}) == [])
+    afirmar(nav.atualizar(set()) == [])
+    afirmar(nav.atualizar({"confirmar"}) == ["confirmar"])
+
+
+def teste_navegador_nao_repete_bumpers_nem_menu():
+    t = [0.0]
+    nav = Navegador(relogio=lambda: t[0])
+    afirmar(nav.atualizar({"proxima", "menu"}) == ["menu", "proxima"])
+    t[0] = 10
+    afirmar(nav.atualizar({"proxima", "menu"}) == [])
+
+
 def teste_qt_controle_avisa_conexao_e_so_age_com_janela_ativa():
-    import qt_bridge
     from test_qt import _aguardar, _qt
     app, bridge = _qt()
     if app is None:
         return
+    import qt_bridge
     try:
         bridge._timer_controle.stop()
         acoes, conexoes = [], []

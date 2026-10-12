@@ -5,8 +5,6 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
-## [Não lançado]
-
 ### Adicionado
 
 - Navegação por controle XInput no desktop Qt (setas e analógico, A confirma,
@@ -20,15 +18,19 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 - A leitura da wishlist pública da Steam não funciona: o endpoint devolve HTML.
   Use a importação de JSON.
-- As chaves salvas em "Provedores online" foram recusadas nas verificações de
-  12/10/2026 (Spotify, Steam e SteamGridDB). Atualize-as antes de usar buscas
-  autenticadas.
+- Integrações autenticadas precisam de credenciais válidas, configuradas em
+  "Provedores online". Diagnósticos pessoais não fazem parte da release.
 
 ### Alterado
 
 - CI com `actions/checkout`, `actions/setup-python` e `actions/upload-artifact`
   em v7 e `gitleaks/gitleaks-action` em v3. Ubuntu fixado em 24.04.
-- Workflow manual `bundle-mac.yml` gera o payload macOS em runner nativo.
+- Job macOS manual em `testes.yml`, ativado com `mac=true`.
+- Cliente Everything local opcional, com consulta Unicode e instância separada;
+  correção dos argumentos do ES 1.1.0.38, comprovada com índice nativo isolado.
+- Testes Qt verificam a dependência opcional antes de importá-la na suíte stdlib.
+- Controle exige posição neutra após conexão/retorno de foco, pausa durante
+  jogos e não muda a seção por trás de diálogos modais.
 
 ## [1.0.1] — 11/10/2026
 

@@ -18,11 +18,11 @@ def _sincrono(bridge):
 
 
 def teste_ferramentas_emulador_mods_cheats_texturas_e_presets_persistem():
-    from PySide6.QtCore import QUrl
     from test_qt import _qt
     app, bridge = _qt()
     if app is None:
         return
+    from PySide6.QtCore import QUrl
     tmp = Path(tempfile.mkdtemp(prefix="emu-ferr-"))
     user = tmp / "azahar-user"
     for pasta in ("cheats", "load/textures", "config"):

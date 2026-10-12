@@ -213,6 +213,8 @@ class HubBridge(QObject):
         self._emulacao = FerramentasEmulador(self)
         self._controles: list[str] = []
         self._navegador = Navegador()
+        self._navegador.bloquear_ate_neutro()
+        self._janela_controle = None
         self._timer_controle = QTimer(self)
         self._timer_controle.setInterval(33)
         self._timer_controle.timeout.connect(self._ler_controle)
@@ -1739,15 +1741,23 @@ class HubBridge(QObject):
         conectados = [f"Controle {slot + 1}" for slot in sorted(estados)]
         if conectados != self._controles:
             self._controles = conectados
+            self._navegador.bloquear_ate_neutro()
             self.controleMudou.emit()
         acoes = set()
         for estado in estados.values():
             acoes |= acoes_do_estado(estado)
-        for acao in self._navegador.atualizar(acoes):
-            if QGuiApplication.focusWindow() is not None:
+        janela = QGuiApplication.focusWindow()
+        habilitado = janela is not None and janela.isActive() and not self.emJogo
+        if not habilitado or janela is not self._janela_controle:
+            self._navegador.bloquear_ate_neutro()
+            self._janela_controle = janela if habilitado else None
+        if habilitado:
+            for acao in self._navegador.atualizar(acoes):
                 self._agir_controle(acao)
 
     def _agir_controle(self, acao):
+        if acao in ("anterior", "proxima", "menu") and self._controle_em_popup():
+            return  # Não trocar a tela por trás de uma confirmação/seleção modal.
         if acao in ("anterior", "proxima"):
             atual = SECOES_CONTROLE.index(self._secao) if self._secao in SECOES_CONTROLE else 0
             self.navegar(SECOES_CONTROLE[(atual + (1 if acao == "proxima" else -1)) % len(SECOES_CONTROLE)])
@@ -1755,6 +1765,17 @@ class HubBridge(QObject):
             self.controleAcao.emit("menu")
         elif acao in TECLAS_CONTROLE:
             self._enviar_tecla(TECLAS_CONTROLE[acao])
+
+    @staticmethod
+    def _controle_em_popup():
+        if QGuiApplication.modalWindow() is not None:
+            return True
+        alvo = QGuiApplication.focusObject()
+        while alvo is not None:
+            if "Popup" in alvo.metaObject().className() or "Dialog" in alvo.metaObject().className():
+                return True
+            alvo = alvo.parentItem() if hasattr(alvo, "parentItem") else alvo.parent()
+        return False
 
     @staticmethod
     def _enviar_tecla(tecla):
