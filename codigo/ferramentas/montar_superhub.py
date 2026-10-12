@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import datetime
 import hashlib
 import json
 import os
@@ -29,6 +28,12 @@ ASSETS = {
               "yt-dlp.pyz", "1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6", "2026.08.19"),
     "quickjs": ("https://github.com/quickjs-ng/quickjs/releases/download/v0.17.0/qjs-windows-x86_64.exe",
                 "qjs.exe", "2aeabf0092c3262d6b2609824418f7dd7ed1f1df939f73b2b15645230cac0d77", "0.17.0"),
+}
+
+LICENCAS_QT = {
+    "LGPL-3.0-only": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+    "GPL-3.0-only": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+    "GPL-2.0-only": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
 }
 
 LEIAME = """TUCOTECA SUPERHUB — Windows x64, portátil
@@ -265,7 +270,29 @@ def incluir_qt(raiz: Path, extras="essencial"):
         for p in locales.glob("*.pak"):
             if p.stem not in ("en-US", "pt-BR"):
                 p.unlink()
+    incluir_licencas_qt(raiz)
     return "6.10.2"
+
+
+def incluir_licencas_qt(raiz: Path):
+    """As wheels só trazem o aviso comercial; inclui também os textos livres."""
+    destino = raiz / "python/LICENSES-Qt"
+    destino.mkdir(parents=True, exist_ok=True)
+    for nome, sha in LICENCAS_QT.items():
+        url = f"https://raw.githubusercontent.com/qt/qtbase/v6.10.2/LICENSES/{nome}.txt"
+        origem = baixar_verificado(url, f"qt-6.10.2-{nome}.txt", sha)
+        shutil.copy2(origem, destino / (nome + ".txt"))
+    (destino / "FONTES.txt").write_text(
+        "Qt / PySide6 / shiboken6 6.10.2, wheels originais, bibliotecas dinâmicas.\n"
+        "Textos LGPL/GPL fornecidos em paralelo ao aviso comercial original.\n"
+        "Qt: https://code.qt.io/cgit/qt/qtbase.git/?h=v6.10.2\n"
+        "PySide6/shiboken6: https://code.qt.io/cgit/pyside/pyside-setup.git/?h=v6.10.2\n"
+        "QtWebEngine (variante completa): https://code.qt.io/cgit/qt/qtwebengine.git/?h=v6.10.2\n"
+        "Licenças/avisos dos módulos: https://doc.qt.io/qt-6/licensing.html\n"
+        "Chromium: chrome://credits no WebEngine; avisos adicionais nos fontes.\n"
+        "Pode substituir DLLs/bindings em python/Lib/PySide6 e python/Lib/shiboken6\n"
+        "por versões compatíveis; não há proteção que impeça relink/modificação.\n",
+        encoding="utf-8")
 
 
 def validar_fontes_runtime(raiz: Path, repo: Path = REPO) -> dict:
@@ -437,11 +464,15 @@ def validar_runtime(raiz: Path, extras="essencial") -> dict:
 
 def empacotar(raiz: Path, formato="todos", extras="essencial") -> list[Path]:
     DIST.mkdir(parents=True, exist_ok=True)
-    hoje = datetime.date.today().strftime("%Y%m%d")
+    versao = (raiz / "VERSION").read_text(encoding="utf-8").strip()
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", versao):
+        raise ValueError("VERSION inválida para nomear o pacote")
     tag = "completo" if extras == "completo" else "essencial"
     saidas = []
     if formato in ("zip", "todos"):
-        p = DIST / f"tucoteca-superhub-windows-x64-{tag}-{hoje}.zip"
+        p = DIST / f"tucoteca-{versao}-windows-x64-{tag}.zip"
+        if p.exists():
+            raise ValueError(f"pacote já existe; preserve-o antes de gerar outro: {p}")
         with zipfile.ZipFile(p, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
             for f in sorted(raiz.rglob("*")):
                 z.write(f, f.relative_to(raiz))
@@ -450,9 +481,9 @@ def empacotar(raiz: Path, formato="todos", extras="essencial") -> list[Path]:
                 raise ValueError("ZIP gerado está corrompido")
         saidas.append(p)
     if formato in ("7z", "todos"):
-        p = DIST / f"tucoteca-superhub-windows-x64-{tag}-{hoje}.7z"
+        p = DIST / f"tucoteca-{versao}-windows-x64-{tag}.7z"
         if p.exists():
-            p.unlink()
+            raise ValueError(f"pacote já existe; preserve-o antes de gerar outro: {p}")
         exe = raiz / "ferramentas/7zip/7z.exe"
         r = subprocess.run([str(exe), "a", str(p), ".\\*", "-t7z", "-mx=9",
                             "-m0=lzma2:d=64m", "-ms=on", "-mmt=2", "-bsp0"],
@@ -515,6 +546,12 @@ def montar(formato="todos", reutilizar=False, extras="essencial", revisao=""):
         m = criar_manifesto(raiz, componentes, v, fontes)
         provas = validar_runtime(raiz, extras=extras)
         componentes["qbittorrent"]["versao"] = provas["qbittorrent"]["versao"].lstrip("v")
+        ffmpeg = re.search(r"ffmpeg version (\S+)", provas["ffmpeg"]["saida"])
+        if not ffmpeg:
+            raise ValueError("FFmpeg não informou sua versão")
+        componentes["ffmpeg"]["versao"] = ffmpeg[1]
+        _nota(raiz / "ferramentas/ffmpeg", "FFmpeg", ffmpeg[1],
+              componentes["ffmpeg"]["fonte"], componentes["ffmpeg"]["licenca"])
         m = criar_manifesto(raiz, componentes, v, fontes)
         rel = {"bytes_runtime": m["bytes_runtime"], "provas": provas,
                "componentes": componentes, "extras": extras, "fontes": fontes,

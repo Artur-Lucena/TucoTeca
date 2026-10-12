@@ -87,16 +87,23 @@ Os ZIPs R5 em `dist/marco-s0-s8/r5/` permanecem apenas locais, associados a
 `b35bac9`. Não devem ser apresentados como builds de um commit posterior
 sem nova geração e validação.
 
-## Release privada v1.0.0
+## Release privada v1.0.1
 
 A release é montada a partir de uma revisão congelada por
 `codigo/ferramentas/preparar_release.py`, que reúne pacote de fontes, bundles
 Windows já validados, relatórios de verificação, notas e checksums. Nada é
 publicado automaticamente: criar a release no GitHub é passo explícito, com o
-repositório privado, e sem coleção, jogos, saves, perfis pessoais ou runtimes
-de terceiros. A proveniência de cada bundle fica registrada no
-`manifesto-runtime.json` (`revisao_git`, `tucoteca`) e conferida por SHA-256
+repositório privado, e sem coleção, jogos, saves ou perfis pessoais.
+Os runtimes de terceiros ficam apenas nos anexos autorizados, com licenças;
+não entram na árvore Git. A proveniência de cada bundle fica registrada no
+`manifesto-runtime.json` (`versoes.revisao_git`, `versoes.tucoteca`) e conferida por SHA-256
 no builder e na preparação da release.
+
+A tag `v1.0.0` aponta para `853c9a0` e permanece intacta; a CI dessa revisão
+passou, mas a preparação revelou falhas antes da publicação dos anexos.
+Por autorização do proprietário, a primeira release publicada passa a ser
+`v1.0.1`, com fontes e bundles da revisão corrigida. Não houve exclusão ou
+movimentação da tag antiga. Fluxo completo: [RELEASES.md](RELEASES.md).
 
 ## Complemento: portabilidade dos testes na CI
 

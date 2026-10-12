@@ -1,14 +1,43 @@
 # Changelog
 
-Todas as mudanças relevantes do TucoTeca. Formo: [SemVer](https://semver.org/),
+Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
-## [1.0.0] — 11/10/2026
+## [Não lançado]
 
-Primeira release privada formal do projeto, publicada na tag `v1.0.0`. A
-revisão exata dos fontes fica registrada em `release.json`, no
-`MANIFESTO-FONTES.json` do pacote de fontes e no `manifesto-runtime.json` de
-cada bundle, conferida por SHA-256.
+## [1.0.1] — 11/10/2026
+
+Primeira release privada publicada. A tag `v1.0.0` permanece intacta como
+registro de preparação, sem release: a verificação final encontrou falhas
+no empacotador antes de qualquer upload. A revisão exata desta entrega fica
+em `release.json` e nos manifestos de fontes/runtime, sem SHA autorreferente
+nos documentos versionados.
+
+### Corrigido e organizado
+
+- Preparação testada de ponta a ponta: inventário plano de anexos e
+  `SHA256SUMS.txt` com todos os arquivos, exceto o próprio checksum.
+- Recusa checkout sujo, SHA/versão/variante divergentes, fontes não rastreados,
+  relatório incompleto, provas de extração ausentes e hashes divergentes.
+- ZIPs conferidos por conteúdo, tamanhos, hashes e fontes `app/`; caminhos
+  inseguros, entradas duplicadas e estado pessoal são rejeitados.
+- Staging temporário e publicação local por renomeação: uma falha não deixa
+  entrega parcial e um destino existente não é sobrescrito.
+- Assets nomeados por versão; notas, `LICENCAS.md` e proveniência sem caminhos
+  absolutos da máquina. Os pacotes anteriores continuam preservados localmente.
+- Textos LGPL/GPL do Qt incluídos com versão e hashes fixados, além dos avisos
+  das wheels. A versão real do FFmpeg passa ao manifesto e à nota de fonte.
+- README corrigido e ampliado: download privado, escolha de variante,
+  primeiro uso, atualização sem perder dados, diagnóstico e limites de rede.
+  Procedimento de congelamento, CI, rascunho e publicação em `docs/RELEASES.md`.
+
+Núcleo, interfaces e integração S0–S8/R4/R5 preservados. Esta release não
+atualiza automaticamente a instalação pessoal, coleção ou atalho.
+
+## [1.0.0] — 11/10/2026 (tag de preparação, não publicada como release)
+
+Preparação inicial de uma release privada. Os itens abaixo registram o que
+foi implementado nessa tag; as falhas de preparação foram corrigidas em 1.0.1.
 
 ### Adicionado
 
@@ -40,7 +69,7 @@ cada bundle, conferida por SHA-256.
   `.venv/` entra no `.gitignore`. A raiz do projeto fica só com arquivos de
   entrada, configuração e documentação.
 
-## [Não lançado]
+## Histórico de integração anterior à publicação
 
 ### Portabilidade dos testes na CI (11/10/2026)
 

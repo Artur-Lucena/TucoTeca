@@ -56,7 +56,8 @@ def empacotar_fontes(destino: Path, repo: Path = REPO, revisao: str | None = Non
     if not (repo / "codigo/bib_core.py").is_file():
         raise ValueError("pasta não contém os fontes da TucoTeca")
     destino.parent.mkdir(parents=True, exist_ok=True)
-    sys.path.insert(0, str(repo / "codigo"))
+    # Empacotar não deve executar módulos da árvore de entrada.
+    sys.path.insert(0, str(REPO / "codigo"))
     from bib_nucleo.arquivos import destino_temporario
     manifesto = {"esquema": 1, "projeto": "TucoTeca", "origem": "árvore de trabalho",
                   "gerado_em": datetime.datetime.now(datetime.timezone.utc).isoformat(),

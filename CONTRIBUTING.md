@@ -114,7 +114,7 @@ de áudio quando MCI falha. Smokes remotos ficam fora da suíte e registram
 versão/data/limites; contrato mockado não prova disponibilidade de um host.
 
 `--revisao` espera o SHA completo do checkout congelado; ele é gravado no
-manifesto do runtime, em `VERSION` e em `VERSAO.txt`. Sem ele, o pacote fica
+manifesto do runtime e em `VERSAO.txt`; `VERSION` guarda a versão SemVer. Sem ele, o pacote fica
 marcado como “árvore de trabalho não identificada” — aceitável para iteração,
 não para release.
 
@@ -147,20 +147,27 @@ uma alteração na UI não deve absorver silenciosamente trabalho paralelo.
 
 ## Preparar uma release privada
 
-1. Congele os fontes: árvore limpa, gates verdes e SHA completo do commit.
+1. Finalize versão, README e changelog antes de congelar os fontes: árvore
+   limpa, gates locais verdes e CI aprovada no SHA completo do commit.
 2. Gere os dois bundles com `--revisao <SHA>` (o builder executa as provas na
    árvore montada e no pacote extraído).
 3. Monte a pasta da release:
 
    ```powershell
-   py -3.14 codigo/ferramentas/preparar_release.py --revisao <SHA> --saida dist/release/v1.0.0
+    py -3.14 codigo/ferramentas/preparar_release.py --revisao <SHA> --saida dist/release/v1.0.1
    ```
 
    Sai o pacote de fontes, os bundles, os relatórios de verificação,
-   `NOTAS-RELEASE.md`, `SHA256SUMS.txt` e `release.json`.
-4. Crie a release no GitHub (repo privado) com `gh release create`, anexando
-   os arquivos da pasta. Essa publicação é sempre explícita — nenhum script
-   deste repositório publica sozinho.
+   `NOTAS-RELEASE.md`, `LICENCAS.md`, `SHA256SUMS.txt` e `release.json`.
+   Revisão/versão devem coincidir nos fontes, relatórios e manifestos.
+   O script recusa destino existente e não deixa uma entrega parcial.
+4. Confirme a privacidade, crie uma tag normal e uma release em **rascunho**.
+   Anexe os arquivos, confira tamanhos/hashes no servidor e só então publique.
+   Nunca mova uma tag enviada nem use force-push para corrigir uma entrega.
+   Essa publicação é explícita — nenhum script do projeto publica sozinho.
+
+O procedimento detalhado e o inventário de anexos estão em
+[docs/RELEASES.md](docs/RELEASES.md).
 
 O pacote de coleção do Hub continua sendo o caminho para levar a biblioteca
 pessoal entre máquinas; a release nunca a inclui.
