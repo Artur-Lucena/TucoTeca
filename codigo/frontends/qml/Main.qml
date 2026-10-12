@@ -810,6 +810,10 @@ ApplicationWindow {
             Text { text: "MANUTENÇÃO"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
             Text { text: "Sanear organiza sobras de instalação e leva instaladores para .hub-lixo, sempre reversível. Mostra o plano antes de aplicar."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             ActionButton { objectName: "sanearButton"; text: "Sanear pasta de jogo…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: sanearFolder.open() }
+            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
+            Text { text: "EMULADORES E CONTROLES"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "Atualização consulta o release e só baixa depois da sua confirmação. Presets de controle aplicam com o Azahar fechado."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            ActionButton { objectName: "emusButton"; text: "Emuladores e controles avançados…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: { hub.consultarEmus(); hub.consultarPads(); emus.open() } }
             ActionButton { objectName: "personalToolsButton"; text: "Perfis, atalhos, vigia, estatísticas e API local…"; Layout.fillWidth: true; onClicked: personalTools.open() }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
             Text { text: "DIAGNÓSTICO"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
@@ -1383,6 +1387,115 @@ ApplicationWindow {
                 text: "Nada 100% ainda. Concluídos aparecem aqui; a origem do download é preservada."
                 color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true
             }
+        }
+    }
+    Dialog {
+        id: emus
+        objectName: "emusDialog"
+        title: "Emuladores e controles avançados"
+        anchors.centerIn: parent
+        width: Math.min(760, window.width - 80); height: Math.min(620, window.height - 80)
+        modal: true; standardButtons: Dialog.Close
+        onOpened: { hub.consultarEmus(); hub.consultarPads() }
+        contentItem: ColumnLayout {
+            spacing: 12
+            Text { text: "EMULADORES"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            ListView {
+                Layout.fillWidth: true; Layout.preferredHeight: 150; clip: true; spacing: 10
+                model: (hub.emus.itens || [])
+                ScrollBar.vertical: ScrollBar {}
+                delegate: Rectangle {
+                    required property var modelData
+                    width: ListView.view.width - 12
+                    implicitHeight: 76; radius: 10; color: Theme.surface
+                    RowLayout {
+                        anchors.fill: parent; anchors.margins: 14; spacing: 14
+                        ColumnLayout {
+                            Layout.fillWidth: true; spacing: 4
+                            Text {
+                                objectName: "emuNome"
+                                text: modelData.nome || ""
+                                color: Theme.text; font { pixelSize: 15; weight: Font.DemiBold }
+                                Layout.fillWidth: true; elide: Text.ElideRight
+                            }
+                            Text {
+                                text: {
+                                    var c = (hub.emus.consulta || {});
+                                    if (c.chave === modelData.chave && c.tag)
+                                        return "Instalada: " + (c.local || "?") + " → remota: " + c.tag + (c.atualizado ? " ✓" : " (" + (c.tamanho_mb || 0) + " MB)");
+                                    return "Instalada: " + (modelData.local || "ausente");
+                                }
+                                color: Theme.muted
+                                font.pixelSize: Theme.subtitle; Layout.fillWidth: true; elide: Text.ElideRight
+                            }
+                        }
+                        ActionButton { text: "Consultar"; enabled: !hub.ocupado; onClicked: hub.consultarEmu(modelData.chave) }
+                        ActionButton {
+                            objectName: "emuAtualizarButton"
+                            text: "Atualizar"; primary: true
+                            enabled: !hub.ocupado && (hub.emus.consulta || {}).chave === modelData.chave && (hub.emus.consulta || {}).tag && (hub.emus.consulta || {}).atualizado === false
+                            onClicked: emuConfirm.open()
+                        }
+                    }
+                }
+            }
+            Text { text: "CONTROLES"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text {
+                objectName: "padsResumo"
+                Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.muted
+                text: {
+                    var ps = (hub.pads.pads || []).map(function(p) { return p.nome || "?"; });
+                    return "Pads: " + (ps.length ? ps.join("; ") : "nenhum controle") + " — feche o Azahar para aplicar.";
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 10
+                ComboBox {
+                    id: presetBox; objectName: "presetBox"
+                    Layout.fillWidth: true; implicitHeight: 36
+                    model: (hub.pads.presets || [])
+                }
+                ActionButton { text: "Aplicar"; enabled: !hub.ocupado && (hub.pads.presets || []).length > 0; onClicked: hub.aplicarControle(presetBox.currentText) }
+            }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 10
+                TextField { id: presetNome; objectName: "presetNome"; Layout.fillWidth: true; placeholderText: "Nome do novo preset" }
+                ActionButton { text: "Fotografar"; enabled: !hub.ocupado && presetNome.text.length > 0; onClicked: hub.fotografarControle(presetNome.text) }
+                ComboBox {
+                    id: tipoBox; objectName: "tipoBox"
+                    implicitWidth: 200; implicitHeight: 36
+                    textRole: "nome"; valueRole: "tipo"
+                    model: (hub.pads.tipos || [])
+                }
+                ActionButton { text: "Gerar mapa"; enabled: !hub.ocupado && (hub.pads.tipos || []).length > 0; onClicked: hub.gerarControle(tipoBox.currentValue) }
+            }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 10
+                ActionButton { text: "Testar (ler botões)"; enabled: !hub.ocupado; onClicked: hub.lerEstadoControle() }
+                Text {
+                    objectName: "padEstado"
+                    Layout.fillWidth: true; elide: Text.ElideRight
+                    color: Theme.muted; font.pixelSize: Theme.subtitle
+                    text: (hub.pads.estado || "Aperte Testar e mexa no controle — sem hardware, mostra a ausência.")
+                }
+            }
+            Text { text: "Download e instalação reais ficam para a validação com rede; aqui nada baixa sem a sua confirmação."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: Theme.subtitle }
+        }
+    }
+    Dialog {
+        id: emuConfirm
+        anchors.centerIn: parent; width: Math.min(520, window.width - 60)
+        modal: true; title: "Baixar e instalar?"; standardButtons: Dialog.Cancel
+        contentItem: ColumnLayout {
+            spacing: 12
+            Label {
+                Layout.fillWidth: true; wrapMode: Text.WordWrap
+                text: {
+                    var c = (hub.emus.consulta || {});
+                    return "“" + (c.nome || "?") + "”: " + (c.local || "?") + " → " + (c.tag || "?") + " (~" + (c.tamanho_mb || 0) + " MB). Demora alguns minutos.";
+                }
+            }
+            RowLayout { Layout.fillWidth: true; Item { Layout.fillWidth: true } ActionButton { objectName: "emuConfirmarButton"; text: "Baixar e instalar"; primary: true; enabled: !hub.ocupado; onClicked: { hub.atualizarEmu((hub.emus.consulta || {}).chave || ""); emuConfirm.close() } } }
         }
     }
     YouTubeDialog { id: youtube }

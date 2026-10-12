@@ -100,6 +100,8 @@ class HubBridge(QObject):
     previewMudou = Signal()
     manutencaoMudou = Signal()
     prontosMudou = Signal()
+    emusMudou = Signal()
+    padsMudou = Signal()
     _sessao = Signal(int, float, bool)
     controleAcao = Signal(str)
     controleMudou = Signal()
@@ -220,6 +222,9 @@ class HubBridge(QObject):
                             "precisa_instalar": False, "quarentenaveis": 0,
                             "avisos": [], "erro": ""}
         self._prontos = {"itens": [], "erros": []}
+        self._emus = {"itens": [], "consulta": {}}
+        self._emu_infos: dict[str, dict] = {}
+        self._pads = {"pads": [], "presets": [], "tipos": [], "estado": ""}
         self._controles: list[str] = []
         self._navegador = Navegador()
         self._navegador.bloquear_ate_neutro()
@@ -1834,6 +1839,82 @@ class HubBridge(QObject):
             self.consultarTorrentsProntos()
         self._alterar("Importando concluído…",
                       lambda: self.servico.importar_torrent(save_path), apos)
+
+    @Property("QVariantMap", notify=emusMudou)
+    def emus(self):
+        return self._emus
+
+    @Property("QVariantMap", notify=padsMudou)
+    def pads(self):
+        return self._pads
+
+    @Slot()
+    def consultarEmus(self):
+        self.executar("Lendo emuladores…", self.servico.emus_status,
+                      lambda r: (self._emus.update(itens=list((r or {}).get("itens") or [])),
+                                 self.emusMudou.emit()))
+
+    @Slot(str)
+    def consultarEmu(self, chave):
+        def pronto(r):
+            r = dict(r or {})
+            self._emu_infos[r.get("chave", chave)] = dict(r.get("info") or {})
+            self._emus = {"itens": [r], "consulta": {
+                k: v for k, v in r.items() if k != "info"}}
+            self.emusMudou.emit()
+        self.executar("Consultando release…",
+                      lambda: self.servico.emu_consultar(chave), pronto)
+
+    @Slot(str)
+    def atualizarEmu(self, chave):
+        """Instala o release consultado. A confirmação expressa é da QML."""
+        info = self._emu_infos.get(chave)
+        if not info:
+            self.aviso.emit("Consulte o release antes de atualizar.", True)
+            return
+
+        def apos(_r):
+            self._emu_infos.pop(chave, None)
+            self.consultarEmus()
+        self._alterar("Baixando e instalando…",
+                      lambda: self.servico.emu_atualizar(chave, info), apos)
+
+    @Slot()
+    def consultarPads(self):
+        def trabalho():
+            return {"pads": self.servico.controles_pads().get("pads", []),
+                    "presets": self.servico.controles_presets().get("presets", []),
+                    "tipos": self.servico.controles_tipos().get("tipos", []),
+                    "estado": self._pads.get("estado", "")}
+
+        def pronto(r):
+            self._pads = dict(r or {})
+            self.padsMudou.emit()
+        self.executar("Lendo controles…", trabalho, pronto)
+
+    @Slot(str)
+    def fotografarControle(self, nome):
+        self._alterar("Salvando preset…",
+                      lambda: self.servico.controle_fotografar(nome),
+                      lambda _r: self.consultarPads())
+
+    @Slot(str)
+    def aplicarControle(self, nome):
+        self._alterar("Aplicando preset…",
+                      lambda: self.servico.controle_aplicar(nome))
+
+    @Slot(str)
+    def gerarControle(self, tipo):
+        self._alterar("Gerando mapa…",
+                      lambda: self.servico.controle_gerar(tipo),
+                      lambda _r: self.consultarPads())
+
+    @Slot()
+    def lerEstadoControle(self):
+        def pronto(r):
+            self._pads = {**self._pads, "estado": (r or {}).get("resumo", "")}
+            self.padsMudou.emit()
+        self.executar("Lendo controle…", self.servico.controle_estado, pronto)
 
     @Slot(str, str, str, str, str)
     def adicionarIntegracao(self, chave, nome, descricao, tipo, url):
