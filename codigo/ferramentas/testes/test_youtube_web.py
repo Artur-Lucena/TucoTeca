@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from executar import afirmar
+from executar import afirmar, fundo_segundo_plano
 
 
 def _bridge():
@@ -14,6 +14,7 @@ def _bridge():
 
 
 def _app():
+    fundo_segundo_plano()
     try:
         from PySide6.QtGui import QGuiApplication
     except ImportError:

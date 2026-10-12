@@ -8,10 +8,11 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from executar import afirmar
+from executar import afirmar, fundo_segundo_plano
 
 
 def _app():
+    fundo_segundo_plano()
     try:
         from PySide6.QtGui import QGuiApplication
     except ImportError:
