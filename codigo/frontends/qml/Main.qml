@@ -480,6 +480,12 @@ ApplicationWindow {
                 text: "Pacotes locais…"; implicitHeight: 36
                 onClicked: pacotes.open()
             }
+            ActionButton {
+                objectName: "concluidosButton"
+                visible: hub.secao === "downloads"
+                text: "Importar concluídos…"; implicitHeight: 36
+                onClicked: { hub.consultarTorrentsProntos(); concluidos.open() }
+            }
             ActionButton { visible: hub.secao === "videos"; text: "Pesquisar YouTube…"; implicitHeight: 36; onClicked: youtube.open() }
             TextField {
                 id: youtubeQuery
@@ -701,7 +707,9 @@ ApplicationWindow {
             ActionButton { objectName: "registerGameHoursButton"; Layout.fillWidth: true; text: "Registrar horas…"; enabled: !hub.ocupado && !hub.emJogo && !!hub.selecionado.id; onClicked: window.registerHours(hub.selecionado, "") }
             ActionButton { objectName: "gameToolsButton"; Layout.fillWidth: true; text: "Saves, screenshots e organização…"; enabled: !hub.ocupado; onClicked: { gameTools.gid = hub.selecionado.id; gameTools.open() } }
             ActionButton { visible: (hub.selecionado.origem || "") === "rom-3ds"; Layout.fillWidth: true; text: "Mods, texturas, cheats e presets…"; enabled: !hub.ocupado; onClicked: { emulacaoDialog.gid = hub.selecionado.id; emulacaoDialog.open() } }
-            ActionButton { Layout.fillWidth: true; text: "Remover da biblioteca"; enabled: !hub.ocupado; onClicked: { window.deleteItem("jogos", hub.selecionado); details.close() } }
+            ActionButton { objectName: "gameDiagnosticButton"; Layout.fillWidth: true; text: "Diagnosticar e religar exe/ROM…"; enabled: !hub.ocupado && !!hub.selecionado.id; onClicked: { hub.diagnosticarJogo(hub.selecionado.id); manutencaoDialog.open() } }
+            ActionButton { objectName: "gameElevateButton"; Layout.fillWidth: true; text: "▶  Jogar como administrador (UAC)"; enabled: !hub.ocupado && !hub.emJogo && !!hub.selecionado.id; onClicked: { uacConfirm.gid = hub.selecionado.id; uacConfirm.jogo = hub.selecionado.titulo || ""; uacConfirm.open() } }
+            ActionButton { text: "Remover da biblioteca"; enabled: !hub.ocupado; onClicked: { window.deleteItem("jogos", hub.selecionado); details.close() } }
             Item { Layout.fillHeight: true }
             Text { text: "Notas pessoais"; color: Theme.muted; font { pixelSize: 13; letterSpacing: 2 } }
             TextArea {
@@ -721,7 +729,7 @@ ApplicationWindow {
                 text: "Salvar notas"; enabled: !hub.ocupado && !!hub.selecionado.id
                 onClicked: hub.salvarObservacoes(hub.selecionado.id, notasJogo.text)
             }
-            Text { text: "Importação avançada, atualização de emuladores e sanear pastas continuam nas ferramentas clássicas, em Configurações."; color: Theme.muted; font.pixelSize: 14; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            Text { text: "Saneamento, reparo e atualização de emuladores ficam em Configurações › Manutenção; importar pacotes e pastas está em Configurações › Coleção."; color: Theme.muted; font.pixelSize: 14; Layout.fillWidth: true; wrapMode: Text.WordWrap }
         }
         }
     }
@@ -796,7 +804,16 @@ ApplicationWindow {
             }
             ActionButton { objectName: "importarColecaoButton"; text: "Importar pacote de coleção…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: packageFile.open() }
             ActionButton { text: "Importar pasta de jogos locais…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: gamesFolder.open() }
+            ActionButton { text: "Importar arquivo (exe/ROM) com preview…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: singleGameFile.open() }
             ActionButton { text: "Importar pacote de jogo (.zip/.rar/.7z)…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: repackFile.open() }
+            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
+            Text { text: "MANUTENÇÃO"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "Sanear organiza sobras de instalação e leva instaladores para .hub-lixo, sempre reversível. Mostra o plano antes de aplicar."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            ActionButton { objectName: "sanearButton"; text: "Sanear pasta de jogo…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: sanearFolder.open() }
+            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
+            Text { text: "EMULADORES E CONTROLES"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "Atualização consulta o release e só baixa depois da sua confirmação. Presets de controle aplicam com o Azahar fechado."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            ActionButton { objectName: "emusButton"; text: "Emuladores e controles avançados…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: { hub.consultarEmus(); hub.consultarPads(); emus.open() } }
             ActionButton { objectName: "personalToolsButton"; text: "Perfis, atalhos, vigia, estatísticas e API local…"; Layout.fillWidth: true; onClicked: personalTools.open() }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
             Text { text: "DIAGNÓSTICO"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
@@ -860,7 +877,8 @@ ApplicationWindow {
     FileDialog { id: executableDialog; title: "Escolha o executável"; onAccepted: gameExe.text = decodeURIComponent(selectedFile.toString().replace(Qt.platform.os === "windows" ? /^file:\/\/\// : /^file:\/\//, "")) }
     FolderDialog { id: musicFolder; title: "Importar pasta de músicas"; onAccepted: hub.importarMusicas(selectedFolder) }
     FolderDialog { id: videoFolder; title: "Importar pasta de vídeos"; onAccepted: hub.importarVideos(selectedFolder) }
-    FolderDialog { id: gamesFolder; title: "Importar jogos locais"; onAccepted: hub.importarJogos(selectedFolder) }
+    FolderDialog { id: gamesFolder; title: "Importar jogos locais"; onAccepted: { hub.preverPasta(selectedFolder); importPreview.open() } }
+    FileDialog { id: singleGameFile; title: "Arquivo de jogo (exe/ROM)"; nameFilters: ["Jogos (*.exe *.lnk *.bat *.cmd *.3ds *.3dsx *.cci *.cxi *.elf *.app *.axf *.nds *.dsi)", "Todos (*.*)"]; onAccepted: { hub.analisarArquivo(selectedFile); importPreview.open() } }
     FileDialog { id: repackFile; title: "Pacote de jogo"; nameFilters: ["Pacotes (*.zip *.rar *.7z)"]; onAccepted: hub.importarRepack(selectedFile) }
     FileDialog { id: wishlistFile; title: "Wishlist salva (JSON)"; nameFilters: ["JSON (*.json)"]; onAccepted: hub.importarWishlist(selectedFile) }
     FileDialog { id: packageFile; title: "Pacote da coleção"; nameFilters: ["TucoTeca (*.zip)"]; onAccepted: packageConfirm.open() }
@@ -875,6 +893,162 @@ ApplicationWindow {
             CheckBox { id: restoreSaves; checked: false; text: "Também restaurar saves de emuladores (sobrescreve os atuais)"; Layout.fillWidth: true }
         }
     }
+    Dialog {
+        id: importPreview
+        objectName: "importPreviewDialog"
+        property var selecao: []
+        anchors.centerIn: parent
+        width: Math.min(760, window.width - 80); height: Math.min(580, window.height - 100)
+        modal: true; title: "Importar — preview"; standardButtons: Dialog.Cancel
+        onOpened: recarregarSelecao()
+        onRejected: hub.limparPreview()
+        function recarregarSelecao() {
+            var itens = hub.previewImportacao.itens || [];
+            var nova = [];
+            for (var i = 0; i < itens.length; i++)
+                nova.push((itens[i].score || 0) >= 0.3);
+            selecao = nova;
+        }
+        function indicesMarcados() {
+            var out = [];
+            for (var i = 0; i < selecao.length; i++)
+                if (selecao[i]) out.push(i);
+            return out;
+        }
+        contentItem: ColumnLayout {
+            spacing: 12
+            Label {
+                objectName: "importPreviewResumo"
+                Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.muted
+                text: {
+                    var n = (hub.previewImportacao.itens || []).length;
+                    var t = n + " achado(s). Pré-marcados: score ≥ 0.3.";
+                    if (hub.previewImportacao.info && hub.previewImportacao.info.truncado)
+                        t += " LISTA PARCIAL — refine a pasta.";
+                    if (hub.previewImportacao.info && !hub.previewImportacao.info.emu)
+                        t += " ROMs importam sem executável (emulador ausente).";
+                    return t;
+                }
+            }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 6
+                model: hub.previewImportacao.itens
+                ScrollBar.vertical: ScrollBar {}
+                delegate: RowLayout {
+                    required property var modelData
+                    required property int index
+                    width: ListView.view.width - 12; spacing: 10
+                    CheckBox {
+                        checked: importPreview.selecao.length > index ? importPreview.selecao[index] : false
+                        onToggled: {
+                            var s = importPreview.selecao.slice();
+                            s[index] = checked;
+                            importPreview.selecao = s;
+                        }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 2
+                        Text { text: modelData.titulo || "(sem título)"; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true; elide: Text.ElideRight }
+                        Text { text: (modelData.fonte || modelData.origem || "") + " · " + (modelData.score || 0).toFixed(2); color: Theme.muted; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                    }
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 10
+                ActionButton { text: "Marcar todos"; enabled: !hub.ocupado; onClicked: { var s = []; for (var i = 0; i < (hub.previewImportacao.itens || []).length; i++) s.push(true); importPreview.selecao = s; } }
+                ActionButton { text: "Limpar"; enabled: !hub.ocupado; onClicked: { var s = []; for (var i = 0; i < (hub.previewImportacao.itens || []).length; i++) s.push(false); importPreview.selecao = s; } }
+                Item { Layout.fillWidth: true }
+                ActionButton { objectName: "importPreviewConfirm"; text: "Importar selecionados"; primary: true; enabled: !hub.ocupado && importPreview.indicesMarcados().length > 0; onClicked: { hub.importarSelecionados(importPreview.indicesMarcados()); importPreview.close(); } }
+            }
+            Label { visible: (hub.previewImportacao.itens || []).length === 0; text: "Nada por aqui ainda — escolha uma pasta ou arquivo para ver o preview antes de importar."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+        }
+        Connections { target: hub; function onPreviewMudou() { importPreview.recarregarSelecao(); } }
+    }
+    Dialog {
+        id: manutencaoDialog
+        objectName: "manutencaoDialog"
+        property string campo: ""
+        property int gid: 0
+        anchors.centerIn: parent
+        width: Math.min(620, window.width - 80); height: Math.min(520, window.height - 100)
+        modal: true; title: "Manutenção do jogo"; standardButtons: Dialog.Close
+        onOpened: { campo = ""; gid = hub.selecionado.id }
+        contentItem: ColumnLayout {
+            spacing: 12
+            Text { text: (hub.manutencao.titulo || hub.selecionado.titulo || "") + " — plano do que será religado"; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Label {
+                objectName: "manutencaoExe"
+                Layout.fillWidth: true; wrapMode: Text.WordWrap
+                text: {
+                    var d = hub.manutencao.exe || {};
+                    if (d.estado === "ok") return "Executável: ok (" + (d.atual || d.gravado || "?") + ")";
+                    if (d.estado === "trocou-emulador")
+                        return "Emulador trocado: " + (d.atual || "?") + " pode substituir " + (d.gravado || "?");
+                    return "Executável: " + (d.estado || "?") + " — " + (d.gravado || d.atual || "sem caminho");
+                }
+            }
+            Label {
+                objectName: "manutencaoRom"
+                Layout.fillWidth: true; wrapMode: Text.WordWrap
+                visible: { var e = (hub.manutencao.rom || {}).estado; return !!e && e !== "ok"; }
+                text: "ROM ausente: " + ((hub.manutencao.rom || {}).gravado || "?")
+            }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 6
+                model: ((hub.manutencao.rom || {}).candidatos || [])
+                ScrollBar.vertical: ScrollBar {}
+                delegate: RowLayout {
+                    required property var modelData
+                    width: ListView.view.width - 12
+                    ActionButton { text: "Religar para este"; Layout.fillWidth: true; enabled: !hub.ocupado && hub.manutencao.gid > 0; onClicked: { manutencaoDialog.campo = "launch_options"; manutencaoDialog.gid = hub.manutencao.gid || hub.selecionado.id; hub.religarJogo(manutencaoDialog.gid, "launch_options", modelData) } }
+                }
+            }
+            Text { visible: (((hub.manutencao.rom || {}).candidatos || []).length === 0) && (hub.manutencao.rom || {}).estado === "rom-ausente"; text: "Nenhum candidato encontrado nas pastas de ROM. Use “Religar à mão” e informe o caminho novo."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 10
+                TextField { id: romManual; objectName: "manutencaoCaminho"; Layout.fillWidth: true; placeholderText: "Novo caminho (ROM ou executável)" }
+                ActionButton { objectName: "manutencaoReligar"; text: "Religar à mão"; enabled: !hub.ocupado && hub.manutencao.gid > 0 && romManual.text.length > 0; onClicked: hub.religarJogo(hub.manutencao.gid, (hub.selecionado.origem || "").indexOf("rom-") === 0 ? "launch_options" : "executable_path", romManual.text) }
+            }
+            Text { text: "Religar só troca o caminho gravado e preserva horas, notas, saves e etiquetas."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+        }
+    }
+    Dialog {
+        id: uacConfirm
+        property int gid: 0
+        property string jogo: ""
+        anchors.centerIn: parent; width: Math.min(520, window.width - 60)
+        modal: true; title: "Elevar privilégios (UAC)?"; standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: hub.jogarElevado(uacConfirm.gid)
+        ColumnLayout {
+            width: parent.width; spacing: 12
+            Label { text: "O Windows pedirá confirmação do Controle de Conta de Usuário para abrir “" + uacConfirm.jogo + "” como administrador. Use só se o jogo exigir; com elevação o Hub não rastreia as horas sozinho — registre a sessão ao terminar."; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            CheckBox { id: uacEntendi; checked: false; text: "Entendi e quero elevar só este jogo"; Layout.fillWidth: true }
+        }
+        footer: RowLayout { Item { Layout.fillWidth: true } ActionButton { text: "Cancelar"; onClicked: uacConfirm.reject() } ActionButton { text: "Elevar e jogar"; primary: true; enabled: uacEntendi.checked; onClicked: uacConfirm.accept() } }
+    }
+    Dialog {
+        id: sanearPlanoDialog
+        objectName: "sanearPlanoDialog"
+        anchors.centerIn: parent; width: Math.min(600, window.width - 60)
+        modal: true; title: "Sanear pasta — plano"; standardButtons: Dialog.Cancel
+        contentItem: ColumnLayout {
+            spacing: 12
+            Label {
+                objectName: "sanearPlanoResumo"
+                Layout.fillWidth: true; wrapMode: Text.WordWrap
+                text: {
+                    var s = hub.saneamento;
+                    if (s.erro && !s.ok) return s.erro;
+                    var t = "Pasta: " + (s.pasta || "?") + "\nExecutável: " + (s.exe || (s.precisa_instalar ? "só instalador" : "nenhum"));
+                    if (s.quarentenaveis) t += "\n" + s.quarentenaveis + " instalador(es) vão para .hub-lixo (reversível)";
+                    if (s.avisos && s.avisos.length) t += "\n" + s.avisos.join("\n");
+                    return t;
+                }
+            }
+            RowLayout { Layout.fillWidth: true; Item { Layout.fillWidth: true } ActionButton { objectName: "sanearPlanoAplicar"; text: "Aplicar"; primary: true; enabled: !hub.ocupado && hub.saneamento.ok === true; onClicked: { hub.aplicarSaneamento(hub.saneamento.pasta); sanearPlanoDialog.close() } } }
+        }
+    }
+    FolderDialog { id: sanearFolder; title: "Pasta do jogo para sanear"; onAccepted: { hub.planejarSaneamento(selectedFolder); sanearPlanoDialog.open() } }
     Dialog {
         id: wishDialog
         anchors.centerIn: parent; width: 470; modal: true; title: "Adicionar desejo"
@@ -1153,6 +1327,177 @@ ApplicationWindow {
     SpotifyDialog { id: spotifyCatalog; onConfigureProviders: providers.open(); onShowDownloads: { close(); musicDownloads.open() } }
     MusicDownloadsDialog { id: musicDownloads }
     PiratasDialog { id: pacotes }
+    Dialog {
+        id: concluidos
+        objectName: "concluidosDialog"
+        title: "Torrents concluídos · importar para a coleção"
+        anchors.centerIn: parent
+        width: Math.min(720, window.width - 80); height: Math.min(560, window.height - 100)
+        modal: true; standardButtons: Dialog.Close
+        onOpened: hub.consultarTorrentsProntos()
+        contentItem: ColumnLayout {
+            spacing: 12
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    text: "Só entra aqui o que chegou a 100%. Download incompleto não importa pela metade."
+                    color: Theme.muted
+                    Layout.fillWidth: true; wrapMode: Text.WordWrap; font.pixelSize: Theme.subtitle
+                }
+                ActionButton { text: "↻ Atualizar"; enabled: !hub.ocupado; onClicked: hub.consultarTorrentsProntos() }
+            }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 10
+                model: (hub.torrentsProntos.itens || [])
+                ScrollBar.vertical: ScrollBar {}
+                delegate: Rectangle {
+                    required property var modelData
+                    width: ListView.view.width - 12
+                    implicitHeight: 76; radius: 10; color: Theme.surface
+                    RowLayout {
+                        anchors.fill: parent; anchors.margins: 14; spacing: 14
+                        ColumnLayout {
+                            Layout.fillWidth: true; spacing: 4
+                            Text {
+                                objectName: "concluidoNome"
+                                text: modelData.nome || ""
+                                color: Theme.text; font { pixelSize: 15; weight: Font.DemiBold }
+                                Layout.fillWidth: true; elide: Text.ElideRight
+                            }
+                            Text {
+                                text: modelData.estado === "pasta" ? "Pasta pronta · organiza e importa" :
+                                      modelData.estado === "arquivo" ? "Arquivo pronto · extrai e importa" :
+                                      modelData.estado === "sumiu" ? "Sumiu do disco · nada a importar" :
+                                      "Formato não suportado · nada a importar"
+                                color: modelData.estado === "sumiu" || modelData.estado === "nao-suportado" ? Theme.warning : Theme.muted
+                                font.pixelSize: Theme.subtitle; Layout.fillWidth: true; elide: Text.ElideRight
+                            }
+                        }
+                        ActionButton {
+                            objectName: "concluidoImportarButton"
+                            visible: modelData.estado === "pasta" || modelData.estado === "arquivo"
+                            text: "Importar"; primary: true; enabled: !hub.ocupado
+                            onClicked: hub.importarTorrent(modelData.save_path)
+                        }
+                    }
+                }
+            }
+            Text {
+                visible: (hub.torrentsProntos.itens || []).length === 0
+                text: "Nada 100% ainda. Concluídos aparecem aqui; a origem do download é preservada."
+                color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true
+            }
+        }
+    }
+    Dialog {
+        id: emus
+        objectName: "emusDialog"
+        title: "Emuladores e controles avançados"
+        anchors.centerIn: parent
+        width: Math.min(760, window.width - 80); height: Math.min(620, window.height - 80)
+        modal: true; standardButtons: Dialog.Close
+        onOpened: { hub.consultarEmus(); hub.consultarPads() }
+        contentItem: ColumnLayout {
+            spacing: 12
+            Text { text: "EMULADORES"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            ListView {
+                Layout.fillWidth: true; Layout.preferredHeight: 150; clip: true; spacing: 10
+                model: (hub.emus.itens || [])
+                ScrollBar.vertical: ScrollBar {}
+                delegate: Rectangle {
+                    required property var modelData
+                    width: ListView.view.width - 12
+                    implicitHeight: 76; radius: 10; color: Theme.surface
+                    RowLayout {
+                        anchors.fill: parent; anchors.margins: 14; spacing: 14
+                        ColumnLayout {
+                            Layout.fillWidth: true; spacing: 4
+                            Text {
+                                objectName: "emuNome"
+                                text: modelData.nome || ""
+                                color: Theme.text; font { pixelSize: 15; weight: Font.DemiBold }
+                                Layout.fillWidth: true; elide: Text.ElideRight
+                            }
+                            Text {
+                                text: {
+                                    var c = (hub.emus.consulta || {});
+                                    if (c.chave === modelData.chave && c.tag)
+                                        return "Instalada: " + (c.local || "?") + " → remota: " + c.tag + (c.atualizado ? " ✓" : " (" + (c.tamanho_mb || 0) + " MB)");
+                                    return "Instalada: " + (modelData.local || "ausente");
+                                }
+                                color: Theme.muted
+                                font.pixelSize: Theme.subtitle; Layout.fillWidth: true; elide: Text.ElideRight
+                            }
+                        }
+                        ActionButton { text: "Consultar"; enabled: !hub.ocupado; onClicked: hub.consultarEmu(modelData.chave) }
+                        ActionButton {
+                            objectName: "emuAtualizarButton"
+                            text: "Atualizar"; primary: true
+                            enabled: !hub.ocupado && (hub.emus.consulta || {}).chave === modelData.chave && (hub.emus.consulta || {}).tag && (hub.emus.consulta || {}).atualizado === false
+                            onClicked: emuConfirm.open()
+                        }
+                    }
+                }
+            }
+            Text { text: "CONTROLES"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text {
+                objectName: "padsResumo"
+                Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.muted
+                text: {
+                    var ps = (hub.pads.pads || []).map(function(p) { return p.nome || "?"; });
+                    return "Pads: " + (ps.length ? ps.join("; ") : "nenhum controle") + " — feche o Azahar para aplicar.";
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 10
+                ComboBox {
+                    id: presetBox; objectName: "presetBox"
+                    Layout.fillWidth: true; implicitHeight: 36
+                    model: (hub.pads.presets || [])
+                }
+                ActionButton { text: "Aplicar"; enabled: !hub.ocupado && (hub.pads.presets || []).length > 0; onClicked: hub.aplicarControle(presetBox.currentText) }
+            }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 10
+                TextField { id: presetNome; objectName: "presetNome"; Layout.fillWidth: true; placeholderText: "Nome do novo preset" }
+                ActionButton { text: "Fotografar"; enabled: !hub.ocupado && presetNome.text.length > 0; onClicked: hub.fotografarControle(presetNome.text) }
+                ComboBox {
+                    id: tipoBox; objectName: "tipoBox"
+                    implicitWidth: 200; implicitHeight: 36
+                    textRole: "nome"; valueRole: "tipo"
+                    model: (hub.pads.tipos || [])
+                }
+                ActionButton { text: "Gerar mapa"; enabled: !hub.ocupado && (hub.pads.tipos || []).length > 0; onClicked: hub.gerarControle(tipoBox.currentValue) }
+            }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 10
+                ActionButton { text: "Testar (ler botões)"; enabled: !hub.ocupado; onClicked: hub.lerEstadoControle() }
+                Text {
+                    objectName: "padEstado"
+                    Layout.fillWidth: true; elide: Text.ElideRight
+                    color: Theme.muted; font.pixelSize: Theme.subtitle
+                    text: (hub.pads.estado || "Aperte Testar e mexa no controle — sem hardware, mostra a ausência.")
+                }
+            }
+            Text { text: "Download e instalação reais ficam para a validação com rede; aqui nada baixa sem a sua confirmação."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: Theme.subtitle }
+        }
+    }
+    Dialog {
+        id: emuConfirm
+        anchors.centerIn: parent; width: Math.min(520, window.width - 60)
+        modal: true; title: "Baixar e instalar?"; standardButtons: Dialog.Cancel
+        contentItem: ColumnLayout {
+            spacing: 12
+            Label {
+                Layout.fillWidth: true; wrapMode: Text.WordWrap
+                text: {
+                    var c = (hub.emus.consulta || {});
+                    return "“" + (c.nome || "?") + "”: " + (c.local || "?") + " → " + (c.tag || "?") + " (~" + (c.tamanho_mb || 0) + " MB). Demora alguns minutos.";
+                }
+            }
+            RowLayout { Layout.fillWidth: true; Item { Layout.fillWidth: true } ActionButton { objectName: "emuConfirmarButton"; text: "Baixar e instalar"; primary: true; enabled: !hub.ocupado; onClicked: { hub.atualizarEmu((hub.emus.consulta || {}).chave || ""); emuConfirm.close() } } }
+        }
+    }
     YouTubeDialog { id: youtube }
     MediaToolsDialog { id: mediaTools }
     GameToolsDialog { id: gameTools }

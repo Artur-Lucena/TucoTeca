@@ -780,8 +780,312 @@ class ServicoBiblioteca:
         roots, itens, info = core.preview_scan([pasta])
         return self.alterar(lambda con: core.importar_lista(con, itens))
 
+    def prever_pasta(self, pasta):
+        """Preview só-leitura de pasta (PC + ROMs). Sem backup, sem escrita."""
+        pasta = (pasta or "").strip()
+        if not pasta:
+            return {"ok": False, "raizes": [], "itens": [], "info": {},
+                    "erro": "Escolha uma pasta para varrer."}
+        try:
+            raizes, itens, info = core.preview_pasta([pasta])
+        except Exception as e:
+            return {"ok": False, "raizes": [], "itens": [], "info": {},
+                    "erro": f"falha na varredura: {e}"}
+        return {"ok": True, "raizes": list(raizes or []),
+                "itens": [dict(it) for it in (itens or [])],
+                "info": dict(info or {}), "erro": ""}
+
+    def analisar_arquivo(self, caminho):
+        """Classifica um caminho sem importar. Só leitura."""
+        caminho = (caminho or "").strip()
+        if not caminho:
+            return {"ok": False, "tipo": "desconhecido", "item": None,
+                    "provedor": None, "detalhe": "caminho vazio.", "aviso": None}
+        try:
+            ana = core.analisar_arquivo(caminho)
+        except Exception as e:
+            return {"ok": False, "tipo": "desconhecido", "item": None,
+                    "provedor": None, "detalhe": f"falha na análise: {e}",
+                    "aviso": None}
+        return {"ok": True, "tipo": ana.get("tipo"), "item": ana.get("item"),
+                "provedor": ana.get("provedor"), "detalhe": ana.get("detalhe", ""),
+                "aviso": ana.get("aviso")}
+
+    def importar_selecionados(self, itens):
+        """Importa a seleção do preview, com backup. Nada antes da seleção."""
+        sel = [dict(it) for it in (itens or [])
+               if isinstance(it, dict) and (it.get("titulo") or it.get("executable_path"))]
+        if not sel:
+            raise ValueError("Nada selecionado para importar.")
+        return self.alterar(lambda con: core.importar_lista(con, sel))
+
+    def sanear_plano(self, caminho):
+        """Plano de saneamento. Só leitura: nada é movido ou apagado.
+
+        Devolve o que a organização faria (pasta resolvida, executável, sobras
+        que iriam para .hub-lixo) para a interface mostrar antes de aplicar.
+        """
+        from bib_nucleo.rede.repacks import achar_exe
+        pasta = (caminho or "").strip()
+        if not pasta:
+            return {"ok": False, "pasta": "", "exe": None, "precisa_instalar": False,
+                    "quarentenaveis": 0, "avisos": ["escolha uma pasta."], "erro": ""}
+        base = Path(pasta)
+        if not base.is_dir():
+            return {"ok": False, "pasta": str(base), "exe": None,
+                    "precisa_instalar": False, "quarentenaveis": 0,
+                    "avisos": [], "erro": "pasta não encontrada."}
+        from bib_nucleo.rede.repacks import _pasta_conteudo
+        base = _pasta_conteudo(base)
+        ach = achar_exe(base)
+        if not ach.get("ok"):
+            if ach.get("precisa_instalar"):
+                return {"ok": True, "pasta": str(base), "exe": None,
+                        "precisa_instalar": True, "quarentenaveis": 0,
+                        "avisos": ["só há instalador: a pasta fica como está."],
+                        "erro": ""}
+            return {"ok": False, "pasta": str(base), "exe": None,
+                    "precisa_instalar": False, "quarentenaveis": 0, "avisos": [],
+                    "erro": ach.get("erro", "sem executável.")}
+        sobras = 0
+        try:
+            sobras = len(sorted(base.glob("setup*.exe")))
+        except OSError:
+            sobras = 0
+        return {"ok": True, "pasta": str(base), "exe": ach.get("exe"),
+                "precisa_instalar": False, "quarentenaveis": sobras,
+                "avisos": ([f"{sobras} instalador(es) iriam para .hub-lixo (reversível)."]
+                           if sobras else []),
+                "erro": ""}
+
+    def sanear_pasta(self, caminho):
+        """Aplica o saneamento. Reversível (.hub-lixo); depende de sanear_plano."""
+        from bib_nucleo.rede.repacks import sanear_pasta as _sanear
+        pasta = (caminho or "").strip()
+        if not pasta:
+            raise ValueError("Escolha uma pasta para sanear.")
+        r = _sanear(pasta)
+        if not r.get("ok"):
+            raise ValueError(r.get("erro", "Não foi possível sanear a pasta."))
+        return r
+
+    def diagnosticar_jogo(self, gid):
+        """Diagnóstico só-leitura de exe/ROM: estado, caminho e candidatos."""
+        jogo = self.jogo(gid)
+        return {"gid": gid, "titulo": jogo.get("titulo") or "",
+                "exe": core.diagnosticar_exe(jogo), "rom": core.diagnosticar_rom(jogo),
+                "jogo": jogo}
+
+    _RELIGAR_CAMPOS = ("launch_options", "executable_path", "exe_win", "exe_linux")
+
+    def religar_jogo(self, gid, campo, caminho):
+        """Grava um novo caminho de exe/ROM escolhido pelo usuário. Com backup."""
+        campo = str(campo or "")
+        caminho = str(caminho or "").strip()
+        if campo not in self._RELIGAR_CAMPOS:
+            raise ValueError("Campo inválido para religar.")
+        if not caminho:
+            raise ValueError("Informe o novo caminho.")
+        return self.alterar(lambda con: core.atualizar_jogo(con, gid, {campo: caminho}))
+
+    def iniciar_jogo_elevado(self, gid):
+        """Relança o jogo com elevação explícita (UAC). Confirmação é da UI."""
+        jogo = self.jogo(gid)
+        preparo = core.preparar_lancamento(jogo)
+        r = core.executar_jogo_dict(jogo, elevar=True)
+        if not r.get("ok"):
+            raise ValueError(r.get("erro", "Não foi possível iniciar com elevação."))
+        with closing(core.get_db(self.db_path)) as con:
+            core.marcar_execucao(con, gid)
+        try:
+            core.iniciar_sessao_manual(gid, jogo.get("titulo") or "")
+        except Exception as e:
+            # sessão manual é rastreamento auxiliar; não falha o lançamento
+            core.log_erro("jogar-uac", f"sessão manual não abriu: {e}")
+        return {"ok": True, "modo": r.get("modo", "runas-uac"),
+                "aviso": preparo.get("aviso", "")}
+        return self.alterar(lambda con: core.importar_lista(con, sel))
+
+    def torrents_prontos(self):
+        """Torrents 100% com caminho conhecido. Só leitura.
+
+        Download incompleto não entra na lista: nada de importar pela metade.
+        Devolve {"itens": [...], "erros": [...]} com o estado de cada alvo.
+        """
+        from bib_nucleo.rede.repacks import ARQUIVO_EXTS
+        leitura = core.listar_torrents()
+        erro = leitura.get("erro") if isinstance(leitura, dict) else None
+        torrents = leitura.get("torrents") if isinstance(leitura, dict) else []
+        prontos: list[dict] = []
+        for t in torrents or []:
+            if not isinstance(t, dict) or not (t.get("completo") and t.get("save_path")):
+                continue
+            alvo = Path(str(t["save_path"]))
+            if alvo.is_file():
+                if alvo.suffix.lower() in ARQUIVO_EXTS:
+                    estado = "arquivo"
+                else:
+                    estado = "nao-suportado"
+            elif alvo.is_dir():
+                estado = "pasta"
+            else:
+                estado = "sumiu"
+            prontos.append({"hash": t.get("hash", ""), "nome": t.get("nome") or alvo.name,
+                            "save_path": str(alvo), "estado": estado,
+                            "progresso": t.get("progresso", 1.0)})
+        return {"itens": prontos, "erros": [erro] if erro else list(leitura.get("erros") or [])}
+
+    def importar_torrent(self, save_path):
+        """Importa UM torrent concluído, com backup. Preserva a origem."""
+        caminho = (save_path or "").strip()
+        if not caminho:
+            raise ValueError("Informe o caminho do download concluído.")
+        alvo = Path(caminho)
+        if not alvo.exists():
+            raise ValueError("O arquivo/pasta não está mais no disco.")
+
+        def trabalho(con):
+            if not core.dentro_do_destino(alvo):
+                org = core.organizar_no_destino(alvo)
+                if not org.get("ok"):
+                    raise ValueError(org.get("erro", "Não foi possível organizar o download."))
+                alvo_local = Path(org["path"])
+            else:
+                alvo_local = alvo
+            if alvo_local.is_file():
+                from bib_nucleo.rede.repacks import ARQUIVO_EXTS
+                if alvo_local.suffix.lower() not in ARQUIVO_EXTS:
+                    raise ValueError("Formato não suportado para importar.")
+                res = core.importar_repack(con, str(alvo_local))
+                if res.get("precisa_instalar"):
+                    return {"ok": True, "titulo": res.get("titulo"),
+                            "avisos": ["instalador baixado: rode o setup e importe a pasta."]}
+                return res
+            _roots, itens, _info = core.preview_pasta([str(alvo_local)])
+            if not itens:
+                raise ValueError("Nada importável nesta pasta.")
+            return core.importar_lista(con, itens)
+        return self.alterar(trabalho)
+
     def importar_repack_local(self, caminho):
         return self.alterar(lambda con: core.importar_repack(con, caminho))
+
+    _EMU_CHAVES = ("azahar", "desmume")
+
+    def emus_status(self):
+        """Status local dos emuladores. Só leitura, sem rede.
+
+        O remoto só aparece depois de emu_consultar (rede explícita).
+        """
+        itens = []
+        for chave, prov in core.provedores().items():
+            if chave not in self._EMU_CHAVES:
+                continue
+            try:
+                local = prov["versao_local"]() or ""
+            except Exception:
+                local = ""
+            itens.append({"chave": chave, "nome": prov.get("nome", chave),
+                          "local": local, "tag": "", "atualizado": None})
+        return {"itens": itens}
+
+    def emu_consultar(self, chave):
+        """Consulta o release remoto (rede). Devolve local × remoto + info.
+
+        A info volta para a ponte guardar; a instalação só ocorre em
+        emu_atualizar, depois de confirmação expressa na UI.
+        """
+        chave = (chave or "").strip()
+        prov = core.provedores().get(chave)
+        if prov is None:
+            raise ValueError("Emulador desconhecido.")
+        info = prov["release_info"]()
+        if not isinstance(info, dict) or info.get("erro"):
+            raise ValueError((info or {}).get("erro", "Não foi possível consultar o release."))
+        try:
+            local = prov["versao_local"]() or ""
+        except Exception:
+            local = ""
+        tag = info.get("tag") or "?"
+        return {"chave": chave, "nome": prov.get("nome", chave), "local": local,
+                "tag": tag, "tamanho_mb": round((info.get("size") or 0) / 1048576),
+                "atualizado": bool(local and local == tag), "info": dict(info)}
+
+    def emu_atualizar(self, chave, info):
+        """Baixa e instala o release já consultado. Rede + escrita, com confirmação da UI."""
+        chave = (chave or "").strip()
+        prov = core.provedores().get(chave)
+        if prov is None:
+            raise ValueError("Emulador desconhecido.")
+        if not isinstance(info, dict) or not info.get("tag"):
+            raise ValueError("Consulte o release antes de atualizar.")
+        r = prov["instalar"](dict(info))
+        if not isinstance(r, dict) or not r.get("ok"):
+            raise ValueError((r or {}).get("erro", "Não foi possível instalar o emulador."))
+        return r
+
+    def controles_pads(self):
+        """Pads detectados. Só leitura; sem pads é lista vazia, não erro."""
+        try:
+            pads = core.listar_controles() or []
+        except Exception:
+            pads = []
+        return {"pads": [dict(p) for p in pads]}
+
+    def controles_presets(self):
+        try:
+            nomes = core.listar_presets_controle() or []
+        except Exception:
+            nomes = []
+        return {"presets": [str(n) for n in nomes]}
+
+    def controles_tipos(self):
+        tipos = sorted(core.NOMES_TIPO)
+        return {"tipos": [{"tipo": t, "nome": core.NOMES_TIPO[t]} for t in tipos]}
+
+    def controle_fotografar(self, nome):
+        nome = (nome or "").strip()
+        if not nome:
+            raise ValueError("Dê um nome ao preset.")
+        r = core.fotografar_perfil(nome)
+        if not isinstance(r, dict) or not r.get("ok"):
+            raise ValueError((r or {}).get("erro", "Não foi possível salvar o preset."))
+        return r
+
+    def controle_aplicar(self, nome):
+        nome = (nome or "").strip()
+        if not nome:
+            raise ValueError("Escolha um preset para aplicar.")
+        r = core.aplicar_preset_controle(nome)
+        if not isinstance(r, dict) or not r.get("ok"):
+            raise ValueError((r or {}).get("erro", "Não foi possível aplicar o preset."))
+        return r
+
+    def controle_gerar(self, tipo):
+        tipo = (tipo or "").strip()
+        if tipo not in core.NOMES_TIPO:
+            raise ValueError("Escolha um tipo de controle.")
+        guid, port, rot = "", 0, {}
+        try:
+            det = core.detectar_sdl()
+            if det:
+                guid, port = det[0].get("guid", ""), det[0].get("port", 0)
+            rot = core.nomes_sdl()
+        except Exception:
+            pass
+        r = core.salvar_mapa_gerado(tipo, guid=guid, port=port,
+                                    nome=f"{tipo}-hub", rotulos=rot)
+        if not isinstance(r, dict) or not r.get("ok"):
+            raise ValueError((r or {}).get("erro", "Não foi possível gerar o mapa."))
+        return r
+
+    def controle_estado(self):
+        """Resumo ao vivo do pad 0. Hardware real em produção; testes simulam."""
+        try:
+            est = core.ler_estado_xinput(0)
+        except Exception as e:
+            raise ValueError(f"Sem leitura do controle: {e}")
+        return {"resumo": core.resumir_estado(est)}
 
     def pacotes_piratas(self):
         with closing(core.get_db(self.db_path)) as con:

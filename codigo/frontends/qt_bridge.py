@@ -97,6 +97,11 @@ class HubBridge(QObject):
     jogoIniciado = Signal()
     jogoTerminou = Signal()
     pedirClassico = Signal()
+    previewMudou = Signal()
+    manutencaoMudou = Signal()
+    prontosMudou = Signal()
+    emusMudou = Signal()
+    padsMudou = Signal()
     _sessao = Signal(int, float, bool)
     controleAcao = Signal(str)
     controleMudou = Signal()
@@ -211,6 +216,15 @@ class HubBridge(QObject):
         self._timer_screenshots.timeout.connect(self._atualizar_screenshots)
         self._timer_screenshots.start()
         self._emulacao = FerramentasEmulador(self)
+        self._preview = {"itens": [], "info": {}, "raizes": [], "origem": "", "erro": ""}
+        self._manutencao = {"gid": 0, "titulo": "", "exe": {}, "rom": {}}
+        self._saneamento = {"ok": False, "pasta": "", "exe": None,
+                            "precisa_instalar": False, "quarentenaveis": 0,
+                            "avisos": [], "erro": ""}
+        self._prontos = {"itens": [], "erros": []}
+        self._emus = {"itens": [], "consulta": {}}
+        self._emu_infos: dict[str, dict] = {}
+        self._pads = {"pads": [], "presets": [], "tipos": [], "estado": ""}
         self._controles: list[str] = []
         self._navegador = Navegador()
         self._navegador.bloquear_ate_neutro()
@@ -846,6 +860,148 @@ class HubBridge(QObject):
     @Slot(QUrl)
     def importarRepack(self, url):
         self._alterar("Importando pacote de jogo…", lambda: self.servico.importar_repack_local(url.toLocalFile()))
+
+    @Property("QVariantMap", notify=previewMudou)
+    def previewImportacao(self):
+        return self._preview
+
+    def _preview_pronta(self, r):
+        r = dict(r or {})
+        self._preview = {"itens": list(r.get("itens") or []),
+                         "info": dict(r.get("info") or {}),
+                         "raizes": list(r.get("raizes") or []),
+                         "origem": str(r.get("origem") or ""),
+                         "erro": str(r.get("erro") or "")}
+        self.previewMudou.emit()
+        if not r.get("ok"):
+            self.aviso.emit(self._preview["erro"] or "Falha na varredura.", True)
+
+    @Slot(QUrl)
+    def preverPasta(self, url):
+        pasta = url.toLocalFile()
+        self.executar("Varrendo pasta…",
+                      lambda: dict(self.servico.prever_pasta(pasta), origem="pasta"),
+                      self._preview_pronta)
+
+    @Slot(QUrl)
+    def analisarArquivo(self, url):
+        caminho = url.toLocalFile()
+
+        def trabalho():
+            ana = self.servico.analisar_arquivo(caminho)
+            if not ana.get("ok"):
+                return dict(ana, origem="arquivo")
+            tipo = ana.get("tipo")
+            if tipo == "pasta":
+                return dict(self.servico.prever_pasta(caminho), origem="pasta")
+            if tipo in ("rom", "jogo") and isinstance(ana.get("item"), dict):
+                item = dict(ana["item"])
+                return {"ok": True, "raizes": [], "itens": [item],
+                        "info": {"vistos": 1, "truncado": False,
+                                 "raizes": [], "origem": "arquivo"},
+                        "erro": "", "origem": "arquivo",
+                        "detalhe": ana.get("detalhe", ""),
+                        "aviso": ana.get("aviso")}
+            return {"ok": True, "raizes": [], "itens": [],
+                    "info": {"vistos": 0, "truncado": False, "raizes": []},
+                    "erro": "", "origem": "arquivo",
+                    "detalhe": ana.get("detalhe", ""),
+                    "aviso": ana.get("aviso"),
+                    "tipo": tipo}
+        self.executar("Analisando arquivo…", trabalho, self._preview_pronta)
+
+    @Slot("QVariantList")
+    def importarSelecionados(self, indices):
+        try:
+            idx = [int(i) for i in (indices or [])]
+        except (TypeError, ValueError):
+            self.aviso.emit("Seleção inválida.", True)
+            return
+        itens = self._preview.get("itens") or []
+        sel = [itens[i] for i in idx if 0 <= i < len(itens)]
+        if not sel:
+            self.aviso.emit("Nada selecionado para importar.", False)
+            return
+
+        def apos(_r):
+            self._preview = {"itens": [], "info": {}, "raizes": [], "origem": "", "erro": ""}
+            self.previewMudou.emit()
+        self._alterar("Importando selecionados…",
+                      lambda: self.servico.importar_selecionados(sel), apos)
+
+    @Slot()
+    def limparPreview(self):
+        self._preview = {"itens": [], "info": {}, "raizes": [], "origem": "", "erro": ""}
+        self.previewMudou.emit()
+
+    @Property("QVariantMap", notify=manutencaoMudou)
+    def manutencao(self):
+        return self._manutencao
+
+    @Property("QVariantMap", notify=manutencaoMudou)
+    def saneamento(self):
+        return self._saneamento
+
+    def _limpar_manutencao(self):
+        self._manutencao = {"gid": 0, "titulo": "", "exe": {}, "rom": {}}
+        self.manutencaoMudou.emit()
+
+    @Slot(QUrl)
+    def planejarSaneamento(self, url):
+        def trabalho():
+            return self.servico.sanear_plano(url.toLocalFile())
+        self._saneamento = {"ok": False, "pasta": "", "exe": None,
+                            "precisa_instalar": False, "quarentenaveis": 0,
+                            "avisos": [], "erro": "analisando…"}
+        self.manutencaoMudou.emit()
+        self.executar("Analisando pasta…", trabalho, self._saneamento_pronto)
+
+    def _saneamento_pronto(self, r):
+        self._saneamento = dict(r or {})
+        self.manutencaoMudou.emit()
+        if not (r or {}).get("ok"):
+            self.aviso.emit(self._saneamento.get("erro") or "Falha ao analisar a pasta.", True)
+
+    @Slot(str)
+    def aplicarSaneamento(self, pasta):
+        self._alterar("Sanear, organizar e aplicar…",
+                      lambda: self.servico.sanear_pasta(pasta))
+
+    @Slot(int)
+    def diagnosticarJogo(self, gid):
+        def trabalho():
+            return self.servico.diagnosticar_jogo(int(gid))
+        self.executar("Diagnosticando exe/ROM…", trabalho, self._diagnostico_pronto)
+
+    def _diagnostico_pronto(self, r):
+        r = dict(r or {})
+        self._manutencao = {"gid": r.get("gid", 0), "titulo": r.get("titulo", ""),
+                            "exe": dict(r.get("exe") or {}),
+                            "rom": dict(r.get("rom") or {})}
+        self.manutencaoMudou.emit()
+
+    @Slot(int, str, str)
+    def religarJogo(self, gid, campo, caminho):
+        self._alterar("Religando jogo…",
+                      lambda: self.servico.religar_jogo(int(gid), campo, caminho),
+                      lambda _r: self.diagnosticarJogo(int(gid)))
+
+    @Slot(int)
+    def jogarElevado(self, gid):
+        if self.ocupado or self._em_jogo:
+            self.aviso.emit("Aguarde a operação/sessão atual terminar.", False)
+            return
+        self._em_jogo = True
+        self._jogo_gid = gid
+        self.mudou.emit()
+        self.executar("Pedindo elevação…", lambda: self.servico.iniciar_jogo_elevado(int(gid)),
+                      self._jogo_elevado_pronto)
+
+    def _jogo_elevado_pronto(self, r):
+        self.aviso.emit((r or {}).get("aviso") or
+                        "Iniciado com elevação. Registre a sessão ao terminar.", False)
+        self.jogoIniciado.emit()
+        self.mudou.emit()
 
     @Property("QVariantList", notify=mudou)
     def pacotesPiratas(self):
@@ -1664,6 +1820,101 @@ class HubBridge(QObject):
     @Slot()
     def iniciarDownloads(self):
         self._alterar("Iniciando qBittorrent…", core.qbit_iniciar)
+
+    @Property("QVariantMap", notify=prontosMudou)
+    def torrentsProntos(self):
+        return self._prontos
+
+    @Slot()
+    def consultarTorrentsProntos(self):
+        def pronto(r):
+            self._prontos = {"itens": list((r or {}).get("itens") or []),
+                             "erros": list((r or {}).get("erros") or [])}
+            self.prontosMudou.emit()
+        self.executar("Verificando concluídos…", self.servico.torrents_prontos, pronto)
+
+    @Slot(str)
+    def importarTorrent(self, save_path):
+        def apos(_r):
+            self.consultarTorrentsProntos()
+        self._alterar("Importando concluído…",
+                      lambda: self.servico.importar_torrent(save_path), apos)
+
+    @Property("QVariantMap", notify=emusMudou)
+    def emus(self):
+        return self._emus
+
+    @Property("QVariantMap", notify=padsMudou)
+    def pads(self):
+        return self._pads
+
+    @Slot()
+    def consultarEmus(self):
+        self.executar("Lendo emuladores…", self.servico.emus_status,
+                      lambda r: (self._emus.update(itens=list((r or {}).get("itens") or [])),
+                                 self.emusMudou.emit()))
+
+    @Slot(str)
+    def consultarEmu(self, chave):
+        def pronto(r):
+            r = dict(r or {})
+            self._emu_infos[r.get("chave", chave)] = dict(r.get("info") or {})
+            self._emus = {"itens": [r], "consulta": {
+                k: v for k, v in r.items() if k != "info"}}
+            self.emusMudou.emit()
+        self.executar("Consultando release…",
+                      lambda: self.servico.emu_consultar(chave), pronto)
+
+    @Slot(str)
+    def atualizarEmu(self, chave):
+        """Instala o release consultado. A confirmação expressa é da QML."""
+        info = self._emu_infos.get(chave)
+        if not info:
+            self.aviso.emit("Consulte o release antes de atualizar.", True)
+            return
+
+        def apos(_r):
+            self._emu_infos.pop(chave, None)
+            self.consultarEmus()
+        self._alterar("Baixando e instalando…",
+                      lambda: self.servico.emu_atualizar(chave, info), apos)
+
+    @Slot()
+    def consultarPads(self):
+        def trabalho():
+            return {"pads": self.servico.controles_pads().get("pads", []),
+                    "presets": self.servico.controles_presets().get("presets", []),
+                    "tipos": self.servico.controles_tipos().get("tipos", []),
+                    "estado": self._pads.get("estado", "")}
+
+        def pronto(r):
+            self._pads = dict(r or {})
+            self.padsMudou.emit()
+        self.executar("Lendo controles…", trabalho, pronto)
+
+    @Slot(str)
+    def fotografarControle(self, nome):
+        self._alterar("Salvando preset…",
+                      lambda: self.servico.controle_fotografar(nome),
+                      lambda _r: self.consultarPads())
+
+    @Slot(str)
+    def aplicarControle(self, nome):
+        self._alterar("Aplicando preset…",
+                      lambda: self.servico.controle_aplicar(nome))
+
+    @Slot(str)
+    def gerarControle(self, tipo):
+        self._alterar("Gerando mapa…",
+                      lambda: self.servico.controle_gerar(tipo),
+                      lambda _r: self.consultarPads())
+
+    @Slot()
+    def lerEstadoControle(self):
+        def pronto(r):
+            self._pads = {**self._pads, "estado": (r or {}).get("resumo", "")}
+            self.padsMudou.emit()
+        self.executar("Lendo controle…", self.servico.controle_estado, pronto)
 
     @Slot(str, str, str, str, str)
     def adicionarIntegracao(self, chave, nome, descricao, tipo, url):

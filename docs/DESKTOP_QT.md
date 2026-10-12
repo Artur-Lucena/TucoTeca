@@ -61,8 +61,8 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 | Backup da coleção / volume global Windows | Sim | Sim |
 | Sistema: backups, registro/encerramento de sessões pendentes, últimos erros | Sim | Parcial |
 | Mods, texturas HD, cheats e presets do Azahar no detalhe de cada jogo 3DS | Sim | Sim |
-| Controles: aplicar e salvar perfis; gerar mapa padrão e testar botões | Parcial (perfis) | Sim |
-| Atualizar emuladores | Ferramentas clássicas | Sim |
+| Controles: aplicar e salvar perfis; gerar mapa padrão e testar botões | Sim (leitura ao vivo; sem hardware mostra a ausência, prova física com o usuário) | Sim |
+| Atualizar emuladores | Sim, com consulta do release e confirmação expressa antes de baixar | Sim |
 | Importação avançada de jogos/ROMs, sanar/religar executáveis, UAC | Ferramentas clássicas | Sim |
 | CSV → áudio, fila de downloads de músicas, buscar capas | Sim | Sim |
 | Wishlist por JSON salvo; leitura Steam com erro explícito se endpoint indisponível | Sim | Sim |
