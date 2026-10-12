@@ -98,6 +98,7 @@ class HubBridge(QObject):
     jogoTerminou = Signal()
     pedirClassico = Signal()
     previewMudou = Signal()
+    manutencaoMudou = Signal()
     _sessao = Signal(int, float, bool)
     controleAcao = Signal(str)
     controleMudou = Signal()
@@ -213,6 +214,10 @@ class HubBridge(QObject):
         self._timer_screenshots.start()
         self._emulacao = FerramentasEmulador(self)
         self._preview = {"itens": [], "info": {}, "raizes": [], "origem": "", "erro": ""}
+        self._manutencao = {"gid": 0, "titulo": "", "exe": {}, "rom": {}}
+        self._saneamento = {"ok": False, "pasta": "", "exe": None,
+                            "precisa_instalar": False, "quarentenaveis": 0,
+                            "avisos": [], "erro": ""}
         self._controles: list[str] = []
         self._navegador = Navegador()
         self._navegador.bloquear_ate_neutro()
@@ -921,6 +926,75 @@ class HubBridge(QObject):
     def limparPreview(self):
         self._preview = {"itens": [], "info": {}, "raizes": [], "origem": "", "erro": ""}
         self.previewMudou.emit()
+
+    @Property("QVariantMap", notify=manutencaoMudou)
+    def manutencao(self):
+        return self._manutencao
+
+    @Property("QVariantMap", notify=manutencaoMudou)
+    def saneamento(self):
+        return self._saneamento
+
+    def _limpar_manutencao(self):
+        self._manutencao = {"gid": 0, "titulo": "", "exe": {}, "rom": {}}
+        self.manutencaoMudou.emit()
+
+    @Slot(QUrl)
+    def planejarSaneamento(self, url):
+        def trabalho():
+            return self.servico.sanear_plano(url.toLocalFile())
+        self._saneamento = {"ok": False, "pasta": "", "exe": None,
+                            "precisa_instalar": False, "quarentenaveis": 0,
+                            "avisos": [], "erro": "analisando…"}
+        self.manutencaoMudou.emit()
+        self.executar("Analisando pasta…", trabalho, self._saneamento_pronto)
+
+    def _saneamento_pronto(self, r):
+        self._saneamento = dict(r or {})
+        self.manutencaoMudou.emit()
+        if not (r or {}).get("ok"):
+            self.aviso.emit(self._saneamento.get("erro") or "Falha ao analisar a pasta.", True)
+
+    @Slot(str)
+    def aplicarSaneamento(self, pasta):
+        self._alterar("Sanear, organizar e aplicar…",
+                      lambda: self.servico.sanear_pasta(pasta))
+
+    @Slot(int)
+    def diagnosticarJogo(self, gid):
+        def trabalho():
+            return self.servico.diagnosticar_jogo(int(gid))
+        self.executar("Diagnosticando exe/ROM…", trabalho, self._diagnostico_pronto)
+
+    def _diagnostico_pronto(self, r):
+        r = dict(r or {})
+        self._manutencao = {"gid": r.get("gid", 0), "titulo": r.get("titulo", ""),
+                            "exe": dict(r.get("exe") or {}),
+                            "rom": dict(r.get("rom") or {})}
+        self.manutencaoMudou.emit()
+
+    @Slot(int, str, str)
+    def religarJogo(self, gid, campo, caminho):
+        self._alterar("Religando jogo…",
+                      lambda: self.servico.religar_jogo(int(gid), campo, caminho),
+                      lambda _r: self.diagnosticarJogo(int(gid)))
+
+    @Slot(int)
+    def jogarElevado(self, gid):
+        if self.ocupado or self._em_jogo:
+            self.aviso.emit("Aguarde a operação/sessão atual terminar.", False)
+            return
+        self._em_jogo = True
+        self._jogo_gid = gid
+        self.mudou.emit()
+        self.executar("Pedindo elevação…", lambda: self.servico.iniciar_jogo_elevado(int(gid)),
+                      self._jogo_elevado_pronto)
+
+    def _jogo_elevado_pronto(self, r):
+        self.aviso.emit((r or {}).get("aviso") or
+                        "Iniciado com elevação. Registre a sessão ao terminar.", False)
+        self.jogoIniciado.emit()
+        self.mudou.emit()
 
     @Property("QVariantList", notify=mudou)
     def pacotesPiratas(self):

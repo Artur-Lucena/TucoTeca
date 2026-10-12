@@ -701,7 +701,9 @@ ApplicationWindow {
             ActionButton { objectName: "registerGameHoursButton"; Layout.fillWidth: true; text: "Registrar horas…"; enabled: !hub.ocupado && !hub.emJogo && !!hub.selecionado.id; onClicked: window.registerHours(hub.selecionado, "") }
             ActionButton { objectName: "gameToolsButton"; Layout.fillWidth: true; text: "Saves, screenshots e organização…"; enabled: !hub.ocupado; onClicked: { gameTools.gid = hub.selecionado.id; gameTools.open() } }
             ActionButton { visible: (hub.selecionado.origem || "") === "rom-3ds"; Layout.fillWidth: true; text: "Mods, texturas, cheats e presets…"; enabled: !hub.ocupado; onClicked: { emulacaoDialog.gid = hub.selecionado.id; emulacaoDialog.open() } }
-            ActionButton { Layout.fillWidth: true; text: "Remover da biblioteca"; enabled: !hub.ocupado; onClicked: { window.deleteItem("jogos", hub.selecionado); details.close() } }
+            ActionButton { objectName: "gameDiagnosticButton"; Layout.fillWidth: true; text: "Diagnosticar e religar exe/ROM…"; enabled: !hub.ocupado && !!hub.selecionado.id; onClicked: { hub.diagnosticarJogo(hub.selecionado.id); manutencaoDialog.open() } }
+            ActionButton { objectName: "gameElevateButton"; Layout.fillWidth: true; text: "▶  Jogar como administrador (UAC)"; enabled: !hub.ocupado && !hub.emJogo && !!hub.selecionado.id; onClicked: { uacConfirm.gid = hub.selecionado.id; uacConfirm.title = hub.selecionado.titulo || ""; uacConfirm.open() } }
+            ActionButton { text: "Remover da biblioteca"; enabled: !hub.ocupado; onClicked: { window.deleteItem("jogos", hub.selecionado); details.close() } }
             Item { Layout.fillHeight: true }
             Text { text: "Notas pessoais"; color: Theme.muted; font { pixelSize: 13; letterSpacing: 2 } }
             TextArea {
@@ -721,7 +723,7 @@ ApplicationWindow {
                 text: "Salvar notas"; enabled: !hub.ocupado && !!hub.selecionado.id
                 onClicked: hub.salvarObservacoes(hub.selecionado.id, notasJogo.text)
             }
-            Text { text: "Importação avançada, atualização de emuladores e sanear pastas continuam nas ferramentas clássicas, em Configurações."; color: Theme.muted; font.pixelSize: 14; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            Text { text: "Saneamento, reparo e atualização de emuladores ficam em Configurações › Manutenção; importar pacotes e pastas está em Configurações › Coleção."; color: Theme.muted; font.pixelSize: 14; Layout.fillWidth: true; wrapMode: Text.WordWrap }
         }
         }
     }
@@ -798,6 +800,10 @@ ApplicationWindow {
             ActionButton { text: "Importar pasta de jogos locais…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: gamesFolder.open() }
             ActionButton { text: "Importar arquivo (exe/ROM) com preview…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: singleGameFile.open() }
             ActionButton { text: "Importar pacote de jogo (.zip/.rar/.7z)…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: repackFile.open() }
+            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
+            Text { text: "MANUTENÇÃO"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "Sanear organiza sobras de instalação e leva instaladores para .hub-lixo, sempre reversível. Mostra o plano antes de aplicar."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            ActionButton { objectName: "sanearButton"; text: "Sanear pasta de jogo…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: sanearFolder.open() }
             ActionButton { objectName: "personalToolsButton"; text: "Perfis, atalhos, vigia, estatísticas e API local…"; Layout.fillWidth: true; onClicked: personalTools.open() }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
             Text { text: "DIAGNÓSTICO"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
@@ -947,6 +953,92 @@ ApplicationWindow {
             Label { visible: (hub.previewImportacao.itens || []).length === 0; text: "Nada por aqui ainda — escolha uma pasta ou arquivo para ver o preview antes de importar."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
         }
         Connections { target: hub; function onPreviewMudou() { importPreview.recarregarSelecao(); } }
+    }
+    Dialog {
+        id: manutencaoDialog
+        objectName: "manutencaoDialog"
+        property string campo: ""
+        property int gid: 0
+        anchors.centerIn: parent
+        width: Math.min(620, window.width - 80); height: Math.min(520, window.height - 100)
+        modal: true; title: "Manutenção do jogo"; standardButtons: Dialog.Close
+        onOpened: { campo = ""; gid = hub.selecionado.id }
+        contentItem: ColumnLayout {
+            spacing: 12
+            Text { text: (hub.manutencao.titulo || hub.selecionado.titulo || "") + " — plano do que será religado"; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Label {
+                objectName: "manutencaoExe"
+                Layout.fillWidth: true; wrapMode: Text.WordWrap
+                text: {
+                    var d = hub.manutencao.exe || {};
+                    if (d.estado === "ok") return "Executável: ok (" + (d.atual || d.gravado || "?") + ")";
+                    if (d.estado === "trocou-emulador")
+                        return "Emulador trocado: " + (d.atual || "?") + " pode substituir " + (d.gravado || "?");
+                    return "Executável: " + (d.estado || "?") + " — " + (d.gravado || d.atual || "sem caminho");
+                }
+            }
+            Label {
+                objectName: "manutencaoRom"
+                Layout.fillWidth: true; wrapMode: Text.WordWrap
+                visible: (hub.manutencao.rom || {}).estado && (hub.manutencao.rom || {}).estado !== "ok"
+                text: "ROM ausente: " + ((hub.manutencao.rom || {}).gravado || "?")
+            }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 6
+                model: ((hub.manutencao.rom || {}).candidatos || [])
+                ScrollBar.vertical: ScrollBar {}
+                delegate: RowLayout {
+                    required property var modelData
+                    width: ListView.view.width - 12
+                    ActionButton { text: "Religar para este"; Layout.fillWidth: true; enabled: !hub.ocupado && hub.manutencao.gid > 0; onClicked: { manutencaoDialog.campo = "launch_options"; manutencaoDialog.gid = hub.manutencao.gid || hub.selecionado.id; hub.religarJogo(manutencaoDialog.gid, "launch_options", modelData) } }
+                }
+            }
+            Text { visible: (((hub.manutencao.rom || {}).candidatos || []).length === 0) && (hub.manutencao.rom || {}).estado === "rom-ausente"; text: "Nenhum candidato encontrado nas pastas de ROM. Use “Religar à mão” e informe o caminho novo."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 10
+                TextField { id: romManual; objectName: "manutencaoCaminho"; Layout.fillWidth: true; placeholderText: "Novo caminho (ROM ou executável)" }
+                ActionButton { objectName: "manutencaoReligar"; text: "Religar à mão"; enabled: !hub.ocupado && hub.manutencao.gid > 0 && romManual.text.length > 0; onClicked: hub.religarJogo(hub.manutencao.gid, (hub.selecionado.origem || "").indexOf("rom-") === 0 ? "launch_options" : "executable_path", romManual.text) }
+            }
+            Text { text: "Religar só troca o caminho gravado e preserva horas, notas, saves e etiquetas."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+        }
+    }
+    Dialog {
+        id: uacConfirm
+        property int gid: 0
+        property string title: ""
+        anchors.centerIn: parent; width: Math.min(520, window.width - 60)
+        modal: true; title: "Elevar privilégios (UAC)?"; standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: hub.jogarElevado(uacConfirm.gid)
+        ColumnLayout {
+            width: parent.width; spacing: 12
+            Label { text: "O Windows pedirá confirmação do Controle de Conta de Usuário para abrir “" + uacConfirm.title + "” como administrador. Use só se o jogo exigir; com elevação o Hub não rastreia as horas sozinho — registre a sessão ao terminar."; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            CheckBox { id: uacEntendi; checked: false; text: "Entendi e quero elevar só este jogo"; Layout.fillWidth: true }
+        }
+        footer: RowLayout { Item { Layout.fillWidth: true } ActionButton { text: "Cancelar"; onClicked: uacConfirm.reject() } ActionButton { text: "Elevar e jogar"; primary: true; enabled: uacEntendi.checked; onClicked: uacConfirm.accept() } }
+    }
+    Dialog {
+        id: sanearPlanoDialog
+        objectName: "sanearPlanoDialog"
+        anchors.centerIn: parent; width: Math.min(600, window.width - 60)
+        modal: true; title: "Sanear pasta — plano"; standardButtons: Dialog.Cancel
+        contentItem: ColumnLayout {
+            spacing: 12
+            Label {
+                objectName: "sanearPlanoResumo"
+                Layout.fillWidth: true; wrapMode: Text.WordWrap
+                text: {
+                    var s = hub.saneamento;
+                    if (s.erro && !s.ok) return s.erro;
+                    var t = "Pasta: " + (s.pasta || "?") + "\nExecutável: " + (s.exe || (s.precisa_instalar ? "só instalador" : "nenhum"));
+                    if (s.quarentenaveis) t += "\n" + s.quarentenaveis + " instalador(es) vão para .hub-lixo (reversível)";
+                    if (s.avisos && s.avisos.length) t += "\n" + s.avisos.join("\n");
+                    return t;
+                }
+            }
+            RowLayout { Layout.fillWidth: true; Item { Layout.fillWidth: true } ActionButton { objectName: "sanearPlanoAplicar"; text: "Aplicar"; primary: true; enabled: !hub.ocupado && hub.saneamento.ok === true; onClicked: { hub.aplicarSaneamento(hub.saneamento.pasta); sanearPlanoDialog.close() } } }
+        }
+    }
+    FolderDialog { id: sanearFolder; title: "Pasta do jogo para sanear"; onAccepted: { hub.planejarSaneamento(selectedFolder); sanearPlanoDialog.open() } }
     }
     Dialog {
         id: wishDialog

@@ -819,6 +819,93 @@ class ServicoBiblioteca:
             raise ValueError("Nada selecionado para importar.")
         return self.alterar(lambda con: core.importar_lista(con, sel))
 
+    def sanear_plano(self, caminho):
+        """Plano de saneamento. Só leitura: nada é movido ou apagado.
+
+        Devolve o que a organização faria (pasta resolvida, executável, sobras
+        que iriam para .hub-lixo) para a interface mostrar antes de aplicar.
+        """
+        from bib_nucleo.rede.repacks import achar_exe
+        pasta = (caminho or "").strip()
+        if not pasta:
+            return {"ok": False, "pasta": "", "exe": None, "precisa_instalar": False,
+                    "quarentenaveis": 0, "avisos": ["escolha uma pasta."], "erro": ""}
+        base = Path(pasta)
+        if not base.is_dir():
+            return {"ok": False, "pasta": str(base), "exe": None,
+                    "precisa_instalar": False, "quarentenaveis": 0,
+                    "avisos": [], "erro": "pasta não encontrada."}
+        from bib_nucleo.rede.repacks import _pasta_conteudo
+        base = _pasta_conteudo(base)
+        ach = achar_exe(base)
+        if not ach.get("ok"):
+            if ach.get("precisa_instalar"):
+                return {"ok": True, "pasta": str(base), "exe": None,
+                        "precisa_instalar": True, "quarentenaveis": 0,
+                        "avisos": ["só há instalador: a pasta fica como está."],
+                        "erro": ""}
+            return {"ok": False, "pasta": str(base), "exe": None,
+                    "precisa_instalar": False, "quarentenaveis": 0, "avisos": [],
+                    "erro": ach.get("erro", "sem executável.")}
+        sobras = 0
+        try:
+            sobras = len(sorted(base.glob("setup*.exe")))
+        except OSError:
+            sobras = 0
+        return {"ok": True, "pasta": str(base), "exe": ach.get("exe"),
+                "precisa_instalar": False, "quarentenaveis": sobras,
+                "avisos": ([f"{sobras} instalador(es) iriam para .hub-lixo (reversível)."]
+                           if sobras else []),
+                "erro": ""}
+
+    def sanear_pasta(self, caminho):
+        """Aplica o saneamento. Reversível (.hub-lixo); depende de sanear_plano."""
+        from bib_nucleo.rede.repacks import sanear_pasta as _sanear
+        pasta = (caminho or "").strip()
+        if not pasta:
+            raise ValueError("Escolha uma pasta para sanear.")
+        r = _sanear(pasta)
+        if not r.get("ok"):
+            raise ValueError(r.get("erro", "Não foi possível sanear a pasta."))
+        return r
+
+    def diagnosticar_jogo(self, gid):
+        """Diagnóstico só-leitura de exe/ROM: estado, caminho e candidatos."""
+        jogo = self.jogo(gid)
+        return {"gid": gid, "titulo": jogo.get("titulo") or "",
+                "exe": core.diagnosticar_exe(jogo), "rom": core.diagnosticar_rom(jogo),
+                "jogo": jogo}
+
+    _RELIGAR_CAMPOS = ("launch_options", "executable_path", "exe_win", "exe_linux")
+
+    def religar_jogo(self, gid, campo, caminho):
+        """Grava um novo caminho de exe/ROM escolhido pelo usuário. Com backup."""
+        campo = str(campo or "")
+        caminho = str(caminho or "").strip()
+        if campo not in self._RELIGAR_CAMPOS:
+            raise ValueError("Campo inválido para religar.")
+        if not caminho:
+            raise ValueError("Informe o novo caminho.")
+        return self.alterar(lambda con: core.atualizar_jogo(con, gid, {campo: caminho}))
+
+    def iniciar_jogo_elevado(self, gid):
+        """Relança o jogo com elevação explícita (UAC). Confirmação é da UI."""
+        jogo = self.jogo(gid)
+        preparo = core.preparar_lancamento(jogo)
+        r = core.executar_jogo_dict(jogo, elevar=True)
+        if not r.get("ok"):
+            raise ValueError(r.get("erro", "Não foi possível iniciar com elevação."))
+        with closing(core.get_db(self.db_path)) as con:
+            core.marcar_execucao(con, gid)
+        try:
+            core.iniciar_sessao_manual(gid, jogo.get("titulo") or "")
+        except Exception as e:
+            # sessão manual é rastreamento auxiliar; não falha o lançamento
+            core.log_erro("jogar-uac", f"sessão manual não abriu: {e}")
+        return {"ok": True, "modo": r.get("modo", "runas-uac"),
+                "aviso": preparo.get("aviso", "")}
+        return self.alterar(lambda con: core.importar_lista(con, sel))
+
     def importar_repack_local(self, caminho):
         return self.alterar(lambda con: core.importar_repack(con, caminho))
 
