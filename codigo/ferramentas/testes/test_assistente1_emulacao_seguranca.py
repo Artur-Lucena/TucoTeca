@@ -123,9 +123,10 @@ def teste_jogo_aberto_bloqueia_mudancas():
 
 def teste_instalar_textura_preserva_a_origem():
     """A pasta escolhida pelo usuário não pode desaparecer (A2-04)."""
+    import os
+
     from bib_nucleo import texturas as TEX
     from executar import azahar_fake
-    import os
     emu = Path(os.environ["BIBLIOTECA_AZAHAR_DIR"])
     (emu / "user").mkdir(parents=True, exist_ok=True)
     azahar_fake(emu)
