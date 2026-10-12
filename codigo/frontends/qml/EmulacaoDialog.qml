@@ -21,6 +21,10 @@ Dialog {
         ColumnLayout {
             width: parent.width; spacing: 12
             Label { text: dialog.d.titulo || "Jogo 3DS"; font.bold: true; font.pixelSize: 18; Layout.fillWidth: true; elide: Text.ElideRight }
+            Label {
+                visible: hub.emJogo; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.warning
+                text: "Um jogo está aberto. Feche-o antes de alterar mods, texturas, cheats ou presets."
+            }
             Label { visible: dialog.d.erro.length > 0; text: dialog.d.erro; color: Theme.warning; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             Label { visible: dialog.d.erro.length === 0; text: "MODS (" + dialog.d.tid + ")"; color: Theme.accent; font.bold: true }
             Label { visible: dialog.d.erro.length === 0 && dialog.d.mods.length === 0; text: "Nenhum mod na biblioteca deste jogo. Importe uma pasta LayeredFS (romfs/exefs) ou um arquivo compactado."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
@@ -29,15 +33,15 @@ Dialog {
                 RowLayout {
                     required property var modelData
                     Layout.fillWidth: true
-                    CheckBox { text: modelData.nome; checked: modelData.ativo; Layout.fillWidth: true; enabled: !hub.ocupado; onToggled: dialog.emu.alternarMod(modelData.nome) }
-                    ActionButton { text: "Remover"; enabled: !hub.ocupado; onClicked: dialog.emu.removerMod(modelData.nome) }
+                    CheckBox { text: modelData.nome; checked: modelData.ativo; Layout.fillWidth: true; enabled: !hub.ocupado && !hub.emJogo; onToggled: dialog.emu.alternarMod(modelData.nome) }
+                    ActionButton { text: "Remover"; enabled: !hub.ocupado && !hub.emJogo; onClicked: dialog.emu.removerMod(modelData.nome) }
                 }
             }
             RowLayout {
                 visible: dialog.d.erro.length === 0
-                ActionButton { text: dialog.d.mods_off ? "Ligar mods" : "Desligar mods"; enabled: !hub.ocupado; onClicked: dialog.emu.alternarModsOff() }
-                ActionButton { text: "Importar pasta de mod…"; enabled: !hub.ocupado; onClicked: modFolder.open() }
-                ActionButton { text: "Importar arquivo de mod…"; enabled: !hub.ocupado; onClicked: modFile.open() }
+                ActionButton { text: dialog.d.mods_off ? "Ligar mods" : "Desligar mods"; enabled: !hub.ocupado && !hub.emJogo; onClicked: dialog.emu.alternarModsOff() }
+                ActionButton { text: "Importar pasta de mod…"; enabled: !hub.ocupado && !hub.emJogo; onClicked: modFolder.open() }
+                ActionButton { text: "Importar arquivo de mod…"; enabled: !hub.ocupado && !hub.emJogo; onClicked: modFile.open() }
             }
             Label { visible: dialog.d.erro.length === 0; text: "TEXTURAS HD"; color: Theme.accent; font.bold: true }
             Label {
@@ -46,8 +50,8 @@ Dialog {
             }
             RowLayout {
                 visible: dialog.d.erro.length === 0
-                ActionButton { visible: dialog.d.textura.instalado; text: dialog.d.textura.ativo ? "Desligar texturas" : "Ligar texturas"; enabled: !hub.ocupado; onClicked: dialog.emu.alternarTextura() }
-                ActionButton { text: "Instalar pasta de texturas…"; enabled: !hub.ocupado; onClicked: texFolder.open() }
+                ActionButton { visible: dialog.d.textura.instalado; text: dialog.d.textura.ativo ? "Desligar texturas" : "Ligar texturas"; enabled: !hub.ocupado && !hub.emJogo; onClicked: dialog.emu.alternarTextura() }
+                ActionButton { text: "Instalar pasta de texturas…"; enabled: !hub.ocupado && !hub.emJogo; onClicked: texFolder.open() }
             }
             Label { visible: dialog.d.erro.length === 0; text: "CHEATS (valem depois de reiniciar o jogo)"; color: Theme.accent; font.bold: true }
             Repeater {
@@ -55,8 +59,8 @@ Dialog {
                 RowLayout {
                     required property var modelData
                     Layout.fillWidth: true
-                    CheckBox { text: modelData.nome + " · " + modelData.linhas + " linhas"; checked: modelData.ativo; Layout.fillWidth: true; enabled: !hub.ocupado; onToggled: dialog.emu.alternarCheat(modelData.nome) }
-                    ActionButton { text: "Remover"; enabled: !hub.ocupado; onClicked: dialog.emu.removerCheat(modelData.nome) }
+                    CheckBox { text: modelData.nome + " · " + modelData.linhas + " linhas"; checked: modelData.ativo; Layout.fillWidth: true; enabled: !hub.ocupado && !hub.emJogo; onToggled: dialog.emu.alternarCheat(modelData.nome) }
+                    ActionButton { text: "Remover"; enabled: !hub.ocupado && !hub.emJogo; onClicked: dialog.emu.removerCheat(modelData.nome) }
                 }
             }
             TextField { id: cheatNome; visible: dialog.d.erro.length === 0; Layout.fillWidth: true; placeholderText: "Nome do cheat"; selectByMouse: true }
@@ -73,7 +77,7 @@ Dialog {
                     required property var modelData
                     Layout.fillWidth: true
                     Label { text: modelData; Layout.fillWidth: true; elide: Text.ElideRight }
-                    ActionButton { text: "Aplicar"; enabled: !hub.ocupado; onClicked: dialog.emu.aplicarPreset(modelData) }
+                    ActionButton { text: "Aplicar"; enabled: !hub.ocupado && !hub.emJogo; onClicked: dialog.emu.aplicarPreset(modelData) }
                 }
             }
             RowLayout {
@@ -91,7 +95,7 @@ Dialog {
                     required property var modelData
                     Layout.fillWidth: true
                     Label { text: modelData; Layout.fillWidth: true; elide: Text.ElideRight }
-                    ActionButton { text: "Aplicar"; enabled: !hub.ocupado; onClicked: dialog.emu.aplicarPresetControle(modelData) }
+                    ActionButton { text: "Aplicar"; enabled: !hub.ocupado && !hub.emJogo; onClicked: dialog.emu.aplicarPresetControle(modelData) }
                 }
             }
             RowLayout {
@@ -104,4 +108,23 @@ Dialog {
     FolderDialog { id: modFolder; title: "Pasta do mod (LayeredFS)"; onAccepted: dialog.emu.importarMod(selectedFolder) }
     FileDialog { id: modFile; title: "Arquivo do mod"; nameFilters: ["Mods (*.zip *.rar *.7z)"]; onAccepted: dialog.emu.importarMod(selectedFile) }
     FolderDialog { id: texFolder; title: "Pasta de texturas (PNG)"; onAccepted: dialog.emu.instalarTextura(selectedFolder) }
+
+    MessageDialog {
+        id: confirmar
+        title: ""
+        text: ""
+        buttons: MessageDialog.Yes | MessageDialog.No
+        property string chave: ""
+        onConfirmed: { dialog.emu.confirmarAcao(confirmar.chave); confirmar.close() }
+        onRejected: { dialog.emu.cancelarAcao(confirmar.chave); confirmar.close() }
+    }
+    Connections {
+        target: dialog.emu
+        function onConfirmar(titulo, texto, chave) {
+            confirmar.title = titulo
+            confirmar.text = texto
+            confirmar.chave = chave
+            confirmar.open()
+        }
+    }
 }
