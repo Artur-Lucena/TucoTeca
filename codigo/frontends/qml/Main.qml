@@ -480,6 +480,12 @@ ApplicationWindow {
                 text: "Pacotes locais…"; implicitHeight: 36
                 onClicked: pacotes.open()
             }
+            ActionButton {
+                objectName: "concluidosButton"
+                visible: hub.secao === "downloads"
+                text: "Importar concluídos…"; implicitHeight: 36
+                onClicked: { hub.consultarTorrentsProntos(); concluidos.open() }
+            }
             ActionButton { visible: hub.secao === "videos"; text: "Pesquisar YouTube…"; implicitHeight: 36; onClicked: youtube.open() }
             TextField {
                 id: youtubeQuery
@@ -702,7 +708,7 @@ ApplicationWindow {
             ActionButton { objectName: "gameToolsButton"; Layout.fillWidth: true; text: "Saves, screenshots e organização…"; enabled: !hub.ocupado; onClicked: { gameTools.gid = hub.selecionado.id; gameTools.open() } }
             ActionButton { visible: (hub.selecionado.origem || "") === "rom-3ds"; Layout.fillWidth: true; text: "Mods, texturas, cheats e presets…"; enabled: !hub.ocupado; onClicked: { emulacaoDialog.gid = hub.selecionado.id; emulacaoDialog.open() } }
             ActionButton { objectName: "gameDiagnosticButton"; Layout.fillWidth: true; text: "Diagnosticar e religar exe/ROM…"; enabled: !hub.ocupado && !!hub.selecionado.id; onClicked: { hub.diagnosticarJogo(hub.selecionado.id); manutencaoDialog.open() } }
-            ActionButton { objectName: "gameElevateButton"; Layout.fillWidth: true; text: "▶  Jogar como administrador (UAC)"; enabled: !hub.ocupado && !hub.emJogo && !!hub.selecionado.id; onClicked: { uacConfirm.gid = hub.selecionado.id; uacConfirm.title = hub.selecionado.titulo || ""; uacConfirm.open() } }
+            ActionButton { objectName: "gameElevateButton"; Layout.fillWidth: true; text: "▶  Jogar como administrador (UAC)"; enabled: !hub.ocupado && !hub.emJogo && !!hub.selecionado.id; onClicked: { uacConfirm.gid = hub.selecionado.id; uacConfirm.jogo = hub.selecionado.titulo || ""; uacConfirm.open() } }
             ActionButton { text: "Remover da biblioteca"; enabled: !hub.ocupado; onClicked: { window.deleteItem("jogos", hub.selecionado); details.close() } }
             Item { Layout.fillHeight: true }
             Text { text: "Notas pessoais"; color: Theme.muted; font { pixelSize: 13; letterSpacing: 2 } }
@@ -980,7 +986,7 @@ ApplicationWindow {
             Label {
                 objectName: "manutencaoRom"
                 Layout.fillWidth: true; wrapMode: Text.WordWrap
-                visible: (hub.manutencao.rom || {}).estado && (hub.manutencao.rom || {}).estado !== "ok"
+                visible: { var e = (hub.manutencao.rom || {}).estado; return !!e && e !== "ok"; }
                 text: "ROM ausente: " + ((hub.manutencao.rom || {}).gravado || "?")
             }
             ListView {
@@ -1005,13 +1011,13 @@ ApplicationWindow {
     Dialog {
         id: uacConfirm
         property int gid: 0
-        property string title: ""
+        property string jogo: ""
         anchors.centerIn: parent; width: Math.min(520, window.width - 60)
         modal: true; title: "Elevar privilégios (UAC)?"; standardButtons: Dialog.Ok | Dialog.Cancel
         onAccepted: hub.jogarElevado(uacConfirm.gid)
         ColumnLayout {
             width: parent.width; spacing: 12
-            Label { text: "O Windows pedirá confirmação do Controle de Conta de Usuário para abrir “" + uacConfirm.title + "” como administrador. Use só se o jogo exigir; com elevação o Hub não rastreia as horas sozinho — registre a sessão ao terminar."; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Label { text: "O Windows pedirá confirmação do Controle de Conta de Usuário para abrir “" + uacConfirm.jogo + "” como administrador. Use só se o jogo exigir; com elevação o Hub não rastreia as horas sozinho — registre a sessão ao terminar."; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             CheckBox { id: uacEntendi; checked: false; text: "Entendi e quero elevar só este jogo"; Layout.fillWidth: true }
         }
         footer: RowLayout { Item { Layout.fillWidth: true } ActionButton { text: "Cancelar"; onClicked: uacConfirm.reject() } ActionButton { text: "Elevar e jogar"; primary: true; enabled: uacEntendi.checked; onClicked: uacConfirm.accept() } }
@@ -1039,7 +1045,6 @@ ApplicationWindow {
         }
     }
     FolderDialog { id: sanearFolder; title: "Pasta do jogo para sanear"; onAccepted: { hub.planejarSaneamento(selectedFolder); sanearPlanoDialog.open() } }
-    }
     Dialog {
         id: wishDialog
         anchors.centerIn: parent; width: 470; modal: true; title: "Adicionar desejo"
@@ -1318,6 +1323,68 @@ ApplicationWindow {
     SpotifyDialog { id: spotifyCatalog; onConfigureProviders: providers.open(); onShowDownloads: { close(); musicDownloads.open() } }
     MusicDownloadsDialog { id: musicDownloads }
     PiratasDialog { id: pacotes }
+    Dialog {
+        id: concluidos
+        objectName: "concluidosDialog"
+        title: "Torrents concluídos · importar para a coleção"
+        anchors.centerIn: parent
+        width: Math.min(720, window.width - 80); height: Math.min(560, window.height - 100)
+        modal: true; standardButtons: Dialog.Close
+        onOpened: hub.consultarTorrentsProntos()
+        contentItem: ColumnLayout {
+            spacing: 12
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    text: "Só entra aqui o que chegou a 100%. Download incompleto não importa pela metade."
+                    color: Theme.muted
+                    Layout.fillWidth: true; wrapMode: Text.WordWrap; font.pixelSize: Theme.subtitle
+                }
+                ActionButton { text: "↻ Atualizar"; enabled: !hub.ocupado; onClicked: hub.consultarTorrentsProntos() }
+            }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 10
+                model: (hub.torrentsProntos.itens || [])
+                ScrollBar.vertical: ScrollBar {}
+                delegate: Rectangle {
+                    required property var modelData
+                    width: ListView.view.width - 12
+                    implicitHeight: 76; radius: 10; color: Theme.surface
+                    RowLayout {
+                        anchors.fill: parent; anchors.margins: 14; spacing: 14
+                        ColumnLayout {
+                            Layout.fillWidth: true; spacing: 4
+                            Text {
+                                objectName: "concluidoNome"
+                                text: modelData.nome || ""
+                                color: Theme.text; font { pixelSize: 15; weight: Font.DemiBold }
+                                Layout.fillWidth: true; elide: Text.ElideRight
+                            }
+                            Text {
+                                text: modelData.estado === "pasta" ? "Pasta pronta · organiza e importa" :
+                                      modelData.estado === "arquivo" ? "Arquivo pronto · extrai e importa" :
+                                      modelData.estado === "sumiu" ? "Sumiu do disco · nada a importar" :
+                                      "Formato não suportado · nada a importar"
+                                color: modelData.estado === "sumiu" || modelData.estado === "nao-suportado" ? Theme.warning : Theme.muted
+                                font.pixelSize: Theme.subtitle; Layout.fillWidth: true; elide: Text.ElideRight
+                            }
+                        }
+                        ActionButton {
+                            objectName: "concluidoImportarButton"
+                            visible: modelData.estado === "pasta" || modelData.estado === "arquivo"
+                            text: "Importar"; primary: true; enabled: !hub.ocupado
+                            onClicked: hub.importarTorrent(modelData.save_path)
+                        }
+                    }
+                }
+            }
+            Text {
+                visible: (hub.torrentsProntos.itens || []).length === 0
+                text: "Nada 100% ainda. Concluídos aparecem aqui; a origem do download é preservada."
+                color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true
+            }
+        }
+    }
     YouTubeDialog { id: youtube }
     MediaToolsDialog { id: mediaTools }
     GameToolsDialog { id: gameTools }

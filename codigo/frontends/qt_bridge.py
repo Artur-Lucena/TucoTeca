@@ -99,6 +99,7 @@ class HubBridge(QObject):
     pedirClassico = Signal()
     previewMudou = Signal()
     manutencaoMudou = Signal()
+    prontosMudou = Signal()
     _sessao = Signal(int, float, bool)
     controleAcao = Signal(str)
     controleMudou = Signal()
@@ -218,6 +219,7 @@ class HubBridge(QObject):
         self._saneamento = {"ok": False, "pasta": "", "exe": None,
                             "precisa_instalar": False, "quarentenaveis": 0,
                             "avisos": [], "erro": ""}
+        self._prontos = {"itens": [], "erros": []}
         self._controles: list[str] = []
         self._navegador = Navegador()
         self._navegador.bloquear_ate_neutro()
@@ -1813,6 +1815,25 @@ class HubBridge(QObject):
     @Slot()
     def iniciarDownloads(self):
         self._alterar("Iniciando qBittorrent…", core.qbit_iniciar)
+
+    @Property("QVariantMap", notify=prontosMudou)
+    def torrentsProntos(self):
+        return self._prontos
+
+    @Slot()
+    def consultarTorrentsProntos(self):
+        def pronto(r):
+            self._prontos = {"itens": list((r or {}).get("itens") or []),
+                             "erros": list((r or {}).get("erros") or [])}
+            self.prontosMudou.emit()
+        self.executar("Verificando concluídos…", self.servico.torrents_prontos, pronto)
+
+    @Slot(str)
+    def importarTorrent(self, save_path):
+        def apos(_r):
+            self.consultarTorrentsProntos()
+        self._alterar("Importando concluído…",
+                      lambda: self.servico.importar_torrent(save_path), apos)
 
     @Slot(str, str, str, str, str)
     def adicionarIntegracao(self, chave, nome, descricao, tipo, url):
