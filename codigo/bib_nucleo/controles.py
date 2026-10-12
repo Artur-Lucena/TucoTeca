@@ -710,18 +710,21 @@ def _listar_linux() -> list[dict]:
 # Teste por polling (viewer): poll() -> {botoes:set/int, eixos:{}, pov}
 # --------------------------------------------------------------------------
 
-def ler_estado_xinput(slot: int = 0) -> dict | None:
-    """Estado instantâneo XInput (None se ausente). Para o viewer/teste."""
+def ler_estados_xinput() -> dict[int, dict]:
+    """Controles XInput conectados agora: slot -> estado (vazio sem driver)."""
     try:
         xis = _xinput_slots()
     except OSError:
-        return None
-    st = xis.get(slot)
-    if st is None:
-        return None
-    return {"botoes": {i for i in range(16) if st["botoes"] >> i & 1},
-            "lt": st["lt"], "rt": st["rt"],
-            "lx": st["lx"], "ly": st["ly"], "rx": st["rx"], "ry": st["ry"]}
+        return {}
+    return {slot: {"botoes": {i for i in range(16) if st["botoes"] >> i & 1},
+                   "lt": st["lt"], "rt": st["rt"],
+                   "lx": st["lx"], "ly": st["ly"], "rx": st["rx"], "ry": st["ry"]}
+            for slot, st in xis.items()}
+
+
+def ler_estado_xinput(slot: int = 0) -> dict | None:
+    """Estado instantâneo XInput (None se ausente). Para o viewer/teste."""
+    return ler_estados_xinput().get(slot)
 
 
 # Bits do wButtons XInput -> nome (A=0x1000=bit 12, ...). Não confundir
@@ -790,7 +793,7 @@ def capturar(poll, timeout: float = 10.0, limiar_eixo: int = 16000) -> dict:
 __all__ = ['GUIDS', 'NOMES_TIPO', 'MAPAS', 'BOTOES_3DS', 'DPAD',
            'gerar_perfil', 'bind_botao', 'bind_eixo', 'bind_analogico',
            'detectar_sdl', 'nomes_sdl', 'perfil_ativo', 'higienizar_controles',
-           'listar_controles',
+           'listar_controles', 'ler_estados_xinput',
            'ler_perfil_atual', 'fotografar_perfil', 'listar_presets_controle',
            'aplicar_preset_controle', 'salvar_mapa_gerado', 'ler_estado_xinput',
            'XINPUT_NOMES', 'XINPUT_PARA_SDL', 'xinput_para_sdl',

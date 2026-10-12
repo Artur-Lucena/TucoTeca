@@ -60,10 +60,13 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 | SteamRip/FitGirl: pesquisar e abrir página do resultado | Sim | Sim |
 | Backup da coleção / volume global Windows | Sim | Sim |
 | Sistema: backups, registro/encerramento de sessões pendentes, últimos erros | Sim | Parcial |
-| Configurar mods, HD, cheats, controles, presets, atualizar emuladores | Acesso pelo botão de ferramentas clássicas | Sim |
+| Mods, texturas HD, cheats e presets do Azahar no detalhe de cada jogo 3DS | Sim | Sim |
+| Controles: aplicar e salvar perfis; gerar mapa padrão e testar botões | Parcial (perfis) | Sim |
+| Atualizar emuladores | Ferramentas clássicas | Sim |
 | Importação avançada de jogos/ROMs, sanar/religar executáveis, UAC | Ferramentas clássicas | Sim |
 | CSV → áudio, fila de downloads de músicas, buscar capas | Sim | Sim |
-| Sincronizar wishlist, importar torrent concluído | Ferramentas clássicas | Sim |
+| Wishlist por JSON salvo; leitura Steam com erro explícito se endpoint indisponível | Sim | Sim |
+| Importar torrent concluído | Ferramentas clássicas | Sim |
 | Desejo → SteamRip → baixar/importar → obtido | Sim | Fluxo manual |
 | Registrar horas manualmente nos detalhes e encerrar sessão pendente no Sistema | Sim | Sim |
 | Bibliotecas sem credencial, catálogo Spotify, download/conversão/importação de músicas | Sim | CSV/import local |
@@ -74,11 +77,21 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 | Perfis Tuco/Isa, atalhos, vigia e API de leitura | Sim, em Ferramentas pessoais | — |
 | Letras LRCLIB, LibRetro, SponsorBlock e MP3 por URL | Sim | — |
 | IPS/BPS, cópia/hardlinks e uso de disco | Sim, em ferramentas do jogo | — |
-| Navegação por gamepad | Ainda não | Ainda não |
+| Navegação por controle XInput: setas/analógico, A, B, LB/RB e Start | Sim, sem hardware validado ainda | Não |
 
 Não se trata ainda de paridade integral: a migração visual preserva acesso
 explícito aos fluxos avançados existentes. Distribuições anteriores em `dist/`
 não são atualizadas ao editar os fontes.
+
+### Everything opcional no Windows
+
+O scanner usa `es.exe` do PATH ou de `programa/ferramentas/everything/cli/`.
+O cliente local consulta a instância `TucoTeca`; uma configuração externa pode
+usar `BIBLIOTECA_EVERYTHING` e `BIBLIOTECA_EVERYTHING_INSTANCIA`.
+Everything deve estar aberto e com o volume/pasta indexado. Erro, timeout ou
+índice vazio mantêm o scanner normal como fallback; o Hub não instala o serviço
+automaticamente nem envia o índice ao GitHub. A exportação temporária usa UTF-8
+com BOM, é removida após a consulta e restringe os resultados às raízes pedidas.
 
 ## Contratos e integrações
 

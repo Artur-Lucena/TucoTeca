@@ -35,3 +35,8 @@ pos-*.log
 htmlcov/
 .ruff_cache/
 .venv/
+
+# Infraestrutura local dos assistentes (nao publicar)
+/assistentes/
+/.assistente/
+/INICIAR_CHAT.cmd

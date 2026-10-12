@@ -3,20 +3,25 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      mac:
+        description: 'Gerar e conferir o payload macOS (usa runner macOS, com custo maior de minutos)'
+        type: boolean
+        default: false
 jobs:
   stdlib:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-24.04]
         python: ['3.10', '3.14']
     runs-on: ${{ matrix.os }}
     env:
       PYTHONIOENCODING: utf-8
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       - name: Display virtual Linux
@@ -39,7 +44,7 @@ jobs:
         run: python -B codigo/ferramentas/provar_linux_shell.py
       - name: Relatório
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: testes-${{ matrix.os }}-${{ matrix.python }}
           path: resultados-testes.json
@@ -47,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
@@ -55,8 +60,8 @@ jobs:
       QML_DISABLE_DISK_CACHE: '1'
       PYTHONIOENCODING: utf-8
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
       - name: Bibliotecas Qt Linux
@@ -70,18 +75,50 @@ jobs:
         run: python -B -m pytest --cobertura
       - name: Relatório Qt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: qt-${{ matrix.os }}
           path: .provas/cobertura/
 
   segredos:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Varredura de segredos (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  mac:
+    if: github.event_name == 'workflow_dispatch' && inputs.mac
+    runs-on: macos-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Montar payload macOS
+        run: python3 -B codigo/ferramentas/montar_mac.py
+      - name: Conferir payload, instalador e privacidade
+        run: |
+          set -eu
+          payload=$(ls dist/mac/tucoteca-mac-*.tar.xz)
+          sh -n dist/mac/Instalar-Mac.command
+          tar -tJf "$payload" > "$RUNNER_TEMP/payload.txt"
+          grep -qx 'tucoteca/BibliotecaHubMac.command' "$RUNNER_TEMP/payload.txt"
+          grep -qx 'tucoteca/app/app_win.py' "$RUNNER_TEMP/payload.txt"
+          grep -qx 'tucoteca/app/navegacao_controle.py' "$RUNNER_TEMP/payload.txt"
+          grep -qx 'tucoteca/app/qt_emulacao.py' "$RUNNER_TEMP/payload.txt"
+          if grep -E '^tucoteca/dados/.+[^/]$' "$RUNNER_TEMP/payload.txt"; then
+            echo "dado pessoal no payload" >&2
+            exit 1
+          fi
+          if grep -E '/(saves|sysdata|aes_keys\.txt|\.db)$' "$RUNNER_TEMP/payload.txt"; then
+            echo "estado de emulador no payload" >&2
+            exit 1
+          fi
+          wc -c "$payload"

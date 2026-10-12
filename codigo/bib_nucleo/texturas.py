@@ -211,10 +211,12 @@ def flag_custom_textures() -> bool | None:
 
 
 def instalar_textura(tid: str, origem: str | os.PathLike) -> dict:
-    """Move pasta extraída p/ `load/textures/<TID>/`. Valida PNGs, sem rede.
+    """Copia a pasta extraída p/ `load/textures/<TID>/`. **Origem preservada.**
 
-    Origem some (move); destino não pode existir (nem `.off`). Para trocar
-    versão, apague a atual primeiro (rename p/ `.off` não libera o nome).
+    Copia em vez de mover: a pasta escolhida pelo usuário continua existindo
+    depois da instalação (perder o único exemplar do pack seria destrutivo).
+    Valida PNGs, sem rede. Destino não pode existir (nem `.off`); para trocar
+    de versão, desligue/apague a atual primeiro.
     """
     tid = titulo_ok(tid)
     if not tid:
@@ -223,7 +225,9 @@ def instalar_textura(tid: str, origem: str | os.PathLike) -> dict:
     try:
         if not src.is_dir():
             return {"ok": False, "erro": "origem não é pasta."}
-        pngs = [p for p in src.rglob("*.png") if p.is_file()]
+        if src.is_symlink():
+            return {"ok": False, "erro": "origem é um link; escolha a pasta real."}
+        pngs = [p for p in src.rglob("*.png") if p.is_file() and not p.is_symlink()]
     except OSError as e:
         return {"ok": False, "erro": f"falha ao ler origem: {e}"}
     if not pngs:
@@ -236,10 +240,23 @@ def instalar_textura(tid: str, origem: str | os.PathLike) -> dict:
         if on.exists() or off.exists():
             return {"ok": False,
                     "erro": f"{tid} já instalado (desligue/apague antes)."}
-        shutil.move(str(src), str(on))
+        destino_real = on.resolve() if on.parent.exists() else base / tid
+        if (destino_real == src.resolve() or destino_real in src.resolve().parents
+                or src.resolve() in destino_real.parents):
+            return {"ok": False, "erro": "a origem está dentro da pasta de texturas."}
+        tmp = base / f".{tid}-stage"
+        if tmp.exists():
+            shutil.rmtree(tmp, ignore_errors=True)
+        shutil.copytree(src, tmp)
+        n_destino = sum(1 for p in tmp.rglob("*.png") if p.is_file() and not p.is_symlink())
+        if n_destino != len(pngs):
+            raise OSError("cópia incompleta: número de PNGs divergente")
+        tmp.replace(on)
     except OSError as e:
+        shutil.rmtree(tmp, ignore_errors=True)
         return {"ok": False, "erro": f"falha ao instalar: {e}"}
-    return {"ok": True, "tid": tid, "ativo": True, "arquivos": len(pngs)}
+    return {"ok": True, "tid": tid, "ativo": True, "arquivos": len(pngs),
+            "origem_preservada": True}
 
 
 __all__ = ['TITULOS', 'titulo_ok', 'load_textures_dir', 'listar_texturas',

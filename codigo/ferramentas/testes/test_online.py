@@ -123,6 +123,26 @@ def teste_imagem_cache_rejeita_html_e_capas_album_preservam_aspecto():
         con.close()
 
 
+def teste_dicas_provedores_nao_expoem_valor_e_avisam_tamanho():
+    """A2-03: aviso de conferência sem jamais expor a credencial."""
+    online.configurar_provedores({"spotify_client_id": "a" * 32,
+                                  "spotify_client_secret": "x",
+                                  "steam_key": "k" * 32})
+    dicas = online.dicas_provedores()
+    afirmar(dicas["steam_key"]["configurada"] and not dicas["steam_key"]["aviso"], dicas)
+    id_spotify = dicas["spotify_client_id"]
+    afirmar(id_spotify["configurada"] and not id_spotify["aviso"], dicas)
+    segredo = dicas["spotify_client_secret"]
+    afirmar(segredo["configurada"] and segredo["tamanho"] == 1, dicas)
+    afirmar(segredo["aviso"] and "Confira" in segredo["aviso"], segredo)
+    texto = repr(dicas)
+    afirmar("x" * 3 not in texto and "aaaa" not in texto, "valor vazou no diagnóstico")
+    for chave in ("steamgriddb_key",):
+        afirmar(not dicas[chave]["configurada"] and dicas[chave]["aviso"] == "", dicas)
+    estado = online.estado_provedores()
+    afirmar(estado["steam_key"] and estado["spotify_client_id"] and estado["spotify_client_secret"], estado)
+
+
 def teste_http_chave_steam_nao_vaza_em_mensagem_de_erro():
     import urllib.error
     erro = urllib.error.HTTPError("https://example.com/?key=segredo", 401, "invalid key", {}, None)

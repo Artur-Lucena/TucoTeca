@@ -49,6 +49,7 @@ def teste_texturas_instalar_listar_alternar():
     afirmar(not r.get("ok") and "png" in r["erro"], r)
     r = TEX.instalar_textura(TID, str(_pack(tmp, "hd")))
     afirmar(r.get("ok") and r["arquivos"] == 3, r)
+    afirmar(r.get("origem_preservada"), r)
     lst = TEX.listar_texturas()
     afirmar(len(lst) == 1 and lst[0]["ativo"] and lst[0]["arquivos"] == 4, lst)
     afirmar(TEX.tem_textura(TID))
@@ -64,6 +65,33 @@ def teste_texturas_instalar_listar_alternar():
     afirmar(not r.get("ok") and "instalado" in r["erro"], r)
     r = TEX.alternar_textura("0004000000999999")
     afirmar(not r.get("ok"), r)
+
+
+def teste_instalar_textura_preserva_a_origem_e_rejeita_link():
+    """A2-04: a pasta escolhida não pode desaparecer; link é recusado."""
+    from bib_nucleo import texturas as TEX
+    tmp = Path(tempfile.mkdtemp(prefix="suite-tex-"))
+    _emu_fake()
+    pack = _pack(tmp, "origem")
+    r = TEX.instalar_textura(TID, str(pack))
+    afirmar(r.get("ok") and r.get("origem_preservada"), r)
+    afirmar(pack.is_dir() and (pack / "sub" / "tex0.png").is_file(),
+            "pasta de origem foi consumida pela instalação")
+    afirmar(TEX.tem_textura(TID) and TEX.estado_textura(TID)["arquivos"] == 4,
+            TEX.estado_textura(TID))
+
+    link = tmp / "atalho"
+    try:
+        link.symlink_to(pack, target_is_directory=True)
+    except OSError:
+        return  # sem privilégio: pula a parte do link
+    r = TEX.instalar_textura("000400000011C500", str(link))
+    afirmar(not r.get("ok") and "link" in r["erro"], r)
+
+    base = TEX.load_textures_dir()
+    r = TEX.instalar_textura("000400000011C600", str(base))
+    afirmar(not r.get("ok") and "dentro da pasta de texturas" in r["erro"], r)
+    afirmar(not (base / "000400000011C600").exists(), "instalou a partir da própria pasta")
 
 
 def teste_texturas_ignora_lixo():
