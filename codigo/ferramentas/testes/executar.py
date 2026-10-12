@@ -36,6 +36,43 @@ def afirmar(cond, msg=""):
         raise AssertionError(msg or "afirmação falhou")
 
 
+def _sem_tela():
+    """Stub dos diálogos modais para a suíte nunca pedir clique na tela.
+
+    A janela some, a decisão do caso continua nas afirmações: falha real
+    segue falhando honestamente. Chamada inesperada vira linha `[sem-tela]`
+    na saída (sem as palavras que o runner lê como pulo). Testes que
+    esperam um diálogo instalam o próprio stub depois — o deles vence.
+    (Hotfix do coordenador, idêntico ao do A3: modal travava a máquina.)
+    """
+    try:
+        from tkinter import filedialog, messagebox, simpledialog
+    except ImportError:
+        return
+
+    def _nulo(retorno, nome):
+        def _chamada(*args, **kwargs):
+            print(f"[sem-tela] {nome} {args[0] if args else ''!r}")
+            return retorno
+        _chamada.__name__ = "sem_tela_" + nome
+        return _chamada
+
+    messagebox.showinfo = _nulo("ok", "showinfo")
+    messagebox.showwarning = _nulo("ok", "showwarning")
+    messagebox.showerror = _nulo("error", "showerror")
+    messagebox.askyesno = _nulo(False, "askyesno")
+    messagebox.askokcancel = _nulo(False, "askokcancel")
+    messagebox.askyesnocancel = _nulo(None, "askyesnocancel")
+    messagebox.askretrycancel = _nulo(False, "askretrycancel")
+    filedialog.askopenfilename = _nulo("", "askopenfilename")
+    filedialog.askopenfilenames = _nulo((), "askopenfilenames")
+    filedialog.asksaveasfilename = _nulo("", "asksaveasfilename")
+    filedialog.askdirectory = _nulo("", "askdirectory")
+    simpledialog.askstring = _nulo(None, "askstring")
+    simpledialog.askinteger = _nulo(None, "askinteger")
+    simpledialog.askfloat = _nulo(None, "askfloat")
+
+
 def azahar_fake(emu):
     """Binário falso do Azahar que o SO atual detecta (exe no Win, AppImage no Linux)."""
     from pathlib import Path as _P
@@ -123,6 +160,7 @@ def isolar(raiz: Path):
         elif event in ("socket.connect", "subprocess.Popen", "os.system", "os.startfile"):
             raise PermissionError(f"Operação externa bloqueada no teste: {event}")
     sys.addaudithook(audit)
+    _sem_tela()
 
 
 def main():
