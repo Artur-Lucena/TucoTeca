@@ -5,6 +5,31 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
+## [Não lançado]
+
+### Adicionado
+
+- Navegação por controle XInput no desktop Qt (setas e analógico, A confirma,
+  B volta, LB/RB trocam de seção, Start abre a busca global). A navegação foi
+  testada com estados simulados; a validação com controle físico está pendente.
+- Mods, texturas HD, cheats e presets do Azahar no detalhe de jogos 3DS, pelo
+  desktop Qt, usando as mesmas funções do modo clássico.
+- Importação de wishlist a partir de JSON salvo, com backup antes de gravar.
+
+### Limitações conhecidas
+
+- A leitura da wishlist pública da Steam não funciona: o endpoint devolve HTML.
+  Use a importação de JSON.
+- As chaves salvas em "Provedores online" foram recusadas nas verificações de
+  12/10/2026 (Spotify, Steam e SteamGridDB). Atualize-as antes de usar buscas
+  autenticadas.
+
+### Alterado
+
+- CI com `actions/checkout`, `actions/setup-python` e `actions/upload-artifact`
+  em v7 e `gitleaks/gitleaks-action` em v3. Ubuntu fixado em 24.04.
+- Workflow manual `bundle-mac.yml` gera o payload macOS em runner nativo.
+
 ## [1.0.1] — 11/10/2026
 
 Primeira release privada publicada. A tag `v1.0.0` permanece intacta como

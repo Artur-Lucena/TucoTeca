@@ -7,9 +7,13 @@ from pathlib import Path
 
 import bib_core as core
 from bib_nucleo import online, spotify
+from bib_nucleo.controles import ler_estados_xinput
+from navegacao_controle import Navegador, acoes_do_estado
 from PySide6.QtCore import (
     Property,
     QAbstractListModel,
+    QCoreApplication,
+    QEvent,
     QModelIndex,
     QObject,
     QRunnable,
@@ -20,8 +24,13 @@ from PySide6.QtCore import (
     Signal,
     Slot,
 )
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QGuiApplication, QKeyEvent
+from qt_emulacao import FerramentasEmulador
 from servicos_ui import ServicoBiblioteca
+
+SECOES_CONTROLE = ("inicio", "jogos", "musicas", "desejos", "downloads", "integracoes", "videos", "youtube")
+TECLAS_CONTROLE = {"cima": Qt.Key.Key_Up, "baixo": Qt.Key.Key_Down, "esquerda": Qt.Key.Key_Left,
+                   "direita": Qt.Key.Key_Right, "confirmar": Qt.Key.Key_Return, "voltar": Qt.Key.Key_Escape}
 
 
 class ModeloItens(QAbstractListModel):
@@ -89,6 +98,8 @@ class HubBridge(QObject):
     jogoTerminou = Signal()
     pedirClassico = Signal()
     _sessao = Signal(int, float, bool)
+    controleAcao = Signal(str)
+    controleMudou = Signal()
 
     def __init__(self, db_path, parent=None, servico=None):
         super().__init__(parent)
@@ -199,6 +210,13 @@ class HubBridge(QObject):
         self._timer_screenshots.setInterval(5000)
         self._timer_screenshots.timeout.connect(self._atualizar_screenshots)
         self._timer_screenshots.start()
+        self._emulacao = FerramentasEmulador(self)
+        self._controles: list[str] = []
+        self._navegador = Navegador()
+        self._timer_controle = QTimer(self)
+        self._timer_controle.setInterval(33)
+        self._timer_controle.timeout.connect(self._ler_controle)
+        self._timer_controle.start()
 
     @Property(QObject, constant=True)
     def capasResultados(self):
@@ -734,6 +752,14 @@ class HubBridge(QObject):
             return importlib.util.find_spec("PySide6.QtMultimedia") is not None
         except (ImportError, ValueError):
             return False
+
+    @Property(QObject, constant=True)
+    def emulacao(self):
+        return self._emulacao
+
+    @Property("QVariantList", notify=controleMudou)
+    def controlesConectados(self):
+        return list(self._controles)
 
     @Slot(str)
     def trocarPerfil(self, nome):
@@ -1447,6 +1473,14 @@ class HubBridge(QObject):
     def excluir(self, categoria, ident):
         self._alterar("Removendo da coleção…", lambda: self.servico.excluir(categoria, ident))
 
+    @Slot()
+    def sincronizarDesejosSteam(self):
+        self._alterar("Lendo a wishlist da Steam…", self.servico.sincronizar_desejos_steam)
+
+    @Slot(QUrl)
+    def importarWishlist(self, url):
+        self._alterar("Importando wishlist…", lambda: self.servico.importar_wishlist(url.toLocalFile()))
+
     @Slot(str, str)
     def adicionarDesejo(self, appid, titulo):
         self._alterar("Salvando desejo…", lambda: self.servico.adicionar_desejo(appid, titulo))
@@ -1698,6 +1732,39 @@ class HubBridge(QObject):
         else:
             self.pedirClassico.emit()
 
+    def _ler_controle(self):
+        if self._fechado:
+            return
+        estados = ler_estados_xinput()
+        conectados = [f"Controle {slot + 1}" for slot in sorted(estados)]
+        if conectados != self._controles:
+            self._controles = conectados
+            self.controleMudou.emit()
+        acoes = set()
+        for estado in estados.values():
+            acoes |= acoes_do_estado(estado)
+        for acao in self._navegador.atualizar(acoes):
+            if QGuiApplication.focusWindow() is not None:
+                self._agir_controle(acao)
+
+    def _agir_controle(self, acao):
+        if acao in ("anterior", "proxima"):
+            atual = SECOES_CONTROLE.index(self._secao) if self._secao in SECOES_CONTROLE else 0
+            self.navegar(SECOES_CONTROLE[(atual + (1 if acao == "proxima" else -1)) % len(SECOES_CONTROLE)])
+        elif acao == "menu":
+            self.controleAcao.emit("menu")
+        elif acao in TECLAS_CONTROLE:
+            self._enviar_tecla(TECLAS_CONTROLE[acao])
+
+    @staticmethod
+    def _enviar_tecla(tecla):
+        alvo = QGuiApplication.focusObject()
+        if alvo is None:
+            return False
+        for tipo in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
+            QCoreApplication.sendEvent(alvo, QKeyEvent(tipo, tecla, Qt.KeyboardModifier.NoModifier))
+        return True
+
     def fechar(self):
         self._fechado = True
         self._audio_token += 1
@@ -1708,6 +1775,7 @@ class HubBridge(QObject):
         self._timer_spotify.stop()
         self._timer_watch.stop()
         self._timer_screenshots.stop()
+        self._timer_controle.stop()
         self._busca_timer.stop()
         self._pool.waitForDone()
         if self._api:

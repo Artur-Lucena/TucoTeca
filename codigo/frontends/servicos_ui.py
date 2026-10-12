@@ -568,6 +568,28 @@ class ServicoBiblioteca:
         # Capas remotas não são buscadas implicitamente nesta importação local.
         return self.alterar(lambda con: core.importar_musicas(con, pasta, capa_auto=False))
 
+    def sincronizar_desejos_steam(self):
+        from bib_nucleo.rede import fontes
+        conta = fontes.steam_principal()
+        if not conta.get("steamid"):
+            raise ValueError("Conta Steam não encontrada neste PC. Defina BIBLIOTECA_STEAM_ID ou importe o JSON da wishlist.")
+        return self._aplicar_wishlist(fontes.ler_wishlist(conta["steamid"]), "Steam")
+
+    def importar_wishlist(self, caminho):
+        from bib_nucleo.rede import fontes
+        return self._aplicar_wishlist(fontes.ler_wishlist_arquivo(caminho), "arquivo")
+
+    def _aplicar_wishlist(self, leitura, origem):
+        if not leitura.get("itens"):
+            raise ValueError((leitura.get("erros") or ["Nenhum jogo encontrado na wishlist."])[0])
+        r = self.alterar(lambda con: core.sincronizar_desejos(con, leitura["itens"]))
+        aviso = f"Wishlist ({origem}): {r['novos']} novos, {r['atualizados']} atualizados, {r['removidos']} removidos."
+        return {"ok": True, "erros": [], "avisos": [aviso, *leitura.get("erros", [])]}
+
+    def salvar_mods_jogo(self, gid, ativos, off):
+        return self.alterar(lambda con: core.atualizar_jogo(
+            con, gid, {"azahar_mods": list(ativos), "azahar_mods_off": 1 if off else 0}))
+
     def adicionar_desejo(self, appid, titulo):
         return self.alterar(lambda con: core.adicionar_desejo(con, appid, titulo))
 

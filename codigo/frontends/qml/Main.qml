@@ -243,6 +243,7 @@ ApplicationWindow {
     Connections {
         target: hub
         function onAviso(message, error) { window.notify(message, error) }
+        function onControleAcao(acao) { if (acao === "menu") window.openPalette() }
         function onMudou() {
             if (search.text !== hub.busca) search.text = hub.busca
             if (sistema.visible && !hub.ocupado) sistema.refresh()
@@ -522,6 +523,8 @@ ApplicationWindow {
                     else hub.iniciarDownloads()
                 }
             }
+            ActionButton { visible: hub.secao === "desejos"; text: "Sincronizar Steam"; implicitHeight: 36; enabled: !hub.ocupado; onClicked: hub.sincronizarDesejosSteam() }
+            ActionButton { visible: hub.secao === "desejos"; text: "Importar wishlist…"; implicitHeight: 36; enabled: !hub.ocupado; onClicked: wishlistFile.open() }
         }
 
         RowLayout {
@@ -683,6 +686,7 @@ ApplicationWindow {
             ActionButton { objectName: "gameAchievementsButton"; Layout.fillWidth: true; text: "Conquistas do Hub…"; enabled: !!hub.selecionado.id; onClicked: window.openAchievements(hub.selecionado) }
             ActionButton { objectName: "registerGameHoursButton"; Layout.fillWidth: true; text: "Registrar horas…"; enabled: !hub.ocupado && !hub.emJogo && !!hub.selecionado.id; onClicked: window.registerHours(hub.selecionado, "") }
             ActionButton { objectName: "gameToolsButton"; Layout.fillWidth: true; text: "Saves, screenshots e organização…"; enabled: !hub.ocupado; onClicked: { gameTools.gid = hub.selecionado.id; gameTools.open() } }
+            ActionButton { visible: (hub.selecionado.origem || "") === "rom-3ds"; Layout.fillWidth: true; text: "Mods, texturas, cheats e presets…"; enabled: !hub.ocupado; onClicked: { emulacaoDialog.gid = hub.selecionado.id; emulacaoDialog.open() } }
             ActionButton { Layout.fillWidth: true; text: "Remover da biblioteca"; enabled: !hub.ocupado; onClicked: { window.deleteItem("jogos", hub.selecionado); details.close() } }
             Item { Layout.fillHeight: true }
             Text { text: "Notas pessoais"; color: Theme.muted; font { pixelSize: 13; letterSpacing: 2 } }
@@ -703,7 +707,7 @@ ApplicationWindow {
                 text: "Salvar notas"; enabled: !hub.ocupado && !!hub.selecionado.id
                 onClicked: hub.salvarObservacoes(hub.selecionado.id, notasJogo.text)
             }
-            Text { text: "Mods, presets, cheats e saves estão nas ferramentas clássicas, em Configurações."; color: Theme.muted; font.pixelSize: 14; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            Text { text: "Importação avançada, atualização de emuladores e sanear pastas continuam nas ferramentas clássicas, em Configurações."; color: Theme.muted; font.pixelSize: 14; Layout.fillWidth: true; wrapMode: Text.WordWrap }
         }
         }
     }
@@ -792,6 +796,8 @@ ApplicationWindow {
             Text { text: "A interface clássica reúne importação avançada, mods, emuladores, CSV, pacotes e manutenção. A troca encerra esta interface e mantém a mesma coleção."; color: Theme.muted; Layout.fillWidth: true; wrapMode: Text.WordWrap; font.pixelSize: Theme.subtitle }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
             Text { text: "F11  Tela cheia     Ctrl+1…7  Categorias\nCtrl+F  Buscar     Ctrl+K  Busca global     Setas  Navegar\nEnter  Jogar/Tocar/Assistir     Espaço  Detalhes"; color: Theme.muted; lineHeight: 1.5; font.pixelSize: 13 }
+            Text { text: hub.controlesConectados.length ? "Controle conectado: " + hub.controlesConectados.join(", ") : "Nenhum controle XInput detectado. Conecte-o; ele é reconhecido sem reiniciar."; color: Theme.muted; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Text { text: "Controle XInput: setas ou analógico navegam · A confirma · B volta · LB/RB trocam de seção · Start abre a busca global."; color: Theme.muted; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
         }
         }
     }
@@ -842,6 +848,7 @@ ApplicationWindow {
     FolderDialog { id: videoFolder; title: "Importar pasta de vídeos"; onAccepted: hub.importarVideos(selectedFolder) }
     FolderDialog { id: gamesFolder; title: "Importar jogos locais"; onAccepted: hub.importarJogos(selectedFolder) }
     FileDialog { id: repackFile; title: "Pacote de jogo"; nameFilters: ["Pacotes (*.zip *.rar *.7z)"]; onAccepted: hub.importarRepack(selectedFile) }
+    FileDialog { id: wishlistFile; title: "Wishlist salva (JSON)"; nameFilters: ["JSON (*.json)"]; onAccepted: hub.importarWishlist(selectedFile) }
     FileDialog { id: packageFile; title: "Pacote da coleção"; nameFilters: ["TucoTeca (*.zip)"]; onAccepted: packageConfirm.open() }
     Dialog {
         id: packageConfirm
@@ -1135,6 +1142,7 @@ ApplicationWindow {
     YouTubeDialog { id: youtube }
     MediaToolsDialog { id: mediaTools }
     GameToolsDialog { id: gameTools }
+    EmulacaoDialog { id: emulacaoDialog }
     PersonalToolsDialog { id: personalTools }
     Dialog {
         id: internalVideo
