@@ -3,6 +3,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      mac:
+        description: 'Gerar e conferir o payload macOS (usa runner macOS, com custo maior de minutos)'
+        type: boolean
+        default: false
 jobs:
   stdlib:
     strategy:
@@ -85,3 +90,35 @@ jobs:
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  mac:
+    if: github.event_name == 'workflow_dispatch' && inputs.mac
+    runs-on: macos-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Montar payload macOS
+        run: python3 -B codigo/ferramentas/montar_mac.py
+      - name: Conferir payload, instalador e privacidade
+        run: |
+          set -eu
+          payload=$(ls dist/mac/tucoteca-mac-*.tar.xz)
+          sh -n dist/mac/Instalar-Mac.command
+          tar -tJf "$payload" > "$RUNNER_TEMP/payload.txt"
+          grep -qx 'tucoteca/BibliotecaHubMac.command' "$RUNNER_TEMP/payload.txt"
+          grep -qx 'tucoteca/app/app_win.py' "$RUNNER_TEMP/payload.txt"
+          grep -qx 'tucoteca/app/navegacao_controle.py' "$RUNNER_TEMP/payload.txt"
+          grep -qx 'tucoteca/app/qt_emulacao.py' "$RUNNER_TEMP/payload.txt"
+          if grep -E '^tucoteca/dados/.+[^/]$' "$RUNNER_TEMP/payload.txt"; then
+            echo "dado pessoal no payload" >&2
+            exit 1
+          fi
+          if grep -E '/(saves|sysdata|aes_keys\.txt|\.db)$' "$RUNNER_TEMP/payload.txt"; then
+            echo "estado de emulador no payload" >&2
+            exit 1
+          fi
+          wc -c "$payload"
