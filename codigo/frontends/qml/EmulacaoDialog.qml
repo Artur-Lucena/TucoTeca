@@ -109,20 +109,23 @@ Dialog {
     FileDialog { id: modFile; title: "Arquivo do mod"; nameFilters: ["Mods (*.zip *.rar *.7z)"]; onAccepted: dialog.emu.importarMod(selectedFile) }
     FolderDialog { id: texFolder; title: "Pasta de texturas (PNG)"; onAccepted: dialog.emu.instalarTextura(selectedFolder) }
 
-    MessageDialog {
+    Dialog {
         id: confirmar
-        title: ""
-        text: ""
-        buttons: MessageDialog.Yes | MessageDialog.No
+        objectName: "emulacaoConfirmar"
         property string chave: ""
-        onConfirmed: { dialog.emu.confirmarAcao(confirmar.chave); confirmar.close() }
-        onRejected: { dialog.emu.cancelarAcao(confirmar.chave); confirmar.close() }
+        property string texto: ""
+        anchors.centerIn: parent; width: 480; modal: true
+        title: ""
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: { dialog.emu.confirmarAcao(confirmar.chave); confirmar.chave = "" }
+        onRejected: { dialog.emu.cancelarAcao(confirmar.chave); confirmar.chave = "" }
+        Label { width: parent.width; text: confirmar.texto; wrapMode: Text.WordWrap }
     }
     Connections {
         target: dialog.emu
         function onConfirmar(titulo, texto, chave) {
             confirmar.title = titulo
-            confirmar.text = texto
+            confirmar.texto = texto
             confirmar.chave = chave
             confirmar.open()
         }
