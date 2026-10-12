@@ -21,13 +21,19 @@ def _tid(jogo):
 
 
 class FerramentasEmulador(QObject):
+    """Ações de mods/texturas/cheats. Destrutivas passam por confirmação."""
+
     mudou = Signal()
+    # (titulo, texto, chave) — a QML mostra o diálogo e responde com
+    # confirmarAcao/cancelarAcao; nada é apagado antes dessa resposta.
+    confirmar = Signal(str, str, str)
 
     def __init__(self, hub):
         super().__init__(hub)
         self._hub = hub
         self._geracao = 0
         self._dados = _vazio()
+        self._pendentes: dict[str, tuple[str, object]] = {}
 
     @Property("QVariantMap", notify=mudou)
     def dados(self):
@@ -36,6 +42,7 @@ class FerramentasEmulador(QObject):
     @Slot(int)
     def carregar(self, gid):
         self._geracao += 1
+        self._pendentes.clear()
         geracao, gid = self._geracao, int(gid or 0)
 
         def mostrar(dados):
@@ -47,6 +54,7 @@ class FerramentasEmulador(QObject):
     @Slot()
     def limpar(self):
         self._geracao += 1
+        self._pendentes.clear()
         self._dados = _vazio()
         self.mudou.emit()
 
@@ -73,9 +81,18 @@ class FerramentasEmulador(QObject):
         )
         return base
 
-    def _depois(self, rotulo, trabalho):
+    def _bloqueado(self) -> str:
+        """Motivo do bloqueio, ou '' se pode seguir."""
         if self._hub.ocupado:
-            self._hub.aviso.emit("Aguarde a operação atual terminar.", False)
+            return "Aguarde a operação atual terminar."
+        if getattr(self._hub, "emJogo", False):
+            return "Feche o jogo aberto antes de mudar mods, texturas, cheats ou presets."
+        return ""
+
+    def _depois(self, rotulo, trabalho):
+        aviso = self._bloqueado()
+        if aviso:
+            self._hub.aviso.emit(aviso, False)
             return
 
         def pronto(r):
@@ -86,6 +103,29 @@ class FerramentasEmulador(QObject):
                     self._hub.aviso.emit(aviso, False)
             self.carregar(self._dados["gid"])
         self._hub.executar(rotulo, trabalho, pronto)
+
+    def _chave(self, prefixo, nome):
+        return f"{prefixo}/{self._geracao}/{nome}"
+
+    def _confirmar(self, chave, titulo, texto, rotulo, trabalho):
+        """Pede confirmação; o trabalho só existe depois de confirmarAcao."""
+        aviso = self._bloqueado()
+        if aviso:
+            self._hub.aviso.emit(aviso, False)
+            return
+        self._pendentes[chave] = (rotulo, trabalho)
+        self.confirmar.emit(titulo, texto, chave)
+
+    @Slot(str)
+    def confirmarAcao(self, chave):
+        pendente = self._pendentes.pop(chave, None)
+        if pendente is None:
+            return
+        self._depois(*pendente)
+
+    @Slot(str)
+    def cancelarAcao(self, chave):
+        self._pendentes.pop(chave, None)
 
     def _tid_atual(self):
         tid = self._dados.get("tid") or ""
@@ -130,7 +170,10 @@ class FerramentasEmulador(QObject):
 
     @Slot(str)
     def removerMod(self, nome):
-        self._depois("Removendo mod…", lambda: self._remover_mod(nome))
+        self._confirmar(
+            self._chave("mod", nome), "Remover mod",
+            f"O mod '{nome}' será apagado da biblioteca. Não há desfazer.",
+            "Removendo mod…", lambda: self._remover_mod(nome))
 
     @Slot(QUrl)
     def importarMod(self, url):
@@ -155,11 +198,18 @@ class FerramentasEmulador(QObject):
 
     @Slot(str)
     def removerCheat(self, nome):
-        self._depois("Removendo cheat…", lambda: CHEATS.remover_cheat(self._tid_atual(), nome))
+        self._confirmar(
+            self._chave("cheat", nome), "Remover cheat",
+            f"O cheat '{nome}' será removido deste jogo. Não há desfazer.",
+            "Removendo cheat…", lambda: CHEATS.remover_cheat(self._tid_atual(), nome))
 
     @Slot(str)
     def aplicarPreset(self, nome):
-        self._depois("Aplicando preset…", lambda: EMU.aplicar_preset(nome, "azahar"))
+        self._confirmar(
+            self._chave("preset", nome), "Aplicar preset",
+            f"O preset '{nome}' sobrescreve a configuração atual do Azahar. "
+            "Feche o emulador antes e confirme para continuar.",
+            "Aplicando preset…", lambda: EMU.aplicar_preset(nome, "azahar"))
 
     @Slot(str)
     def salvarPreset(self, nome):
@@ -167,7 +217,10 @@ class FerramentasEmulador(QObject):
 
     @Slot(str)
     def aplicarPresetControle(self, nome):
-        self._depois("Aplicando controles…", lambda: CONTROLES.aplicar_preset_controle(nome))
+        self._confirmar(
+            self._chave("preset-controle", nome), "Aplicar perfil de controles",
+            f"O perfil '{nome}' sobrescreve o perfil de controles atual do Azahar.",
+            "Aplicando controles…", lambda: CONTROLES.aplicar_preset_controle(nome))
 
     @Slot(str)
     def salvarPresetControle(self, nome):
