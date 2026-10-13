@@ -44,19 +44,10 @@ def teste_actionbutton_e_pilula_por_token():
 
 
 def teste_telas_sem_altura_magica_em_botao():
-    """Todo 32/36 restante no QML pertence a ComboBox/TextField, nunca a botão."""
-    for nome in ("Main.qml", "ActionButton.qml"):
-        linhas = _ler(nome).splitlines()
-        for i, linha in enumerate(linhas, 1):
-            if re.search(r"implicitHeight: (32|36)\b", linha):
-                dono = ""
-                for anterior in reversed(linhas[:i]):
-                    m = re.search(r"(ActionButton|ComboBox|TextField)\s*\{", anterior)
-                    if m:
-                        dono = m.group(1)
-                        break
-                afirmar(dono in ("ComboBox", "TextField"),
-                        f"{nome}:{i} fixa altura em {dono or '?'}: {linha.strip()[:80]}")
+    """Sem 32/36/44 literais no Main.qml: botões, combos e campos usam o token."""
+    for i, linha in enumerate(_ler("Main.qml").splitlines(), 1):
+        afirmar(not re.search(r"implicitHeight: (32|36|44)\b", linha),
+                f"Main.qml:{i} com altura mágica: {linha.strip()[:80]}")
 
 
 def teste_qt_botao_grande_e_redondo():
@@ -84,6 +75,10 @@ def teste_qt_botao_grande_e_redondo():
         afirmar(fundo is not None, "botão sem fundo")
         raio = fundo.property("radius")
         afirmar(raio == altura / 2, f"pílula quebrada (raio={raio}, altura={altura})")
+        busca = _encontrar(janela.contentItem(), "searchField")
+        afirmar(busca is not None, "campo de busca sumiu")
+        afirmar(busca.property("implicitHeight") == altura,
+                "campo vizinho fora da escala do botão")
         erros_reais = [e for e in erros if any(x in e for x in
                        ("ReferenceError", "TypeError", "Unable to assign", "failed to load"))]
         afirmar(not erros_reais, "\n".join(erros_reais))
