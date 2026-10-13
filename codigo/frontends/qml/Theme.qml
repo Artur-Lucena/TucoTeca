@@ -31,4 +31,9 @@ QtObject {
     readonly property int card: densidade === "compacto" ? 14 : 15
     readonly property int meta: densidade === "compacto" ? 12 : 13
     readonly property int kicker: 12
+    // Botões: pílula (raio = altura/2 no ActionButton), altos e com texto
+    // legível; uma fonte só — sem altura mágica por tela.
+    readonly property int btnAlto: densidade === "bigpicture" ? 54 : densidade === "compacto" ? 44 : 48
+    readonly property int btnTexto: densidade === "bigpicture" ? 16 : densidade === "compacto" ? 14 : 15
+    readonly property int btnMargem: 20
 }

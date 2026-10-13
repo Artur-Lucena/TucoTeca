@@ -439,7 +439,7 @@ ApplicationWindow {
             ActionButton {
                 objectName: "addIntegrationButton"
                 visible: hub.secao === "integracoes"
-                text: "+ Adicionar"; implicitHeight: 36
+                text: "+ Adicionar"
                 onClicked: novaIntegracao.open()
             }
             Repeater {
@@ -450,7 +450,7 @@ ApplicationWindow {
                 ActionButton {
                     required property var modelData
                     text: modelData.text; selected: hub.filtro === modelData.key; quiet: true
-                    implicitHeight: 36
+                    compact: true
                     onClicked: hub.filtrar(modelData.key)
                 }
             }
@@ -465,28 +465,28 @@ ApplicationWindow {
             ActionButton {
                 objectName: "spotifyCatalogButton"
                 visible: hub.secao === "musicas"
-                text: "Spotify…"; implicitHeight: 36
+                text: "Spotify…"
                 onClicked: spotifyCatalog.open()
             }
             ActionButton {
                 objectName: "musicDownloadsButton"
                 visible: hub.secao === "musicas"
-                text: "Fila de downloads"; implicitHeight: 36
+                text: "Fila de downloads"
                 onClicked: musicDownloads.open()
             }
             ActionButton {
                 objectName: "pacotesButton"
                 visible: hub.secao === "downloads"
-                text: "Pacotes locais…"; implicitHeight: 36
+                text: "Pacotes locais…"
                 onClicked: pacotes.open()
             }
             ActionButton {
                 objectName: "concluidosButton"
                 visible: hub.secao === "downloads"
-                text: "Importar concluídos…"; implicitHeight: 36
+                text: "Importar concluídos…"
                 onClicked: { hub.consultarTorrentsProntos(); concluidos.open() }
             }
-            ActionButton { visible: hub.secao === "videos"; text: "Pesquisar YouTube…"; implicitHeight: 36; onClicked: youtube.open() }
+            ActionButton { visible: hub.secao === "videos"; text: "Pesquisar YouTube…"; onClicked: youtube.open() }
             TextField {
                 id: youtubeQuery
                 objectName: "youtubeNavQuery"
@@ -497,12 +497,12 @@ ApplicationWindow {
             }
             ActionButton {
                 visible: hub.secao === "youtube" && hub.webDisponivel
-                text: "Ir"; implicitHeight: 36
+                text: "Ir"
                 onClicked: youtubeLoader.item ? youtubeLoader.item.irPara(youtubeQuery.text) : youtube.open()
             }
             ActionButton {
                 visible: hub.secao === "youtube" && hub.webDisponivel
-                text: "⬇ Baixar este"; primary: true; implicitHeight: 36
+                text: "⬇ Baixar este"; primary: true
                 enabled: !hub.ocupado
                 onClicked: {
                     youtubeLoader.item.urlAtualAsync(function(u) { hub.youtubeBaixarUrl(u) })
@@ -510,17 +510,17 @@ ApplicationWindow {
             }
             ActionButton {
                 visible: hub.secao === "youtube" && hub.webDisponivel
-                text: "MP3 deste"; implicitHeight: 36; enabled: !hub.ocupado
+                text: "MP3 deste"; enabled: !hub.ocupado
                 onClicked: { if (youtubeLoader.item) youtubeLoader.item.urlAtualAsync(function(u) { hub.baixarMp3Url(u) }) }
             }
             ComboBox { id: videoPlayer; visible: hub.secao === "videos"; model: hub.multimediaDisponivel ? ["Interno", "Automático", "VLC", "MPV", "MPC-HC"] : ["Automático", "VLC", "MPV", "MPC-HC"]; implicitWidth: 130; implicitHeight: 36 }
-            ActionButton { visible: hub.secao === "videos"; text: "Ferramentas…"; implicitHeight: 36; onClicked: mediaTools.open() }
+            ActionButton { visible: hub.secao === "videos"; text: "Ferramentas…"; onClicked: mediaTools.open() }
             ActionButton {
                 objectName: "collectionAddButton"
                 visible: hub.secao !== "integracoes" && hub.secao !== "youtube"
                 text: hub.secao === "jogos" ? "+ Adicionar" : hub.secao === "musicas" ? "+ Importar pasta" :
                       hub.secao === "desejos" ? "+ Adicionar desejo" : hub.secao === "videos" ? "+ Importar vídeos" : "Iniciar cliente"
-                implicitHeight: 36; enabled: !hub.ocupado
+                enabled: !hub.ocupado
                 onClicked: {
                     if (hub.secao === "jogos") window.editGame({})
                     else if (hub.secao === "musicas") musicFolder.open()
@@ -529,8 +529,8 @@ ApplicationWindow {
                     else hub.iniciarDownloads()
                 }
             }
-            ActionButton { visible: hub.secao === "desejos"; text: "Sincronizar Steam"; implicitHeight: 36; enabled: !hub.ocupado; onClicked: hub.sincronizarDesejosSteam() }
-            ActionButton { visible: hub.secao === "desejos"; text: "Importar wishlist…"; implicitHeight: 36; enabled: !hub.ocupado; onClicked: wishlistFile.open() }
+            ActionButton { visible: hub.secao === "desejos"; text: "Sincronizar Steam"; enabled: !hub.ocupado; onClicked: hub.sincronizarDesejosSteam() }
+            ActionButton { visible: hub.secao === "desejos"; text: "Importar wishlist…"; enabled: !hub.ocupado; onClicked: wishlistFile.open() }
         }
 
         RowLayout {
@@ -545,13 +545,13 @@ ApplicationWindow {
                 objectName: "filterProblemsButton"
                 visible: hub.secao === "jogos" && hub.saude.pendentes > 0
                 text: "Pendências (" + hub.saude.pendentes + ")"
-                selected: hub.filtro === "pendencias"; implicitHeight: 32
+                selected: hub.filtro === "pendencias"; compact: true
                 onClicked: hub.verPendencias()
             }
             ActionButton {
                 objectName: "clearFiltersButton"
                 visible: hub.busca.length > 0 || (hub.secao === "jogos" && hub.filtro !== "todos")
-                text: "Limpar filtros"; implicitHeight: 32
+                text: "Limpar filtros"; compact: true
                 onClicked: hub.limparFiltros()
             }
         }
