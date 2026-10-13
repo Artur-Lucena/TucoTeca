@@ -37,7 +37,8 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 - `Theme.qml` centraliza tokens; `ActionButton.qml` e `PosterCard.qml` são
   componentes reaproveitáveis. Botões seguem pílula (raio = altura/2) com
   altura/texto dos tokens `btnAlto`/`btnTexto` e variante `compact` para
-  chips e ações secundárias — sem altura mágica por tela. Hover/foco/seleção têm estados explícitos.
+  chips e ações secundárias; combos e campos usam a mesma altura —
+  sem número mágico por tela. Hover/foco/seleção têm estados explícitos.
 - Layout compacto validado em 960×640; destaque recolhe em telas baixas para
   reservar espaço para a coleção. Renderização sem GPU pode usar
   `QT_QUICK_BACKEND=software` (útil em testes e diagnóstico).

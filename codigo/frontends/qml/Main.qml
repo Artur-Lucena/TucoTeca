@@ -360,7 +360,7 @@ ApplicationWindow {
                 objectName: "searchField"
                 visible: hub.secao !== "integracoes" && hub.secao !== "inicio"
                 Layout.preferredWidth: window.width < 1150 ? 230 : 300
-                implicitHeight: 44
+                implicitHeight: Theme.btnAlto
                 placeholderText: "Buscar nesta categoria  ·  Ctrl+F"
                 color: Theme.text
                 font.pixelSize: 13
@@ -459,7 +459,7 @@ ApplicationWindow {
                 visible: hub.secao === "jogos"
                 model: ["Nome", "Recentes", "Mais jogados"]
                 currentIndex: ["titulo", "recentes", "horas"].indexOf(hub.ordem)
-                implicitWidth: 130; implicitHeight: 36
+                implicitWidth: 130; implicitHeight: Theme.btnAlto
                 onActivated: hub.ordenar(["titulo", "recentes", "horas"][currentIndex])
             }
             ActionButton {
@@ -491,7 +491,7 @@ ApplicationWindow {
                 id: youtubeQuery
                 objectName: "youtubeNavQuery"
                 visible: hub.secao === "youtube" && hub.webDisponivel
-                placeholderText: "Pesquisar no YouTube"; implicitWidth: 240; implicitHeight: 36
+                placeholderText: "Pesquisar no YouTube"; implicitWidth: 240; implicitHeight: Theme.btnAlto
                 color: Theme.text
                 onAccepted: youtubeLoader.item ? youtubeLoader.item.irPara(text) : youtube.open()
             }
@@ -513,7 +513,7 @@ ApplicationWindow {
                 text: "MP3 deste"; enabled: !hub.ocupado
                 onClicked: { if (youtubeLoader.item) youtubeLoader.item.urlAtualAsync(function(u) { hub.baixarMp3Url(u) }) }
             }
-            ComboBox { id: videoPlayer; visible: hub.secao === "videos"; model: hub.multimediaDisponivel ? ["Interno", "Automático", "VLC", "MPV", "MPC-HC"] : ["Automático", "VLC", "MPV", "MPC-HC"]; implicitWidth: 130; implicitHeight: 36 }
+            ComboBox { id: videoPlayer; visible: hub.secao === "videos"; model: hub.multimediaDisponivel ? ["Interno", "Automático", "VLC", "MPV", "MPC-HC"] : ["Automático", "VLC", "MPV", "MPC-HC"]; implicitWidth: 130; implicitHeight: Theme.btnAlto }
             ActionButton { visible: hub.secao === "videos"; text: "Ferramentas…"; onClicked: mediaTools.open() }
             ActionButton {
                 objectName: "collectionAddButton"
@@ -1452,18 +1452,18 @@ ApplicationWindow {
                 Layout.fillWidth: true; spacing: 10
                 ComboBox {
                     id: presetBox; objectName: "presetBox"
-                    Layout.fillWidth: true; implicitHeight: 36
+                    Layout.fillWidth: true; implicitHeight: Theme.btnAlto
                     model: (hub.pads.presets || [])
                 }
                 ActionButton { text: "Aplicar"; enabled: !hub.ocupado && (hub.pads.presets || []).length > 0; onClicked: hub.aplicarControle(presetBox.currentText) }
             }
             RowLayout {
                 Layout.fillWidth: true; spacing: 10
-                TextField { id: presetNome; objectName: "presetNome"; Layout.fillWidth: true; placeholderText: "Nome do novo preset" }
+                TextField { id: presetNome; objectName: "presetNome"; Layout.fillWidth: true; implicitHeight: Theme.btnAlto; placeholderText: "Nome do novo preset" }
                 ActionButton { text: "Fotografar"; enabled: !hub.ocupado && presetNome.text.length > 0; onClicked: hub.fotografarControle(presetNome.text) }
                 ComboBox {
                     id: tipoBox; objectName: "tipoBox"
-                    implicitWidth: 200; implicitHeight: 36
+                    implicitWidth: 200; implicitHeight: Theme.btnAlto
                     textRole: "nome"; valueRole: "tipo"
                     model: (hub.pads.tipos || [])
                 }
