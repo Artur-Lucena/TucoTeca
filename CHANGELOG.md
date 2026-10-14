@@ -5,14 +5,46 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
+Planejamento da 1.1.0 segue no roadmap da coordenação (`assistentes/ROADMAP.md`).
+
+## [1.0.2] — 14/10/2026
+
+Segunda release privada. Inclui o trabalho dos três assistentes integrado em
+`revisao/assistentes-1.1.0`, com gates locais verdes e CI aprovada no SHA
+congelado (ver `release.json`). Sem assinatura de código, por decisão do
+usuário (o Windows pode exibir o SmartScreen na primeira execução).
+
 ### Adicionado
 
 - Navegação por controle XInput no desktop Qt (setas e analógico, A confirma,
   B volta, LB/RB trocam de seção, Start abre a busca global). A navegação foi
   testada com estados simulados; a validação com controle físico está pendente.
+  Regressões A1-06: só o direcional repete; neutro após conexão/retorno de
+  foco; pausa com jogo; sem troca atrás de modais.
 - Mods, texturas HD, cheats e presets do Azahar no detalhe de jogos 3DS, pelo
-  desktop Qt, usando as mesmas funções do modo clássico.
+  desktop Qt, usando as mesmas funções do modo clássico. Remoções e presets
+  pedem confirmação; mutações bloqueadas com jogo aberto; origem das texturas
+  preservada.
 - Importação de wishlist a partir de JSON salvo, com backup antes de gravar.
+  Leitura com BOM (`utf-8-sig`), teto local de 8 MB e falha explícita quando
+  a Steam devolve HTML/erro; `sincronizar_desejos` preserva manual e obtido.
+- Importação Qt com preview e seleção (A1-02): nada é gravado antes da
+  confirmação; reutiliza o domínio existente.
+- Saneamento com plano, reparo por religar e opção UAC com confirmação
+  expressa (A1-03); o teste nunca eleva nem executa jogo real.
+- Importação de torrents concluídos pelo Qt (A1-04): só 100%, origem
+  preservada, incompleto nunca entra.
+- Emuladores e controles avançados no Qt (A1-05): `emus_status` local sem
+  rede, consulta remota sem instalar, atualização só com info consultada e
+  confirmação; pads com fotografar/aplicar/gerar mapa e leitura de estado.
+- Hierarquia visual e leitura (Lote 1): tokens `display`/`headline` por
+  densidade, ordem no resumo, vazio com ação por seção; botões em pílula por
+  tokens e inputs na escala dos botões.
+- Everything endurecido: linha literal `-search*` com `shell=False`, sem
+  `-utf8`/`-full-path` isolados nem `-argv`; Unicode/parênteses, instância
+  configurável e fallback stdlib preservados.
+- Suíte sempre em segundo plano: Qt offscreen, Tk fora da tela, nenhum
+  diálogo modal durante os testes; índice temático `docs/INDICE.md`.
 
 ### Limitações conhecidas
 

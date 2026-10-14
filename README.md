@@ -3,7 +3,7 @@
 [![Testes](https://github.com/Artur-Lucena/Projeto-Launcher/actions/workflows/testes.yml/badge.svg)](https://github.com/Artur-Lucena/Projeto-Launcher/actions/workflows/testes.yml)
 [![Licença: MIT](https://img.shields.io/badge/Licen%C3%A7a-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Versão](https://img.shields.io/badge/vers%C3%A3o-1.0.1-informational)](VERSION)
+[![Versão](https://img.shields.io/badge/vers%C3%A3o-1.0.2-informational)](VERSION)
 
 Um hub para a **sua** coleção de jogos, músicas e vídeos — no seu computador,
 sem conta, sem nuvem e sem depender de ninguém para abrir a biblioteca.
@@ -12,7 +12,7 @@ A ideia é simples: reunir a coleção em um lugar agradável de usar, sem
 precisar estar online para abri-la. É um projeto pessoal de Tuco e Isa,
 feito para o uso do dia a dia — com os limites documentados, não escondidos.
 
-[Baixar a release privada](https://github.com/Artur-Lucena/Projeto-Launcher/releases/tag/v1.0.1)
+[Baixar a release privada](https://github.com/Artur-Lucena/Projeto-Launcher/releases/tag/v1.0.2)
 · [Como começar](#primeiros-passos) · [Desenvolvimento](CONTRIBUTING.md)
 
 - **A coleção é sua.** Fica em `dados/`, na sua máquina. Nenhum servidor
@@ -26,7 +26,7 @@ feito para o uso do dia a dia — com os limites documentados, não escondidos.
 
 ### Usar no Windows, sem instalar Python
 
-1. Abra a [release v1.0.1](https://github.com/Artur-Lucena/Projeto-Launcher/releases/tag/v1.0.1).
+1. Abra a [release v1.0.2](https://github.com/Artur-Lucena/Projeto-Launcher/releases/tag/v1.0.2).
    É preciso ter acesso ao repositório privado.
 2. Escolha **essencial** ou **completo** na tabela abaixo. Baixe também
    `SHA256SUMS.txt` para conferir o arquivo antes de abrir.
@@ -38,7 +38,7 @@ feito para o uso do dia a dia — com os limites documentados, não escondidos.
 que substitua uma instalação existente. Para conferir o download no PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\tucoteca-1.0.1-windows-x64-essencial.zip
+Get-FileHash -Algorithm SHA256 .\tucoteca-1.0.2-windows-x64-essencial.zip
 ```
 
 Compare o resultado com a linha correspondente em `SHA256SUMS.txt`.
@@ -153,7 +153,7 @@ inclusive os emuladores. Não é preciso instalar Python separadamente.
 
 ## Pacotes prontos
 
-A [release privada **v1.0.1**](https://github.com/Artur-Lucena/Projeto-Launcher/releases/tag/v1.0.1)
+A [release privada **v1.0.2**](https://github.com/Artur-Lucena/Projeto-Launcher/releases/tag/v1.0.2)
 reúne fontes, dois bundles Windows x64, notas, licenças, proveniência e hashes:
 
 | Variante | O que tem | Para quem |
@@ -165,8 +165,8 @@ Os dois incluem Python, Tk, Pillow, PySide6, 7-Zip, FFmpeg, yt-dlp,
 QuickJS-NG, qBittorrent, Azahar e DeSmuME. A coleção começa vazia; para
 trazer a sua, use **exportar/importar pacote de coleção** dentro do hub.
 
-Os arquivos são `tucoteca-1.0.1-windows-x64-essencial.zip`,
-`tucoteca-1.0.1-windows-x64-completo.zip` e `tucoteca-1.0.1-fontes.zip`.
+Os arquivos são `tucoteca-1.0.2-windows-x64-essencial.zip`,
+`tucoteca-1.0.2-windows-x64-completo.zip` e `tucoteca-1.0.2-fontes.zip`.
 A tag `v1.0.0` foi preservada como registro de preparação, sem release publicada.
 
 ## Gerar e verificar uma release
@@ -189,7 +189,7 @@ como uma entrega validada.
 Para montar a pasta da release (fontes + bundles + notas + checksums):
 
 ```powershell
-py -3.14 codigo/ferramentas/preparar_release.py --revisao $sha --saida dist/release/v1.0.1
+py -3.14 codigo/ferramentas/preparar_release.py --revisao $sha --saida dist/release/v1.0.2
 ```
 
 Esse comando exige revisão e versão iguais entre fontes e bundles, confere
