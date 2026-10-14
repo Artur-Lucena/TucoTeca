@@ -6,8 +6,8 @@ Falha = seleção vazia/inválida falha explícita; caminho inexistente não imp
 Sem jogos reais, sem elevação, sem rede: fixtures sintéticas em pasta descartável.
 Parte Qt usa _qt() e pula sem PySide6; domínio roda em stdlib.
 """
-from contextlib import closing
 import tempfile
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 

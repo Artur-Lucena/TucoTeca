@@ -904,7 +904,6 @@ class ServicoBiblioteca:
             core.log_erro("jogar-uac", f"sessão manual não abriu: {e}")
         return {"ok": True, "modo": r.get("modo", "runas-uac"),
                 "aviso": preparo.get("aviso", "")}
-        return self.alterar(lambda con: core.importar_lista(con, sel))
 
     def torrents_prontos(self):
         """Torrents 100% com caminho conhecido. Só leitura.

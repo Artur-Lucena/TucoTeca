@@ -171,7 +171,6 @@ def teste_qt_elevacao_bloqueada_com_sessao_aberta():
     app, bridge = _qt()
     if app is None:
         return
-    from PySide6.QtCore import QUrl
     tmp = Path(tempfile.mkdtemp(prefix="a1-manut-qtb-"))
     (tmp / "jogo.exe").write_bytes(b"MZ-falso")
     gid = bridge.servico.salvar_jogo(
