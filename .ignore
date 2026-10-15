@@ -1,0 +1,5 @@
+# Dados pessoais e artefatos locais: nao pesquisar/indexar como fontes.
+/dados/
+/programa/
+/dist/
+/.provas/
