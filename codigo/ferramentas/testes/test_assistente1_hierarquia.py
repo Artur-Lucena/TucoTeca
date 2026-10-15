@@ -48,6 +48,7 @@ def teste_lista_usa_tokens_de_texto():
 
 
 def teste_resumo_mostra_ordem_nos_jogos():
-    ponte = (QML.parent / "qt_bridge.py").read_text(encoding="utf-8")
+    ponte = "".join(p.read_text(encoding="utf-8")
+                    for p in sorted((QML.parent / "qt_bridge").glob("*.py")))
     afirmar('"titulo": "Nome"' in ponte and '"horas": "Mais jogados"' in ponte,
             "resumoLista sem rótulo de ordem")

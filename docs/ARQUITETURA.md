@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart TD
-  Qt[app_qt / QML por seção] --> Bridge[qt_bridge / modelos e workers]
+  Qt[app_qt / QML por seção] --> Bridge[qt_bridge / superfície Qt + mixins]
   Bridge --> Services[servicos_ui / casos de uso]
   Services --> Compat[bib_core / APIs públicas]
   GUI[app_win.py / tkinter clássico] --> Compat
@@ -104,7 +104,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 | `frontends/app_win.py` | App tkinter clássico CONGELADO (só correções críticas), grade, detalhes e ferramentas avançadas |
 | `frontends/desktop.py` | Dispatcher Qt ↔ clássico (saída 42 troca preservando lock) |
 | `frontends/app_qt.py` | Shell Qt Quick, lock, selftest e screenshot |
-| `frontends/qt_bridge.py` | Modelos, seções, workers, player, paleta e sistema |
+| `frontends/qt_bridge/` (pacote) | Superfície Qt no `HubBridge` (sinais + properties), lógica por domínio nos mixins, modelos e workers |
 | `frontends/navegacao_controle.py` | Estado XInput → ações (direcional repete ao ser segurado); o Qt traduz para teclas e seções |
 | `frontends/qt_emulacao.py` | Mods, texturas, cheats e presets do Azahar para o jogo selecionado; cada ação recarrega o estado |
 | `frontends/servicos_ui/` (pacote) | Casos de uso desktop, `resumo_sistema`, `busca_global`, registro |

@@ -47,7 +47,6 @@ APP_ARQS = (("README.md", "README.md"),
                ("codigo/frontends/despacho.py", "despacho.py"),
                ("codigo/frontends/desktop.py", "desktop.py"),
                ("codigo/frontends/app_qt.py", "app_qt.py"),
-               ("codigo/frontends/qt_bridge.py", "qt_bridge.py"),
                 ("codigo/frontends/navegacao_controle.py", "navegacao_controle.py"),
                  ("codigo/frontends/qt_emulacao.py", "qt_emulacao.py"),
                 ("codigo/ferramentas/__init__.py", "ferramentas/__init__.py"),
@@ -60,7 +59,8 @@ APP_ARQS = (("README.md", "README.md"),
 # Pacotes-diretório do app (F2/F3 do O2): viajam como árvore, igual ao
 # bib_nucleo, em vez de arquivo avulso. Novos pacotes entram aqui, não no
 # APP_ARQS — os validadores expandem via arquivos_app().
-APP_PACOTES = (("codigo/frontends/servicos_ui", "servicos_ui"),)
+APP_PACOTES = (("codigo/frontends/servicos_ui", "servicos_ui"),
+               ("codigo/frontends/qt_bridge", "qt_bridge"))
 
 
 def arquivos_app(repo=None):

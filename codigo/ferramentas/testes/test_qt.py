@@ -597,7 +597,8 @@ def teste_qt_fontes_e_builders_incluem_recursos_qml():
     dest = Path(tempfile.mkdtemp()) / "app"
     montar.copiar_app(dest)
     afirmar((dest / "qml/Main.qml").is_file() and (dest / "qml/qmldir").is_file())
-    afirmar((dest / "qt_bridge.py").is_file() and (dest / "desktop.py").is_file())
+    afirmar((dest / "desktop.py").is_file())
+    afirmar((dest / "qt_bridge" / "__init__.py").is_file(), "bundle sem pacote qt_bridge")
     afirmar((dest / "servicos_ui" / "__init__.py").is_file(), "bundle sem pacote servicos_ui")
     for nome in ("VolumeControl", "ProvidersDialog", "CoversDialog", "AchievementsDialog",
                   "SpotifyDialog", "MusicDownloadsDialog", "PiratasDialog"):
