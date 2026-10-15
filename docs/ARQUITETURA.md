@@ -107,8 +107,8 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 
 | Arquivo | Função |
 |---|---|
-| `frontends/app_win.py` + `app_win_*.py` | App tkinter clássico CONGELADO (só correções críticas) em mixins por domínio; entry point, `NAV`, `messagebox` e top funcs preservados; acesso ao módulo por `late.py` (funciona como script e importado) |
-| `frontends/desktop.py` | Dispatcher Qt ↔ clássico (saída 42 troca preservando lock) |
+| `frontends/app_win.py` + `app_win_*.py` | App tkinter clássico **legado/congelado** (só correções críticas; desenvolvimento novo é só no Qt) em mixins por domínio; entry point, `NAV`, `messagebox` e top funcs preservados; acesso ao módulo por `late.py` (funciona como script e importado) |
+| `frontends/desktop.py` | Dispatcher Qt ↔ clássico: abre o Qt quando PySide6 está presente (padrão) e cai no clássico como alternativa; saída 42 troca preservando lock |
 | `frontends/app_qt.py` | Shell Qt Quick, lock, selftest e screenshot |
 | `frontends/qt_bridge/` (pacote) | Superfície Qt no `HubBridge` (sinais + properties), lógica por domínio nos mixins, modelos e workers |
 | `frontends/navegacao_controle.py` | Estado XInput → ações (direcional repete ao ser segurado); o Qt traduz para teclas e seções |
