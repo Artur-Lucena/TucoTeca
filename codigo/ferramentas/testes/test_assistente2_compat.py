@@ -35,7 +35,15 @@ def teste_assistente2_compat_nucleo_sem_qt_obrigatorio():
 
 
 def teste_assistente2_compat_imports_de_so_condicionais():
-    alvos = ["controles.py", "emuladores.py", "base.py", "player.py", "volume.py", "scans.py"]
+    alvos = ["controles.py", "base.py", "player.py", "volume.py", "scans.py",
+             "emuladores/__init__.py", "emuladores/_comum.py",
+             "emuladores/azahar.py", "emuladores/desmume.py",
+             "emuladores/lancamento.py", "emuladores/mods.py",
+             "emuladores/presets.py", "emuladores/provedores.py"]
+    # Módulos puros (sem ramificação por SO): nada a guardar; os demais
+    # acessam o SO via `_E` (ligação tardia p/ monkeypatch) e mantêm a guarda.
+    sem_so = {"emuladores/__init__.py", "emuladores/_comum.py",
+              "emuladores/presets.py", "emuladores/provedores.py"}
     for nome in alvos:
         arq = NUCLEO / nome
         arvore = ast.parse(arq.read_text(encoding="utf-8"))
@@ -45,7 +53,8 @@ def teste_assistente2_compat_imports_de_so_condicionais():
         # ctypes só aparece no topo quando é fallback tipado; o uso Win32 real
         # mora em função/ramo (não quebra Linux/macOS na importação).
         texto = arq.read_text(encoding="utf-8")
-        afirmar("os.name" in texto or "sys.platform" in texto, f"{nome}: sem guarda de SO")
+        if nome not in sem_so:
+            afirmar("os.name" in texto or "sys.platform" in texto, f"{nome}: sem guarda de SO")
     # Prova viva de importação no Linux atual (sem Qt, sem Win32).
     import bib_nucleo.controles as CT
     import bib_nucleo.player as PL

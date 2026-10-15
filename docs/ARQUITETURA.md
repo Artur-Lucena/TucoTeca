@@ -71,7 +71,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 | `banco.py` | schema, migrações por colunas, CRUD jogos/músicas/fila, capas |
 | `banco_desejos.py` | wishlist local, sincronização preservadora e histórico obtido |
 | `scans.py` / `scans_hydra.py` | lojas/disco/ROMs e adaptador Hydra, preview, dedup e restore |
-| `emuladores.py` | Azahar/DeSmuME, processos/sessões, presets e overlay de mods |
+| `emuladores/` (pacote) | Azahar/DeSmuME, processos/sessões, presets e overlay de mods — `emuladores.py` fatiado na F1 do O2 sem mudar contratos |
 | `atualizacao.py` | download e atualização transacional, manifesto, rollback |
 | `pacotes.py` | JSON, ZIP de coleção e backups versionados |
 | `arquivos.py` | temporário no mesmo disco + publicação atômica |
@@ -264,8 +264,10 @@ descobre `teste_*` e informa os pulos e falhas por ambiente.
 `pytest --cobertura` agrega cobertura dos subprocessos. Provas nativas e
 smokes remotos são separados dos casos herméticos e não usam jogos reais.
 
-Os maiores pontos de acoplamento continuam `app_win.py`, `app_tui.py`,
-`emuladores.py` e `scans.py`. A decomposição futura deve seguir domínios
+Os maiores pontos de acoplamento continuam `app_win.py`, `app_tui.py`
+e `scans.py` (`emuladores.py` foi fatiado na F1 do O2 em
+`emuladores/{azahar,desmume,provedores,presets,mods,lancamento,_comum}`,
+contratos e `__all__` preservados). A decomposição futura deve seguir domínios
 (catálogo, áudio, diálogos, sessões), mantendo contratos e fixtures antes
 de mover métodos. Desejos, Hydra, sessões manuais e adaptadores remotos já
 foram extraídos; isso não significa decomposição integral dos módulos grandes.

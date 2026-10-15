@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Player interno do Hub (sem app externo): transporte + playlist + auto-avançar.
 
-Backends por SO, stdlib só (molde `controles.py`/`emuladores.py`):
+Backends por SO, stdlib só (molde `controles.py`/`emuladores/`):
 - Windows: MCI `waveaudio` via `winmm` (ctypes; `mpegvideo` quebra aqui com
   rc=277, então mp3/m4a decodificam via ffmpeg em cache WAV).
 - macOS: `afplay` do sistema (pause via SIGSTOP/SIGCONT).
@@ -76,7 +76,7 @@ class MciBackend:
     (provado rc=0): mp3/m4a/ogg entram via ffmpeg em cache WAV
     (`CACHE_WAV_DIR`, teto LRU); `.wav` toca direto, sem ffmpeg.
 
-    Lições de `emuladores.py`: `WinDLL(..., use_last_error=True)` +
+    Lições de `emuladores/` (pacote fatiado por contrato): `WinDLL(..., use_last_error=True)` +
     `argtypes`/`restype` declarados (sem `ctypes.windll`).
     """
 

@@ -73,3 +73,8 @@ ignore = ["E501", "E402", "F403"]
 # (`try: import tkinter` -> skip), nao codigo morto.
 "codigo/ferramentas/testes/test_dialogo.py" = ["F401"]
 "codigo/ferramentas/testes/test_varredura.py" = ["F401"]
+# F401 na fachada do pacote: os reexports (inclusive `_privados` e os
+# modulos `os`/`shutil`/`subprocess`, alvos de monkeypatch nos testes)
+# SAO o contrato de compatibilidade com o antigo `emuladores.py`; a
+# cobertura nominal e provada pelo teste de completude da fatia F1.
+"codigo/bib_nucleo/emuladores/__init__.py" = ["F401", "F405"]
