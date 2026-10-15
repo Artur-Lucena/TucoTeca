@@ -326,6 +326,11 @@ class HubBridge(MixInfra, MixMusica, MixMidia, MixCapas, MixJogos,
     def precosDesejos(self):
         return self._precos
 
+    @Property("QVariantMap", notify=mudou)
+    def lixeira(self):
+        from bib_nucleo import lixeira as _lixeira
+        return _lixeira.ultima() or {}
+
     @Property(str, notify=playerMudou)
     def modoAudioAtual(self):
         return self._modo_audio

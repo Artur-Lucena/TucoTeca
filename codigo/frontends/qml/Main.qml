@@ -579,6 +579,14 @@ ApplicationWindow {
                 onClicked: hub.verPendencias()
             }
             ActionButton {
+                objectName: "desfazerButton"
+                visible: !!hub.lixeira.disponivel
+                text: "Desfazer remoção"; compact: true; enabled: !hub.ocupado
+                ToolTip.visible: hovered
+                ToolTip.text: (hub.lixeira.tipo || "") + " · " + (hub.lixeira.titulo || "")
+                onClicked: hub.desfazerExclusao()
+            }
+            ActionButton {
                 objectName: "clearFiltersButton"
                 visible: hub.busca.length > 0 || (hub.secao === "jogos" && hub.filtro !== "todos")
                 text: "Limpar filtros"; compact: true

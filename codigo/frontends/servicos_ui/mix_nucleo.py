@@ -94,7 +94,22 @@ class MixNucleo:
                    "videos": core.excluir_video}
         if categoria not in funcoes:
             raise ValueError("Esta categoria não permite exclusão pela biblioteca.")
-        return self.alterar(lambda con: funcoes[categoria](con, int(ident)))
+        if categoria == "musicas":
+            # O arquivo de áudio é apagado junto; fica fora da lixeira (por design).
+            return self.alterar(lambda con: funcoes["musicas"](con, int(ident)))
+
+        def operacao(con):
+            from bib_nucleo import lixeira
+            recibo = lixeira.arquivar(con, categoria, int(ident))
+            funcoes[categoria](con, int(ident))
+            return {"ok": True, "desfazer": recibo}
+
+        return self.alterar(operacao)
+
+    def desfazer_exclusao(self):
+        """Recria a última remoção arquivada na lixeira local."""
+        from bib_nucleo import lixeira
+        return self.alterar(lambda con: lixeira.restaurar_ultimo(con))
 
     def favorito(self, gid):
         with self._escrita:

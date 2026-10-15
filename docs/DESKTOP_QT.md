@@ -80,6 +80,7 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 | Videoteca, YouTube (embutido na variante completa; link externo na essencial), reprodutores, editores e EQ por cópia | Sim | — |
 | Atalhos personalizados em Integrações | Sim | — |
 | Exportar/importar pacotes | Sim, com confirmação para restaurar saves | Sim |
+| Remoções com desfazer (jogos com capa, desejos, vídeos) via lixeira local | Sim | — |
 | Saves de jogo: configurar, snapshot, restaurar; screenshots | Sim | Backup dos emuladores |
 | Perfis Tuco/Isa, atalhos, vigia e API de leitura | Sim, em Ferramentas pessoais | — |
 | Letras LRCLIB, LibRetro, SponsorBlock e MP3 por URL | Sim | — |

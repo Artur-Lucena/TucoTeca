@@ -359,6 +359,11 @@ class MixJogos:
         self._alterar("Removendo da coleção…", lambda: self.servico.excluir(categoria, ident))
 
     @Slot()
+    def desfazerExclusao(self):
+        """Recria a última remoção arquivada na lixeira local."""
+        self._alterar("Restaurando da lixeira…", self.servico.desfazer_exclusao)
+
+    @Slot()
     def sincronizarDesejosSteam(self):
         self._alterar("Lendo a wishlist da Steam…", self.servico.sincronizar_desejos_steam)
 

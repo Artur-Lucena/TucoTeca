@@ -80,6 +80,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 | `emuladores/` (pacote) | Azahar/DeSmuME, processos/sessões, presets e overlay de mods — `emuladores.py` fatiado na F1 do O2 sem mudar contratos |
 | `atualizacao.py` | download e atualização transacional, manifesto, rollback |
 | `pacotes.py` | JSON, ZIP de coleção e backups versionados |
+| `lixeira.py` | snapshot e desfazer de remoções (jogos com capa, desejos, vídeos); música fora por design |
 | `arquivos.py` | temporário no mesmo disco + publicação atômica |
 | `rede/repacks.py` (alias `repacks.py`) | extrair, organizar, selecionar exe, importar e confirmar archive |
 | `cheats.py` | texto Gateway com liga/desliga e TID canônico |
