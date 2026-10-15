@@ -176,3 +176,20 @@ def teste_qt_cancelar_preserva():
     finally:
         con.close()
     afirmar(depois == antes, (antes, depois))
+
+
+def teste_drag_drop_reutiliza_o_mesmo_preview():
+    """Arrastar pasta/arquivo abre o MESMO preview (estático, roda sem PySide6).
+
+    O drop não importa direto: reusa `analisarArquivo` + `importPreview`, então
+    a seleção da lista continua sendo o único caminho que grava na coleção.
+    """
+    from pathlib import Path as _P
+    main = (_P(__file__).resolve().parents[2] / "frontends" / "qml" / "Main.qml"
+            ).read_text(encoding="utf-8")
+    for trecho in ("DropArea {", "id: dropGlobal", "onDropped:", "drop.hasUrls",
+                   "hub.analisarArquivo(alvo)", "importPreview.open()",
+                   "dropGlobal.containsDrag"):
+        afirmar(trecho in main, "drag&drop ausente: " + trecho)
+    afirmar("importarSelecionados(drop" not in main and "importarJogos(drop" not in main,
+            "drop não pode importar direto, sem preview")

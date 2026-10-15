@@ -68,6 +68,7 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 | Controles: aplicar e salvar perfis; gerar mapa padrão e testar botões | Sim (leitura ao vivo; sem hardware mostra a ausência, prova física com o usuário) | Sim |
 | Atualizar emuladores | Sim, com consulta do release e confirmação expressa antes de baixar | Sim |
 | Importação avançada de jogos/ROMs, sanar/religar executáveis, UAC | Ferramentas clássicas | Sim |
+| Arrastar pasta/arquivo para a janela abre o mesmo preview antes de importar | Sim | — |
 | CSV → áudio, fila de downloads de músicas, buscar capas | Sim | Sim |
 | Wishlist por JSON salvo; leitura Steam com erro explícito se endpoint indisponível | Sim | Sim |
 | Importar torrent concluído | Ferramentas clássicas | Sim |

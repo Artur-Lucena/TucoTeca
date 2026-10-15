@@ -86,6 +86,23 @@ ApplicationWindow {
         palette.open()
         paletteQuery.forceActiveFocus()
     }
+    function aceitarArrasto(drop) {
+        if (!drop || !drop.hasUrls || drop.urls.length === 0) {
+            notify("Solte uma pasta ou um arquivo do PC.", true)
+            return
+        }
+        if (drop.urls.length > 1) {
+            notify("Solte um item por vez — pastas inteiras já trazem a seleção no preview.", true)
+            return
+        }
+        var alvo = drop.urls[0]
+        if (String(alvo).indexOf("file:") !== 0) {
+            notify("Somente arquivos locais podem ser analisados aqui.", true)
+            return
+        }
+        hub.analisarArquivo(alvo)
+        importPreview.open()
+    }
     function registerHours(game, file) {
         sessionDialog.gid = game.id || game.gid || 0
         sessionDialog.file = file || ""
@@ -894,6 +911,25 @@ ApplicationWindow {
             TextField { id: gameTags; Layout.fillWidth: true; placeholderText: "rpg, favorito, coop"; selectByMouse: true }
             CheckBox { id: syncReference; visible: gameDialog.gid === 0; checked: true; text: "Consultar Steam como referência de conquistas ao adicionar"; Layout.fillWidth: true }
         }
+        }
+    }
+    DropArea {
+        id: dropGlobal
+        anchors.fill: parent
+        onDropped: function(drop) { window.aceitarArrasto(drop) }
+    }
+    Rectangle {
+        anchors.fill: parent
+        z: 900
+        visible: dropGlobal.containsDrag
+        color: Theme.bg
+        opacity: 0.88
+        ColumnLayout {
+            anchors.centerIn: parent
+            spacing: 12
+            Text { text: "⤓"; color: Theme.accent; font.pixelSize: Theme.fs(54); Layout.alignment: Qt.AlignHCenter }
+            Text { text: "Solte a pasta ou o arquivo para ver o preview antes de importar"; color: Theme.text; font.pixelSize: Theme.fs(18); Layout.alignment: Qt.AlignHCenter }
+            Text { text: "Nada entra na coleção sem a sua seleção na lista."; color: Theme.muted; font.pixelSize: Theme.fs(14); Layout.alignment: Qt.AlignHCenter }
         }
     }
     FileDialog { id: executableDialog; title: "Escolha o executável"; onAccepted: gameExe.text = decodeURIComponent(selectedFile.toString().replace(Qt.platform.os === "windows" ? /^file:\/\/\// : /^file:\/\//, "")) }
