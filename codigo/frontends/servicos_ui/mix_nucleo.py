@@ -1,0 +1,160 @@
+"""Nucleo do ServicoBiblioteca: ciclo de vida, biblioteca e colecao."""
+from __future__ import annotations
+
+import threading
+from contextlib import closing
+from pathlib import Path
+
+import bib_core as core
+from bib_nucleo import conquistas, spotify
+
+from .integracoes import integracoes_padrao
+from .sistema import busca_global, capa_url, resumo_sistema, saude_colecao
+
+
+class MixNucleo:
+    def __init__(self, db_path, registro=None):
+        self.db_path = Path(db_path)
+        self.integracoes = registro or integracoes_padrao()
+        self._escrita = threading.RLock()
+        self.spotify = spotify.ClienteSpotify()
+
+    def snapshot(self):
+        with closing(core.get_db(self.db_path)) as con:
+            jogos = core.listar_jogos(con)
+            musicas = core.listar_musicas(con)
+            desejos = core.listar_desejos(con)
+            fila_musicas = core.listar_downloads(con)
+            videos = core.listar_videos(con)
+        for j in jogos:
+            j.update(capa_url=capa_url(j.get("capa")), plataforma=core.plataforma_jogo(j))
+        for m in musicas:
+            m["capa_url"] = capa_url(m.get("musica_capa"))
+        from bib_nucleo.preferencias_pessoais import aplicar_perfil
+        jogos = aplicar_perfil(jogos)
+        return {"jogos": jogos, "musicas": musicas, "desejos": desejos, "videos": videos,
+                "fila_musicas": fila_musicas,
+                "sistema": resumo_sistema(jogos, musicas, desejos)}
+
+    def panorama(self, termo=""):
+        snap = self.snapshot()
+        return {"sistema": snap["sistema"],
+                "global": busca_global(snap["jogos"], snap["musicas"],
+                                       snap["desejos"], [], termo) if termo.strip() else []}
+
+    def jogo(self, gid):
+        with closing(core.get_db(self.db_path)) as con:
+            row = con.execute("SELECT * FROM jogos WHERE id=?", (int(gid),)).fetchone()
+            if row is None:
+                raise LookupError("O jogo não está mais na biblioteca.")
+            return core.row_to_dict(row)
+
+    def alterar(self, operacao):
+        with self._escrita:
+            core.fazer_backup(self.db_path)
+            with closing(core.get_db(self.db_path)) as con:
+                return operacao(con)
+
+    def salvar_jogo(self, gid, dados, sincronizar=False):
+        permitido = {"titulo", "executable_path", "launch_options", "status", "nota",
+                     "etiquetas", "favorito", "observacoes"}
+        dados = {k: v for k, v in (dados or {}).items() if k in permitido}
+        if "nota" in dados and (dados["nota"] == "" or dados["nota"] is None):
+            dados["nota"] = None
+        resultado = self.alterar(lambda con: core.atualizar_jogo(con, gid, dados) if gid
+                                 else core.criar_jogo(con, dados))
+        if sincronizar and not gid:
+            novo_id = resultado.get("id") if isinstance(resultado, dict) else None
+            if novo_id:
+                try:
+                    conquistas.sincronizar_catalogo(self.jogo(novo_id))
+                except (ValueError, OSError) as e:
+                    resultado["avisos"] = ["Jogo salvo. Referência de conquistas pendente: " + str(e)]
+        return resultado
+
+    def item_capa(self, categoria, ident):
+        if categoria == "jogos":
+            return self.jogo(ident)
+        if categoria != "musicas":
+            raise ValueError("Categoria de capas inválida.")
+        with closing(core.get_db(self.db_path)) as con:
+            row = con.execute("SELECT * FROM musicas WHERE id=?", (int(ident),)).fetchone()
+        if row is None:
+            raise LookupError("Música não encontrada.")
+        return dict(row)
+
+    def salvar_observacoes(self, gid, texto):
+        """Notas/diário do jogo (campo `observacoes`, sem migração)."""
+        texto = str(texto or "")[:4000]
+        return self.alterar(lambda con: core.atualizar_jogo(con, gid, {"observacoes": texto}))
+
+    def excluir(self, categoria, ident):
+        funcoes = {"jogos": core.excluir_jogo, "desejos": core.remover_desejo,
+                   "musicas": core.excluir_musica,
+                   "videos": core.excluir_video}
+        if categoria not in funcoes:
+            raise ValueError("Esta categoria não permite exclusão pela biblioteca.")
+        return self.alterar(lambda con: funcoes[categoria](con, int(ident)))
+
+    def favorito(self, gid):
+        with self._escrita:
+            from bib_nucleo.preferencias_pessoais import (
+                aplicar_perfil,
+                ler_preferencias,
+                salvar_favorito,
+            )
+            jogo = self.jogo(gid)
+            novo = not aplicar_perfil([jogo])[0]["favorito"]
+            if ler_preferencias()["ativo"] == "Tuco":
+                self.salvar_jogo(gid, {"favorito": novo})
+            salvar_favorito(jogo, novo)
+            return {"ok": True}
+
+    def saude(self):
+        with closing(core.get_db(self.db_path)) as con:
+            jogos = core.listar_jogos(con)
+        return saude_colecao(jogos)
+
+    def backups(self, manter=10):
+        arqs = sorted(core.BACKUP_DIR.glob("biblioteca-*.db"),
+                      key=lambda p: p.name, reverse=True)[:manter]
+        return [{"nome": p.name, "bytes": p.stat().st_size if p.is_file() else 0}
+                for p in arqs]
+
+    def sessoes(self):
+        try:
+            return core.listar_sessoes_pendentes()
+        except Exception:
+            return []
+
+    def log_cauda(self, linhas=30):
+        try:
+            alvo = core.DADOS_DIR / "erros.log"
+            texto = alvo.read_text(encoding="utf-8", errors="replace").splitlines()
+            return "\n".join(texto[-linhas:]) if texto else "Sem erros registrados."
+        except Exception as e:
+            return f"Log indisponível: {e}"
+
+    def exportar_colecao_para(self, pasta):
+        """Pacote ZIP da coleção numa pasta escolhida (pendrive, nuvem, etc.)."""
+        from datetime import datetime
+        from pathlib import Path
+        destino = Path(pasta) / f"tucoteca-{datetime.now():%Y%m%d-%H%M%S-%f}.zip"
+        return core.exportar_pacote(destino, self.db_path)
+
+    def estatisticas(self):
+        from bib_nucleo.estatisticas import resumo_ano
+        from bib_nucleo.preferencias_pessoais import ler_preferencias
+        with closing(core.get_db(self.db_path)) as con:
+            return resumo_ano(con, perfil=ler_preferencias()["ativo"])
+
+    def disco_jogo(self, gid):
+        from bib_nucleo.estatisticas import tamanho_pasta
+        jogo = self.jogo(gid)
+        exe = Path(core.traduzir_para_atual(jogo.get("executable_path", "")))
+        if not exe.is_file():
+            raise ValueError("Executável local não encontrado.")
+        return tamanho_pasta(exe.parent)
+
+
+__all__ = ["MixNucleo"]

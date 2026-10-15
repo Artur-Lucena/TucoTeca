@@ -48,8 +48,7 @@ APP_ARQS = (("README.md", "README.md"),
                ("codigo/frontends/desktop.py", "desktop.py"),
                ("codigo/frontends/app_qt.py", "app_qt.py"),
                ("codigo/frontends/qt_bridge.py", "qt_bridge.py"),
-                ("codigo/frontends/servicos_ui.py", "servicos_ui.py"),
-                 ("codigo/frontends/navegacao_controle.py", "navegacao_controle.py"),
+                ("codigo/frontends/navegacao_controle.py", "navegacao_controle.py"),
                  ("codigo/frontends/qt_emulacao.py", "qt_emulacao.py"),
                 ("codigo/ferramentas/__init__.py", "ferramentas/__init__.py"),
                 ("codigo/ferramentas/diagnosticar.py", "ferramentas/diagnosticar.py"),
@@ -57,6 +56,26 @@ APP_ARQS = (("README.md", "README.md"),
                  ("codigo/ferramentas/provar_qt_runtime.py", "provar_qt_runtime.py"),
                  ("codigo/ferramentas/provar_integracoes_locais.py", "provar_integracoes_locais.py"),
                 ("codigo/ferramentas/provar_qbit_runtime.py", "provar_qbit_runtime.py"))
+
+# Pacotes-diretório do app (F2/F3 do O2): viajam como árvore, igual ao
+# bib_nucleo, em vez de arquivo avulso. Novos pacotes entram aqui, não no
+# APP_ARQS — os validadores expandem via arquivos_app().
+APP_PACOTES = (("codigo/frontends/servicos_ui", "servicos_ui"),)
+
+
+def arquivos_app(repo=None):
+    """Pares (origem, destino) de TODOS os arquivos do app/, expandindo pacotes."""
+    repo = REPO if repo is None else Path(repo)
+    for origem, destino in APP_ARQS:
+        yield origem, destino
+    for origem, destino in APP_PACOTES:
+        base = repo / origem
+        if not base.is_dir():
+            continue
+        for p in sorted(base.rglob("*")):
+            if p.is_file() and "__pycache__" not in p.parts and p.suffix not in (".pyc", ".pyo"):
+                yield ((Path(origem) / p.relative_to(base)).as_posix(),
+                       (Path(destino) / p.relative_to(base)).as_posix())
 
 BAT_GUI = """@echo off
 setlocal
@@ -339,6 +358,13 @@ def copiar_app(app_dir: Path, repo: Path | None = None) -> None:
         alvo = app_dir / destino
         alvo.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, alvo)
+    for origem, destino in APP_PACOTES:
+        src = repo / origem
+        if not (src / "__init__.py").is_file():
+            raise SystemExit(f"pacote do app ausente no repo: {origem}")
+        shutil.copytree(src, app_dir / destino,
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+                        dirs_exist_ok=True)
     nucleo = repo / "codigo" / "bib_nucleo"
     if not (nucleo / "__init__.py").is_file():
         raise SystemExit("pacote bib_nucleo ausente no repo.")

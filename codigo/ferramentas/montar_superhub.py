@@ -297,7 +297,7 @@ def incluir_licencas_qt(raiz: Path):
 
 def validar_fontes_runtime(raiz: Path, repo: Path = REPO) -> dict:
     """Confere conteúdo e conjunto dos fontes copiados, inclusive ao reutilizar."""
-    esperados = {destino: repo / origem for origem, destino in MP.APP_ARQS}
+    esperados = {destino: repo / origem for origem, destino in MP.arquivos_app(repo)}
     for origem, destino in (("codigo/bib_nucleo", "bib_nucleo"),
                             ("codigo/frontends/qml", "qml")):
         base = repo / origem

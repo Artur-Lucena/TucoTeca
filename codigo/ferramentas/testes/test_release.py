@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import empacotar_fontes as FONTES
 import montar_superhub as MS
 import preparar_release as REL
-from montar_portatil import APP_ARQS
+from montar_portatil import APP_ARQS, APP_PACOTES
 
 SHA = "a" * 40
 
@@ -25,6 +25,10 @@ def _repo_minimo(tmp: Path) -> Path:
         p = repo / origem
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("# fonte sintético\n", encoding="utf-8")
+    for origem, _ in APP_PACOTES:
+        p = repo / origem / "__init__.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("# pacote sintético\n", encoding="utf-8")
     (repo / "codigo/bib_nucleo").mkdir(parents=True)
     (repo / "codigo/bib_nucleo/__init__.py").write_text("# nucleo", encoding="utf-8")
     (repo / "codigo/bib_nucleo/arquivos.py").write_text(

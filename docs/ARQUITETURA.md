@@ -107,7 +107,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 | `frontends/qt_bridge.py` | Modelos, seções, workers, player, paleta e sistema |
 | `frontends/navegacao_controle.py` | Estado XInput → ações (direcional repete ao ser segurado); o Qt traduz para teclas e seções |
 | `frontends/qt_emulacao.py` | Mods, texturas, cheats e presets do Azahar para o jogo selecionado; cada ação recarrega o estado |
-| `frontends/servicos_ui.py` | Casos de uso desktop, `resumo_sistema`, `busca_global`, registro |
+| `frontends/servicos_ui/` (pacote) | Casos de uso desktop, `resumo_sistema`, `busca_global`, registro |
 | `frontends/qml/` | shell `Main.qml`, `secoes/`, componentes, diálogos, navegador/player opcionais |
 | `frontends/app_tui.py` | Tui, desenho, prompts, menus e loop de terminal |
 | `frontends/despacho.py` | callbacks de workers entregues pela thread Tk |

@@ -127,8 +127,8 @@ def _sums(variante: str, windows_dir: Path | None = None) -> dict:
 
 
 def _fontes_app(repo: Path) -> dict[str, Path]:
-    from montar_portatil import APP_ARQS
-    esperados = {"app/" + destino: repo / origem for origem, destino in APP_ARQS}
+    from montar_portatil import arquivos_app
+    esperados = {"app/" + destino: repo / origem for origem, destino in arquivos_app(repo)}
     for origem, destino in (("codigo/bib_nucleo", "bib_nucleo"),
                             ("codigo/frontends/qml", "qml")):
         base = repo / origem

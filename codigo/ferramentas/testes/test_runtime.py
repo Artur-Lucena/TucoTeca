@@ -184,6 +184,10 @@ def teste_runtime_confere_revisao_e_recusa_fontes_obsoletos():
         p = repo / origem
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("# fonte de prova", encoding="utf-8")
+    for origem, _destino in MS.MP.APP_PACOTES:
+        p = repo / origem / "__init__.py"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("# pacote de prova", encoding="utf-8")
     (repo / "codigo/bib_nucleo").mkdir()
     (repo / "codigo/bib_nucleo/__init__.py").write_text("# nucleo", encoding="utf-8")
     (repo / "codigo/frontends/qml/secoes").mkdir(parents=True)
@@ -191,7 +195,7 @@ def teste_runtime_confere_revisao_e_recusa_fontes_obsoletos():
     qml.write_text("import QtQuick; Item {}", encoding="utf-8")
     MS.MP.copiar_app(runtime / "app", repo)
     r = MS.validar_fontes_runtime(runtime, repo)
-    afirmar(r["arquivos"] == len(MS.MP.APP_ARQS) + 2, r)
+    afirmar(r["arquivos"] == len(list(MS.MP.arquivos_app(repo))) + 2, r)
     afirmar(len(r["sha256_arvore_app"]) == 64, r)
     (runtime / "app/qml/secoes/Inicio.qml").write_text("# divergente", encoding="utf-8")
     try:
