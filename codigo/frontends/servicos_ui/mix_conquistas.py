@@ -23,9 +23,11 @@ class MixConquistas:
         from bib_nucleo import aparencia_usuario
         return aparencia_usuario.ler_aparencia()
 
-    def definir_aparencia(self, tema="", densidade="", auto_backup=None, modo_simples=None):
+    def definir_aparencia(self, tema="", densidade="", auto_backup=None,
+                          modo_simples=None, escala_texto=None):
         from bib_nucleo import aparencia_usuario
-        return aparencia_usuario.salvar_aparencia(tema, densidade, auto_backup, modo_simples)
+        return aparencia_usuario.salvar_aparencia(tema, densidade, auto_backup,
+                                                  modo_simples, escala_texto)
 
 
 __all__ = ["MixConquistas"]

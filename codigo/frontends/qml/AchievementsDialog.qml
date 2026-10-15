@@ -60,7 +60,7 @@ Dialog {
                     anchors.fill: parent; anchors.margins: 14; spacing: 14
                     Rectangle {
                         width: 44; height: 44; radius: 8; color: Theme.raised
-                        Text { anchors.centerIn: parent; text: modelData.desbloqueada ? "★" : "☆"; font.pixelSize: 30; color: modelData.desbloqueada ? Theme.positive : Theme.muted }
+                        Text { anchors.centerIn: parent; text: modelData.desbloqueada ? "★" : "☆"; font.pixelSize: Theme.fs(30); color: modelData.desbloqueada ? Theme.positive : Theme.muted }
                         Image { anchors.fill: parent; source: modelData.icon_url || ""; fillMode: Image.PreserveAspectFit }
                     }
                     ColumnLayout {

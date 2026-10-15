@@ -15,7 +15,7 @@ ApplicationWindow {
     color: Theme.bg
     font.family: Theme.family
     font.pixelSize: Theme.subtitle
-    Component.onCompleted: { Theme.tema = hub.aparencia.tema; Theme.densidade = hub.aparencia.densidade }
+    Component.onCompleted: { Theme.tema = hub.aparencia.tema; Theme.densidade = hub.aparencia.densidade; Theme.escala = hub.aparencia.escala_texto }
     palette {
         window: Theme.bg; windowText: Theme.text; base: Theme.surface
         text: Theme.text; button: Theme.raised; buttonText: Theme.text
@@ -175,7 +175,7 @@ ApplicationWindow {
                     width: ListView.view.width - 16
                     text: modelData.texto; wrapMode: Text.WordWrap
                     color: index === hub.letraIndice ? Theme.accent : Theme.text
-                    font.bold: index === hub.letraIndice; font.pixelSize: 18
+                    font.bold: index === hub.letraIndice; font.pixelSize: Theme.fs(18)
                 }
             }
             ScrollView {
@@ -202,7 +202,7 @@ ApplicationWindow {
             clip: true; contentWidth: availableWidth
             ColumnLayout {
                 width: parent.width; spacing: 10
-                Text { text: "SteamRip — download direto (host automático)"; color: Theme.accent; font.pixelSize: 13; visible: hub.fontesDesejo.steamrip.length > 0 }
+                Text { text: "SteamRip — download direto (host automático)"; color: Theme.accent; font.pixelSize: Theme.fs(13); visible: hub.fontesDesejo.steamrip.length > 0 }
                 Repeater {
                     model: hub.fontesDesejo.steamrip
                     RowLayout {
@@ -213,7 +213,7 @@ ApplicationWindow {
                         ActionButton { text: "Abrir ↗"; onClicked: hub.abrirUrl(modelData.url) }
                     }
                 }
-                Text { text: "FitGirl — abre a página para escolher os links"; color: Theme.accent; font.pixelSize: 13; visible: hub.fontesDesejo.fitgirl.length > 0 }
+                Text { text: "FitGirl — abre a página para escolher os links"; color: Theme.accent; font.pixelSize: Theme.fs(13); visible: hub.fontesDesejo.fitgirl.length > 0 }
                 Repeater {
                     model: hub.fontesDesejo.fitgirl
                     RowLayout {
@@ -223,7 +223,7 @@ ApplicationWindow {
                         ActionButton { text: "Abrir página ↗"; onClicked: hub.abrirUrl(modelData.url) }
                     }
                 }
-                Text { text: hub.fontesDesejo.erros.join("; "); color: Theme.warning; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 13; visible: hub.fontesDesejo.erros.length > 0 }
+                Text { text: hub.fontesDesejo.erros.join("; "); color: Theme.warning; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: Theme.fs(13); visible: hub.fontesDesejo.erros.length > 0 }
             }
         }
     }
@@ -249,6 +249,7 @@ ApplicationWindow {
             if (sistema.visible && !hub.ocupado) sistema.refresh()
             Theme.tema = hub.aparencia.tema
             Theme.densidade = hub.aparencia.densidade
+            Theme.escala = hub.aparencia.escala_texto
             if (hub.secao === "jogos") {
                 if (games && games.currentIndex !== hub.indiceSelecionado) games.currentIndex = hub.indiceSelecionado
             } else if (hub.secao !== "integracoes" && hub.secao !== "inicio") {
@@ -284,13 +285,13 @@ ApplicationWindow {
                     GradientStop { position: 0; color: "#91e6ee" }
                     GradientStop { position: 1; color: "#638bff" }
                 }
-                Text { anchors.centerIn: parent; text: "T"; font { pixelSize: 24; weight: Font.Black } color: Theme.ink }
+                Text { anchors.centerIn: parent; text: "T"; font { pixelSize: Theme.fs(24); weight: Font.Black } color: Theme.ink }
             }
             Text {
                 id: headerBrand
                 visible: window.width >= 1360
                 text: "TUCOTECA"; color: Theme.text
-                font { pixelSize: 16; weight: Font.Bold; letterSpacing: 2 }
+                font { pixelSize: Theme.fs(16); weight: Font.Bold; letterSpacing: 2 }
                 Layout.rightMargin: 28
             }
             Repeater {
@@ -301,7 +302,7 @@ ApplicationWindow {
                     text: modelData.title
                     selected: hub.secao === modelData.key
                     quiet: true
-                    font.pixelSize: window.immersive ? 16 : 14
+                    font.pixelSize: Theme.fs(window.immersive ? 16 : 14)
                     Layout.maximumWidth: headerRow.navigationWidth
                     onClicked: { hub.navegar(modelData.key); search.text = "" }
                     ToolTip.visible: hovered
@@ -331,7 +332,7 @@ ApplicationWindow {
                 onClicked: window.toggleImmersive()
                 ToolTip.visible: hovered; ToolTip.text: "Tela cheia · F11"
             }
-            ActionButton { objectName: "settingsButton"; text: "⚙"; font.pixelSize: 20; Layout.maximumWidth: 50; onClicked: settings.open(); Accessible.name: "Configurações" }
+            ActionButton { objectName: "settingsButton"; text: "⚙"; font.pixelSize: Theme.fs(20); Layout.maximumWidth: 50; onClicked: settings.open(); Accessible.name: "Configurações" }
         }
     }
 
@@ -363,7 +364,7 @@ ApplicationWindow {
                 implicitHeight: Theme.btnAlto
                 placeholderText: "Buscar nesta categoria  ·  Ctrl+F"
                 color: Theme.text
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 leftPadding: 15; rightPadding: 35
                 background: Rectangle { radius: 12; color: Theme.surface; border.color: search.activeFocus ? Theme.accent : Theme.line }
                 onTextEdited: hub.pesquisar(text)
@@ -405,7 +406,7 @@ ApplicationWindow {
                 anchors.fill: parent; anchors.margins: 24; spacing: 18
                 ColumnLayout {
                     Layout.fillWidth: true; spacing: 8
-                    Text { text: "DA SUA COLEÇÃO"; color: Theme.accent; font { pixelSize: 12; weight: Font.Bold; letterSpacing: 2 } }
+                    Text { text: "DA SUA COLEÇÃO"; color: Theme.accent; font { pixelSize: Theme.fs(12); weight: Font.Bold; letterSpacing: 2 } }
                     Text {
                         text: hub.selecionado.titulo || "Escolha seu próximo jogo"
                         color: Theme.text; font { pixelSize: window.immersive ? Theme.display : Theme.headline; weight: Font.Bold }
@@ -414,7 +415,7 @@ ApplicationWindow {
                     Text {
                         text: (hub.selecionado.plataforma || "PC") + "   /   " + (hub.selecionado.status || "backlog") +
                               "   /   " + Number(hub.selecionado.horas || 0).toFixed(1) + " horas jogadas"
-                        color: Theme.muted; font.pixelSize: 14
+                        color: Theme.muted; font.pixelSize: Theme.fs(14)
                     }
                 }
                 ActionButton {
@@ -433,7 +434,7 @@ ApplicationWindow {
             spacing: 8
             Text {
                 visible: hub.secao === "integracoes"
-                text: "Suas fontes e atalhos no mesmo lugar."; color: Theme.muted; font.pixelSize: 13
+                text: "Suas fontes e atalhos no mesmo lugar."; color: Theme.muted; font.pixelSize: Theme.fs(13)
                 Layout.fillWidth: true; elide: Text.ElideRight
             }
             ActionButton {
@@ -571,9 +572,9 @@ ApplicationWindow {
                 anchors.centerIn: parent
                 visible: hub.secao !== "integracoes" && hub.secao !== "inicio" && hub.secao !== "youtube" && hub.quantidade === 0
                 spacing: 14
-                Text { text: hub.ocupado ? "◌" : "◇"; color: Theme.accent; font.pixelSize: 54; Layout.alignment: Qt.AlignHCenter }
+                Text { text: hub.ocupado ? "◌" : "◇"; color: Theme.accent; font.pixelSize: Theme.fs(54); Layout.alignment: Qt.AlignHCenter }
                 Text { text: hub.ocupado ? "Preparando sua coleção…" : hub.busca ? "Nenhum resultado por aqui." : "Este espaço está esperando por você."; color: Theme.text; font.pixelSize: Theme.headline; Layout.alignment: Qt.AlignHCenter }
-                Text { text: hub.busca ? "Experimente outro nome ou limpe os filtros." : "Use a ação abaixo para começar."; color: Theme.muted; font.pixelSize: 13; Layout.alignment: Qt.AlignHCenter }
+                Text { text: hub.busca ? "Experimente outro nome ou limpe os filtros." : "Use a ação abaixo para começar."; color: Theme.muted; font.pixelSize: Theme.fs(13); Layout.alignment: Qt.AlignHCenter }
                 ActionButton {
                     objectName: "emptyStateAction"
                     visible: !hub.ocupado && !hub.busca && (hub.secao === "jogos" || hub.secao === "musicas" || hub.secao === "desejos" || hub.secao === "videos" || hub.secao === "downloads")
@@ -608,13 +609,13 @@ ApplicationWindow {
             anchors.fill: parent; anchors.margins: 20; spacing: window.width < 1150 ? 8 : 14
             Rectangle {
                 width: 46; height: 46; radius: 12; color: Theme.raised
-                Text { anchors.centerIn: parent; text: "♫"; color: Theme.accent; font.pixelSize: 25 }
+                Text { anchors.centerIn: parent; text: "♫"; color: Theme.accent; font.pixelSize: Theme.fs(25) }
                 Image { anchors.fill: parent; source: hub.audio.capa_url; fillMode: Image.PreserveAspectCrop; asynchronous: true; sourceSize: Qt.size(96, 96) }
             }
             ColumnLayout {
                 Layout.preferredWidth: window.width < 1150 ? 140 : 220; spacing: 5
-                Text { text: hub.audio.titulo; color: Theme.text; font { pixelSize: 13; weight: Font.DemiBold } Layout.fillWidth: true; elide: Text.ElideRight }
-                Text { text: hub.audio.artista; color: Theme.muted; font.pixelSize: 13; Layout.fillWidth: true; elide: Text.ElideRight }
+                Text { text: hub.audio.titulo; color: Theme.text; font { pixelSize: Theme.fs(13); weight: Font.DemiBold } Layout.fillWidth: true; elide: Text.ElideRight }
+                Text { text: hub.audio.artista; color: Theme.muted; font.pixelSize: Theme.fs(13); Layout.fillWidth: true; elide: Text.ElideRight }
             }
             ActionButton { text: "❮"; Accessible.name: "Faixa anterior"; onClicked: hub.transporte("anterior") }
             ActionButton { text: hub.audio.estado === "tocando" ? "Ⅱ" : hub.audio.estado === "carregando" ? "…" : "▶"; primary: true; Accessible.name: "Reproduzir ou pausar"; onClicked: hub.transporte("alternar") }
@@ -634,7 +635,7 @@ ApplicationWindow {
             }
             Item { Layout.fillWidth: true }
             BusyIndicator { running: hub.ocupado; visible: running; implicitWidth: 28; implicitHeight: 28 }
-            Text { visible: window.width >= 1150; text: hub.atividade; color: Theme.muted; font.pixelSize: 13; Layout.maximumWidth: 170; elide: Text.ElideRight }
+            Text { visible: window.width >= 1150; text: hub.atividade; color: Theme.muted; font.pixelSize: Theme.fs(13); Layout.maximumWidth: 170; elide: Text.ElideRight }
             ActionButton { text: "↻"; enabled: !hub.ocupado; Accessible.name: "Atualizar coleção"; onClicked: hub.atualizar() }
         }
     }
@@ -663,7 +664,7 @@ ApplicationWindow {
                     wrapMode: TextEdit.WrapAnywhere
                     color: Theme.text
                     font.family: "Consolas"
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fs(12)
                     text: "Gerando…"
                     background: Rectangle { radius: Theme.radiusSmall; color: Theme.bg }
                 }
@@ -692,12 +693,12 @@ ApplicationWindow {
         ColumnLayout {
             id: detailsColumn
             width: parent.width; spacing: 18
-            RowLayout { Layout.fillWidth: true; Text { text: "SOBRE O JOGO"; color: Theme.muted; font { pixelSize: 13; letterSpacing: 2 } } Item { Layout.fillWidth: true } ActionButton { text: "×"; onClicked: details.close() } }
+            RowLayout { Layout.fillWidth: true; Text { text: "SOBRE O JOGO"; color: Theme.muted; font { pixelSize: Theme.fs(13); letterSpacing: 2 } } Item { Layout.fillWidth: true } ActionButton { text: "×"; onClicked: details.close() } }
             Image { Layout.fillWidth: true; Layout.preferredHeight: Math.min(280, window.height * 0.28); source: hub.selecionado.capa_url || ""; fillMode: Image.PreserveAspectFit; asynchronous: true }
-            Text { text: hub.selecionado.titulo || ""; color: Theme.text; font { pixelSize: 27; weight: Font.Bold } Layout.fillWidth: true; wrapMode: Text.WordWrap }
-            Text { text: (hub.selecionado.plataforma || "PC") + "  ·  " + (hub.selecionado.status || "backlog"); color: Theme.accent; font.pixelSize: 13 }
-            Text { text: Number(hub.selecionado.horas || 0).toFixed(1) + " horas jogadas" + (hub.selecionado.nota !== null && hub.selecionado.nota !== undefined ? "  ·  nota " + hub.selecionado.nota + "/10" : ""); color: Theme.muted; font.pixelSize: 14 }
-            Text { text: hub.selecionado.etiquetas || "Sem etiquetas — edite para organizar."; color: Theme.muted; font.pixelSize: 14; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Text { text: hub.selecionado.titulo || ""; color: Theme.text; font { pixelSize: Theme.fs(27); weight: Font.Bold } Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            Text { text: (hub.selecionado.plataforma || "PC") + "  ·  " + (hub.selecionado.status || "backlog"); color: Theme.accent; font.pixelSize: Theme.fs(13) }
+            Text { text: Number(hub.selecionado.horas || 0).toFixed(1) + " horas jogadas" + (hub.selecionado.nota !== null && hub.selecionado.nota !== undefined ? "  ·  nota " + hub.selecionado.nota + "/10" : ""); color: Theme.muted; font.pixelSize: Theme.fs(14) }
+            Text { text: hub.selecionado.etiquetas || "Sem etiquetas — edite para organizar."; color: Theme.muted; font.pixelSize: Theme.fs(14); wrapMode: Text.WordWrap; Layout.fillWidth: true }
             ActionButton { Layout.fillWidth: true; text: "▶  Jogar"; primary: true; enabled: !hub.ocupado && !hub.emJogo; onClicked: { hub.jogar(hub.selecionado.id); details.close() } }
             ActionButton { Layout.fillWidth: true; text: hub.selecionado.favorito ? "★  Remover dos favoritos" : "☆  Adicionar aos favoritos"; enabled: !hub.ocupado; onClicked: hub.favorito(hub.selecionado.id) }
             ActionButton { Layout.fillWidth: true; text: "Editar jogo"; enabled: !hub.ocupado; onClicked: window.editGame(hub.selecionado) }
@@ -711,7 +712,7 @@ ApplicationWindow {
             ActionButton { objectName: "gameElevateButton"; Layout.fillWidth: true; text: "▶  Jogar como administrador (UAC)"; enabled: !hub.ocupado && !hub.emJogo && !!hub.selecionado.id; onClicked: { uacConfirm.gid = hub.selecionado.id; uacConfirm.jogo = hub.selecionado.titulo || ""; uacConfirm.open() } }
             ActionButton { text: "Remover da biblioteca"; enabled: !hub.ocupado; onClicked: { window.deleteItem("jogos", hub.selecionado); details.close() } }
             Item { Layout.fillHeight: true }
-            Text { text: "Notas pessoais"; color: Theme.muted; font { pixelSize: 13; letterSpacing: 2 } }
+            Text { text: "Notas pessoais"; color: Theme.muted; font { pixelSize: Theme.fs(13); letterSpacing: 2 } }
             TextArea {
                 id: notasJogo
                 objectName: "gameNotesArea"
@@ -729,7 +730,7 @@ ApplicationWindow {
                 text: "Salvar notas"; enabled: !hub.ocupado && !!hub.selecionado.id
                 onClicked: hub.salvarObservacoes(hub.selecionado.id, notasJogo.text)
             }
-            Text { text: "Saneamento, reparo e atualização de emuladores ficam em Configurações › Manutenção; importar pacotes e pastas está em Configurações › Coleção."; color: Theme.muted; font.pixelSize: 14; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            Text { text: "Saneamento, reparo e atualização de emuladores ficam em Configurações › Manutenção; importar pacotes e pastas está em Configurações › Coleção."; color: Theme.muted; font.pixelSize: Theme.fs(14); Layout.fillWidth: true; wrapMode: Text.WordWrap }
         }
         }
     }
@@ -747,16 +748,16 @@ ApplicationWindow {
             clip: true; contentWidth: availableWidth
         ColumnLayout {
             width: parent.width; spacing: 16
-            Text { text: "TUCOTECA  /  DESKTOP QT"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "TUCOTECA  /  DESKTOP QT"; color: Theme.accent; font { pixelSize: Theme.fs(12); letterSpacing: 2 } }
             Text { text: "Interface Qt Quick, biblioteca local e integrações independentes."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             ActionButton { text: window.immersive ? "Sair do Big Picture" : "Entrar no Big Picture"; Layout.fillWidth: true; onClicked: { settings.close(); window.toggleImmersive() } }
             ActionButton { text: "Criar backup da coleção"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: hub.backup() }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
-            Text { text: "APARÊNCIA"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
-            Text { text: "Tema e densidade ficam salvos nesta coleção."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Text { text: "APARÊNCIA"; color: Theme.accent; font { pixelSize: Theme.fs(12); letterSpacing: 2 } }
+            Text { text: "Tema, densidade e escala de texto ficam salvos nesta coleção."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: "Tema"; color: Theme.muted; font.pixelSize: 14; Layout.preferredWidth: 90 }
+                Text { text: "Tema"; color: Theme.muted; font.pixelSize: Theme.fs(14); Layout.preferredWidth: 90 }
                 Repeater {
                     model: [{k: "escuro", t: "Escuro"}, {k: "claro", t: "Claro"}]
                     ActionButton {
@@ -768,7 +769,7 @@ ApplicationWindow {
             }
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: "Densidade"; color: Theme.muted; font.pixelSize: 14; Layout.preferredWidth: 90 }
+                Text { text: "Densidade"; color: Theme.muted; font.pixelSize: Theme.fs(14); Layout.preferredWidth: 90 }
                 Repeater {
                     model: [{k: "compacto", t: "Compacto"}, {k: "conforto", t: "Conforto"}, {k: "bigpicture", t: "Big Picture"}]
                     ActionButton {
@@ -780,7 +781,28 @@ ApplicationWindow {
             }
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: "Backup"; color: Theme.muted; font.pixelSize: 14; Layout.preferredWidth: 90 }
+                Text { text: "Texto"; color: Theme.muted; font.pixelSize: Theme.fs(14); Layout.preferredWidth: 90 }
+                ActionButton {
+                    objectName: "escalaTextoMenos"; text: "A−"; quiet: true
+                    enabled: hub.aparencia.escala_texto > 0.801
+                    onClicked: hub.definirEscalaTexto(Math.max(0.8, hub.aparencia.escala_texto - 0.1))
+                }
+                Text {
+                    objectName: "escalaTextoValor"
+                    text: Math.round(hub.aparencia.escala_texto * 100) + "%"
+                    color: Theme.text; font.pixelSize: Theme.fs(14); Layout.minimumWidth: 52
+                    horizontalAlignment: Text.AlignHCenter
+                }
+                ActionButton {
+                    objectName: "escalaTextoMais"; text: "A+"; quiet: true
+                    enabled: hub.aparencia.escala_texto < 1.499
+                    onClicked: hub.definirEscalaTexto(Math.min(1.5, hub.aparencia.escala_texto + 0.1))
+                }
+                Item { Layout.fillWidth: true }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Text { text: "Backup"; color: Theme.muted; font.pixelSize: Theme.fs(14); Layout.preferredWidth: 90 }
                 ActionButton {
                     text: hub.aparencia.auto_backup ? "Automático ao fim da sessão" : "Somente manual"
                     selected: hub.aparencia.auto_backup; quiet: true
@@ -789,7 +811,7 @@ ApplicationWindow {
             }
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: "Modo"; color: Theme.muted; font.pixelSize: 14; Layout.preferredWidth: 90 }
+                Text { text: "Modo"; color: Theme.muted; font.pixelSize: Theme.fs(14); Layout.preferredWidth: 90 }
                 ActionButton {
                     objectName: "modoSimplesButton"
                     text: hub.aparencia.modo_simples ? "Simples (Isa) — ligado" : "Completo — ligado"
@@ -807,16 +829,16 @@ ApplicationWindow {
             ActionButton { text: "Importar arquivo (exe/ROM) com preview…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: singleGameFile.open() }
             ActionButton { text: "Importar pacote de jogo (.zip/.rar/.7z)…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: repackFile.open() }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
-            Text { text: "MANUTENÇÃO"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "MANUTENÇÃO"; color: Theme.accent; font { pixelSize: Theme.fs(12); letterSpacing: 2 } }
             Text { text: "Sanear organiza sobras de instalação e leva instaladores para .hub-lixo, sempre reversível. Mostra o plano antes de aplicar."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             ActionButton { objectName: "sanearButton"; text: "Sanear pasta de jogo…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: sanearFolder.open() }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
-            Text { text: "EMULADORES E CONTROLES"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "EMULADORES E CONTROLES"; color: Theme.accent; font { pixelSize: Theme.fs(12); letterSpacing: 2 } }
             Text { text: "Atualização consulta o release e só baixa depois da sua confirmação. Presets de controle aplicam com o Azahar fechado."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             ActionButton { objectName: "emusButton"; text: "Emuladores e controles avançados…"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: { hub.consultarEmus(); hub.consultarPads(); emus.open() } }
             ActionButton { objectName: "personalToolsButton"; text: "Perfis, atalhos, vigia, estatísticas e API local…"; Layout.fillWidth: true; onClicked: personalTools.open() }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
-            Text { text: "DIAGNÓSTICO"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "DIAGNÓSTICO"; color: Theme.accent; font { pixelSize: Theme.fs(12); letterSpacing: 2 } }
             Text { text: "Relatório somente-leitura da instalação. Útil para anexar em um issue."; color: Theme.muted; font.pixelSize: Theme.subtitle; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             ActionButton { text: "Gerar diagnóstico"; Layout.fillWidth: true; enabled: !hub.ocupado; onClicked: { hub.rodarDiagnostico(); diagnostico.open() } }
             ActionButton { text: "Sistema: backups, sessões e logs"; Layout.fillWidth: true; onClicked: { settings.close(); sistema.open() } }
@@ -826,9 +848,9 @@ ApplicationWindow {
             ActionButton { text: "Abrir ferramentas clássicas"; Layout.fillWidth: true; enabled: !hub.ocupado && !hub.emJogo; onClicked: hub.classico() }
             Text { text: "A interface clássica reúne importação avançada, mods, emuladores, CSV, pacotes e manutenção. A troca encerra esta interface e mantém a mesma coleção."; color: Theme.muted; Layout.fillWidth: true; wrapMode: Text.WordWrap; font.pixelSize: Theme.subtitle }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
-            Text { text: "F11  Tela cheia     Ctrl+1…7  Categorias\nCtrl+F  Buscar     Ctrl+K  Busca global     Setas  Navegar\nEnter  Jogar/Tocar/Assistir     Espaço  Detalhes"; color: Theme.muted; lineHeight: 1.5; font.pixelSize: 13 }
-            Text { text: hub.controlesConectados.length ? "Controle conectado: " + hub.controlesConectados.join(", ") : "Nenhum controle XInput detectado. Conecte-o; ele é reconhecido sem reiniciar."; color: Theme.muted; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-            Text { text: "Controle XInput: setas ou analógico navegam · A confirma · B volta · LB/RB trocam de seção · Start abre a busca global."; color: Theme.muted; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Text { text: "F11  Tela cheia     Ctrl+1…7  Categorias\nCtrl+F  Buscar     Ctrl+K  Busca global     Setas  Navegar\nEnter  Jogar/Tocar/Assistir     Espaço  Detalhes"; color: Theme.muted; lineHeight: 1.5; font.pixelSize: Theme.fs(13) }
+            Text { text: hub.controlesConectados.length ? "Controle conectado: " + hub.controlesConectados.join(", ") : "Nenhum controle XInput detectado. Conecte-o; ele é reconhecido sem reiniciar."; color: Theme.muted; font.pixelSize: Theme.fs(13); wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Text { text: "Controle XInput: setas ou analógico navegam · A confirma · B volta · LB/RB trocam de seção · Start abre a busca global."; color: Theme.muted; font.pixelSize: Theme.fs(13); wrapMode: Text.WordWrap; Layout.fillWidth: true }
         }
         }
     }
@@ -948,8 +970,8 @@ ApplicationWindow {
                     }
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 2
-                        Text { text: modelData.titulo || "(sem título)"; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true; elide: Text.ElideRight }
-                        Text { text: (modelData.fonte || modelData.origem || "") + " · " + (modelData.score || 0).toFixed(2); color: Theme.muted; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                        Text { text: modelData.titulo || "(sem título)"; color: Theme.text; font.pixelSize: Theme.fs(14); Layout.fillWidth: true; elide: Text.ElideRight }
+                        Text { text: (modelData.fonte || modelData.origem || "") + " · " + (modelData.score || 0).toFixed(2); color: Theme.muted; font.pixelSize: Theme.fs(12); Layout.fillWidth: true; elide: Text.ElideRight }
                     }
                 }
             }
@@ -1107,7 +1129,7 @@ ApplicationWindow {
                     }
                 }
             }
-            Text { text: "A pesquisa acessa a fonte somente quando solicitada. Magnets vão ao qBittorrent do Hub (Meus Jogos Locais/); o resto abre no navegador."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 14 }
+            Text { text: "A pesquisa acessa a fonte somente quando solicitada. Magnets vão ao qBittorrent do Hub (Meus Jogos Locais/); o resto abre no navegador."; color: Theme.muted; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: Theme.fs(14) }
         }
     }
     Dialog {
@@ -1150,7 +1172,7 @@ ApplicationWindow {
                     onClicked: { hub.abrirPaleta(item); palette.close() }
                 }
             }
-            Text { text: "Somente coleção local. ↑↓ navega, Enter abre."; color: Theme.muted; font.pixelSize: 13 }
+            Text { text: "Somente coleção local. ↑↓ navega, Enter abre."; color: Theme.muted; font.pixelSize: Theme.fs(13) }
         }
     }
 
@@ -1165,7 +1187,7 @@ ApplicationWindow {
             spacing: 10
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: "FILA DE REPRODUÇÃO"; color: Theme.muted; font { pixelSize: 13; letterSpacing: 2 } }
+                Text { text: "FILA DE REPRODUÇÃO"; color: Theme.muted; font { pixelSize: Theme.fs(13); letterSpacing: 2 } }
                 Item { Layout.fillWidth: true }
                 RowLayout {
                     ActionButton { text: "→"; Accessible.name: "Sequência"; selected: hub.modoAudioAtual === "sequencia"; onClicked: hub.modoAudio("sequencia") }
@@ -1186,7 +1208,7 @@ ApplicationWindow {
                     onClicked: hub.tocar(modelData.id)
                 }
             }
-            Text { text: "Repetir toca a faixa atual; aleatório sorteia sem repetir a atual."; color: Theme.muted; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Text { text: "Repetir toca a faixa atual; aleatório sorteia sem repetir a atual."; color: Theme.muted; font.pixelSize: Theme.fs(13); wrapMode: Text.WordWrap; Layout.fillWidth: true }
         }
     }
 
@@ -1361,7 +1383,7 @@ ApplicationWindow {
                             Text {
                                 objectName: "concluidoNome"
                                 text: modelData.nome || ""
-                                color: Theme.text; font { pixelSize: 15; weight: Font.DemiBold }
+                                color: Theme.text; font { pixelSize: Theme.fs(15); weight: Font.DemiBold }
                                 Layout.fillWidth: true; elide: Text.ElideRight
                             }
                             Text {
@@ -1399,7 +1421,7 @@ ApplicationWindow {
         onOpened: { hub.consultarEmus(); hub.consultarPads() }
         contentItem: ColumnLayout {
             spacing: 12
-            Text { text: "EMULADORES"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "EMULADORES"; color: Theme.accent; font { pixelSize: Theme.fs(12); letterSpacing: 2 } }
             ListView {
                 Layout.fillWidth: true; Layout.preferredHeight: 150; clip: true; spacing: 10
                 model: (hub.emus.itens || [])
@@ -1415,7 +1437,7 @@ ApplicationWindow {
                             Text {
                                 objectName: "emuNome"
                                 text: modelData.nome || ""
-                                color: Theme.text; font { pixelSize: 15; weight: Font.DemiBold }
+                                color: Theme.text; font { pixelSize: Theme.fs(15); weight: Font.DemiBold }
                                 Layout.fillWidth: true; elide: Text.ElideRight
                             }
                             Text {
@@ -1439,7 +1461,7 @@ ApplicationWindow {
                     }
                 }
             }
-            Text { text: "CONTROLES"; color: Theme.accent; font { pixelSize: 12; letterSpacing: 2 } }
+            Text { text: "CONTROLES"; color: Theme.accent; font { pixelSize: Theme.fs(12); letterSpacing: 2 } }
             Text {
                 objectName: "padsResumo"
                 Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.muted

@@ -35,7 +35,7 @@ Item {
             anchors.centerIn: parent
             width: parent.width - 30
             text: (card.game.titulo || "?").substring(0, 2).toUpperCase()
-            font { family: Theme.family; pixelSize: 50; weight: Font.Light }
+            font { family: Theme.family; pixelSize: Theme.fs(50); weight: Font.Light }
             color: "#6a8aa7"
             horizontalAlignment: Text.AlignHCenter
         }
@@ -65,13 +65,13 @@ Item {
                 anchors.centerIn: parent
                 text: card.game.plataforma || "PC"
                 color: Theme.text
-                font { family: Theme.family; pixelSize: 12; weight: Font.Bold }
+                font { family: Theme.family; pixelSize: Theme.fs(12); weight: Font.Bold }
             }
         }
         Text {
             anchors { right: parent.right; top: parent.top; margins: 14 }
             text: card.game.favorito ? "★" : ""
-            font.pixelSize: 21
+            font.pixelSize: Theme.fs(21)
             color: "#f5d587"
         }
         Text {

@@ -47,7 +47,7 @@ Dialog {
                         Text {
                             anchors.centerIn: parent
                             text: item.tipo === "arquivo" ? "📦" : "📁"
-                            color: Theme.accent; font.pixelSize: 18
+                            color: Theme.accent; font.pixelSize: Theme.fs(18)
                         }
                     }
                     ColumnLayout {
@@ -55,7 +55,7 @@ Dialog {
                         Text {
                             objectName: "pacoteNome"
                             text: item.nome
-                            color: Theme.text; font { pixelSize: 15; weight: Font.DemiBold }
+                            color: Theme.text; font { pixelSize: Theme.fs(15); weight: Font.DemiBold }
                             Layout.fillWidth: true; elide: Text.ElideRight
                         }
                         Text {
@@ -82,7 +82,7 @@ Dialog {
                             text: item.estado === "falta-7z" ? "sem 7-Zip" : item.estado
                             color: item.estado === "pronta" ? Theme.positive :
                                    item.estado === "falta-7z" ? Theme.warning : Theme.muted
-                            font.pixelSize: 11
+                            font.pixelSize: Theme.fs(11)
                         }
                     }
                     ActionButton {

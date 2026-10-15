@@ -20,12 +20,12 @@ ScrollView {
                 ColumnLayout {
                     anchors.fill: parent; anchors.margins: 23; spacing: 12
                     RowLayout {
-                        Rectangle { width: 44; height: 44; radius: 13; color: Theme.raised; Text { anchors.centerIn: parent; text: modelData.inicial; color: modelData.cor; font { pixelSize: 18; weight: Font.Bold } } }
+                        Rectangle { width: 44; height: 44; radius: 13; color: Theme.raised; Text { anchors.centerIn: parent; text: modelData.inicial; color: modelData.cor; font { pixelSize: Theme.fs(18); weight: Font.Bold } } }
                         Item { Layout.fillWidth: true }
-                        Text { text: modelData.personalizada ? "SUA" : modelData.tipo === "catalogo" ? "SOB DEMANDA" : "LOCAL"; color: Theme.muted; font { pixelSize: 12; letterSpacing: 1 } }
+                        Text { text: modelData.personalizada ? "SUA" : modelData.tipo === "catalogo" ? "SOB DEMANDA" : "LOCAL"; color: Theme.muted; font { pixelSize: Theme.fs(12); letterSpacing: 1 } }
                     }
-                    Text { text: modelData.nome; color: Theme.text; font { pixelSize: 21; weight: Font.DemiBold } }
-                    Text { text: modelData.descricao; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.muted; font.pixelSize: 14 }
+                    Text { text: modelData.nome; color: Theme.text; font { pixelSize: Theme.fs(21); weight: Font.DemiBold } }
+                    Text { text: modelData.descricao; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.muted; font.pixelSize: Theme.fs(14) }
                     Item { Layout.fillHeight: true }
                     ActionButton { text: modelData.url ? "Abrir →" : modelData.tipo === "catalogo" ? "Explorar catálogo →" : modelData.tipo === "download" ? "Ver downloads →" : modelData.tipo === "musicas_online" ? "Escolher músicas →" : modelData.tipo === "provedores" ? "Configurar provedores →" : "Gerenciar emulador →"; Layout.fillWidth: true; onClicked: section.shell.useIntegration(modelData) }
                     ActionButton { visible: modelData.personalizada; text: "Remover"; quiet: true; Layout.fillWidth: true; onClicked: hub.removerIntegracao(modelData.chave) }

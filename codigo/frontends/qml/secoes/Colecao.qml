@@ -28,7 +28,7 @@ ListView {
             anchors.fill: parent; anchors.margins: 14; spacing: 12
             Rectangle {
                 width: 50; height: 50; radius: 10; color: Theme.raised
-                Text { anchors.centerIn: parent; text: hub.secao === "musicas" ? "♫" : hub.secao === "desejos" ? "☆" : hub.secao === "videos" ? "▶" : "↓"; color: Theme.accent; font.pixelSize: 26 }
+                Text { anchors.centerIn: parent; text: hub.secao === "musicas" ? "♫" : hub.secao === "desejos" ? "☆" : hub.secao === "videos" ? "▶" : "↓"; color: Theme.accent; font.pixelSize: Theme.fs(26) }
                 Image { anchors.fill: parent; source: row.item.capa_url || ""; fillMode: Image.PreserveAspectCrop; asynchronous: true; sourceSize: Qt.size(100, 100) }
             }
             ColumnLayout {

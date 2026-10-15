@@ -33,13 +33,21 @@ def teste_bridge_aparencia_e_diagnostico():
         afirmar(ap["tema"] in ("escuro", "claro"), ap)
         afirmar(ap["densidade"] in ("compacto", "conforto", "bigpicture"), ap)
         afirmar(isinstance(ap.get("modo_simples"), bool), ap)
+        afirmar(0.8 <= ap["escala_texto"] <= 1.5, ap)
 
         # definir_aparencia grava e devolve o estado validado
         r = bridge.servico.definir_aparencia("claro", "compacto")
-        afirmar(r == {"tema": "claro", "densidade": "compacto", "auto_backup": ap["auto_backup"],
-                      "modo_simples": ap["modo_simples"]}, r)
+        afirmar(r == {"tema": "claro", "densidade": "compacto", "escala_texto": ap["escala_texto"],
+                      "auto_backup": ap["auto_backup"], "modo_simples": ap["modo_simples"]}, r)
         r = bridge.servico.definir_aparencia("roxo", "")
         afirmar(r["tema"] == "claro" and r["densidade"] == "compacto", r)
+        # escala de texto: limite e persistência via serviço da ponte
+        r = bridge.servico.definir_aparencia(escala_texto=1.25)
+        afirmar(abs(r["escala_texto"] - 1.25) < 1e-9, r)
+        r = bridge.servico.definir_aparencia(escala_texto=9.9)
+        afirmar(abs(r["escala_texto"] - 1.5) < 1e-9, r)
+        r = bridge.servico.definir_aparencia(escala_texto=1.0)
+        afirmar(abs(r["escala_texto"] - 1.0) < 1e-9, r)
 
         # diagnóstico roda sem levantar (pode falhar, mas devolve texto/json)
         recebido = []

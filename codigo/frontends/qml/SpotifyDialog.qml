@@ -71,7 +71,7 @@ Dialog {
                         Label { text: (item.artista || "") + (item.album ? " · " + item.album : "") + (item.duracao_ms ? " · " + dialog.duracao(item.duracao_ms) : ""); color: Theme.muted; Layout.fillWidth: true; elide: Text.ElideRight }
                     }
                     Rectangle { radius: 6; color: Theme.raised; width: badge.implicitWidth + 14; height: 24
-                        Label { id: badge; anchors.centerIn: parent; text: item.nome_fonte || item.fonte; font.pixelSize: 11; color: Theme.accent } }
+                        Label { id: badge; anchors.centerIn: parent; text: item.nome_fonte || item.fonte; font.pixelSize: Theme.fs(11); color: Theme.accent } }
                     ActionButton { visible: item.tipo === "playlist"; text: "Ver faixas"; enabled: !hub.ocupado; onClicked: hub.consultarSpotify("playlist", item.id, false) }
                     ActionButton { text: "Abrir ↗"; enabled: !!item.url; onClicked: hub.abrirUrl(item.url) }
                 }

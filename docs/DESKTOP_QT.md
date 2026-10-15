@@ -54,6 +54,7 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 | Fluxo | Qt Quick | Ferramentas clássicas |
 |---|---|---|
 | Coleção, busca, filtros, favorito, adicionar/editar/excluir jogo | Sim | Sim |
+| Aparência: tema claro/escuro, densidade e escala de texto 80–150% | Sim | — |
 | Editar nota 0–10 e etiquetas; saúde exe/ROM no Início | Sim | Sim (diálogo) |
 | Jogar com provider, presets/mods já configurados e sessão rastreada | Sim | Sim |
 | Músicas locais: importar pasta, tocar, pausar, anterior/próxima, parar | Sim | Sim |

@@ -20,7 +20,7 @@ Dialog {
         clip: true; contentWidth: availableWidth
         ColumnLayout {
             width: parent.width; spacing: 12
-            Label { text: dialog.d.titulo || "Jogo 3DS"; font.bold: true; font.pixelSize: 18; Layout.fillWidth: true; elide: Text.ElideRight }
+            Label { text: dialog.d.titulo || "Jogo 3DS"; font.bold: true; font.pixelSize: Theme.fs(18); Layout.fillWidth: true; elide: Text.ElideRight }
             Label {
                 visible: hub.emJogo; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.warning
                 text: "Um jogo está aberto. Feche-o antes de alterar mods, texturas, cheats ou presets."

@@ -452,6 +452,16 @@ class MixInfra:
                       lambda: self.servico.definir_aparencia(tema, densidade, auto_backup, modo_simples),
                       pronto)
 
+    @Slot(float)
+    def definirEscalaTexto(self, escala):
+        """Escala de texto em % (0.8–1.5); persiste e reemite para o QML aplicar."""
+        def pronto(r):
+            self._aparencia = r
+            self.mudou.emit()
+        self.executar("Salvando escala de texto…",
+                      lambda: self.servico.definir_aparencia(escala_texto=escala),
+                      pronto)
+
     def fechar(self):
         self._fechado = True
         self._audio_token += 1

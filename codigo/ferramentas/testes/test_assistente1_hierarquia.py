@@ -52,3 +52,22 @@ def teste_resumo_mostra_ordem_nos_jogos():
                     for p in sorted((QML.parent / "qt_bridge").glob("*.py")))
     afirmar('"titulo": "Nome"' in ponte and '"horas": "Mais jogados"' in ponte,
             "resumoLista sem rótulo de ordem")
+
+
+def teste_theme_escala_de_texto_configuravel():
+    """Escala de texto: token/fs() no Theme, binding no Main e controle nas Configurações.
+
+    Estática de propósito (roda sem PySide6): prova que os NÚMEROS de texto
+    passaram por Theme.fs(...) e que o usuário consegue 80–150%.
+    """
+    tema = _ler("Theme.qml")
+    afirmar("property real escala" in tema, "Theme sem escala de texto")
+    afirmar("function fs(n)" in tema, "Theme sem função fs")
+    afirmar("fs(densidade" in tema, "tokens sem escala aplicada")
+    main = _ler("Main.qml")
+    afirmar("Theme.escala = hub.aparencia.escala_texto" in main, "Main sem binding da escala")
+    afirmar("definirEscalaTexto" in main and 'objectName: "escalaTextoMais"' in main,
+            "Configurações sem controle de escala de texto")
+    afirmar(not re.search(r"pixelSize:\s*\d", main), "pixelSize numérico ainda no Main.qml")
+    afirmar(not re.search(r"pixelSize:\s*\d", _ler("PosterCard.qml")),
+            "pixelSize numérico ainda no PosterCard.qml")

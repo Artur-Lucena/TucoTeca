@@ -37,7 +37,7 @@ Dialog {
                         Layout.fillWidth: true; Layout.fillHeight: true; spacing: 3
                         Item { Layout.fillHeight: true }
                         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: Math.max(2, 90 * modelData / Math.max(1, Math.max.apply(null, hub.estatisticasAno.meses))); color: Theme.accent; radius: 3 }
-                        Label { text: index + 1; Layout.alignment: Qt.AlignHCenter; font.pixelSize: 12 }
+                        Label { text: index + 1; Layout.alignment: Qt.AlignHCenter; font.pixelSize: Theme.fs(12) }
                     }
                 }
             }

@@ -104,3 +104,26 @@ def teste_modo_simples_persistido_e_filtra_navegacao():
         afirmar(A.ler_aparencia()["modo_simples"] is True, "modo precisa persistir")
         A.salvar_aparencia("", "", None, False)
         afirmar(A.ler_aparencia()["modo_simples"] is False)
+
+
+def teste_escala_texto_persistida_e_limitada():
+    """Escala de texto: padrão 100%, persiste, respeita piso/teto e valor inválido mantém."""
+    from bib_nucleo import aparencia_usuario as A
+    A.salvar_aparencia(escala_texto=A.ESCALA_PADRAO)  # estado conhecido
+    afirmar(A.ler_aparencia()["escala_texto"] == A.ESCALA_PADRAO, "padrão da escala")
+    r = A.salvar_aparencia("", "", None, None, 1.25)
+    afirmar(abs(r["escala_texto"] - 1.25) < 1e-9, r)
+    afirmar(abs(A.ler_aparencia()["escala_texto"] - 1.25) < 1e-9, "escala precisa persistir")
+    afirmar(r["tema"] in ("escuro", "claro") and r["densidade"] in A.DENSIDADES, r)
+    # Botões de tema/densidade (4 argumentos) não apagam a escala escolhida.
+    r2 = A.salvar_aparencia("claro", "compacto")
+    afirmar(abs(r2["escala_texto"] - 1.25) < 1e-9, r2)
+    afirmar(r2["tema"] == "claro" and r2["densidade"] == "compacto", r2)
+    # Tetos e pisos de segurança.
+    afirmar(abs(A.salvar_aparencia(escala_texto=9.0)["escala_texto"] - A.ESCALA_MAX) < 1e-9)
+    afirmar(abs(A.salvar_aparencia(escala_texto=0.1)["escala_texto"] - A.ESCALA_MIN) < 1e-9)
+    # Valor inválido (texto/NaN) mantém a escala atual em vez de zerar.
+    afirmar(abs(A.salvar_aparencia(escala_texto="x")["escala_texto"] - A.ESCALA_MIN) < 1e-9)
+    afirmar(abs(A.salvar_aparencia(escala_texto=float("nan"))["escala_texto"] - A.ESCALA_MIN) < 1e-9)
+    afirmar(A.ler_aparencia()["escala_texto"] == A.ESCALA_MIN, "escala persistiu")
+    A.salvar_aparencia(escala_texto=A.ESCALA_PADRAO)

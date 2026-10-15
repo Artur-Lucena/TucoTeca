@@ -5,6 +5,9 @@ QtObject {
     // "escuro" (padrao) ou "claro"; densidade: compacto|conforto|bigpicture
     property string tema: "escuro"
     property string densidade: "conforto"
+    // Escala de texto configuravel (0.8–1.5); aplica em TODOS os tamanhos.
+    property real escala: 1.0
+    function fs(n) { return Math.max(8, Math.round(n * escala)) }
 
     readonly property color bg: tema === "claro" ? "#eef2f8" : "#0b1019"
     readonly property color surface: tema === "claro" ? "#ffffff" : "#131c2a"
@@ -24,16 +27,16 @@ QtObject {
     readonly property int motion: 160
     readonly property int pad: densidade === "compacto" ? 12 : 18
     readonly property int gap: densidade === "compacto" ? 9 : 14
-    readonly property int title: densidade === "bigpicture" ? 38 : 30
-    readonly property int display: densidade === "bigpicture" ? 44 : densidade === "compacto" ? 32 : 36
-    readonly property int headline: densidade === "bigpicture" ? 32 : densidade === "compacto" ? 22 : 25
-    readonly property int subtitle: densidade === "compacto" ? 13 : 14
-    readonly property int card: densidade === "compacto" ? 14 : 15
-    readonly property int meta: densidade === "compacto" ? 12 : 13
-    readonly property int kicker: 12
+    readonly property int title: fs(densidade === "bigpicture" ? 38 : 30)
+    readonly property int display: fs(densidade === "bigpicture" ? 44 : densidade === "compacto" ? 32 : 36)
+    readonly property int headline: fs(densidade === "bigpicture" ? 32 : densidade === "compacto" ? 22 : 25)
+    readonly property int subtitle: fs(densidade === "compacto" ? 13 : 14)
+    readonly property int card: fs(densidade === "compacto" ? 14 : 15)
+    readonly property int meta: fs(densidade === "compacto" ? 12 : 13)
+    readonly property int kicker: fs(12)
     // Botões: pílula (raio = altura/2 no ActionButton), altos e com texto
     // legível; uma fonte só — sem altura mágica por tela.
-    readonly property int btnAlto: densidade === "bigpicture" ? 54 : densidade === "compacto" ? 44 : 48
-    readonly property int btnTexto: densidade === "bigpicture" ? 16 : densidade === "compacto" ? 14 : 15
-    readonly property int btnMargem: 20
+    readonly property int btnAlto: fs(densidade === "bigpicture" ? 54 : densidade === "compacto" ? 44 : 48)
+    readonly property int btnTexto: fs(densidade === "bigpicture" ? 16 : densidade === "compacto" ? 14 : 15)
+    readonly property int btnMargem: fs(20)
 }
