@@ -13,6 +13,8 @@ import time
 import unicodedata
 from pathlib import Path
 
+from .config import cfg
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
@@ -20,11 +22,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Casa canônica + tradução determinística de caminhos (Win <-> Linux)
 # --------------------------------------------------------------------------
 
-WIN_ROOT = os.environ.get("BIBLIOTECA_WIN_ROOT", "D:\\")
-
-LINUX_ROOT = os.environ.get("BIBLIOTECA_LINUX_ROOT", "/run/media/tuco/Games")
-
-MAC_ROOT = os.environ.get("BIBLIOTECA_MAC_ROOT", "/Volumes/Games")
+WIN_ROOT = str(cfg.win_root)
+LINUX_ROOT = str(cfg.linux_root)
+MAC_ROOT = str(cfg.mac_root)
 
 
 def eh_mac() -> bool:
@@ -35,14 +35,15 @@ REL_HOME = Path("Tuco-Compartilhado") / "Jogos" / "biblioteca"
 
 
 def resolve_home() -> Path:
+    # 1. Env var em tempo de execução (testes manipulam os.environ)
     env = os.environ.get("BIBLIOTECA_HOME")
     if env:
         return Path(env)
-    # Um pacote real sempre vence a instalação canônica do PC de build.
+    # 2. Um pacote real sempre vence a instalação canônica do PC de build.
     if (BASE_DIR / "manifesto-runtime.json").is_file() or (
             (BASE_DIR / "app/bib_core.py").is_file() and (BASE_DIR / "python/python.exe").is_file()):
         return BASE_DIR
-    # Pasta única do projeto: coleção dentro da própria árvore de fontes
+    # 3. Pasta única do projeto: coleção dentro da própria árvore de fontes
     # (dev/uso no repo) vence a instalação canônica de build.
     if (BASE_DIR / "dados").is_dir():
         return BASE_DIR

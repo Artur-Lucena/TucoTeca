@@ -15,12 +15,21 @@ _REDE = {
     "musica_online", "spotify", "online",
 }
 
+# Exporta config explicitamente para consumidores
+from .config import cfg, get_config, reset_config  # noqa: F401
+
 
 def __getattr__(nome: str):
     if nome in _REDE:
         modulo = importlib.import_module(f"bib_nucleo.rede.{nome}")
         globals()[nome] = modulo
         return modulo
+    if nome in ("cfg", "get_config", "reset_config"):
+        from .config import cfg as _cfg
+        from .config import get_config as _gc
+        from .config import reset_config as _rc
+        globals()[nome] = _cfg if nome == "cfg" else (_gc if nome == "get_config" else _rc)
+        return globals()[nome]
     raise AttributeError(f"bib_nucleo não tem atributo {nome!r}")
 
 

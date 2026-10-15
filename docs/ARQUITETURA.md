@@ -72,6 +72,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 
 | Módulo | Responsabilidade / fronteira |
 |---|---|
+| `config.py` | leitura única das `BIBLIOTECA_*` (paths, listas `;`/`,`, bools 0/1), defaults e singleton `cfg` — consumida por `base.py`, builders e testes |
 | `base.py` | casa, raízes Win/Linux/Mac, tradução de caminhos, lock, texto, logs |
 | `banco.py` | schema, migrações por colunas, CRUD jogos/músicas/fila, capas |
 | `banco_desejos.py` | wishlist local, sincronização preservadora e histórico obtido |
@@ -259,6 +260,10 @@ duplicatas e escapes, com limites de tamanho/arquivos e backup pré-sobrescrita.
 Defaults de caminhos refletem a máquina original. Ao desenvolver, use
 overrides de ambiente. Bundles novos usam casa raiz; launchers reconhecem
 também a coleção legada `dados/dados/biblioteca.db` sem movê-la.
+A leitura dessas chaves é centralizada em `bib_nucleo/config.py` (somente
+stdlib): `cfg` tipado, defaults documentados, parsing de listas (`;` para
+raízes, `,` para hosts) e bools (`0/false/no/off` desligam). Código novo
+consome `cfg`; o helper `_env` atende chamadas legadas.
 
 ## Testes e evolução
 
