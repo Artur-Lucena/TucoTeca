@@ -555,6 +555,11 @@ ApplicationWindow {
             }
             ActionButton { visible: hub.secao === "desejos"; text: "Sincronizar Steam"; enabled: !hub.ocupado; onClicked: hub.sincronizarDesejosSteam() }
             ActionButton { visible: hub.secao === "desejos"; text: "Importar wishlist…"; enabled: !hub.ocupado; onClicked: wishlistFile.open() }
+            ActionButton {
+                visible: hub.secao === "desejos"; text: "Ver preços"; enabled: !hub.ocupado
+                ToolTip.visible: hovered; ToolTip.text: "Consulta sob demanda na loja; fica em cache local por 24h"
+                onClicked: hub.consultarPrecosDesejos()
+            }
         }
 
         RowLayout {

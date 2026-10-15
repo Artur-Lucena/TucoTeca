@@ -362,6 +362,19 @@ class MixJogos:
     def sincronizarDesejosSteam(self):
         self._alterar("Lendo a wishlist da Steam…", self.servico.sincronizar_desejos_steam)
 
+    @Slot()
+    def consultarPrecosDesejos(self):
+        """Preços dos desejos sob demanda; cache local de 24h no núcleo."""
+        from bib_nucleo.rede import rede_ativa
+        if not rede_ativa():
+            self.aviso.emit("Rede desligada (BIBLIOTECA_REDE=0) — preços usam o cache local.", False)
+
+        def pronto(r):
+            self._precos = dict(r or {})
+            self.mudou.emit()
+        self.executar("Consultando preços na Steam…",
+                      lambda: self.servico.precos_desejos(), pronto)
+
     @Slot(QUrl)
     def importarWishlist(self, url):
         self._alterar("Importando wishlist…", lambda: self.servico.importar_wishlist(url.toLocalFile()))

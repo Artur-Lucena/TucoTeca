@@ -92,7 +92,7 @@ _CAMPOS_PATH = (
 )
 _CAMPOS_BOOL = {"rede": True, "webengine": True, "capa_musica_auto": True}
 _CAMPOS_ROOTS = ("scan_roots", "roms_roots", "roms_nds_roots")
-_CAMPOS_STR = {"azahar_flags": "-f", "desmume_flags": ""}
+_CAMPOS_STR = {"azahar_flags": "-f", "desmume_flags": "", "preco_regiao": "br"}
 _CAMPOS_STR_OU_NONE = ("steam_id", "qbit_api", "everything_instancia")
 
 
@@ -154,6 +154,7 @@ class Config:
     webengine: bool = True
     steam_id: str | None = None
     steamrip_hosts: tuple[str, ...] = ()
+    preco_regiao: str = "br"
     hydra_db_path: Path | None = None
 
     # Comportamento / qualidade de vida

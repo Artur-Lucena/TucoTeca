@@ -82,3 +82,100 @@ def capa_album_url(artista: str, album: str, titulo: str, timeout: int = 15):
         pass
     from bib_nucleo.capas import capa_musica_fallback
     return capa_musica_fallback(art, alb, tit)
+
+
+# --------------------------------------------------------------------------
+# Preços da loja Steam (consulta sob demanda + cache local)
+# --------------------------------------------------------------------------
+
+def _precos_lote(appids: list[str], regiao: str, timeout: int = 15) -> dict:
+    """Consulta crua de appids numa requisição; {appid: dados|None}.
+
+    `price_overview` ausente (gratuito/fora de venda) vira {"gratis": True}.
+    Falha de rede devolve {} — nada é cacheado como sucesso.
+    """
+    if not appids or not rede_ativa():
+        return {}
+    try:
+        q = urllib.parse.urlencode({"appids": ",".join(appids), "cc": regiao,
+                                    "l": "portuguese", "filters": "price_overview"})
+        req = urllib.request.Request(f"https://store.steampowered.com/api/appdetails?{q}",
+                                     headers={"User-Agent": "TucoTeca/1.0"})
+        with abrir_rede(req, timeout=timeout) as r:
+            dados = json.loads(r.read(1_500_001).decode("utf-8"))
+    except (ValueError, OSError, AttributeError, TypeError):
+        return {}
+    saida = {}
+    for appid in appids:
+        info = (dados or {}).get(str(appid)) or {}
+        if not isinstance(info, dict) or not info.get("success"):
+            continue
+        po = ((info.get("data") or {}).get("price_overview")) or {}
+        if not po:
+            saida[appid] = {"appid": appid, "gratis": True, "moeda": "",
+                            "final": 0, "inicial": 0, "desconto_pct": 0}
+        else:
+            saida[appid] = {"appid": appid, "gratis": False,
+                            "moeda": str(po.get("currency") or ""),
+                            "final": int(po.get("final") or 0),
+                            "inicial": int(po.get("initial") or 0),
+                            "desconto_pct": int(po.get("discount_percent") or 0)}
+    return saida
+
+
+def preco_steam(appid: str, regiao: str = "br", timeout: int = 15):
+    """Preço do app em centavos (ou `gratis`); None sem rede/appid inválido."""
+    appid = str(appid or "").strip()
+    if not appid.isdigit():
+        return None
+    return _precos_lote([appid], (regiao or "br").lower(), timeout).get(appid)
+
+
+def _cache_precos_path():
+    from bib_nucleo import base
+    return base.DADOS_DIR / "precos-steam.json"
+
+
+def precos_steam(appids, regiao: str = "br", validade_h: float = 24) -> dict:
+    """Preços de vários appids com cache local de 24h (padrão).
+
+    Consulta só o que está ausente/vencido, em lotes; falha não é cacheada.
+    Rede desligada devolve apenas o que já existe no cache, sem consultar.
+    """
+    import time
+
+    from bib_nucleo.arquivos import gravar_json, ler_json
+    regiao = (regiao or "br").lower()[:8]
+    agora = time.time()
+    valida = max(0.0, float(validade_h or 0)) * 3600
+    alvo = [str(a).strip() for a in (appids or []) if str(a).strip().isdigit()]
+    alvo = list(dict.fromkeys(alvo))[:500]
+    cache = ler_json(_cache_precos_path(), {})
+    cache = cache if isinstance(cache, dict) else {}
+    por_regiao = cache.get(regiao)
+    por_regiao = dict(por_regiao) if isinstance(por_regiao, dict) else {}
+    saida: dict = {}
+    faltando: list[str] = []
+    for appid in alvo:
+        item = por_regiao.get(appid)
+        if (isinstance(item, dict) and isinstance(item.get("dados"), dict)
+                and (agora - float(item.get("em") or 0)) < valida):
+            saida[appid] = item["dados"]
+        else:
+            faltando.append(appid)
+    if faltando and rede_ativa():
+        mudou = False
+        for i in range(0, len(faltando), 20):
+            lote = faltando[i:i + 20]
+            obtidos = _precos_lote(lote, regiao)
+            for appid in lote:
+                dados = obtidos.get(appid)
+                if dados is None:
+                    continue  # falha não vira cache; próxima consulta tenta de novo
+                por_regiao[appid] = {"em": agora, "dados": dados}
+                saida[appid] = dados
+                mudou = True
+        if mudou:
+            cache[regiao] = por_regiao
+            gravar_json(_cache_precos_path(), cache)
+    return saida

@@ -29,6 +29,15 @@ class MixDesejos:
     def adicionar_desejo(self, appid, titulo):
         return self.alterar(lambda con: core.adicionar_desejo(con, appid, titulo))
 
+    def precos_desejos(self, regiao=""):
+        """Preço dos desejos ainda não obtidos (cache local; consulta sob demanda)."""
+        from bib_nucleo.rede import metadados
+        regiao = (regiao or core.cfg.preco_regiao or "br")
+        with closing(core.get_db(self.db_path)) as con:
+            appids = [r["appid"] for r in con.execute(
+                "SELECT appid FROM desejos WHERE obtido_em IS NULL").fetchall()]
+        return metadados.precos_steam(appids, regiao)
+
     def buscar_fontes_desejo(self, titulo):
         """Procura o título nas fontes de download (SteamRip e FitGirl)."""
         from bib_nucleo.rede import exigir_rede, fontes

@@ -18,6 +18,13 @@ ListView {
         return b >= 1073741824 ? (b / 1073741824).toFixed(2) + " GB"
                                : Math.round(b / 1048576) + " MB"
     }
+    function preco(appid) {
+        var p = (hub.precosDesejos || {})[String(appid || "")]
+        if (!p) return ""
+        if (p.gratis) return "Grátis"
+        var f = (Number(p.final || 0) / 100).toFixed(2).replace(".", ",")
+        return (p.moeda ? p.moeda + " " : "") + f + (p.desconto_pct > 0 ? "  (-" + p.desconto_pct + "%)" : "")
+    }
     delegate: Rectangle {
         id: row
         required property var item
@@ -43,7 +50,7 @@ ListView {
                     Layout.fillWidth: true; elide: Text.ElideRight
                     text: hub.secao === "musicas" ? (row.item.artista || "Artista desconhecido") + "  ·  " + (row.item.album || "Álbum local") :
                           hub.secao === "videos" ? (row.item.canal || "Arquivo local") + "  ·  " + Math.floor((row.item.duracao_s || 0) / 60) + " min" :
-                          hub.secao === "desejos" ? "Steam  ·  " + row.item.appid :
+                          hub.secao === "desejos" ? "Steam  ·  " + row.item.appid + (collection.preco(row.item.appid) ? "  ·  " + collection.preco(row.item.appid) : "") :
                           Number(row.item.pct || 0).toFixed(1) + "%  ·  " + (row.item.estado || "Histórico local") +
                           (row.item.total ? "  ·  " + collection.tamanho(row.item.feito) + " / " + collection.tamanho(row.item.total) : "") +
                           (row.item.fonte_progresso === "estimativa" ? "  ·  estimativa em disco" : "") +

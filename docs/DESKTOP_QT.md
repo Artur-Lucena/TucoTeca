@@ -61,6 +61,7 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 | Fila visível, modos sequência/aleatório/repetir, volume no rodapé | Sim | Parcial |
 | Progresso do player no rodapé (tempo decorrido / duração) | Sim | Parcial |
 | Desejos: listar, adicionar por appid, remover, abrir Steam | Sim | Sim |
+| Desejos: preço/desconto sob demanda com cache local de 24h | Sim | — |
 | Torrents: progresso com recebido/total, velocidade/ETA, espaço livre, iniciar, pausar/retomar, abrir pasta | Sim | Parcial |
 | SteamRip/FitGirl: pesquisar e abrir página do resultado | Sim | Sim |
 | Backup da coleção / volume global Windows | Sim | Sim |

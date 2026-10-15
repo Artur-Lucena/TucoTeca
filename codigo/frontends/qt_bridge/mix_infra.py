@@ -70,6 +70,7 @@ class MixInfra:
         self._modo_audio = "sequencia"
         self._selecionado = {}
         self._tarefas, self._numero = {}, 0
+        self._precos = {}
         self._aparencia = self.servico.aparencia()
         from bib_nucleo.preferencias_pessoais import ler_preferencias
         self._preferencias = ler_preferencias()

@@ -322,6 +322,10 @@ class HubBridge(MixInfra, MixMusica, MixMidia, MixCapas, MixJogos,
     def fontesDesejo(self):
         return self._fontes_desejo
 
+    @Property("QVariantMap", notify=mudou)
+    def precosDesejos(self):
+        return self._precos
+
     @Property(str, notify=playerMudou)
     def modoAudioAtual(self):
         return self._modo_audio
