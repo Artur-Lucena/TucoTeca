@@ -109,7 +109,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 | `frontends/qt_emulacao.py` | Mods, texturas, cheats e presets do Azahar para o jogo selecionado; cada ação recarrega o estado |
 | `frontends/servicos_ui/` (pacote) | Casos de uso desktop, `resumo_sistema`, `busca_global`, registro |
 | `frontends/qml/` | shell `Main.qml`, `secoes/`, componentes, diálogos, navegador/player opcionais |
-| `frontends/app_tui.py` | Tui, desenho, prompts, menus e loop de terminal |
+| `frontends/app_tui.py` + `tui_*.py` | Tui em mixins por domínio (entry point e `tui.curses` patchável preservados) |
 | `frontends/despacho.py` | callbacks de workers entregues pela thread Tk |
 | `frontends/aparencia.py` | tema local, elementos nine-slice, barras adaptáveis e painéis roláveis |
 | `ferramentas/diagnosticar.py` | sintaxe/exports/dependências/pastas/SQLite somente-leitura |
