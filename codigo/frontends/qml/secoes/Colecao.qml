@@ -13,6 +13,11 @@ ListView {
     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
     Keys.onReturnPressed: { if (hub.secao === "musicas" && hub.selecionado.id) hub.tocar(hub.selecionado.id); else if (hub.secao === "videos" && hub.selecionado.id) shell.playVideo(hub.selecionado.id) }
     onCurrentIndexChanged: { if (activeFocus) hub.selecionar(currentIndex) }
+    function tamanho(bytes) {
+        var b = Number(bytes || 0)
+        return b >= 1073741824 ? (b / 1073741824).toFixed(2) + " GB"
+                               : Math.round(b / 1048576) + " MB"
+    }
     delegate: Rectangle {
         id: row
         required property var item
@@ -40,6 +45,7 @@ ListView {
                           hub.secao === "videos" ? (row.item.canal || "Arquivo local") + "  ·  " + Math.floor((row.item.duracao_s || 0) / 60) + " min" :
                           hub.secao === "desejos" ? "Steam  ·  " + row.item.appid :
                           Number(row.item.pct || 0).toFixed(1) + "%  ·  " + (row.item.estado || "Histórico local") +
+                          (row.item.total ? "  ·  " + collection.tamanho(row.item.feito) + " / " + collection.tamanho(row.item.total) : "") +
                           (row.item.fonte_progresso === "estimativa" ? "  ·  estimativa em disco" : "") +
                           (row.item.velocidade ? "  ·  " + (row.item.velocidade / 1048576).toFixed(1) + " MB/s" : "") +
                           (row.item.eta ? "  ·  ETA " + Math.floor(row.item.eta / 60) + "min" : "")

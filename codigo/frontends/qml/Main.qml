@@ -103,6 +103,12 @@ ApplicationWindow {
         hub.analisarArquivo(alvo)
         importPreview.open()
     }
+    function tempoAudio(ms) {
+        var s = Math.max(0, Math.floor((ms || 0) / 1000))
+        var m = Math.floor(s / 60)
+        var r = s % 60
+        return m + ":" + (r < 10 ? "0" : "") + r
+    }
     function registerHours(game, file) {
         sessionDialog.gid = game.id || game.gid || 0
         sessionDialog.file = file || ""
@@ -556,7 +562,8 @@ ApplicationWindow {
             visible: hub.secao !== "integracoes" && hub.secao !== "inicio"
             Text {
                 objectName: "collectionSummary"
-                text: hub.resumoLista; color: Theme.muted; font.pixelSize: Theme.meta
+                text: hub.resumoLista + (hub.secao === "downloads" && hub.sistema.disco_livre_gb !== undefined ? "  ·  " + hub.sistema.disco_livre_gb + " GB livres" : "")
+                color: Theme.muted; font.pixelSize: Theme.meta
                 Layout.fillWidth: true; elide: Text.ElideRight
             }
             ActionButton {
@@ -633,6 +640,23 @@ ApplicationWindow {
                 Layout.preferredWidth: window.width < 1150 ? 140 : 220; spacing: 5
                 Text { text: hub.audio.titulo; color: Theme.text; font { pixelSize: Theme.fs(13); weight: Font.DemiBold } Layout.fillWidth: true; elide: Text.ElideRight }
                 Text { text: hub.audio.artista; color: Theme.muted; font.pixelSize: Theme.fs(13); Layout.fillWidth: true; elide: Text.ElideRight }
+            }
+            ColumnLayout {
+                objectName: "playerProgresso"
+                visible: (hub.audio.duracao || 0) > 0 && window.width >= 1100
+                Layout.preferredWidth: window.width < 1150 ? 150 : 240
+                Layout.minimumWidth: 120
+                spacing: 3
+                Text {
+                    objectName: "playerTempo"
+                    text: window.tempoAudio(hub.audio.posicao) + " / " + window.tempoAudio(hub.audio.duracao)
+                    color: Theme.muted; font.pixelSize: Theme.fs(12)
+                }
+                ProgressBar {
+                    Layout.fillWidth: true
+                    from: 0; to: Math.max(1, hub.audio.duracao || 0)
+                    value: Math.min(hub.audio.posicao || 0, hub.audio.duracao || 0)
+                }
             }
             ActionButton { text: "❮"; Accessible.name: "Faixa anterior"; onClicked: hub.transporte("anterior") }
             ActionButton { text: hub.audio.estado === "tocando" ? "Ⅱ" : hub.audio.estado === "carregando" ? "…" : "▶"; primary: true; Accessible.name: "Reproduzir ou pausar"; onClicked: hub.transporte("alternar") }
