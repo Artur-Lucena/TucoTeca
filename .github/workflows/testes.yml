@@ -1,7 +1,7 @@
 name: Testes
+# Gatilho apenas manual: a matriz hospedada está desativada (billing da conta
+# do GitHub bloqueia jobs automáticos). Validação local: codigo/ferramentas/validar.py
 on:
-  push:
-  pull_request:
   workflow_dispatch:
     inputs:
       mac:

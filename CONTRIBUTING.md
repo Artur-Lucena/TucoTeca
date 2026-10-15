@@ -39,8 +39,9 @@ Matriz de compatibilidade e procedimentos: [revisão Linux](docs/REVISAO_LINUX_W
 ## Pontos de entrada para mudanças
 
 - Banco/CRUD/migrações: `codigo/bib_nucleo/banco.py`.
-- Importação/dedup/ROMs: `scans.py`.
-- Lançamento/presets/mods: `emuladores.py`.
+- Importação/dedup/ROMs: `codigo/bib_nucleo/scans/` (pacote fatiado por
+  contrato; `scans_hydra.py` é o adaptador Hydra).
+- Lançamento/presets/mods: `codigo/bib_nucleo/emuladores/` (pacote).
 - Coleção portátil: `pacotes.py`.
 - Áudio/download: `musicas.py`, `baixar.py`, `player.py`.
 - Volume geral Windows: `volume.py`.
@@ -48,9 +49,13 @@ Matriz de compatibilidade e procedimentos: [revisão Linux](docs/REVISAO_LINUX_W
 - Recursos pessoais: `saves.py`, `preferencias_pessoais.py`, `estatisticas.py`,
   `sessoes_manuais.py`; domínios de arquivos independentes da UI.
 - GUI/TUI: `codigo/frontends/`; thread dispatch: `despacho.py`.
-- Desktop Qt: `app_qt.py`, `qt_bridge.py`, `servicos_ui.py` e `qml/`.
+- Desktop Qt: `app_qt.py`, `qt_bridge/` e `servicos_ui/` (pacotes com mixins
+  por domínio; a superfície Qt — sinais/properties — mora em
+  `qt_bridge/__init__.py`) e `qml/`.
   Instale `requirements-ui.txt`; arquitetura e matriz de migração em
   [DESKTOP_QT](docs/DESKTOP_QT.md). Testes: `executar.py --modulo test_qt`.
+- Terminal Linux/macOS: `app_tui.py` + mixins `tui_*.py`.
+- Clássico Windows (congelado): `app_win.py` + mixins `app_win_*.py`.
 - Layout dos bundles: `montar_portatil.copiar_app`, usado pelos três builders.
 
 O índice detalhado está em [ARQUITETURA](docs/ARQUITETURA.md).
@@ -79,6 +84,25 @@ py -3.14 codigo/ferramentas/testes/executar.py --modulo test_musica
 py -3.14 codigo/ferramentas/testes/executar.py --caso test_fontes.py teste_steamrip_nome_e_download_incompleto
 py -3.14 codigo/ferramentas/testes/executar.py
 ```
+
+### Validação completa em um comando (substitui a CI hospedada)
+
+```powershell
+py -3.14 -B codigo/ferramentas/validar.py                 # tudo (~12 min)
+py -3.14 -B codigo/ferramentas/validar.py --sem-pytest    # rápido (~2 min)
+py -3.14 -B codigo/ferramentas/validar.py --modulo test_qt --sem-pytest
+```
+
+Roda Ruff (ou substituto `py_compile` + trailing), a suíte completa, a
+cobertura dos subprocessos e confere a árvore Git; grava o relatório em
+`.provas/gates-local-<timestamp>.json`. A matriz hospedada (`testes.yml`)
+está **desativada** — `workflow_dispatch` manual, sem custo: o billing da
+conta do GitHub bloqueia jobs automáticos e a validação local é equivalente
+para stdlib/Qt/offscreen. O que **não** existe localmente: gitleaks (binário
+ausente no Windows), Python 3.10, Ubuntu e macOS — a suíte cobre caminhos
+cross-SO por patches, mas uma rodada em WSL/Linux continua sendo a paridade
+mais fiel quando disponível. Rode `validar.py` antes de commitar/mergear;
+uma alteração que não passa localmente não deve ser empurrada.
 
 - Casos são funções `teste_*` em `codigo/ferramentas/testes/test_*.py`.
 - A suíte cria a sandbox automaticamente, inclusive com `--caso`.
@@ -148,7 +172,9 @@ uma alteração na UI não deve absorver silenciosamente trabalho paralelo.
 ## Preparar uma release privada
 
 1. Finalize versão, README e changelog antes de congelar os fontes: árvore
-   limpa, gates locais verdes e CI aprovada no SHA completo do commit.
+   limpa e gates locais verdes (`python -B codigo/ferramentas/validar.py`)
+   no SHA completo do commit. A CI hospedada não corre mais; o relatório
+   local em `.provas/gates-local-*.json` é a evidência do gate.
 2. Gere os dois bundles com `--revisao <SHA>` (o builder executa as provas na
    árvore montada e no pacote extraído).
 3. Monte a pasta da release:
