@@ -70,7 +70,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 | `base.py` | casa, raízes Win/Linux/Mac, tradução de caminhos, lock, texto, logs |
 | `banco.py` | schema, migrações por colunas, CRUD jogos/músicas/fila, capas |
 | `banco_desejos.py` | wishlist local, sincronização preservadora e histórico obtido |
-| `scans.py` / `scans_hydra.py` | lojas/disco/ROMs e adaptador Hydra, preview, dedup e restore |
+| `scans/` (pacote) / `scans_hydra.py` | lojas/disco/ROMs e adaptador Hydra, preview, dedup e restore — `scans.py` fatiado na F2 do O2 sem mudar contratos |
 | `emuladores/` (pacote) | Azahar/DeSmuME, processos/sessões, presets e overlay de mods — `emuladores.py` fatiado na F1 do O2 sem mudar contratos |
 | `atualizacao.py` | download e atualização transacional, manifesto, rollback |
 | `pacotes.py` | JSON, ZIP de coleção e backups versionados |

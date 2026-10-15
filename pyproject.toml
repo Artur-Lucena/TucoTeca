@@ -78,3 +78,5 @@ ignore = ["E501", "E402", "F403"]
 # SAO o contrato de compatibilidade com o antigo `emuladores.py`; a
 # cobertura nominal e provada pelo teste de completude da fatia F1.
 "codigo/bib_nucleo/emuladores/__init__.py" = ["F401", "F405"]
+# Idem p/ a fachada do pacote de scans (F2 do O2).
+"codigo/bib_nucleo/scans/__init__.py" = ["F401", "F405"]

@@ -35,15 +35,16 @@ def teste_assistente2_compat_nucleo_sem_qt_obrigatorio():
 
 
 def teste_assistente2_compat_imports_de_so_condicionais():
-    alvos = ["controles.py", "base.py", "player.py", "volume.py", "scans.py",
-             "emuladores/__init__.py", "emuladores/_comum.py",
-             "emuladores/azahar.py", "emuladores/desmume.py",
-             "emuladores/lancamento.py", "emuladores/mods.py",
-             "emuladores/presets.py", "emuladores/provedores.py"]
+    alvos = ["controles.py", "base.py", "player.py", "volume.py",
+             "scans/__init__.py", "scans/lojas.py", "scans/disco.py",
+             "scans/roms.py", "scans/analise.py", "scans/metadados.py",
+             "scans/importacao.py"]
     # Módulos puros (sem ramificação por SO): nada a guardar; os demais
-    # acessam o SO via `_E` (ligação tardia p/ monkeypatch) e mantêm a guarda.
+    # mantêm a guarda `os.name`/`sys.platform` como no arquivo original.
     sem_so = {"emuladores/__init__.py", "emuladores/_comum.py",
-              "emuladores/presets.py", "emuladores/provedores.py"}
+              "emuladores/presets.py", "emuladores/provedores.py",
+              "scans/__init__.py", "scans/analise.py", "scans/metadados.py",
+              "scans/importacao.py"}
     for nome in alvos:
         arq = NUCLEO / nome
         arvore = ast.parse(arq.read_text(encoding="utf-8"))
