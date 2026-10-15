@@ -60,6 +60,11 @@ Tucoteca/
 As pastas físicas locais podem conter material de sessões antigas; o comando
 de entrega seleciona somente fontes/documentos por allowlist.
 Um clone limpo não precisa conter `midia/`, `programa/`, `dados/` ou `dist/`.
+A pasta do projeto pode ser a **única** do PC: com `dados/` e `programa/`
+na raiz (ambos ignorados pelo Git), `resolve_home()` em `base.py` prefere a
+própria árvore à instalação canônica — bundles e clone dev compartilham a
+mesma regra. Links do Wine (`dosdevices/*`, junctions de pastas do usuário)
+não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 A reconciliação do histórico remoto com as revisões locais está documentada
 em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 
@@ -101,7 +106,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 
 | Arquivo | Função |
 |---|---|
-| `frontends/app_win.py` + `app_win_*.py` | App tkinter clássico CONGELADO (só correções críticas) em mixins por domínio; entry point, `NAV`, `messagebox` e top funcs preservados |
+| `frontends/app_win.py` + `app_win_*.py` | App tkinter clássico CONGELADO (só correções críticas) em mixins por domínio; entry point, `NAV`, `messagebox` e top funcs preservados; acesso ao módulo por `late.py` (funciona como script e importado) |
 | `frontends/desktop.py` | Dispatcher Qt ↔ clássico (saída 42 troca preservando lock) |
 | `frontends/app_qt.py` | Shell Qt Quick, lock, selftest e screenshot |
 | `frontends/qt_bridge/` (pacote) | Superfície Qt no `HubBridge` (sinais + properties), lógica por domínio nos mixins, modelos e workers |

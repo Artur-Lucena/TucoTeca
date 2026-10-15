@@ -6,8 +6,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import app_tui as _T
 import bib_core as core
+from late import ModuloTardio
+
+_T = ModuloTardio("app_tui")
 
 
 class MixScans:

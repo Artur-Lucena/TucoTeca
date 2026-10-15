@@ -54,7 +54,23 @@ APP_ARQS = (("README.md", "README.md"),
                 ("codigo/ferramentas/empacotar_fontes.py", "ferramentas/empacotar_fontes.py"),
                  ("codigo/ferramentas/provar_qt_runtime.py", "provar_qt_runtime.py"),
                  ("codigo/ferramentas/provar_integracoes_locais.py", "provar_integracoes_locais.py"),
-                ("codigo/ferramentas/provar_qbit_runtime.py", "provar_qbit_runtime.py"))
+                ("codigo/ferramentas/provar_qbit_runtime.py", "provar_qbit_runtime.py"),
+
+                 ("codigo/frontends/late.py", "late.py"),
+                 ("codigo/frontends/app_win_base.py", "app_win_base.py"),
+                 ("codigo/frontends/app_win_jogos.py", "app_win_jogos.py"),
+                 ("codigo/frontends/app_win_musica.py", "app_win_musica.py"),
+                 ("codigo/frontends/app_win_downloads.py", "app_win_downloads.py"),
+                 ("codigo/frontends/app_win_desejos.py", "app_win_desejos.py"),
+                 ("codigo/frontends/app_win_dialogos.py", "app_win_dialogos.py"),
+                 ("codigo/frontends/app_win_scans.py", "app_win_scans.py"),
+                 ("codigo/frontends/app_win_sistema.py", "app_win_sistema.py"),
+                 ("codigo/frontends/app_win_midia.py", "app_win_midia.py"),
+                 ("codigo/frontends/tui_base.py", "tui_base.py"),
+                 ("codigo/frontends/tui_jogo.py", "tui_jogo.py"),
+                 ("codigo/frontends/tui_menus.py", "tui_menus.py"),
+                 ("codigo/frontends/tui_player.py", "tui_player.py"),
+                 ("codigo/frontends/tui_scans.py", "tui_scans.py"))
 
 # Pacotes-diretório do app (F2/F3 do O2): viajam como árvore, igual ao
 # bib_nucleo, em vez de arquivo avulso. Novos pacotes entram aqui, não no

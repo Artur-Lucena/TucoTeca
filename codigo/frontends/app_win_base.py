@@ -11,11 +11,13 @@ from queue import SimpleQueue
 from tkinter import ttk
 from types import SimpleNamespace
 
-import app_win as _W
 import bib_core as core
 from aparencia import ACC, BG, CARD, LINE, MUT, PANEL, TXT, BarraAcoes, PainelRolavel, aplicar_tema
 from aparencia import HOVER as CARD_HOVER
 from despacho import DespachanteUi
+from late import ModuloTardio
+
+_W = ModuloTardio("app_win")
 
 
 class MixBase:

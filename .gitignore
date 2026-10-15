@@ -3,6 +3,10 @@ dados/
 *.db
 *.db-journal
 *.sqlite3
+# Coleção pessoal consolidada na raiz do projeto E runtime do bundle:
+# a pasta do projeto é a única do PC, mas nada disso vai para o Git.
+programa/
+dist/
 # Histórico local de arquivo único (arquivo, não entrega)
 codigo/historico/
 # Caches e temporários

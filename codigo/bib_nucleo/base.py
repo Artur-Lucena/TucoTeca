@@ -42,6 +42,10 @@ def resolve_home() -> Path:
     if (BASE_DIR / "manifesto-runtime.json").is_file() or (
             (BASE_DIR / "app/bib_core.py").is_file() and (BASE_DIR / "python/python.exe").is_file()):
         return BASE_DIR
+    # Pasta única do projeto: coleção dentro da própria árvore de fontes
+    # (dev/uso no repo) vence a instalação canônica de build.
+    if (BASE_DIR / "dados").is_dir():
+        return BASE_DIR
     if os.name == "nt":
         cand = Path(WIN_ROOT) / REL_HOME
         if cand.is_dir():

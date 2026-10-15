@@ -9,10 +9,12 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, simpledialog, ttk
 
-import app_win as _W
 import bib_core as core
 from aparencia import ACC, BG, CARD, LINE, MUT, PANEL, TXT
 from aparencia import HOVER as CARD_HOVER
+from late import ModuloTardio
+
+_W = ModuloTardio("app_win")
 
 
 class MixJogos:

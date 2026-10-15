@@ -8,9 +8,11 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, simpledialog, ttk
 
-import app_win as _W
 import bib_core as core
 from aparencia import ACC, TXT, BarraAcoes
+from late import ModuloTardio
+
+_W = ModuloTardio("app_win")
 
 
 class MixDialogos:

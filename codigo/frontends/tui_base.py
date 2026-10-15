@@ -7,8 +7,10 @@ import os
 from pathlib import Path
 from queue import SimpleQueue
 
-import app_tui as _T
 import bib_core as core
+from late import ModuloTardio
+
+_T = ModuloTardio("app_tui")
 
 
 class MixBase:

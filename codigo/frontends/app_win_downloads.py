@@ -9,9 +9,11 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
 
-import app_win as _W
 import bib_core as core
 from aparencia import BarraAcoes
+from late import ModuloTardio
+
+_W = ModuloTardio("app_win")
 
 
 class MixDownloads:

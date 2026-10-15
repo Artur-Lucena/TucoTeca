@@ -9,9 +9,11 @@ from pathlib import Path
 from queue import Empty
 from tkinter import filedialog, simpledialog, ttk
 
-import app_win as _W
 import bib_core as core
 from aparencia import ACC, BG, TXT, BarraAcoes
+from late import ModuloTardio
+
+_W = ModuloTardio("app_win")
 
 
 class MixMusica:

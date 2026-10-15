@@ -63,6 +63,33 @@ def teste_runtime_casa_do_bundle_vence_casa_canonica():
                 os.environ["BIBLIOTECA_HOME"] = salvo
 
 
+def teste_runtime_dados_na_raiz_vence_casa_canonica():
+    """Pasta única do projeto: dados/ na árvore vem antes da instalação canônica."""
+    import tempfile
+    from pathlib import Path
+    raiz = Path(tempfile.mkdtemp(prefix="casa-unica-"))
+    (raiz / "dados").mkdir()
+    with patch.object(base, "BASE_DIR", raiz), patch.dict(os.environ, {}, clear=False):
+        salvo = os.environ.pop("BIBLIOTECA_HOME", None)
+        try:
+            afirmar(base.resolve_home() == raiz, "dados/ na raiz não virou a casa")
+        finally:
+            if salvo is not None:
+                os.environ["BIBLIOTECA_HOME"] = salvo
+    # Sem dados/ na raiz, o comportamento antigo permanece (bundle/canônico/fallback).
+    vazio = Path(tempfile.mkdtemp(prefix="casa-vazia-"))
+    with patch.object(base, "BASE_DIR", vazio), patch.dict(os.environ, {}, clear=False):
+        salvo = os.environ.pop("BIBLIOTECA_HOME", None)
+        try:
+            r = base.resolve_home()
+            canonico = Path(base.WIN_ROOT) / base.REL_HOME
+            esperado = canonico if canonico.is_dir() else vazio
+            afirmar(r == esperado, (r, esperado))
+        finally:
+            if salvo is not None:
+                os.environ["BIBLIOTECA_HOME"] = salvo
+
+
 def teste_qbit_perfil_independente_e_comando():
     p = _pacote()
     exe = p / "qbittorrent.exe"

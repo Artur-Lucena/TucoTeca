@@ -90,7 +90,7 @@ def passo_suite(modulos):
 
 def passo_pytest():
     ok, tail, seg, c = _rodar("pytest", [PY, "-B", "-m", "pytest", "--cobertura"])
-    resumo = next((l for l in reversed(tail) if "passed" in l or "failed" in l), "")
+    resumo = next((ln for ln in reversed(tail) if "passed" in ln or "failed" in ln), "")
     return ok, {"cmd": c, "segundos": seg, "resumo": resumo}
 
 
