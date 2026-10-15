@@ -101,7 +101,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 
 | Arquivo | Função |
 |---|---|
-| `frontends/app_win.py` | App tkinter clássico CONGELADO (só correções críticas), grade, detalhes e ferramentas avançadas |
+| `frontends/app_win.py` + `app_win_*.py` | App tkinter clássico CONGELADO (só correções críticas) em mixins por domínio; entry point, `NAV`, `messagebox` e top funcs preservados |
 | `frontends/desktop.py` | Dispatcher Qt ↔ clássico (saída 42 troca preservando lock) |
 | `frontends/app_qt.py` | Shell Qt Quick, lock, selftest e screenshot |
 | `frontends/qt_bridge/` (pacote) | Superfície Qt no `HubBridge` (sinais + properties), lógica por domínio nos mixins, modelos e workers |

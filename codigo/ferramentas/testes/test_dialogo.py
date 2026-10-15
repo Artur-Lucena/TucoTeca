@@ -809,150 +809,153 @@ def teste_desejos_sincronizar_nao_orfana_modal():
 
 def teste_gui_sem_bug_modal_orfao():
     """Trava estática da classe 'modal órfão': defaults que quebram no def,
-    update() de modal sem guarda e Thread sem daemon em app_win.py."""
+    update() de modal sem guarda e Thread sem daemon em app_win.py + app_win_*.py."""
     import ast
     import builtins
     from pathlib import Path
 
     import app_win
-    src = Path(app_win.__file__).read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    globais = set(dir(builtins)) | {"__name__"}
-    for n in tree.body:
-        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            globais.add(n.name)
-        elif isinstance(n, ast.Assign):
-            for t in n.targets:
-                if isinstance(t, ast.Name):
-                    globais.add(t.id)
-                elif isinstance(t, ast.Tuple):
-                    for e in t.elts:
-                        if isinstance(e, ast.Name):
-                            globais.add(e.id)
-        elif isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name):
-            globais.add(n.target.id)
-        elif isinstance(n, (ast.Import, ast.ImportFrom)):
-            for a in n.names:
-                if a.name != "*":
-                    globais.add((a.asname or a.name).split(".")[0])
+    _fontes_win = [Path(app_win.__file__)] + sorted(
+        Path(app_win.__file__).parent.glob("app_win_*.py"))
+    for _fonte in _fontes_win:
+        src = _fonte.read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        globais = set(dir(builtins)) | {"__name__"}
+        for n in tree.body:
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                globais.add(n.name)
+            elif isinstance(n, ast.Assign):
+                for t in n.targets:
+                    if isinstance(t, ast.Name):
+                        globais.add(t.id)
+                    elif isinstance(t, ast.Tuple):
+                        for e in t.elts:
+                            if isinstance(e, ast.Name):
+                                globais.add(e.id)
+            elif isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name):
+                globais.add(n.target.id)
+            elif isinstance(n, (ast.Import, ast.ImportFrom)):
+                for a in n.names:
+                    if a.name != "*":
+                        globais.add((a.asname or a.name).split(".")[0])
 
-    def locais_de(fn):
-        nomes, antes = set(), {}
+        def locais_de(fn):
+            nomes, antes = set(), {}
 
-        def coll(sts, presente):
-            for st in sts:
-                for no in ast.walk(st):
-                    if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef,
+            def coll(sts, presente):
+                for st in sts:
+                    for no in ast.walk(st):
+                        if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                           ast.ClassDef)):
+                            nomes.add(no.name)
+                            antes.setdefault(no.name, no.lineno)
+                    if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef,
                                        ast.ClassDef)):
-                        nomes.add(no.name)
-                        antes.setdefault(no.name, no.lineno)
-                if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef,
-                                   ast.ClassDef)):
-                    continue
-                for no in ast.walk(st):
-                    if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef,
-                                       ast.ClassDef, ast.Lambda)):
                         continue
-                    if isinstance(no, ast.Name) and isinstance(no.ctx, ast.Store):
-                        nomes.add(no.id)
-                        antes.setdefault(no.id, no.lineno)
-                    elif isinstance(no, ast.ExceptHandler) and no.name:
-                        nomes.add(no.name)
-                        antes.setdefault(no.name, no.lineno)
-                    elif isinstance(no, (ast.Import, ast.ImportFrom)):
-                        for a in no.names:
-                            if a.name != "*":
-                                nm = (a.asname or a.name).split(".")[0]
-                                nomes.add(nm)
-                                antes.setdefault(nm, no.lineno)
-        coll(fn.body, True)
-        pars = set()
-        for a in list(fn.args.posonlyargs) + list(fn.args.args) \
-                + list(fn.args.kwonlyargs):
-            pars.add(a.arg)
-        if fn.args.vararg:
-            pars.add(fn.args.vararg.arg)
-        if fn.args.kwarg:
-            pars.add(fn.args.kwarg.arg)
-        return pars, nomes, antes
-
-    problemas = []
-
-    def visitar(no, pilha):
-        if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            ext = (list(no.args.defaults)
-                   + [d for d in no.args.kw_defaults if d])
-            for e in ext:
-                for nm in ast.walk(e):
-                    if isinstance(nm, ast.Name) and isinstance(nm.ctx, ast.Load):
-                        ok = nm.id in globais
-                        for (pars, loc, ant) in reversed(pilha):
-                            if nm.id in pars or (
-                                    nm.id in loc and ant[nm.id] < no.lineno):
-                                ok = True
-                                break
-                        if not ok:
-                            problemas.append(
-                                f"def {no.name}:{no.lineno} default '{nm.id}'")
-            pars, loc, ant = locais_de(no)
-            pilha2 = pilha + [(pars, loc, ant)]
-            for st in no.body:
-                visitar(st, pilha2)
-            return
-        if isinstance(no, ast.Lambda):
+                    for no in ast.walk(st):
+                        if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                           ast.ClassDef, ast.Lambda)):
+                            continue
+                        if isinstance(no, ast.Name) and isinstance(no.ctx, ast.Store):
+                            nomes.add(no.id)
+                            antes.setdefault(no.id, no.lineno)
+                        elif isinstance(no, ast.ExceptHandler) and no.name:
+                            nomes.add(no.name)
+                            antes.setdefault(no.name, no.lineno)
+                        elif isinstance(no, (ast.Import, ast.ImportFrom)):
+                            for a in no.names:
+                                if a.name != "*":
+                                    nm = (a.asname or a.name).split(".")[0]
+                                    nomes.add(nm)
+                                    antes.setdefault(nm, no.lineno)
+            coll(fn.body, True)
             pars = set()
-            for a in list(no.args.posonlyargs) + list(no.args.args) \
-                    + list(no.args.kwonlyargs):
+            for a in list(fn.args.posonlyargs) + list(fn.args.args) \
+                    + list(fn.args.kwonlyargs):
                 pars.add(a.arg)
-            visitar(no.body, pilha + [(pars, set(), {})])
-            return
-        for f in ast.iter_child_nodes(no):
-            visitar(f, pilha)
+            if fn.args.vararg:
+                pars.add(fn.args.vararg.arg)
+            if fn.args.kwarg:
+                pars.add(fn.args.kwarg.arg)
+            return pars, nomes, antes
 
-    visitar(tree, [])
-    afirmar(not problemas, problemas[:5])
-    # update() de modal: exige ancestral Try (guarda TclError)
-    class V(ast.NodeVisitor):
-        def __init__(self):
-            self.pilha = []
-            self.ruins = []
+        problemas = []
 
-        def generic_visit(self, n):
-            self.pilha.append(n)
-            super().generic_visit(n)
-            self.pilha.pop()
+        def visitar(no, pilha):
+            if isinstance(no, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                ext = (list(no.args.defaults)
+                       + [d for d in no.args.kw_defaults if d])
+                for e in ext:
+                    for nm in ast.walk(e):
+                        if isinstance(nm, ast.Name) and isinstance(nm.ctx, ast.Load):
+                            ok = nm.id in globais
+                            for (pars, loc, ant) in reversed(pilha):
+                                if nm.id in pars or (
+                                        nm.id in loc and ant[nm.id] < no.lineno):
+                                    ok = True
+                                    break
+                            if not ok:
+                                problemas.append(
+                                    f"def {no.name}:{no.lineno} default '{nm.id}'")
+                pars, loc, ant = locais_de(no)
+                pilha2 = pilha + [(pars, loc, ant)]
+                for st in no.body:
+                    visitar(st, pilha2)
+                return
+            if isinstance(no, ast.Lambda):
+                pars = set()
+                for a in list(no.args.posonlyargs) + list(no.args.args) \
+                        + list(no.args.kwonlyargs):
+                    pars.add(a.arg)
+                visitar(no.body, pilha + [(pars, set(), {})])
+                return
+            for f in ast.iter_child_nodes(no):
+                visitar(f, pilha)
 
-        def visit_Call(self, n):
-            # só modal (prog/win/dlg/...): dict.update e root.update
-            # não orfanam nada
-            if isinstance(n.func, ast.Attribute) and n.func.attr == "update" \
-                    and isinstance(n.func.value, ast.Name) \
-                    and n.func.value.id in (
-                        "prog", "win", "dlg", "caixa", "vw", "opcoes"):
-                if not any(isinstance(p, ast.Try) for p in self.pilha):
-                    self.ruins.append(n.lineno)
-            self.generic_visit(n)
+        visitar(tree, [])
+        afirmar(not problemas, (_fonte.name, problemas[:5]))
+        # update() de modal: exige ancestral Try (guarda TclError)
+        class V(ast.NodeVisitor):
+            def __init__(self):
+                self.pilha = []
+                self.ruins = []
 
-    v = V()
-    v.visit(tree)
-    afirmar(not v.ruins, f"update() sem guarda: {v.ruins[:8]}")
-    # Threads sempre daemon
-    class T(ast.NodeVisitor):
-        def __init__(self):
-            self.ruins = []
+            def generic_visit(self, n):
+                self.pilha.append(n)
+                super().generic_visit(n)
+                self.pilha.pop()
 
-        def visit_Call(self, n):
-            f = n.func
-            if isinstance(f, ast.Attribute) and f.attr == "Thread":
-                kw = {k.arg: k.value for k in n.keywords}
-                d = kw.get("daemon")
-                if not (isinstance(d, ast.Constant) and d.value is True):
-                    self.ruins.append(n.lineno)
-            self.generic_visit(n)
+            def visit_Call(self, n):
+                # só modal (prog/win/dlg/...): dict.update e root.update
+                # não orfanam nada
+                if isinstance(n.func, ast.Attribute) and n.func.attr == "update" \
+                        and isinstance(n.func.value, ast.Name) \
+                        and n.func.value.id in (
+                            "prog", "win", "dlg", "caixa", "vw", "opcoes"):
+                    if not any(isinstance(p, ast.Try) for p in self.pilha):
+                        self.ruins.append(n.lineno)
+                self.generic_visit(n)
 
-    t = T()
-    t.visit(tree)
-    afirmar(not t.ruins, f"Thread sem daemon=True: {t.ruins[:8]}")
+        v = V()
+        v.visit(tree)
+        afirmar(not v.ruins, (_fonte.name, f"update() sem guarda: {v.ruins[:8]}"))
+        # Threads sempre daemon
+        class T(ast.NodeVisitor):
+            def __init__(self):
+                self.ruins = []
+
+            def visit_Call(self, n):
+                f = n.func
+                if isinstance(f, ast.Attribute) and f.attr == "Thread":
+                    kw = {k.arg: k.value for k in n.keywords}
+                    d = kw.get("daemon")
+                    if not (isinstance(d, ast.Constant) and d.value is True):
+                        self.ruins.append(n.lineno)
+                self.generic_visit(n)
+
+        t = T()
+        t.visit(tree)
+        afirmar(not t.ruins, (_fonte.name, f"Thread sem daemon=True: {t.ruins[:8]}"))
 
 
 def teste_desejos_adicionar_e_manual():

@@ -112,7 +112,10 @@ def teste_log_erro_anexa():
 
 def teste_sem_lambda_e_morta():
     """Regressão: nenhum callback diferido pode referenciar `e` do except."""
-    src = (REPO / "codigo/frontends/app_win.py").read_text(encoding="utf-8")
+    base = REPO / "codigo/frontends"
+    src = "\n".join(
+        (base / f).read_text(encoding="utf-8")
+        for f in ["app_win.py", *[p.name for p in sorted(base.glob("app_win_*.py"))]])
     afirmar("lambda: falhou(e)" not in src, "padrão NameError reintroduzido")
     afirmar("m=msg_erro" in src, "captura por string ausente")
 
