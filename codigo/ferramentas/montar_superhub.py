@@ -12,11 +12,11 @@ import subprocess
 import sys
 import tempfile
 import time
-import urllib.request
 import zipfile
 from pathlib import Path
 
 import montar_portatil as MP
+from build_utils import baixar_verificado, sha_arquivo
 
 REPO = MP.REPO
 CACHE = MP.CACHE / "superhub"
@@ -65,33 +65,6 @@ emuladores selecionados. Ele não inclui os executáveis dos jogos nem as ROMs.
 Este runtime começa com dados/perfis novos. Para atualizar, preserve dados/.
 Licenças e URLs dos fontes ficam junto de cada componente e no manifesto.
 """
-
-
-def sha_arquivo(p: Path) -> str:
-    h = hashlib.sha256()
-    with p.open("rb") as f:
-        for b in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(b)
-    return h.hexdigest()
-
-
-def baixar_verificado(url: str, nome: str, sha: str = "") -> Path:
-    CACHE.mkdir(parents=True, exist_ok=True)
-    p = CACHE / nome
-    if p.is_file() and (not sha or sha_arquivo(p) == sha):
-        return p
-    tmp = p.with_suffix(p.suffix + ".part")
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "TucoTeca-build"})
-        with urllib.request.urlopen(req, timeout=90) as r, tmp.open("wb") as f:
-            shutil.copyfileobj(r, f, 1024 * 256)
-        if sha and sha_arquivo(tmp) != sha:
-            raise ValueError("SHA-256 divergente: " + nome)
-        tmp.replace(p)
-    finally:
-        if tmp.exists():
-            tmp.unlink()
-    return p
 
 
 def copiar_runtime(origem: Path, destino: Path, excluir=()) -> dict:

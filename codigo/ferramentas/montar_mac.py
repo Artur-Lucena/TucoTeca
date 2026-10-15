@@ -17,11 +17,11 @@ import datetime
 import os
 import shutil
 import sys
-import tarfile
 from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI))
+from build_utils import baixar_verificado, escrever_tarxz
 from montar_portatil import DIST, REPO, copiar_app, podar_dieta
 
 MAC_BUILD = AQUI / ".build" / "mac"
@@ -59,43 +59,11 @@ MAC_ARQS = (
 )
 
 
-def _sha_arq(p: Path) -> str:
-    import hashlib
-    h = hashlib.sha256()
-    with p.open("rb") as f:
-        for bloco in iter(lambda: f.read(1024 * 256), b""):
-            h.update(bloco)
-    return h.hexdigest()
-
-
 def garantir_mac() -> Path:
     """Baixa (uma vez) os arquivos oficiais do Mac p/ .cache/mac/."""
-    import urllib.request
     MAC_CACHE.mkdir(parents=True, exist_ok=True)
     for nome, url, minimo, sha in MAC_ARQS:
-        dest = MAC_CACHE / nome
-        if dest.is_file() and dest.stat().st_size > minimo:
-            if sha and _sha_arq(dest) != sha:
-                dest.unlink(missing_ok=True)
-                raise SystemExit(f"{nome} no cache com sha divergente (apaguei; rode de novo)")
-            print(f"[cache] {nome} ({dest.stat().st_size // 1048576} MB)")
-            continue
-        print(f"[baixar] {nome}")
-        req = urllib.request.Request(url, headers={"User-Agent": "tucoteca-hub"})
-        with urllib.request.urlopen(req, timeout=300) as r, open(dest, "wb") as f:
-            while True:
-                bloco = r.read(1024 * 256)
-                if not bloco:
-                    break
-                f.write(bloco)
-        h = _sha_arq(dest)
-        if dest.stat().st_size < minimo:
-            dest.unlink(missing_ok=True)
-            raise SystemExit(f"{nome} veio pequeno demais (link quebrou?)")
-        if sha and h != sha:
-            dest.unlink(missing_ok=True)
-            raise SystemExit(f"{nome}: sha256 divergente (descartado)")
-        print(f"[ok] {nome} ({dest.stat().st_size // 1048576} MB)")
+        baixar_verificado(url, nome, MAC_CACHE, sha256=sha, minimo=minimo, timeout=300)
     return MAC_CACHE
 
 COMMAND_LAUNCHER = """#!/bin/sh
@@ -230,10 +198,7 @@ def empacotar_mac(build: Path, data: str, leve: bool = False) -> tuple[Path, Pat
         shutil.rmtree(pasta)
     pasta.mkdir(parents=True)
     payload = pasta / f"tucoteca-mac-{data}.tar.xz"
-    with tarfile.open(payload, "w:xz", preset=6,
-                      format=tarfile.PAX_FORMAT) as t:
-        for arq in sorted(build.parent.rglob("*")):
-            t.add(arq, arq.relative_to(build.parent), recursive=False)
+    escrever_tarxz(build.parent, payload, strip_parente=0)
     if leve:
         print("[aviso] mac leve: sem Python/emuladores (baixa pelo ⬇ no Mac)")
     else:

@@ -26,6 +26,7 @@ import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
 
+from build_utils import sha_arquivo
 from empacotar_fontes import empacotar_fontes, listar_fontes
 
 REPO = Path(__file__).resolve().parents[2]
@@ -37,14 +38,6 @@ PROIBIDAS = {"dados", "saves", "roms", "jogos", "programa", "dist", ".provas",
 PESSOAIS = re.compile(
     r"(?i)\.(db|db-journal|sqlite3?|lnk|zip|7z|rar|exe|dll|pyd|cia|3ds|nds|sav|dsv|"
     r"mp3|mp4|wav|ogg|flac|mkv|webm|png|jpg|jpeg)$")
-
-
-def sha_arquivo(p: Path) -> str:
-    h = hashlib.sha256()
-    with p.open("rb") as f:
-        for bloco in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(bloco)
-    return h.hexdigest()
 
 
 def _caminho_seguro(rel: str) -> None:

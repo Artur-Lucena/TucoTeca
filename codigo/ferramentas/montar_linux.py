@@ -20,11 +20,11 @@ import datetime
 import os
 import shutil
 import sys
-import tarfile
 from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI))
+from build_utils import escrever_tarxz
 from montar_portatil import (
     AZAHAR_URL,
     AZAHAR_USER_INCLUIR,
@@ -249,10 +249,7 @@ def empacotar_tarxz_linux(build: Path, data: str) -> Path:
     """Payload .tar.xz da árvore Linux (mesmo formato do Windows)."""
     DIST.mkdir(parents=True, exist_ok=True)
     saida = DIST / f"tucoteca-linux-{data}.tar.xz"
-    with tarfile.open(saida, "w:xz", preset=6, format=tarfile.PAX_FORMAT) as t:
-        for arq in sorted(build.parent.rglob("*")):
-            t.add(arq, arq.relative_to(build.parent), recursive=False)
-    print(f"[ok] {saida.name} — {saida.stat().st_size / 1048576:.1f} MB")
+    escrever_tarxz(build.parent, saida, strip_parente=1)
     return saida
 
 
@@ -260,9 +257,7 @@ def empacotar_run(build: Path, versao: str, payload_nome: str) -> Path:
     """Gruda o stub + payload .tar.xz e gera o .run instalável."""
     DIST.mkdir(parents=True, exist_ok=True)
     tmp_xz = DIST / payload_nome
-    with tarfile.open(tmp_xz, "w:xz", preset=6, format=tarfile.PAX_FORMAT) as t:
-        for arq in sorted(build.parent.rglob("*")):
-            t.add(arq, arq.relative_to(build.parent), recursive=False)
+    escrever_tarxz(build.parent, tmp_xz, strip_parente=0)
     stub = STUB.replace("__VERSAO__", versao)
     cabeca, marcador = stub.split("__PAYLOAD_SEGUE__\n")
     base = cabeca + "__PAYLOAD_SEGUE__\n"
