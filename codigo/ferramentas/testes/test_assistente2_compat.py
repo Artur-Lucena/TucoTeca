@@ -127,3 +127,24 @@ def teste_assistente2_compat_banco_migra_sem_reescrever():
         afirmar(set(core.STATUS_VALIDOS) == {"backlog", "jogando", "zerado", "pausado", "abandonado"})
     finally:
         con.close()
+
+
+def teste_banco_pacote_reexporta_o_contrato():
+    """Fachada do pacote banco: os 58 nomes do contrato, privados p/ patch e fatias."""
+    from bib_nucleo import banco as B
+    afirmar(len(B.__all__) == 58, len(B.__all__))
+    faltando = [n for n in B.__all__ if not hasattr(B, n)]
+    afirmar(not faltando, faltando)
+    # privados fora do contrato, mas reexportados de propósito (monkeypatch dos testes)
+    afirmar(hasattr(B, "_inicializar_db"), "patch de _inicializar_db precisa do atributo")
+    afirmar(hasattr(B, "garantir_fts"), "test_fts5 usa B.garantir_fts")
+    afirmar("_inicializar_db" not in B.__all__ and "garantir_fts" not in B.__all__,
+            "privados não entram no __all__")
+    import bib_nucleo.banco._infra as _infra
+    import bib_nucleo.banco.catalogo as _catalogo
+    import bib_nucleo.banco.jogos as _jogos
+    afirmar(B.get_db is _infra.get_db and B.criar_jogo is _jogos.criar_jogo
+            and B.criar_video is _catalogo.criar_video,
+            "reexport deve ser objeto único (identidade preservada)")
+    afirmar(B.SCHEMA_DESEJOS is __import__("bib_nucleo.banco_desejos",
+            fromlist=["SCHEMA_DESEJOS"]).SCHEMA_DESEJOS, "desejos reexportados")

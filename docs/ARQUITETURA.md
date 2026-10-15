@@ -74,7 +74,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 |---|---|
 | `config.py` | leitura única das `BIBLIOTECA_*` (paths, listas `;`/`,`, bools 0/1), defaults e singleton `cfg` — consumida por `base.py`, builders e testes |
 | `base.py` | casa, raízes Win/Linux/Mac, tradução de caminhos, lock, texto, logs |
-| `banco.py` | schema, migrações por colunas, CRUD jogos/músicas/fila, capas |
+| `banco/` (pacote) | schema, migrações por colunas, CRUD jogos/músicas/fila, capas — `banco.py` fatiado em `_infra`/`jogos`/`catalogo` com fachada de compatibilidade (`__all__` idêntico) |
 | `banco_desejos.py` | wishlist local, sincronização preservadora e histórico obtido |
 | `scans/` (pacote) / `scans_hydra.py` | lojas/disco/ROMs e adaptador Hydra, preview, dedup e restore — `scans.py` fatiado na F2 do O2 sem mudar contratos |
 | `emuladores/` (pacote) | Azahar/DeSmuME, processos/sessões, presets e overlay de mods — `emuladores.py` fatiado na F1 do O2 sem mudar contratos |
@@ -276,8 +276,9 @@ smokes remotos são separados dos casos herméticos e não usam jogos reais.
 
 Os maiores pontos de acoplamento continuam `app_win.py`, `app_tui.py`
 e `scans.py` (`emuladores.py` foi fatiado na F1 do O2 em
-`emuladores/{azahar,desmume,provedores,presets,mods,lancamento,_comum}`,
-contratos e `__all__` preservados). A decomposição futura deve seguir domínios
+`emuladores/{azahar,desmume,provedores,presets,mods,lancamento,_comum}` e
+`banco.py` em `banco/{_infra,jogos,catalogo}`; contratos e `__all__`
+preservados). A decomposição futura deve seguir domínios
 (catálogo, áudio, diálogos, sessões), mantendo contratos e fixtures antes
 de mover métodos. Desejos, Hydra, sessões manuais e adaptadores remotos já
 foram extraídos; isso não significa decomposição integral dos módulos grandes.
