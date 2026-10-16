@@ -2,6 +2,28 @@
 
 Registro explicito: instalar um servico nao implica executar plugins
 arbitrarios.
+
+Contrato
+--------
+Cada integracao e um `Integracao` com identidade (`chave`/`nome`), um `tipo`
+de `INTEGRACAO_TIPOS`, o visual (`inicial`/`cor`) e, opcionalmente, um
+callable de busca (`buscar`) e/ou uma `url` com `{q}`. O campo `capacidades`
+declara, num vocabulario fixo (`CAPACIDADES`), o que a integracao faz:
+
+    "busca"    -> oferece pesquisa de catalogo (callable `buscar`)
+    "abrir"    -> abre um destino externo (campo `url`)
+    "midia"    -> trabalha com musica/video/capas
+    "download" -> gerencia downloads (torrentes, repacks)
+    "emulador" -> integra emulador/ROMs
+    "config"   -> expoe presets/opcoes de configuracao
+
+`apresentar()` devolve um DTO serializavel com todas as chaves, inclusive
+`capacidades` como lista ordenada (o QML itera chaves genericas). Nomes,
+exports e formatos atuais continuam validos: `capacidades` tem default `()`.
+
+Para adicionar uma integracao em 3 passos (modulo de rede -> registro aqui ->
+teste hermetico), copie `bib_nucleo/rede/_modelo.py` e siga
+`docs/INTEGRACOES.md`.
 """
 from __future__ import annotations
 
@@ -24,14 +46,36 @@ class Integracao:
     buscar: Callable | None = None
     url: str = ""
     personalizada: bool = False
+    capacidades: tuple[str, ...] = ()
 
     def apresentar(self):
-        return {k: v for k, v in asdict(self).items() if k != "buscar"}
+        dados = {k: v for k, v in asdict(self).items() if k != "buscar"}
+        dados["capacidades"] = list(self.capacidades)
+        return dados
 
 
 INTEGRACAO_TIPOS = ("catalogo", "emulador", "download", "musicas_online",
                     "provedores", "link")
+# Vocabulario fixo de capacidades (ver docstring do modulo).
+CAPACIDADES = ("busca", "abrir", "midia", "download", "emulador", "config")
 _CORES = ("#62d4ad", "#b5a0ff", "#f0bb77", "#7eaaff", "#67cff1", "#7ce3b8", "#6cd5f5")
+
+
+def _capacidades_para(tipo: str, tem_url: bool = False) -> tuple[str, ...]:
+    """Deriva capacidades coerentes para integracoes personalizadas.
+
+    O usuario nao digita capacidades: elas saem do `tipo` e da presenca de
+    `url`, no mesmo vocabulario de `CAPACIDADES`.
+    """
+    caps = ["abrir"] if tem_url else []
+    if tipo == "emulador":
+        caps.append("emulador")
+    elif tipo == "download":
+        caps.append("download")
+    elif tipo in ("musicas_online", "provedores"):
+        caps.append("midia")
+    return tuple(dict.fromkeys(caps))
+
 
 
 def _arquivo_personalizadas():
@@ -119,19 +163,19 @@ def integracoes_padrao():
     registro = RegistroIntegracoes()
     for item in (
         Integracao("steamrip", "SteamRip", "Pesquise o catálogo e abra a página do jogo.",
-                   "catalogo", "SR", "#62d4ad", core.buscar_steamrip),
+                   "catalogo", "SR", "#62d4ad", core.buscar_steamrip, capacidades=("busca",)),
         Integracao("fitgirl", "FitGirl", "Descubra títulos no catálogo conectado.",
-                   "catalogo", "FG", "#b5a0ff", core.buscar_fitgirl),
+                   "catalogo", "FG", "#b5a0ff", core.buscar_fitgirl, capacidades=("busca",)),
         Integracao("azahar", "Azahar", "Emulação 3DS, presets, mods e texturas.",
-                   "emulador", "3D", "#f0bb77"),
+                   "emulador", "3D", "#f0bb77", capacidades=("emulador", "config")),
         Integracao("desmume", "DeSmuME", "Sua coleção Nintendo DS, no mesmo lugar.",
-                   "emulador", "DS", "#7eaaff"),
+                   "emulador", "DS", "#7eaaff", capacidades=("emulador",)),
         Integracao("qbittorrent", "qBittorrent", "Cliente local com progresso, pausa e retomada.",
-                   "download", "qb", "#67cff1"),
+                   "download", "qb", "#67cff1", capacidades=("download",)),
         Integracao("spotify", "Spotify", "Escolha faixas/playlists e envie à fila de música local.",
-                   "musicas_online", "SP", "#7ce3b8"),
+                   "musicas_online", "SP", "#7ce3b8", capacidades=("midia",)),
         Integracao("capas", "Capas online", "Steam, SteamGridDB, Wikipedia, iTunes, MusicBrainz e Deezer.",
-                   "provedores", "AR", "#6cd5f5"),
+                   "provedores", "AR", "#6cd5f5", capacidades=("midia",)),
     ):
         registro.registrar(item)
     for d in carregar_personalizadas():
@@ -139,8 +183,10 @@ def integracoes_padrao():
             item = _validar_personalizada(d)
         except ValueError:
             continue
+        caps = _capacidades_para(item["tipo"], tem_url=bool(item["url"]))
         try:
-            registro.registrar(Integracao(url=item.pop("url"), personalizada=True, **item))
+            registro.registrar(Integracao(url=item.pop("url"), personalizada=True,
+                                          capacidades=caps, **item))
         except ValueError:
             continue
     return registro
@@ -156,7 +202,8 @@ def url_integracao(registro: RegistroIntegracoes, chave: str, termo="") -> str:
     return url
 
 
-__all__ = ["Integracao", "INTEGRACAO_TIPOS", "_CORES", "_arquivo_personalizadas",
+__all__ = ["Integracao", "INTEGRACAO_TIPOS", "CAPACIDADES", "_CORES",
+           "_arquivo_personalizadas", "_capacidades_para",
            "carregar_personalizadas", "_validar_personalizada", "CHAVES_PADRAO",
            "salvar_personalizada", "remover_personalizada", "RegistroIntegracoes",
            "integracoes_padrao", "url_integracao"]
