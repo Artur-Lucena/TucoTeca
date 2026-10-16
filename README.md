@@ -52,18 +52,21 @@ py -3.14 -m pip install -r codigo/ferramentas/requirements-ui.txt
 py -3.14 codigo/frontends/desktop.py
 ```
 
-Sem PySide6, o hub cai automaticamente para a interface clássica em tkinter.
-`--big-picture` abre direto em tela cheia; `--classico` força o modo clássico.
+O desktop usa exclusivamente Qt Quick (PySide6). Sem PySide6, `desktop.py`
+mostra uma mensagem pedindo para instalar `codigo/ferramentas/requirements-ui.txt`
+(ou usar um pacote pronto). `--big-picture` abre direto em tela cheia; as flags
+`--classico`, `--jogar` e `--ignorar-lock` foram neutralizadas: apenas avisam que
+o modo clássico foi removido e abrem o Qt.
 
 **Linux:** `./BibliotecaHub.sh` em um terminal abre a TUI; precisa de Python 3.10+.
-**macOS:** `BibliotecaHubMac.command` abre a interface clássica; é experimental
-e precisa de Python com Tk. Não há bundle macOS validado nesta release.
+**macOS:** `BibliotecaHubMac.command` abre a interface Qt; é experimental
+e não há bundle macOS validado nesta release.
 
 Para experimentar os fontes sem encostar na coleção real:
 
 ```powershell
 $env:BIBLIOTECA_HOME = Join-Path $env:TEMP "tucoteca-dev"
-py -3.14 codigo/frontends/app_win.py --selftest
+py -3.14 codigo/frontends/app_qt.py --selftest
 ```
 
 `BIBLIOTECA_HOME` aponta para a **pasta-mãe** de `dados/`, não para o banco.
@@ -142,7 +145,6 @@ Algumas coisas continuam fora do escopo desta versão:
 | Núcleo, banco e testes | Python 3.10+ (só biblioteca padrão) |
 | Interface principal | PySide6-Essentials 6.10.2 (`codigo/ferramentas/requirements-ui.txt`) |
 | YouTube embutido e vídeo interno | `codigo/ferramentas/requirements-extras.txt` (PySide6-Addons, variante completa) |
-| Interface clássica | tkinter/Tcl/Tk |
 | TUI no Linux | curses (biblioteca padrão do Python) |
 | Imagens JPG/WebP | Pillow (opcional; PNG/GIF funcionam sem ele) |
 | RAR/7z/ISO | 7-Zip instalado ou no pacote |
@@ -161,7 +163,7 @@ reúne fontes, dois bundles Windows x64, notas, licenças, proveniência e hashe
 | **essencial** | Sem Chromium: o YouTube abre no navegador do sistema | Prefere o download menor |
 | **completo** | Com QtWebEngine e QtMultimedia: YouTube embutido e vídeo interno | Prefere a mídia dentro do hub |
 
-Os dois incluem Python, Tk, Pillow, PySide6, 7-Zip, FFmpeg, yt-dlp,
+Os dois incluem Python, Pillow, PySide6, 7-Zip, FFmpeg, yt-dlp,
 QuickJS-NG, qBittorrent, Azahar e DeSmuME. A coleção começa vazia; para
 trazer a sua, use **exportar/importar pacote de coleção** dentro do hub.
 
@@ -180,7 +182,7 @@ py -3.14 codigo/ferramentas/montar_superhub.py --extras essencial --formato zip 
 py -3.14 codigo/ferramentas/montar_superhub.py --extras completo --formato zip --revisao $sha
 ```
 
-O builder monta o runtime, executa provas reais nele (tkinter, Qt, áudio MCI,
+O builder monta o runtime, executa provas reais nele (Qt, áudio MCI,
 Chromium com rede bloqueada na variante completa e qBittorrent) e repete as
 provas no pacote extraído. Mídias são sintéticas e os perfis são temporários.
 Uma falha impede concluir a verificação; não trate um ZIP sem relatório completo
@@ -209,7 +211,7 @@ Git. O histórico está explicado em
 codigo/
   bib_nucleo/          regras, persistência e adaptadores do sistema
     rede/              integrações de internet (sempre sob ação do usuário)
-  frontends/           interface Qt Quick, clássica (tkinter) e TUI
+  frontends/           interface Qt Quick e TUI
     qml/secoes/        telas da interface Qt
   ferramentas/         diagnóstico, provas, empacotamento e testes
 docs/                  arquitetura, revisões, decisões e responsabilidades

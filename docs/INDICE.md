@@ -9,6 +9,8 @@ se localizar; o fluxo de colaboração está em `docs/CONTRIBUTING.md`.
   módulo, modelo de dados, fluxos, concorrência e variáveis de ambiente.
 - [DESKTOP_QT.md](DESKTOP_QT.md) — decisão Qt Quick, cobertura por fluxo,
   contratos de integração, concorrência e limites da etapa (A1).
+- [INTEGRACOES.md](INTEGRACOES.md) — como adicionar uma integração ao hub
+  (contrato, template e testes).
 - [VISAO_OS.md](VISAO_OS.md) — visão TucoOS: o Hub como shell pessoal,
   sem reescrita do domínio.
 

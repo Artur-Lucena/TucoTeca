@@ -11,7 +11,7 @@ Python continua no domínio. Qt Quick continua na apresentação. O que muda
 
 ## Onde estamos (11/10/2026)
 
-- Desktop Qt é o frontend principal no Windows (`desktop.py` → Qt, `--classico` → tkinter).
+- Desktop Qt é o frontend no Windows (`desktop.py` → Qt Quick); a TUI curses atende Linux/macOS.
 - HUD superior: Início, Jogos, Músicas, Desejos, Downloads, Integrações, Vídeos e YouTube.
   Big Picture (F11) preserva categoria; modo simples reduz a navegação.
 - Início: continuar jogando, resumo da coleção (backup/sessões/disco), acesso rápido, recentes.
@@ -35,7 +35,7 @@ Python continua no domínio. Qt Quick continua na apresentação. O que muda
 ## Princípios inegociáveis
 
 1. Local-first: coleção em SQLite + arquivos. Rede só sob ação, com timeout e erro virando aviso.
-2. Uma coleção, um lock. Qt e tkinter nunca escrevem juntos.
+2. Uma coleção, um lock. Qt e TUI nunca escrevem juntos.
 3. Backup antes de mutação. Publicação atômica. Conexão SQLite por operação.
 4. UI nunca bloqueia: I/O em worker, resultado via sinal, resposta obsoleta descartada.
 5. Integração = adaptador registrado, não plugin arbitrário. Sem execução de código de terceiros.
@@ -65,7 +65,7 @@ Gamepad, assinatura Windows e entrega macOS permanecem adiados.
 - Módulos novos, cada um com serviço + QML + teste:
   - **Arquivos**: navegar `Games/`, abrir com app padrão, sanear repacks (reuso de `repacks.py`).
   - **Apps**: launcher de executáveis locais (atalhos `.lnk`, Steam manifests `appmanifest_*.acf`).
-  - **Emulação**: Azahar/DeSmuME com cards de preset/mod/textura/cheat por jogo (traz tkinter → QML).
+  - **Emulação**: Azahar/DeSmuME com cards de preset/mod/textura/cheat por jogo.
   - **Mídia**: fila CSV → áudio com progresso real (traz `baixar.py` → QML).
   - **Sistema**: saúde (CPU/RAM/GPU/disco), volume, sessões, backups, logs — tudo stdlib + WinAPI isolada.
 - Busca global vira launcher: `> comando`, `jogo:`, `musica:`, `? ajuda`.
@@ -115,14 +115,14 @@ docs/VISAO_OS.md: linha na matriz de cobertura
 
 ## Métricas de pronto
 
-- Suite verde + `git diff --check` limpo + selftest Qt e tkinter.
+- Suite verde + `git diff --check` limpo + selftest Qt e TUI.
 - Captura 1440×920 e 960×640 sem HUD engolindo conteúdo, sem `Binding loop`/`ReferenceError`.
 - Ação longa mostra atividade, permite fechar só após concluir, e não deixa áudio/jogo órfão.
-- Docs atualizadas: cobertura Qt × clássico, permissões da integração, como reproduzir.
+- Docs atualizadas: cobertura Qt Quick, permissões da integração, como reproduzir.
 
 ## Evolução posterior
 
 Novas trilhas precisam de decisão específica; não expandir o escopo durante
-o fechamento dos bundles. Emulação avançada permanece acessível no clássico.
+o fechamento dos bundles. Emulação avançada permanece acessível no desktop.
 Everything tem fallback testado, mas o índice nativo não foi comprovado neste
 ambiente; No-Intro/matching exato e provedores externos não são garantidos.

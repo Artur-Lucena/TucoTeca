@@ -7,9 +7,7 @@ flowchart TD
   Qt[app_qt / QML por seção] --> Bridge[qt_bridge / superfície Qt + mixins]
   Bridge --> Services[servicos_ui / casos de uso]
   Services --> Compat[bib_core / APIs públicas]
-  GUI[app_win.py / tkinter clássico] --> Compat
   TUI[app_tui.py / curses] --> Compat
-  GUI --> Dispatch[despacho / fila para thread da UI]
   Compat --> DB[banco / SQLite]
   Compat --> Scan[scans / arquivos e manifestos]
   Compat --> Emu[emuladores / providers e processos]
@@ -44,7 +42,7 @@ Tucoteca/
 │   ├── bib_core.py                   fachada de compatibilidade
 │   ├── bib_nucleo/                   núcleo e domínios pessoais
 │   │   └── rede/                     adaptadores com BIBLIOTECA_REDE
-│   ├── frontends/                    Qt, clássico e TUI
+│   ├── frontends/                    Qt e TUI
 │   │   └── qml/secoes/               telas carregadas por Loader
 │   ├── ferramentas/                  diagnóstico, entrega e builders
 │   │   ├── Montar-Universal.bat       entrada de empacotamento
@@ -110,8 +108,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 
 | Arquivo | Função |
 |---|---|
-| `frontends/app_win.py` + `app_win_*.py` | App tkinter clássico **legado/congelado** (só correções críticas; desenvolvimento novo é só no Qt) em mixins por domínio; entry point, `NAV`, `messagebox` e top funcs preservados; acesso ao módulo por `late.py` (funciona como script e importado) |
-| `frontends/desktop.py` | Dispatcher Qt ↔ clássico: abre o Qt quando PySide6 está presente (padrão) e cai no clássico como alternativa; saída 42 troca preservando lock |
+| `frontends/desktop.py` | Dispatcher Qt: abre o Qt Quick quando PySide6 está presente (padrão) e, sem PySide6, exibe instruções para instalar `codigo/ferramentas/requirements-ui.txt` (ou usar o pacote pronto) |
 | `frontends/app_qt.py` | Shell Qt Quick, lock, selftest e screenshot |
 | `frontends/qt_bridge/` (pacote) | Superfície Qt no `HubBridge` (sinais + properties), lógica por domínio nos mixins, modelos e workers |
 | `frontends/navegacao_controle.py` | Estado XInput → ações (direcional repete ao ser segurado); o Qt traduz para teclas e seções |
@@ -119,12 +116,10 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 | `frontends/servicos_ui/` (pacote) | Casos de uso desktop, `resumo_sistema`, `busca_global`, registro |
 | `frontends/qml/` | shell `Main.qml`, `secoes/`, componentes, diálogos, navegador/player opcionais |
 | `frontends/app_tui.py` + `tui_*.py` | Tui em mixins por domínio (entry point e `tui.curses` patchável preservados) |
-| `frontends/despacho.py` | callbacks de workers entregues pela thread Tk |
-| `frontends/aparencia.py` | tema local, elementos nine-slice, barras adaptáveis e painéis roláveis |
 | `ferramentas/build_utils.py` | comum aos builders: SHA-256 de arquivo, escritor único de `.tar.xz` (Win/Linux/Mac, com diretórios) e download verificado (cache + `.part` atômico) |
 | `ferramentas/diagnosticar.py` | sintaxe/exports/dependências/pastas/SQLite somente-leitura |
 | `ferramentas/empacotar_fontes.py` | entrega da árvore atual + SHA-256 sem coleção |
-| `ferramentas/montar_portatil.py` | Windows, Python embutido/Tk, ZIP/tar.xz/Inno e `copiar_app` |
+| `ferramentas/montar_portatil.py` | Windows, Python embutido, ZIP/tar.xz/Inno e `copiar_app` |
 | `ferramentas/montar_linux.py` | payload Linux + stub `.run`, desktop e desinstalação |
 | `ferramentas/montar_mac.py` | payload + oficiais macOS, completo/leve |
 | `ferramentas/montar_universal.py` | agrega artefatos dos 3 SOs |
@@ -215,7 +210,7 @@ São contratos distintos: consumidores devem usar suas chaves exatas.
 
 - SQLite tem conexão própria no worker.
 - Rede, hashing e conversão são trabalhos de fundo.
-- `_depois` enfileira callbacks no `DespachanteUi`; só seu poll usa Tk.
+- Trabalhos de fundo devolvem resultado à thread da UI por sinais do bridge (conexão enfileirada); nenhum worker toca em widgets.
 - O player tem preparação separada de abertura/controle MCI. Aliases são
   locais à thread: todos os comandos nativos ficam na thread da UI.
 - Tokens invalidam preparações antigas; Stop/fechar não deixam resultado
@@ -278,7 +273,7 @@ descobre `teste_*` e informa os pulos e falhas por ambiente.
 `pytest --cobertura` agrega cobertura dos subprocessos. Provas nativas e
 smokes remotos são separados dos casos herméticos e não usam jogos reais.
 
-Os maiores pontos de acoplamento continuam `app_win.py`, `app_tui.py`
+Os maiores pontos de acoplamento continuam `app_tui.py`
 e `scans.py` (`emuladores.py` foi fatiado na F1 do O2 em
 `emuladores/{azahar,desmume,provedores,presets,mods,lancamento,_comum}` e
 `banco.py` em `banco/{_infra,jogos,catalogo}`; contratos e `__all__`
@@ -286,6 +281,6 @@ preservados). A decomposição futura deve seguir domínios
 (catálogo, áudio, diálogos, sessões), mantendo contratos e fixtures antes
 de mover métodos. Desejos, Hydra, sessões manuais e adaptadores remotos já
 foram extraídos; isso não significa decomposição integral dos módulos grandes.
-`despacho.py` e `copiar_app` são fronteiras já extraídas; `build_utils.py`
+`copiar_app` é uma fronteira já extraída; `build_utils.py`
 concentra o que os três builders compartilham (SHA-256, escritor único de
 `.tar.xz` e download verificado), sem duplicar lógica de empacotamento.

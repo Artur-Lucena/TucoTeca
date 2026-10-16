@@ -2,27 +2,24 @@
 
 ## Decisão de arquitetura
 
-O frontend principal do checkout Windows é PySide6 + Qt Quick/QML.
-O tkinter (`app_win.py`) está congelado: recebe só correções críticas e serve
-como fallback (`--classico`, Qt ausente) e abrigo das ferramentas avançadas
-até a paridade integral.
+O frontend do checkout Windows é PySide6 + Qt Quick/QML, e é o único desktop.
 Python permanece no domínio: substituir banco, emulação e áudio por outra
 linguagem acrescentaria uma reescrita sem benefício necessário para a UI.
 Qt entrega controles, cena acelerada, foco, imagens assíncronas e layouts.
 
 ```text
-BibliotecaHub.bat → abrir_hub.py → desktop.py
-                                  ├── app_qt.py (Qt instalado)
-                                  │    ├── qml/ (apresentação e componentes)
-                                  │    └── qt_bridge.py (modelos, estado, workers)
-                                  │          └── servicos_ui.py (casos de uso/adaptadores)
-                                  │                └── bib_core / bib_nucleo / SQLite
-                                  └── app_win.py (--classico ou Qt ausente)
+BibliotecaHub.bat → abrir_hub.py → desktop.py → app_qt.py (PySide6 instalado)
+                                                   ├── qml/ (apresentação e componentes)
+                                                   └── qt_bridge.py (modelos, estado, workers)
+                                                         └── servicos_ui.py (casos de uso/adaptadores)
+                                                               └── bib_core / bib_nucleo / SQLite
 ```
 
-Qt e tkinter nunca usam a coleção ao mesmo tempo no fluxo de troca. O código
-de saída 42 encerra Qt, fecha player/workers e libera o lock; o dispatcher
-abre então as ferramentas clássicas. Não há migração nova de schema.
+Não há troca de interface dentro do mesmo processo: o Qt Quick é o único
+desktop. Sem PySide6 instalado, `desktop.py` encerra com uma mensagem clara
+orientando a instalar `codigo/ferramentas/requirements-ui.txt` (ou usar o
+pacote pronto). Em Linux/macOS, o hub TUI curses continua disponível pelo
+`./BibliotecaHub.sh`. Não há migração nova de schema.
 
 ## Interface
 
@@ -51,45 +48,44 @@ abre então as ferramentas clássicas. Não há migração nova de schema.
 
 ## Cobertura
 
-| Fluxo | Qt Quick | Ferramentas clássicas |
-|---|---|---|
-| Coleção, busca, filtros, favorito, adicionar/editar/excluir jogo | Sim | Sim |
-| Aparência: tema claro/escuro, densidade e escala de texto 80–150% | Sim | — |
-| Editar nota 0–10 e etiquetas; saúde exe/ROM no Início | Sim | Sim (diálogo) |
-| Jogar com provider, presets/mods já configurados e sessão rastreada | Sim | Sim |
-| Músicas locais: importar pasta, tocar, pausar, anterior/próxima, parar | Sim | Sim |
-| Fila visível, modos sequência/aleatório/repetir, volume no rodapé | Sim | Parcial |
-| Progresso do player no rodapé (tempo decorrido / duração) | Sim | Parcial |
-| Desejos: listar, adicionar por appid, remover, abrir Steam | Sim | Sim |
-| Desejos: preço/desconto sob demanda com cache local de 24h | Sim | — |
-| Torrents: progresso com recebido/total, velocidade/ETA, espaço livre, iniciar, pausar/retomar, abrir pasta | Sim | Parcial |
-| SteamRip/FitGirl: pesquisar e abrir página do resultado | Sim | Sim |
-| Backup da coleção / volume global Windows | Sim | Sim |
-| Sistema: backups, registro/encerramento de sessões pendentes, últimos erros | Sim | Parcial |
-| Mods, texturas HD, cheats e presets do Azahar no detalhe de cada jogo 3DS | Sim | Sim |
-| Controles: aplicar e salvar perfis; gerar mapa padrão e testar botões | Sim (leitura ao vivo; sem hardware mostra a ausência, prova física com o usuário) | Sim |
-| Atualizar emuladores | Sim, com consulta do release e confirmação expressa antes de baixar | Sim |
-| Importação avançada de jogos/ROMs, sanar/religar executáveis, UAC | Ferramentas clássicas | Sim |
-| Arrastar pasta/arquivo para a janela abre o mesmo preview antes de importar | Sim | — |
-| CSV → áudio, fila de downloads de músicas, buscar capas | Sim | Sim |
-| Wishlist por JSON salvo; leitura Steam com erro explícito se endpoint indisponível | Sim | Sim |
-| Importar torrent concluído | Ferramentas clássicas | Sim |
-| Desejo → SteamRip → baixar/importar → obtido | Sim | Fluxo manual |
-| Registrar horas manualmente nos detalhes e encerrar sessão pendente no Sistema | Sim | Sim |
-| Bibliotecas sem credencial, catálogo Spotify, download/conversão/importação de músicas | Sim | CSV/import local |
-| Videoteca, YouTube (embutido na variante completa; link externo na essencial), reprodutores, editores e EQ por cópia | Sim | — |
-| Atalhos personalizados em Integrações | Sim | — |
-| Exportar/importar pacotes | Sim, com confirmação para restaurar saves | Sim |
-| Remoções com desfazer (jogos com capa, desejos, vídeos) via lixeira local | Sim | — |
-| Saves de jogo: configurar, snapshot, restaurar; screenshots | Sim | Backup dos emuladores |
-| Perfis Tuco/Isa, atalhos, vigia e API de leitura | Sim, em Ferramentas pessoais | — |
-| Letras LRCLIB, LibRetro, SponsorBlock e MP3 por URL | Sim | — |
-| IPS/BPS, cópia/hardlinks e uso de disco | Sim, em ferramentas do jogo | — |
-| Navegação por controle XInput: setas/analógico, A, B, LB/RB e Start | Sim, sem hardware validado ainda | Não |
+| Fluxo | Qt Quick |
+|---|---|
+| Coleção, busca, filtros, favorito, adicionar/editar/excluir jogo | Sim |
+| Aparência: tema claro/escuro, densidade e escala de texto 80–150% | Sim |
+| Editar nota 0–10 e etiquetas; saúde exe/ROM no Início | Sim |
+| Jogar com provider, presets/mods já configurados e sessão rastreada | Sim |
+| Músicas locais: importar pasta, tocar, pausar, anterior/próxima, parar | Sim |
+| Fila visível, modos sequência/aleatório/repetir, volume no rodapé | Sim |
+| Progresso do player no rodapé (tempo decorrido / duração) | Sim |
+| Desejos: listar, adicionar por appid, remover, abrir Steam | Sim |
+| Desejos: preço/desconto sob demanda com cache local de 24h | Sim |
+| Torrents: progresso com recebido/total, velocidade/ETA, espaço livre, iniciar, pausar/retomar, abrir pasta | Sim |
+| SteamRip/FitGirl: pesquisar e abrir página do resultado | Sim |
+| Backup da coleção / volume global Windows | Sim |
+| Sistema: backups, registro/encerramento de sessões pendentes, últimos erros | Sim |
+| Mods, texturas HD, cheats e presets do Azahar no detalhe de cada jogo 3DS | Sim |
+| Controles: aplicar e salvar perfis; gerar mapa padrão e testar botões | Sim (leitura ao vivo; sem hardware mostra a ausência, prova física com o usuário) |
+| Atualizar emuladores | Sim, com consulta do release e confirmação expressa antes de baixar |
+| Importação avançada de jogos/ROMs, sanar/religar executáveis, UAC | Sim |
+| Arrastar pasta/arquivo para a janela abre o mesmo preview antes de importar | Sim |
+| CSV → áudio, fila de downloads de músicas, buscar capas | Sim |
+| Wishlist por JSON salvo; leitura Steam com erro explícito se endpoint indisponível | Sim |
+| Importar torrent concluído | Sim |
+| Desejo → SteamRip → baixar/importar → obtido | Sim |
+| Registrar horas manualmente nos detalhes e encerrar sessão pendente no Sistema | Sim |
+| Bibliotecas sem credencial, catálogo Spotify, download/conversão/importação de músicas | Sim |
+| Videoteca, YouTube (embutido na variante completa; link externo na essencial), reprodutores, editores e EQ por cópia | Sim |
+| Atalhos personalizados em Integrações | Sim |
+| Exportar/importar pacotes | Sim, com confirmação para restaurar saves |
+| Remoções com desfazer (jogos com capa, desejos, vídeos) via lixeira local | Sim |
+| Saves de jogo: configurar, snapshot, restaurar; screenshots | Sim |
+| Perfis Tuco/Isa, atalhos, vigia e API de leitura | Sim, em Ferramentas pessoais |
+| Letras LRCLIB, LibRetro, SponsorBlock e MP3 por URL | Sim |
+| IPS/BPS, cópia/hardlinks e uso de disco | Sim, em ferramentas do jogo |
+| Navegação por controle XInput: setas/analógico, A, B, LB/RB e Start | Sim, sem hardware validado ainda |
 
-Não se trata ainda de paridade integral: a migração visual preserva acesso
-explícito aos fluxos avançados existentes. Distribuições anteriores em `dist/`
-não são atualizadas ao editar os fontes.
+A cobertura descreve o desktop Qt Quick atual. Distribuições anteriores em
+`dist/` não são atualizadas ao editar os fontes.
 
 ### Everything opcional no Windows
 
@@ -140,7 +136,6 @@ ações explícitas do usuário.
 py -3.14 -m pip install -r codigo/ferramentas/requirements-ui.txt
 py -3.14 codigo/frontends/desktop.py
 py -3.14 codigo/frontends/desktop.py --big-picture
-py -3.14 codigo/frontends/desktop.py --classico
 py -3.14 codigo/ferramentas/testes/executar.py --modulo test_qt
 ```
 
@@ -160,7 +155,7 @@ rodar sem Qt (casos de GUI Qt são marcados como pulados).
 `codigo/ferramentas/requirements-ui.txt`. `montar_superhub.py` inclui PySide6-Essentials e
 shiboken6 6.10.2, recursos/plugins e metadados/licenças das distribuições,
 e executa o selftest do dispatcher no runtime montado. O builder exige
-essas versões no ambiente de build. Portáteis mínimos sem Qt usam tkinter.
+essas versões no ambiente de build. Sem PySide6, o desktop orienta a instalar `requirements-ui.txt` ou usar um pacote pronto.
 
 PySide6/Qt possuem licenças próprias (LGPL/GPL/comercial conforme componente);
 a licença MIT do Hub não relicencia Qt. Preserve os avisos/licenças e as
@@ -172,8 +167,8 @@ são isoladas; a prova também roda no ZIP extraído e confere SHA-256.
 
 - `qml/secoes/` contém as telas; `Main.qml` mantém o shell/diálogos comuns.
 - Mods, cheats, controles, ROMs/importação avançada, atualização de emuladores,
-  sincronização da wishlist e recuperação de executáveis permanecem no clássico,
-  acessível pelo botão existente. Não se declara paridade visual completa.
+  sincronização da wishlist e recuperação de executáveis têm fluxo próprio no
+  desktop Qt.
 - Estatísticas usam barras Qt Quick, sem exigir QtCharts na variante essencial.
   Histórico começa nas sessões novas; não são inventadas datas antigas.
 - Hardlinks compartilham mudanças com a origem; a organização não apaga a

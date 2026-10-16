@@ -5,7 +5,60 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
-Planejamento da 1.1.0 segue no roadmap da coordenação (`areas/ROADMAP.md`).
+Planejamento da 1.1.0 segue no roadmap (`docs/ROADMAP.md`). Esta rodada remove o
+modo clássico tkinter e passa a tratar o desktop Qt Quick como interface única
+no Windows; a TUI curses continua para Linux/macOS.
+
+### Adicionado
+
+- Integrações modulares: `bib_nucleo/rede/_modelo.py` é um modelo copiável de
+  provedor de rede (sem efeito colateral no import; rede só sob ação do usuário,
+  com `rede_ativa()`, timeout curto, User-Agent e cache local).
+  `docs/INTEGRACOES.md` documenta o contrato e o passo a passo em 3 passos
+  (provedor, registro, teste hermético) e `test_integracoes_modulares.py`
+  cobre 6 casos sem rede real nem instalação.
+- Campo `capacidades` no `Integracao` de `servicos_ui/integracoes.py`
+  (`busca`, `abrir`, `midia`, `download`, `emulador`, `config`), exposto como
+  lista ordenada em `apresentar()`; as 7 integrações padrão foram classificadas
+  e as personalizadas derivam do tipo + URL.
+- `docs/ROADMAP.md` como fonte de planejamento da 1.1.0.
+
+### Alterado
+
+- Desktop Qt Quick (`codigo/frontends/desktop.py`) é a única GUI no Windows;
+  `app_tui.py` (curses) atende Linux/macOS e aponta o usuário do Windows para o
+  Qt quando curses não está disponível.
+- Builders e utilitários sem referências ao modo clássico:
+  `montar_portatil.py`, `montar_mac.py`, `montar_linux.py`,
+  `montar_superhub.py`, `abrir_hub.py`, `diagnosticar.py`,
+  `provar_linux_shell.py` e `executar.py` (que agora roda Qt offscreen).
+- `BibliotecaHubMac.command` abre `codigo/frontends/desktop.py` (Qt) e o
+  instalador do Mac avisa quando falta PySide6.
+- `test_fase_a.py` passa a guardar a regressão inversa: falha se o modo clássico
+  (`app_win*.py`, `aparencia.py`) voltar ou se o frontend Qt sumir.
+- Documentação alinhada: `docs/ARQUITETURA.md`, `docs/CONTRIBUTING.md`,
+  `docs/DESKTOP_QT.md`, `docs/INDICE.md` e `docs/VISAO_OS.md`.
+- `pyproject.toml` sem os `per-file-ignores` de F401 dos testes do modo clássico.
+
+### Removido
+
+- Modo clássico tkinter: `codigo/frontends/app_win.py` e os 10 módulos
+  `app_win_*.py`, mais `aparencia.py` (tema Tk) e `despacho.py`
+  (despachante de callbacks da UI Tk). Todos os callbacks diferidos passaram a
+  ser entregues à thread da UI por sinais do bridge Qt.
+- Testes do modo clássico: `test_despacho.py`, `test_dialogo.py`,
+  `test_varredura.py` e `test_visual.py`.
+- Botão do modo clássico no QML; nenhuma ocorrência de "clássico" permanece em
+  `codigo/frontends/qml`.
+
+### Limitações conhecidas
+
+- `bib_nucleo/rede/_modelo.py` aponta para uma API de exemplo fictícia de
+  propósito: é template, não provedor vivo.
+- A lista de capacidades de cada integração é política de design (vocabulário
+  fixo), ajustável sem quebrar contrato.
+- A validação visual/Hydra-like do Qt Quick foi verificada por testes
+  offscreen; conferência em máquina com GPU real segue pendente.
 
 ## [1.0.2] — 14/10/2026
 

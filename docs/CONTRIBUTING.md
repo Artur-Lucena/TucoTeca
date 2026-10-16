@@ -5,7 +5,6 @@
 1. Use Python 3.10+ para o núcleo; o desktop principal é Qt/PySide6
    (`codigo/ferramentas/requirements-ui.txt`). `codigo/ferramentas/requirements-extras.txt` adiciona Chromium e
    QtMultimedia para a variante completa (não implementa gamepad).
-   Tk é usado pelas ferramentas clássicas.
    O desenvolvimento local Windows usa Python oficial 3.14.
 2. Abra o terminal na raiz do projeto.
 3. Execute `python codigo/ferramentas/diagnosticar.py` e a suíte abaixo.
@@ -15,7 +14,6 @@
 $env:BIBLIOTECA_HOME = Join-Path $env:TEMP "tucoteca-dev"
 py -3.14 -m pip install -e '.[dev,ui]'
 py -3.14 -B codigo/frontends/app_qt.py --selftest
-py -3.14 -B codigo/frontends/app_win.py --selftest
 py -3.14 -B -m pytest --cobertura
 py -3.14 codigo/ferramentas/testes/executar.py --json "$env:TEMP\tucoteca-testes.json"
 ```
@@ -48,14 +46,13 @@ Matriz de compatibilidade e procedimentos: [revisão Linux](REVISAO_LINUX_W11.md
 - Integração remota: `codigo/bib_nucleo/rede/`, sob `BIBLIOTECA_REDE`.
 - Recursos pessoais: `saves.py`, `preferencias_pessoais.py`, `estatisticas.py`,
   `sessoes_manuais.py`; domínios de arquivos independentes da UI.
-- GUI/TUI: `codigo/frontends/`; thread dispatch: `despacho.py`.
+- GUI/TUI: `codigo/frontends/`.
 - Desktop Qt: `app_qt.py`, `qt_bridge/` e `servicos_ui/` (pacotes com mixins
   por domínio; a superfície Qt — sinais/properties — mora em
   `qt_bridge/__init__.py`) e `qml/`.
   Instale `codigo/ferramentas/requirements-ui.txt`; arquitetura e matriz de migração em
   [DESKTOP_QT](DESKTOP_QT.md). Testes: `executar.py --modulo test_qt`.
 - Terminal Linux/macOS: `app_tui.py` + mixins `tui_*.py`.
-- Clássico Windows (congelado): `app_win.py` + mixins `app_win_*.py`.
 - Layout dos bundles: `montar_portatil.copiar_app`, usado pelos três builders.
 
 O índice detalhado está em [ARQUITETURA](ARQUITETURA.md).
@@ -71,7 +68,7 @@ O índice detalhado está em [ARQUITETURA](ARQUITETURA.md).
 - Alteração de coleção inicia com backup; substituição de arquivos finais
   usa publicação atômica quando aplicável (`arquivos.py`).
 - SQLite: conexão própria por worker; fechar em `finally`/`closing`.
-- Tk só na thread da UI. Workers usam `DespachanteUi.enviar`/`App._depois`.
+- Widgets Qt só na thread da UI; workers devolvem resultado por sinais do bridge (conexão enfileirada).
 - MCI: preparar/hash/converter fora da UI, abrir/play/status/close na thread
   dona do dispositivo. Caminhos longos usam cópia em cache temporário curto,
   nunca movem o original. Não interpretar erro de consulta como fim da faixa.
@@ -111,8 +108,8 @@ uma alteração que não passa localmente não deve ser empurrada.
 - Pytest coleta por AST e usa o mesmo subprocesso/sandbox por caso.
   `--cobertura` mede os casos, não só o coletor; HTML/JSON em `.provas/cobertura/`.
 - Lint: `ruff check codigo conftest.py` está limpo (0 achados desde a revisão
-  R4). As exceções (`E402`, `F403`, `F401` em testes de tkinter) estão
-  declaradas em `pyproject.toml` com justificativa, não escondidas no diff.
+  R4). As exceções (`E402`, `F403`) estão declaradas em `pyproject.toml` com
+  justificativa, não escondidas no diff.
 - Tipos: `mypy` cobre hoje `codigo/ferramentas` (builders) em modo gradual —
   `[tool.mypy]` no `pyproject.toml`; o `validar.py` roda o passo quando
   `.provas/venv-tipos` ou o PATH tiverem mypy e pula (sem falhar) quando
@@ -123,7 +120,7 @@ uma alteração que não passa localmente não deve ser empurrada.
   ou um proxy `os` no módulo-alvo; trocar `os.name` global altera `pathlib`.
 - Prova opcional de shell isolada: `python codigo/ferramentas/provar_linux_shell.py`.
   No Windows usa Git Bash; `--ffmpeg` valida os seis presets com WAV sintético.
-- Testes de GUI usam root oculto e pulam sem Tk/display.
+- Testes de GUI Qt usam plataforma offscreen e pulam sem Qt/display.
 - Não execute jogos nem áudio real pela suíte; provas manuais ficam fora
   dos testes herméticos e devem descrever SO, duração e resultado.
 - Preserve os ramos Linux/macOS; casos Mac simulados não substituem um Mac real.
@@ -152,16 +149,14 @@ Lint: `ruff check codigo conftest.py` completo está **limpo** (revisão R4).
 O gate crítico continua como exigência mínima:
 `ruff check codigo conftest.py --select E9,F63,F7,F82`.
 
-Três exceções estão declaradas em `pyproject.toml`, com justificativa no
+Duas exceções estão declaradas em `pyproject.toml`, com justificativa no
 próprio arquivo — nenhuma regra foi silenciada sem registrar o motivo:
 
 - `E402`: imports no meio do arquivo quebram ciclos de importação de propósito
   (`banco`↔`banco_desejos`, `scans`↔`scans_hydra`, `emuladores`↔
   `sessoes_manuais`, `musicas`↔`rede.metadados`, `baixar`↔`rede.binarios`);
 - `F403` em `bib_core.py`: a fachada reexporta a API via `__all__` de cada
-  módulo justamente para preservar consumidores antigos;
-- `F401` em testes de tkinter: o import é a prova de disponibilidade do
-  módulo (`try: import tkinter`), não código morto.
+  módulo justamente para preservar consumidores antigos.
 
 Um `--fix` automático não é neutro: `F841` remove ligações locais, `I001`
 reordena imports e `F401` apaga imports usados só em tipos anotados. Rode a
