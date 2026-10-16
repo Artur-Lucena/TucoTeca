@@ -2,6 +2,7 @@
 
 A TUI curses (app_tui.py) continua disponível para Linux/macOS. O modo
 clássico (janela Tk) foi removido; as flags antigas degradam com aviso.
+`--jogar BUSCA` abre um jogo sem a janela (atalhos do Desktop).
 """
 from __future__ import annotations
 
@@ -24,6 +25,16 @@ _MENSAGEM_SEM_QT = (
     "py -3.14 -m pip install -r codigo/ferramentas/requirements-ui.txt — "
     "ou use um pacote pronto. Em Linux/macOS, o TUI continua: ./BibliotecaHub.sh"
 )
+
+
+def _valor(args: list[str], nome: str):
+    """Valor de `--nome VALOR` ou `--nome=VALOR` na lista (ou None)."""
+    for i, arg in enumerate(args):
+        if arg == nome and i + 1 < len(args):
+            return args[i + 1]
+        if arg.startswith(nome + "="):
+            return arg.split("=", 1)[1]
+    return None
 
 
 def _sem_flags_legadas(args: list[str]) -> tuple[list[str], bool]:
@@ -52,6 +63,10 @@ def _sem_flags_legadas(args: list[str]) -> tuple[list[str], bool]:
 
 def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
+    busca = _valor(args, "--jogar")
+    if busca is not None:
+        from atalho_jogo import abrir
+        return abrir(busca, db=_valor(args, "--db"))
     args, removeu = _sem_flags_legadas(args)
     if removeu:
         print(_AVISO_LEGADO, file=sys.stderr)
