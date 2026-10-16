@@ -126,7 +126,7 @@ def incluir_componentes(raiz: Path) -> dict:
     sys.path.insert(0, str(REPO / "codigo"))
     from bib_nucleo import baixar, emuladores, repacks
     from bib_nucleo.ferramentas import localizar_ferramenta
-    componentes = {}
+    componentes: dict[str, dict] = {}
     gpl = MP.garantir_gpl()
     az = emuladores.default_emu_3ds()
     dm = emuladores.default_emu_nds()
@@ -233,7 +233,7 @@ def incluir_qt(raiz: Path, extras="essencial"):
         for arquivo in dist.files or []:
             if ".." in arquivo.parts or "__pycache__" in arquivo.parts or arquivo.suffix == ".pyc":
                 continue
-            origem = Path(dist.locate_file(arquivo))
+            origem = Path(str(dist.locate_file(arquivo)))
             if origem.is_file():
                 destino = raiz / "python/Lib" / str(arquivo)
                 destino.parent.mkdir(parents=True, exist_ok=True)
@@ -391,9 +391,9 @@ def validar_runtime(raiz: Path, extras="essencial") -> dict:
             w.writeframes(b"\0" * 44100)
         mp3 = Path(tmp) / "audio.mp3"
         ff = raiz / "ferramentas/ffmpeg/ffmpeg.exe"
-        r = subprocess.run([str(ff), "-v", "error", "-y", "-i", str(wav), "-codec:a", "libmp3lame", str(mp3)],
-                           env=env, capture_output=True, timeout=30)
-        if r.returncode or not mp3.is_file():
+        rf = subprocess.run([str(ff), "-v", "error", "-y", "-i", str(wav), "-codec:a", "libmp3lame", str(mp3)],
+                            env=env, capture_output=True, timeout=30)
+        if rf.returncode or not mp3.is_file():
             raise ValueError("conversão MP3 não funcionou no FFmpeg empacotado")
         resultados["audio-mp3"] = {"bytes": mp3.stat().st_size, "ok": True}
         env["BIBLIOTECA_QBIT_PROFILE"] = str(Path(tmp) / "perfis")

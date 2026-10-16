@@ -202,6 +202,7 @@ def empacotar_mac(build: Path, data: str, leve: bool = False) -> tuple[Path, Pat
     if leve:
         print("[aviso] mac leve: sem Python/emuladores (baixa pelo ⬇ no Mac)")
     else:
+        assert cache is not None  # leve=False sempre passa por garantir_mac()
         for nome in MAC_NAVIO:
             shutil.copy2(cache / nome, pasta / nome)
     inst = pasta / "Instalar-Mac.command"

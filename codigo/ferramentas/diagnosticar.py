@@ -20,7 +20,8 @@ from empacotar_fontes import REPO, listar_fontes
 
 
 def resumo_fontes(repo: Path = REPO) -> dict:
-    grupos = collections.defaultdict(lambda: {"arquivos": 0, "bytes": 0, "linhas_python": 0})
+    grupos: dict[str, dict[str, int]] = collections.defaultdict(
+        lambda: {"arquivos": 0, "bytes": 0, "linhas_python": 0})
     erros = []
     testes = total_py = 0
     for arq in listar_fontes(repo):

@@ -150,9 +150,9 @@ def provar(bash: str, ffmpeg=False) -> dict:
             antes = src.read_bytes()
             with patch.object(base, "MUSICAS_DIR", tmp / "equalizados"):
                 for preset in EQ.PRESETS_EQ:
-                    r = EQ.aplicar_eq(str(src), preset, ffmpeg=exe)
-                    assert r["ok"], r
-                    with wave.open(r["path"], "rb") as w:
+                    res = EQ.aplicar_eq(str(src), preset, ffmpeg=exe)
+                    assert res["ok"], res
+                    with wave.open(res["path"], "rb") as w:
                         assert w.getnframes() > 0 and 2.8 <= w.getnframes() / w.getframerate() <= 3.2
                 assert src.read_bytes() == antes
             provas.append("6 presets EQ com FFmpeg real, WAV válido e original intacto")

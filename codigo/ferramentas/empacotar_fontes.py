@@ -11,6 +11,7 @@ import stat
 import sys
 import zipfile
 from pathlib import Path
+from typing import Any
 
 REPO = Path(__file__).resolve().parents[2]
 IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git", ".provas",
@@ -59,7 +60,7 @@ def empacotar_fontes(destino: Path, repo: Path = REPO, revisao: str | None = Non
     # Empacotar não deve executar módulos da árvore de entrada.
     sys.path.insert(0, str(REPO / "codigo"))
     from bib_nucleo.arquivos import destino_temporario
-    manifesto = {"esquema": 1, "projeto": "TucoTeca", "origem": "árvore de trabalho",
+    manifesto: dict[str, Any] = {"esquema": 1, "projeto": "TucoTeca", "origem": "árvore de trabalho",
                   "gerado_em": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   "arquivos": {}}
     if (repo / "VERSION").is_file():

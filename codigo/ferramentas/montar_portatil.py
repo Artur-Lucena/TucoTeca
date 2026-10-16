@@ -209,8 +209,10 @@ def _extrair_lib(tgz: Path, marcador: str, destino: Path) -> None:
             if ".." in nome.split("/") or nome.startswith("/"):
                 continue
             if nome.split("/")[-1] == "license.terms" and nome.count("/") == 1:
-                (destino.parent / f"LICENSE-{destino.name}.txt").write_bytes(
-                    t.extractfile(m).read())
+                fluxo = t.extractfile(m)
+                if fluxo is not None:
+                    (destino.parent / f"LICENSE-{destino.name}.txt").write_bytes(
+                        fluxo.read())
                 continue
             idx = nome.find("/library/")
             if idx < 0:
@@ -223,9 +225,11 @@ def _extrair_lib(tgz: Path, marcador: str, destino: Path) -> None:
                 dest.mkdir(parents=True, exist_ok=True)
             elif m.isfile():
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                with t.extractfile(m) as fh:
-                    dest.write_bytes(fh.read())
-                achou = True
+                fh = t.extractfile(m)
+                if fh is not None:
+                    with fh:
+                        dest.write_bytes(fh.read())
+                    achou = True
     if not achou:
         raise LookupError(f"sem {marcador} em {tgz.name}")
 

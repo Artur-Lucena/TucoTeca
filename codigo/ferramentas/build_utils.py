@@ -89,7 +89,9 @@ def escrever_tarxz(
             for membro in t.getmembers():
                 if membro.isfile():
                     try:
-                        t.extractfile(membro).read(1)
+                        fluxo = t.extractfile(membro)
+                        if fluxo is not None:  # None só p/ membro não-regular
+                            fluxo.read(1)
                     except Exception as e:
                         raise ValueError(f"tar.xz gerado está corrompido: {saida} ({e})")
 
@@ -155,12 +157,13 @@ def baixar_verificado(
 if __name__ == "__main__":
     import tempfile
     from pathlib import Path
-    # smoke test rápido
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        (tmp / "a.txt").write_text("hello")
-        (tmp / "sub").mkdir()
-        (tmp / "sub" / "b.txt").write_text("world")
-        saida = tmp.parent / "teste.tar.xz"
-        escrever_tarxz(tmp, saida, verificar=True)
-        print("smoke OK:", saida, sha_arquivo(saida)[:16])
+    # smoke test rápido (escreve e valida num sandbox próprio, sem lixo fora)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        base = Path(tmp_dir)
+        raiz = base / "raiz"
+        (raiz / "sub").mkdir(parents=True)
+        (raiz / "a.txt").write_text("hello")
+        (raiz / "sub" / "b.txt").write_text("world")
+        saida = base / "dist" / "teste.tar.xz"
+        escrever_tarxz(raiz, saida, verificar=True)
+        print("smoke OK:", saida.name, sha_arquivo(saida)[:16])
