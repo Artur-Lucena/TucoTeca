@@ -62,7 +62,6 @@ def main(argv=None):
         if not engine.rootObjects():
             return 1
         window = engine.rootObjects()[0]
-        bridge.pedirClassico.connect(lambda: app.exit(42))
         if args.big_picture:
             window.toggleImmersive()
         bridge.atualizar()

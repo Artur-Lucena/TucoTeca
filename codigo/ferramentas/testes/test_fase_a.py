@@ -110,14 +110,15 @@ def teste_log_erro_anexa():
         afirmar(len(txt.strip().splitlines()) == 2, txt)
 
 
-def teste_sem_lambda_e_morta():
-    """Regressão: nenhum callback diferido pode referenciar `e` do except."""
+def teste_modo_classico_removido_e_qt_presente():
+    """Regressão: o modo clássico tkinter foi removido e não pode voltar."""
     base = REPO / "codigo/frontends"
-    src = "\n".join(
-        (base / f).read_text(encoding="utf-8")
-        for f in ["app_win.py", *[p.name for p in sorted(base.glob("app_win_*.py"))]])
-    afirmar("lambda: falhou(e)" not in src, "padrão NameError reintroduzido")
-    afirmar("m=msg_erro" in src, "captura por string ausente")
+    legados = sorted(p.name for p in base.glob("app_win*.py"))
+    afirmar(not legados, f"modo clássico reintroduzido: {legados}")
+    afirmar(not (base / "aparencia.py").exists(),
+            "tema Tk (aparencia.py) reintroduzido")
+    afirmar((base / "desktop.py").is_file() and (base / "app_qt.py").is_file(),
+            "frontend Qt (desktop.py/app_qt.py) ausente")
 
 
 def teste_sessao_manual_usa_banco_explicitado_e_preserva_invalida():

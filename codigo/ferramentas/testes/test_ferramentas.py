@@ -17,7 +17,7 @@ import empacotar_fontes as FONTES
 def teste_pacote_fontes_exclui_dados_e_inclui_arvore_atual():
     tmp = Path(tempfile.mkdtemp(prefix="suite-fontes-"))
     repo = tmp / "repo"
-    for nome in ("codigo/bib_core.py", "codigo/bib_nucleo/volume.py", "codigo/frontends/despacho.py",
+    for nome in ("codigo/bib_core.py", "codigo/bib_nucleo/volume.py", "codigo/frontends/desktop.py",
                  "docs/ARQUITETURA.md", "dados/biblioteca.db", "dist/antigo.zip",
                  "codigo/historico/antigo.py", "codigo/ferramentas/.cache/segredo.py",
                  "codigo/__pycache__/x.pyc"):

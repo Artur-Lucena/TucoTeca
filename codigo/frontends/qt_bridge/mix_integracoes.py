@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Ponte Qt: integracoes, abrir destinos e troca de interface."""
+"""Ponte Qt: integracoes e abrir destinos."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -79,13 +79,6 @@ class MixIntegracoes:
             return
         if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(p if p.is_dir() else p.parent))):
             self.aviso.emit("Não foi possível abrir a pasta.", True)
-
-    @Slot()
-    def classico(self):
-        if self.ocupado or self._em_jogo:
-            self.aviso.emit("Aguarde a operação ou sessão atual antes de trocar de interface.", False)
-        else:
-            self.pedirClassico.emit()
 
 
 __all__ = ["MixIntegracoes"]

@@ -15,9 +15,6 @@ def preparar():
     arq = runtime / "manifesto-runtime.json"
     if arq.is_file():
         d = json.loads(arq.read_text(encoding="utf-8"))
-        serie = d["versoes"]["serie_tk"]
-        os.environ["TCL_LIBRARY"] = str(runtime / "python/tcl" / ("tcl" + serie))
-        os.environ["TK_LIBRARY"] = str(runtime / "python/tcl" / ("tk" + serie))
         variaveis = {"7z": "BIBLIOTECA_7Z", "ffmpeg": "BIBLIOTECA_FFMPEG",
                      "ytdlp": "BIBLIOTECA_YTDLP", "quickjs": "BIBLIOTECA_QUICKJS",
                      "qbittorrent": "BIBLIOTECA_QBITTORRENT"}

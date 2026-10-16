@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Monta o HUB portátil Windows: Python embutido + tkinter + app, tudo num .zip.
+Monta o HUB portátil Windows: Python embutido + app, tudo num .zip.
 
     python codigo/ferramentas/montar_portatil.py [--sem-azahar]
 
@@ -16,11 +16,12 @@ Layout do portátil:
     BibliotecaHub.bat      abre a GUI sem console (pythonw)
     Debug-Console.bat      abre com console (ver erros)
     README-PORTATIL.txt
-    app/                   bib_core.py, app_win.py, app_tui.py, README.md
-    python/                Python embutido + tkinter transplantado
+    app/                   bib_core.py, desktop.py, app_qt.py, app_tui.py, README.md
+    python/                Python embutido (sem Tcl/Tk; a GUI Qt não vem aqui)
     dados/                 casa (db, backups, capas, presets, sessoes) via BIBLIOTECA_HOME
 
-Só roda no Windows (o tkinter vem da instalação local).
+Só roda no Windows. A interface gráfica Qt depende do pacote superhub
+(PySide6); sem ele, este portátil fica sem GUI.
 """
 from __future__ import annotations
 
@@ -45,10 +46,7 @@ BUILD = Path(__file__).resolve().parent / ".build" / "hub"
 DIST = REPO / "dist"
 APP_ARQS = (("README.md", "README.md"),
              ("codigo/bib_core.py", "bib_core.py"),
-             ("codigo/frontends/app_win.py", "app_win.py"),
               ("codigo/frontends/app_tui.py", "app_tui.py"),
-               ("codigo/frontends/aparencia.py", "aparencia.py"),
-               ("codigo/frontends/despacho.py", "despacho.py"),
                ("codigo/frontends/desktop.py", "desktop.py"),
                ("codigo/frontends/app_qt.py", "app_qt.py"),
                 ("codigo/frontends/navegacao_controle.py", "navegacao_controle.py"),
@@ -61,15 +59,6 @@ APP_ARQS = (("README.md", "README.md"),
                 ("codigo/ferramentas/provar_qbit_runtime.py", "provar_qbit_runtime.py"),
 
                  ("codigo/frontends/late.py", "late.py"),
-                 ("codigo/frontends/app_win_base.py", "app_win_base.py"),
-                 ("codigo/frontends/app_win_jogos.py", "app_win_jogos.py"),
-                 ("codigo/frontends/app_win_musica.py", "app_win_musica.py"),
-                 ("codigo/frontends/app_win_downloads.py", "app_win_downloads.py"),
-                 ("codigo/frontends/app_win_desejos.py", "app_win_desejos.py"),
-                 ("codigo/frontends/app_win_dialogos.py", "app_win_dialogos.py"),
-                 ("codigo/frontends/app_win_scans.py", "app_win_scans.py"),
-                 ("codigo/frontends/app_win_sistema.py", "app_win_sistema.py"),
-                 ("codigo/frontends/app_win_midia.py", "app_win_midia.py"),
                  ("codigo/frontends/tui_base.py", "tui_base.py"),
                  ("codigo/frontends/tui_jogo.py", "tui_jogo.py"),
                  ("codigo/frontends/tui_menus.py", "tui_menus.py"),
@@ -103,8 +92,6 @@ set BIBLIOTECA_HOME=%~dp0
 if exist "%~dp0dados\\dados\\biblioteca.db" set BIBLIOTECA_HOME=%~dp0dados
 set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
-set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
-set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
 start "BibliotecaHub" "%~dp0python\\pythonw.exe" "%~dp0app\\desktop.py" %*
 """
 
@@ -114,8 +101,6 @@ set BIBLIOTECA_HOME=%~dp0
 if exist "%~dp0dados\\dados\\biblioteca.db" set BIBLIOTECA_HOME=%~dp0dados
 set BIBLIOTECA_AZAHAR_DIR=%~dp0emuladores\\Azahar
 set BIBLIOTECA_DESMUME_DIR=%~dp0emuladores\\DeSmuME
-set TCL_LIBRARY=%~dp0python\\tcl\\tcl{serie}
-set TK_LIBRARY=%~dp0python\\tcl\\tk{serie}
 "%~dp0python\\python.exe" "%~dp0app\\desktop.py" %*
 if errorlevel 1 pause
 """
@@ -130,6 +115,10 @@ pause
 """
 
 LEIAME_PORTATIL = """TUCOTECA (portatil Windows) — sem instalar nada.
+
+IMPORTANTE: a interface grafica (Qt Quick / PySide6) so acompanha o pacote
+TucoTeca SuperHub; este portatil leve traz o app e o nucleo, sem GUI. Para a
+janela grafica no Windows, use o pacote SuperHub.
 
 COMO USAR
 1. Extraia esta pasta onde quiser (inclusive pendrive).
@@ -167,118 +156,6 @@ def baixar(url: str, destino: Path, minimo: int = 10_000_000) -> None:
     with urllib.request.urlopen(req, timeout=120) as r, open(destino, "wb") as f:
         shutil.copyfileobj(r, f, 1024 * 256)
     print(f"[ok] {destino.stat().st_size // 1048576} MB")
-
-
-def transplantar_tkinter(py_dir: Path) -> None:
-    """Copia _tkinter + DLLs Tcl/Tk da instalação local p/ o Python embutido.
-
-    (Os scripts tcl/tk vêm do fonte oficial em garantir_tcl_scripts, pois
-    esta instalação embute o Tcl em zipfs — não há pasta tcl/ para copiar.)
-    """
-    base = Path(sys.base_prefix)
-    pyd = base / "DLLs" / "_tkinter.pyd"
-    if not pyd.is_file():
-        raise SystemExit("esta instalação não tem _tkinter (reinstale o Python com Tcl/Tk).")
-    shutil.copy2(pyd, py_dir / "_tkinter.pyd")
-    dlls = sorted((base / "DLLs").glob("tcl*.dll")) + sorted((base / "DLLs").glob("tk*.dll"))
-    if not dlls:
-        raise SystemExit("DLLs tcl/tk não achadas em DLLs/.")
-    for d in dlls:
-        shutil.copy2(d, py_dir / d.name)
-    # Tcl 9 linka dinâmico: bignum (tommath) + zipfs (zlib). Sem elas,
-    # _tkinter falha com "módulo especificado não encontrado".
-    extras = sorted((base / "DLLs").glob("libtommath*.dll")) \
-        + sorted((base / "DLLs").glob("zlib*.dll"))
-    for d in extras:
-        shutil.copy2(d, py_dir / d.name)
-    tk_src = base / "Lib" / "tkinter"
-    if not (tk_src / "__init__.py").is_file():
-        raise SystemExit("Lib/tkinter ausente na instalação.")
-    shutil.copytree(tk_src, py_dir / "Lib" / "tkinter", dirs_exist_ok=True)
-    print(f"[ok] tkinter: {pyd.name} + {len(dlls)} dll(s) tcl/tk "
-          f"+ {len(extras)} dep(s) + Lib/tkinter")
-
-
-def _extrair_lib(tgz: Path, marcador: str, destino: Path) -> None:
-    """Extrai só */library/** do tarball fossil (trava anti-traversal)."""
-    import tarfile
-    achou = False
-    with tarfile.open(tgz, "r:gz") as t:
-        for m in t.getmembers():
-            nome = m.name.replace("\\", "/")
-            if ".." in nome.split("/") or nome.startswith("/"):
-                continue
-            if nome.split("/")[-1] == "license.terms" and nome.count("/") == 1:
-                fluxo = t.extractfile(m)
-                if fluxo is not None:
-                    (destino.parent / f"LICENSE-{destino.name}.txt").write_bytes(
-                        fluxo.read())
-                continue
-            idx = nome.find("/library/")
-            if idx < 0:
-                continue
-            rel = nome[idx + len("/library/"):]
-            if not rel:
-                continue
-            dest = destino / rel
-            if m.isdir():
-                dest.mkdir(parents=True, exist_ok=True)
-            elif m.isfile():
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                fh = t.extractfile(m)
-                if fh is not None:
-                    with fh:
-                        dest.write_bytes(fh.read())
-                    achou = True
-    if not achou:
-        raise LookupError(f"sem {marcador} em {tgz.name}")
-
-
-def garantir_tcl_scripts(py_dir: Path) -> str:
-    """Scripts Tcl/Tk (BSD) do fonte oficial (fossil core.tcl-lang.org).
-
-    Mesmo minor das DLLs locais; scripts valem dentro do minor, então tenta
-    os patches do mais novo ao .0. Retorna a série ("9.0").
-    """
-    import re
-    dll = next((Path(sys.base_prefix) / "DLLs").glob("tcl*.dll"), None)
-    m = re.search(r"tcl(\d)(\d+)", dll.stem) if dll else None
-    if not m:
-        raise SystemExit("não deu p/ ler a versão do Tcl local.")
-    serie = f"{m.group(1)}.{m.group(2)}"  # ex.: 9.0
-    tagbase = f"core-{serie.replace('.', '-')}"  # ex.: core-9-0
-    tcl_dir = py_dir / "tcl"
-    # Build repetido/offline: aproveitar primeiro o par oficial já em cache.
-    for tk_cache in sorted(CACHE.glob(f"tk-{tagbase}-*.tar.gz"), reverse=True):
-        tag = tk_cache.name[len("tk-"):-len(".tar.gz")]
-        tcl_cache = CACHE / f"tcl-{tag}.tar.gz"
-        if not tcl_cache.is_file():
-            continue
-        try:
-            _extrair_lib(tcl_cache, "library/init.tcl", tcl_dir / f"tcl{serie}")
-            _extrair_lib(tk_cache, "library/tk.tcl", tcl_dir / f"tk{serie}")
-            print(f"[cache] scripts Tcl/Tk {tag}")
-            return serie
-        except (OSError, ValueError, LookupError):
-            continue
-    for pt in ("9", "8", "7", "6", "5", "4", "3", "2", "1", "0"):
-        tag = f"{tagbase}-{pt}"
-        try:
-            for proj, marcador, pasta in (
-                    ("tcl", "library/init.tcl", f"tcl{serie}"),
-                    ("tk", "library/tk.tcl", f"tk{serie}")):
-                tgz = CACHE / f"{proj}-{tag}.tar.gz"
-                baixar(f"https://core.tcl-lang.org/{proj}/tarball/{tag}/{proj}.tar.gz",
-                       tgz, minimo=1_000_000)
-                _extrair_lib(tgz, marcador, tcl_dir / pasta)
-            if ((tcl_dir / f"tcl{serie}" / "init.tcl").is_file()
-                    and (tcl_dir / f"tk{serie}" / "tk.tcl").is_file()):
-                print(f"[ok] scripts Tcl/Tk {tag} (fonte oficial, BSD)")
-                return serie
-        except Exception as e:
-            print(f"[tentar outra] {tag}: {str(e)[-160:]}")
-            continue
-    raise SystemExit("não consegui os scripts Tcl/Tk do fonte oficial.")
 
 
 AZAHAR_USER_INCLUIR = ("config", "cheats", "sdmc", "states", "load")
@@ -534,8 +411,8 @@ def compilar_setup(iss: Path, build: Path, versao: str) -> Path:
 def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
     """Monta a árvore BUILD (portátil) e retorna (pasta, versões).
 
-    As provas reais (tkinter no embutido + selftest + overrides) rodam
-    aqui — todo empacotamento posterior (zip, tar.xz, setup) reaproveita.
+    As provas reais (app importável no embutido + overrides) rodam aqui —
+    todo empacotamento posterior (zip, tar.xz, setup) reaproveita.
     """
     if os.name != "nt":
         raise SystemExit("o portátil Windows só é montado no Windows.")
@@ -544,7 +421,7 @@ def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
     nodot = f"{vi.major}{vi.minor}"
     url = (f"https://www.python.org/ftp/python/{versao}/"
            f"python-{versao}-embed-amd64.zip")
-    print(f"[hub] Python {versao} (igual ao que monta, p/ o tkinter casar)")
+    print(f"[hub] Python {versao} (igual ao que monta)")
     CACHE.mkdir(parents=True, exist_ok=True)
     emb = CACHE / f"python-{versao}-embed-amd64.zip"
     try:
@@ -559,15 +436,13 @@ def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
     py_dir.mkdir(parents=True)
     with zipfile.ZipFile(emb) as z:
         z.extractall(py_dir)
-    transplantar_tkinter(py_dir)
-    serie = garantir_tcl_scripts(py_dir)
     (py_dir / f"python{nodot}._pth").write_text(
         f"python{nodot}.zip\n.\nLib\n../app\n", encoding="utf-8")
 
     copiar_app(app_dir, repo=REPO)
-    (BUILD / "BibliotecaHub.bat").write_text(BAT_GUI.format(serie=serie), encoding="utf-8")
-    (BUILD / "TucoTeca.bat").write_text(BAT_GUI.format(serie=serie), encoding="utf-8")
-    (BUILD / "Debug-Console.bat").write_text(BAT_DEBUG.format(serie=serie), encoding="utf-8")
+    (BUILD / "BibliotecaHub.bat").write_text(BAT_GUI, encoding="utf-8")
+    (BUILD / "TucoTeca.bat").write_text(BAT_GUI, encoding="utf-8")
+    (BUILD / "Debug-Console.bat").write_text(BAT_DEBUG, encoding="utf-8")
     (BUILD / "Criar-Atalho.bat").write_text(BAT_ATALHO, encoding="utf-8")
     (BUILD / "README-PORTATIL.txt").write_text(LEIAME_PORTATIL, encoding="utf-8")
     for sub in ("dados", "dados/backups", "dados/capas", "dados/presets", "dados/sessoes"):
@@ -585,24 +460,19 @@ def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
         + "DeSmuME: " + (desmume_ver or "ausente (--sem-azahar)") + "\n",
         encoding="utf-8")
 
-    # prova real: o python embutido importa tkinter e monta a UI oculta
+    # prova sem UI: o python embutido importa o app, o núcleo e os serviços
     py = py_dir / "python.exe"
     env = dict(os.environ)
     prova_contexto = tempfile.TemporaryDirectory(prefix="hub-prova-", dir=CACHE)
     prova_home = Path(prova_contexto.name)
     env["BIBLIOTECA_HOME"] = str(prova_home)
-    env["TCL_LIBRARY"] = str(py_dir / "tcl" / f"tcl{serie}")
-    env["TK_LIBRARY"] = str(py_dir / "tcl" / f"tk{serie}")
-    r = subprocess.run([str(py), "-B", "-c",
-                        "import tkinter; print('tk', tkinter.TkVersion)"],
-                        capture_output=True, text=True, timeout=60, env=env)
+    r = subprocess.run(
+        [str(py), "-B", "-c",
+         "import bib_core as c; from servicos_ui import ServicoBiblioteca; "
+         "print('app e serviços OK:', c.HOME_DIR.name)"],
+        capture_output=True, text=True, timeout=120, env=env)
     if r.returncode != 0:
-        raise SystemExit(f"tkinter não subiu no embutido:\n{r.stderr[-2000:]}")
-    print(f"[ok] {r.stdout.strip()} no Python embutido")
-    r = subprocess.run([str(py), "-B", str(app_dir / "app_win.py"), "--selftest"],
-                       capture_output=True, text=True, timeout=120, env=env)
-    if r.returncode != 0 or "[ok] selftest" not in r.stdout:
-        raise SystemExit(f"selftest falhou no portátil:\n{r.stdout[-1500:]}\n{r.stderr[-1500:]}")
+        raise SystemExit(f"app não subiu no embutido:\n{r.stderr[-2000:]}")
     print(f"[ok] {r.stdout.strip()} (casa de prova: {prova_home.name}/)")
     if not (app_dir / "bib_nucleo" / "__init__.py").is_file():
         raise SystemExit("app/ sem bib_nucleo (shim bib_core.py não resolve).")
@@ -649,7 +519,7 @@ def montar_base(sem_azahar: bool = False) -> tuple[Path, dict]:
         print("[ok] BIBLIOTECA_DESMUME_DIR resolve o embutido")
 
     podar_dieta(BUILD)
-    versoes = {"python": versao, "serie_tk": serie, "azahar": azahar_ver,
+    versoes = {"python": versao, "azahar": azahar_ver,
                "desmume": desmume_ver,
                "data": datetime.date.today().strftime("%Y%m%d"),
                "magro": sem_azahar}

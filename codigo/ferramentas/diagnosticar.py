@@ -75,8 +75,7 @@ def diagnosticar(repo: Path = REPO, db: Path | None = None) -> dict:
     import bib_core as core
     fonte = resumo_fontes(repo)
     ausentes = [n for n in core.__all__ if not hasattr(core, n)]
-    deps = {"tkinter": importlib.util.find_spec("tkinter") is not None,
-            "pillow_opcional": importlib.util.find_spec("PIL") is not None,
+    deps = {"pillow_opcional": importlib.util.find_spec("PIL") is not None,
             "ffmpeg": bool(core.ffmpeg_pronto()), "yt-dlp": bool(core.ytdlp_pronto()),
             "7z": core.ferramenta_7z() is not None,
             "azahar": bool(core.default_emu_3ds()), "desmume": bool(core.default_emu_nds())}

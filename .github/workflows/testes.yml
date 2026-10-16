@@ -110,7 +110,7 @@ jobs:
           sh -n dist/mac/Instalar-Mac.command
           tar -tJf "$payload" > "$RUNNER_TEMP/payload.txt"
           grep -qx 'tucoteca/BibliotecaHubMac.command' "$RUNNER_TEMP/payload.txt"
-          grep -qx 'tucoteca/app/app_win.py' "$RUNNER_TEMP/payload.txt"
+          grep -qx 'tucoteca/app/desktop.py' "$RUNNER_TEMP/payload.txt"
           grep -qx 'tucoteca/app/navegacao_controle.py' "$RUNNER_TEMP/payload.txt"
           grep -qx 'tucoteca/app/qt_emulacao.py' "$RUNNER_TEMP/payload.txt"
           if grep -E '^tucoteca/dados/.+[^/]$' "$RUNNER_TEMP/payload.txt"; then

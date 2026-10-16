@@ -42,7 +42,7 @@ Extraia toda a pasta e abra TucoTeca.bat (BibliotecaHub.bat é alias legado). N�
 emuladores ou ferramentas no Windows. Tudo usa os caminhos desta pasta.
 
 app/          fontes Python locais, editáveis
-python/       Python + Tk + suporte de imagem
+python/       Python + suporte de imagem
 ferramentas/  7-Zip, FFmpeg, yt-dlp, QuickJS-NG e qBittorrent
 emuladores/   Azahar e DeSmuME com perfis novos
 dados/        sua coleção e perfis; criada/usada localmente
@@ -324,9 +324,6 @@ def validar_runtime(raiz: Path, extras="essencial") -> dict:
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     if extras == "completo":
         env["TUCOTECA_EXTRAS"] = "completo"
-    serie = json.loads((raiz / "manifesto-runtime.json").read_text(encoding="utf-8"))["versoes"]["serie_tk"]
-    env["TCL_LIBRARY"] = str(raiz / "python/tcl" / ("tcl" + serie))
-    env["TK_LIBRARY"] = str(raiz / "python/tcl" / ("tk" + serie))
     resultados = {}
     manifesto = json.loads((raiz / "manifesto-runtime.json").read_text(encoding="utf-8"))
     if manifesto["versoes"].get("extras") != extras:
@@ -358,12 +355,11 @@ def validar_runtime(raiz: Path, extras="essencial") -> dict:
                   "from importlib.util import find_spec; "
                   f"assert (find_spec('PySide6.QtWebEngineQuick') is not None)=={extras == 'completo'}; "
                   f"assert (find_spec('PySide6.QtMultimedia') is not None)=={extras == 'completo'}; "
-                  "from PIL import Image, ImageTk; import tkinter as tk; "
+                  "from PIL import Image; "
                   "im=Image.new('RGB',(16,16),'red'); im.save('prova.jpg'); "
                   "im2=Image.open('prova.jpg'); assert im2.size==(16,16); "
-                  "r=tk.Tk(); foto=ImageTk.PhotoImage(im2, master=r); r.destroy(); "
-                  "print('runtime local OK; JPEG e PhotoImage OK')")
-        comandos = {"python-tk-pillow": [str(py), "-c", script],
+                  "print('runtime local OK; JPEG OK')")
+        comandos = {"python-pillow": [str(py), "-c", script],
                     "ffmpeg": [str(raiz / "ferramentas/ffmpeg/ffmpeg.exe"), "-version"],
                     "7zip": [str(raiz / "ferramentas/7zip/7z.exe"), "i"],
                     "ytdlp": [str(py), str(raiz / "ferramentas/yt-dlp/yt-dlp.pyz"), "--version"],

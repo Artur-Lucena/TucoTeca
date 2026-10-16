@@ -39,11 +39,11 @@ os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
 
 
 def fundo_segundo_plano():
-    """Garante o modo sem janela antes de importar/criar Qt ou Tk.
+    """Garante o modo sem janela antes de importar/criar o Qt.
 
-    Chamar no início de qualquer helper que crie QGuiApplication/QApplication
-    ou tk.Tk: o Qt lê QT_QPA_PLATFORM ao instanciar o aplicativo, então o
-    default precisa existir antes do primeiro import que o consulte.
+    Chamar no início de qualquer helper que crie QGuiApplication/QApplication:
+    o Qt lê QT_QPA_PLATFORM ao instanciar o aplicativo, então o default
+    precisa existir antes do primeiro import que o consulte.
     """
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("QT_QUICK_BACKEND", "software")
@@ -53,42 +53,6 @@ def fundo_segundo_plano():
 def afirmar(cond, msg=""):
     if not cond:
         raise AssertionError(msg or "afirmação falhou")
-
-
-def _sem_tela():
-    """Stub dos diálogos modais para a suíte nunca pedir clique na tela.
-
-    A janela some, a decisão do caso continua nas afirmações: falha real
-    segue falhando honestamente. Chamada inesperada vira linha `[sem-tela]`
-    na saída (sem as palavras que o runner lê como pulo). Testes que
-    esperam um diálogo instalam o próprio stub depois — o deles vence.
-    """
-    try:
-        from tkinter import filedialog, messagebox, simpledialog
-    except ImportError:
-        return
-
-    def _nulo(retorno, nome):
-        def _chamada(*args, **kwargs):
-            print(f"[sem-tela] {nome} {args[0] if args else ''!r}")
-            return retorno
-        _chamada.__name__ = "sem_tela_" + nome
-        return _chamada
-
-    messagebox.showinfo = _nulo("ok", "showinfo")
-    messagebox.showwarning = _nulo("ok", "showwarning")
-    messagebox.showerror = _nulo("error", "showerror")
-    messagebox.askyesno = _nulo(False, "askyesno")
-    messagebox.askokcancel = _nulo(False, "askokcancel")
-    messagebox.askyesnocancel = _nulo(None, "askyesnocancel")
-    messagebox.askretrycancel = _nulo(False, "askretrycancel")
-    filedialog.askopenfilename = _nulo("", "askopenfilename")
-    filedialog.askopenfilenames = _nulo((), "askopenfilenames")
-    filedialog.asksaveasfilename = _nulo("", "asksaveasfilename")
-    filedialog.askdirectory = _nulo("", "askdirectory")
-    simpledialog.askstring = _nulo(None, "askstring")
-    simpledialog.askinteger = _nulo(None, "askinteger")
-    simpledialog.askfloat = _nulo(None, "askfloat")
 
 
 def azahar_fake(emu):
@@ -178,7 +142,6 @@ def isolar(raiz: Path):
         elif event in ("socket.connect", "subprocess.Popen", "os.system", "os.startfile"):
             raise PermissionError(f"Operação externa bloqueada no teste: {event}")
     sys.addaudithook(audit)
-    _sem_tela()
 
 
 def main():

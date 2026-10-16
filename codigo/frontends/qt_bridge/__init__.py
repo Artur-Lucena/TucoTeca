@@ -62,7 +62,6 @@ class HubBridge(MixInfra, MixMusica, MixMidia, MixCapas, MixJogos,
     aviso = Signal(str, bool)
     jogoIniciado = Signal()
     jogoTerminou = Signal()
-    pedirClassico = Signal()
     previewMudou = Signal()
     manutencaoMudou = Signal()
     prontosMudou = Signal()

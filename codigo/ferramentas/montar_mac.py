@@ -5,8 +5,8 @@ Monta o payload Mac: tucoteca-mac-<data>.tar.xz + Instalar-Mac.command.
 
     py -3.14 codigo/ferramentas/montar_mac.py
 
-Fase 0 do Mac: GUI tkinter via python3 do sistema, ROMs 3DS/NDS. O
-instalador é um .command simples (o tar do macOS lê xz nativo) que
+Fase 0 do Mac: GUI Qt Quick via python3 do sistema (PySide6), ROMs 3DS/NDS.
+O instalador é um .command simples (o tar do macOS lê xz nativo) que
 extrai p/ ~/Applications/TucoTeca. Sem AppImage/dmg: dmg só se monta
 num Mac de verdade (fica p/ depois).
 """
@@ -71,7 +71,7 @@ COMMAND_LAUNCHER = """#!/bin/sh
 HUB="$(cd "$(dirname "$0")" && pwd)"
 export BIBLIOTECA_HOME="$HUB"
 [ -f "$HUB/dados/dados/biblioteca.db" ] && export BIBLIOTECA_HOME="$HUB/dados"
-exec python3 "$HUB/app/app_win.py" "$@"
+exec python3 "$HUB/app/desktop.py" "$@"
 """
 
 INSTALADOR = """#!/bin/sh
@@ -81,14 +81,17 @@ DEST="$HOME/Applications/TucoTeca"
 falha() { echo "ERRO: $1" >&2; exit 1; }
 [ -d "$AQUI" ] || falha "pasta do instalador sumiu."
 
-# 1. Python 3.10+ com tkinter (python.org; o da App Store não traz Tk)
-if ! python3 -c 'import sys,tkinter; assert sys.version_info>=(3,10)' 2>/dev/null; then
+# 1. Python 3.10+ (python.org; o da App Store não traz PySide6/Tk)
+if ! python3 -c 'import sys; assert sys.version_info>=(3,10)' 2>/dev/null; then
   echo "[hub] instalando o Python oficial (precisa da sua senha, uma vez só)..."
-  [ -f "$AQUI/python-3.14.7-macos11.pkg" ] || falha "instale Python 3.10+ com Tk (python.org) e execute novamente."
+  [ -f "$AQUI/python-3.14.7-macos11.pkg" ] || falha "instale Python 3.10+ (python.org) e execute novamente."
   open "$AQUI"/python-3.14.7-macos11.pkg || falha "não abri o pkg do Python."
   echo "Termine a instalação do Python e rode este instalador de novo."
   exit 0
 fi
+python3 -c 'import PySide6' 2>/dev/null || {
+  echo "[aviso] sem PySide6: a GUI não abre; instale com 'python3 -m pip install PySide6'."
+}
 
 # 2. App (código do Hub)
 mkdir -p "$DEST" || falha "não criei $DEST."

@@ -54,8 +54,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="monta o TUI sem terminal e sai (verificação)")
     args = ap.parse_args(argv)
     if curses is None and not args.selftest:
-        print("curses indisponível neste Python (no Windows, use app_win.py).",
-              file=sys.stderr)
+        print("curses indisponível neste Python (no Windows, abra a interface Qt "
+              "(TucoTeca.bat / desktop.py)).", file=sys.stderr)
         return 2
     core.garantir_dirs()
     lk = core.adquirir_lock(ignorar=args.ignorar_lock)

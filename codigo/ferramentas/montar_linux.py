@@ -8,10 +8,11 @@ offline — fontes + AppImage disponível + dados vazios).
 
 A árvore Linux é montada AQUI no Windows (só cópia de arquivos) e o
 payload é o mesmo .tar.xz dos instaladores (LZMA2 stdlib). O stub .run
-é shell POSIX: pergunta a pasta, checa python3+tk, extrai com tar -xJ,
+é shell POSIX: pergunta a pasta, checa python3, extrai com tar -xJ,
 cria o .desktop e o desinstalador. O sistema precisa de Python 3.10+;
-Tk é opcional para --gui (frontend clássico). DeSmuME no Linux usa pacote
-do sistema ou AppImage próprio; seu updater não instala uma build Linux.
+PySide6 é opcional para --gui (o TUI curses funciona sempre). DeSmuME no
+Linux usa pacote do sistema ou AppImage próprio; seu updater não instala
+uma build Linux.
 """
 from __future__ import annotations
 
@@ -48,7 +49,7 @@ export BIBLIOTECA_AZAHAR_DIR="${BIBLIOTECA_AZAHAR_DIR:-$HUB/emuladores/Azahar}"
 # Não fixar DESMUME_DIR vazio: isso impediria a descoberta do pacote do sistema.
 if [ "$1" = "--gui" ]; then
   shift
-  exec python3 "$HUB/app/app_win.py" "$@"
+  exec python3 "$HUB/app/desktop.py" "$@"
 fi
 exec python3 "$HUB/app/app_tui.py" "$@"
 """
@@ -104,9 +105,9 @@ command -v tar >/dev/null || falha "sem 'tar' no sistema."
 tar --help 2>&1 | grep -q -- "-J" || falha "seu tar não lê xz (instale o xz)."
 command -v python3 >/dev/null || falha "instale o Python 3.10+ (python3)."
 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' || falha "python3 antigo demais (precisa 3.10+)."
-python3 -c 'import tkinter' 2>/dev/null || {
-  echo "[aviso] sem tkinter: a GUI (--gui) não abre; o TUI funciona normal."
-  echo "        Debian/Ubuntu: sudo apt install python3-tk | Fedora: sudo dnf install python3-tkinter"
+python3 -c 'import PySide6' 2>/dev/null || {
+  echo "[aviso] sem PySide6: a GUI (--gui) não abre; o TUI funciona normal."
+  echo "        Instale: python3 -m pip install PySide6"
 }
 if [ -z "$DESTINO" ]; then
   if [ "$(id -u)" = "0" ]; then DESTINO="/opt/tucoteca"; else DESTINO="$HOME/.local/tucoteca"; fi

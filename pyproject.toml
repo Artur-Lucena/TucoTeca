@@ -79,10 +79,6 @@ select = ["E", "F", "W", "I"]
 ignore = ["E501", "E402", "F403"]
 
 [tool.ruff.lint.per-file-ignores]
-# F401 nesses arquivos e a prova de disponibilidade do modulo
-# (`try: import tkinter` -> skip), nao codigo morto.
-"codigo/ferramentas/testes/test_dialogo.py" = ["F401"]
-"codigo/ferramentas/testes/test_varredura.py" = ["F401"]
 # F401 na fachada do pacote: os reexports (inclusive `_privados` e os
 # modulos `os`/`shutil`/`subprocess`, alvos de monkeypatch nos testes)
 # SAO o contrato de compatibilidade com o antigo `emuladores.py`; a

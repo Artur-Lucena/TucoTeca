@@ -85,7 +85,7 @@ def provar(bash: str, ffmpeg=False) -> dict:
             r = _rodar(bash, p, ["--gui"] if p == launcher_bundle else [], override)
             assert "CASA=casa explícita" in r.stdout, r.stdout
             if p == launcher_bundle:
-                assert "app_win.py" in r.stdout and "ARG=--gui" not in r.stdout, r.stdout
+                assert "desktop.py" in r.stdout and "ARG=--gui" not in r.stdout, r.stdout
         provas.append("2 launchers preservam casa explícita, argumentos e espaços")
 
         bin_real = tmp / "bin-real"

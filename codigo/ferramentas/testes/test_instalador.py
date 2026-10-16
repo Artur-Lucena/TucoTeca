@@ -28,12 +28,12 @@ def teste_dieta_poda_pycache():
     (pc / "x.pyc").write_bytes(b"0" * 100)
     (build / "solto.pyc").write_bytes(b"1" * 50)
     (build / "_sqlite3.pyd").write_bytes(b"extensao nativa")
-    (build / "_tkinter.pyd").write_bytes(b"extensao nativa")
+    (build / "_hashlib.pyd").write_bytes(b"extensao nativa")
     livres = MP.podar_dieta(build)
     afirmar(livres == 150, livres)
     afirmar(not pc.exists() and not (build / "solto.pyc").exists())
     afirmar((build / "app" / "app_tui.py").is_file(), "comeu arquivo real!")
-    afirmar((build / "_sqlite3.pyd").is_file() and (build / "_tkinter.pyd").is_file(),
+    afirmar((build / "_sqlite3.pyd").is_file() and (build / "_hashlib.pyd").is_file(),
             "dieta apagou extensões nativas")
 
 
@@ -112,7 +112,7 @@ def teste_mac_payload_e_instalador():
             nomes = t.getnames()
         for alvo in ("tucoteca/VERSAO.txt",
                      "tucoteca/BibliotecaHubMac.command",
-                     "tucoteca/app/app_win.py"):
+                     "tucoteca/app/desktop.py"):
             afirmar(alvo in nomes, nomes)
     finally:
         MM.DIST, MM.MAC_CACHE, MM.MAC_ARQS, MM.MAC_NAVIO = velhos
@@ -150,7 +150,7 @@ def teste_universal_junta_tres():
         MU.DIST, MU.montar_mac = velho_dist, velho_mac
 
 
-def teste_builders_copiam_despacho_e_volume():
+def teste_builders_copiam_volume_e_app_offline():
     import montar_mac as MM
     tmp = Path(tempfile.mkdtemp(prefix="suite-inst-"))
     MP.copiar_app(tmp / "win")
@@ -159,8 +159,10 @@ def teste_builders_copiam_despacho_e_volume():
     with patch.object(ML, "incluir_azahar_linux", return_value="fake"):
         linux, _ = ML.montar_base_linux(tmp / "linux")
     for app in (tmp / "win", mac / "app", linux / "app"):
-        afirmar((app / "despacho.py").is_file(), app)
-        afirmar((app / "aparencia.py").is_file(), "tema ausente no pacote offline")
+        afirmar((app / "desktop.py").is_file() and (app / "app_qt.py").is_file(),
+                "frontend Qt ausente no pacote offline")
+        afirmar(not (app / "despacho.py").exists() and not (app / "app_win.py").exists(),
+                "código do modo clássico vazou no pacote offline")
         afirmar((app / "bib_nucleo/volume.py").is_file(), app)
         afirmar((app / "bib_nucleo/arquivos.py").is_file(), app)
     afirmar('shift\n' in ML.SH_LAUNCHER)
