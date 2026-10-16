@@ -93,8 +93,10 @@ py -3.14 -B codigo/ferramentas/validar.py --sem-pytest    # rápido (~2 min)
 py -3.14 -B codigo/ferramentas/validar.py --modulo test_qt --sem-pytest
 ```
 
-Roda Ruff (ou substituto `py_compile` + trailing), a suíte completa, a
-cobertura dos subprocessos e confere a árvore Git; grava o relatório em
+Roda Ruff (venv, PATH ou `python -m`; senão substituto `py_compile` +
+trailing), o mypy dos builders (se disponível; pula sem falhar quando
+ausente), a suíte completa, a cobertura dos subprocessos e confere a árvore
+Git; grava o relatório em
 `.provas/gates-local-<timestamp>.json`. A matriz hospedada (`testes.yml`)
 está **desativada** — `workflow_dispatch` manual, sem custo: o billing da
 conta do GitHub bloqueia jobs automáticos e a validação local é equivalente
@@ -111,6 +113,10 @@ uma alteração que não passa localmente não deve ser empurrada.
 - Lint: `ruff check codigo conftest.py` está limpo (0 achados desde a revisão
   R4). As exceções (`E402`, `F403`, `F401` em testes de tkinter) estão
   declaradas em `pyproject.toml` com justificativa, não escondidas no diff.
+- Tipos: `mypy` cobre hoje `codigo/ferramentas` (builders) em modo gradual —
+  `[tool.mypy]` no `pyproject.toml`; o `validar.py` roda o passo quando
+  `.provas/venv-tipos` ou o PATH tiverem mypy e pula (sem falhar) quando
+  ausente. Ampliar o escopo ao núcleo é incremental, sem bloquear a rodada.
 - Simule rede/subprocessos e use arquivos locais pequenos em fixtures.
 - Executáveis falsos nativos Linux/macOS precisam de `chmod(0o755)`; use
   nomes sem `.exe`. Ao simular Linux no Windows, injete `sys.platform`

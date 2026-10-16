@@ -26,7 +26,7 @@ dependencies = []
 [project.optional-dependencies]
 ui = ["PySide6-Essentials==6.10.2"]
 extras = ["PySide6-Addons==6.10.2"]  # variante completa: WebEngine/Multimedia; sem gamepad
-dev = ["pytest>=8", "coverage>=7", "ruff>=0.6"]
+dev = ["pytest>=8", "coverage>=7", "ruff>=0.6", "mypy>=1.11"]
 
 [project.scripts]
 tucoteca = "frontends.desktop:main"
@@ -46,6 +46,16 @@ cache_dir = ".provas/pytest-cache"
 [tool.coverage.run]
 source = ["codigo/bib_nucleo", "codigo/frontends"]
 omit = ["codigo/ferramentas/testes/*"]
+
+[tool.mypy]
+# Checagem de tipos gradual: hoje cobre os builders (ferramentas/).
+# follow_imports=silent mantem o escopo nos arquivos pedidos, sem despejar
+# os achados legados do nucleo; ampliar o escopo e incremental.
+python_version = "3.10"
+files = ["codigo/ferramentas"]
+exclude = ["codigo/ferramentas/testes"]
+follow_imports = "silent"
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100

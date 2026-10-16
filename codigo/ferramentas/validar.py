@@ -4,9 +4,10 @@
 
 Ordem (mesma da antiga matriz, na medida do possível no SO local):
   1. Ruff (se disponível; senão, substituto: py_compile + espaço em branco)
-  2. Suíte completa (`testes/executar.py`) — stdlib + Qt offscreen
-  3. Cobertura dos subprocessos (`pytest --cobertura`) — opcional
-  4. `git diff --check` + árvore suja (informativo)
+  2. mypy nos builders (`ferramentas/`; se disponível; senão, pula)
+  3. Suíte completa (`testes/executar.py`) — stdlib + Qt offscreen
+  4. Cobertura dos subprocessos (`pytest --cobertura`) — opcional
+  5. `git diff --check` + árvore suja (informativo)
 
 Diferenças honestas em relação à matriz hospedada: sem gitleaks (a menos que
 o binário exista no PATH), sem Ubuntu/Python 3.10 (roda no SO/Python atuais)
@@ -60,11 +61,17 @@ def _rodar(nome, cmd, cwd=REPO, env_extra=None):
 
 
 def passo_ruff():
-    """Ruff completo se existir; senão substituto (compile + trailing)."""
-    ruff = shutil.which("ruff")
+    """Ruff completo se existir (venv/PATH/python -m); senão substituto."""
     venv = Path(__file__).resolve().parent.parent / ".provas" / "venv-rel" / "Scripts" / "ruff.exe"
-    exe = str(venv) if venv.is_file() else ruff
-    if not exe:
+    ruff_exe = shutil.which("ruff")
+    if venv.is_file():
+        ruff = [str(venv)]
+    elif ruff_exe:
+        ruff = [ruff_exe]
+    elif subprocess.run([PY, "-m", "ruff", "--version"], capture_output=True,
+                        cwd=REPO).returncode == 0:
+        ruff = [PY, "-m", "ruff"]
+    else:
         print("  [aviso] ruff ausente — substituto: py_compile + trailing whitespace")
         import compileall
         ok_c = compileall.compile_dir("codigo", quiet=2, force=False)
@@ -73,10 +80,23 @@ def passo_ruff():
         sujo = [ln for ln in (r.stdout or "").splitlines() if ln.strip()]
         return bool(ok_c) and not sujo, {"modo": "substituto",
                                          "compile": bool(ok_c), "trailing": sujo}
-    ok, tail, seg, cmd = _rodar("ruff", [exe, "check", "codigo", "conftest.py",
-                                         "--cache-dir", str(REPO / ".provas" / "ruff-cache-local")])
+    ok, tail, seg, cmd = _rodar("ruff", ruff + ["check", "codigo", "conftest.py",
+                                                "--cache-dir", str(REPO / ".provas" / "ruff-cache-local")])
     return ok, {"modo": "ruff", "cmd": cmd,
                 "achados": [ln for ln in tail if "Found" in ln or ": " in ln][:8]}
+
+
+def passo_tipos():
+    """mypy nos builders (config em pyproject.toml); pula se ausente."""
+    venv = REPO / ".provas" / "venv-tipos" / "Scripts" / "python.exe"
+    exe = str(venv) if venv.is_file() else shutil.which("mypy")
+    if not exe:
+        print("  [pulo] mypy ausente (crie .provas/venv-tipos ou instale no PATH)")
+        return True, {"modo": "pulado"}
+    cmd = [exe, "-m", "mypy"] if venv.is_file() else [exe]
+    ok, tail, seg, c = _rodar("mypy", cmd + ["--cache-dir", str(REPO / ".provas" / "mypy-cache")])
+    resumo = next((ln for ln in reversed(tail) if "Success" in ln or "error" in ln), "")
+    return ok, {"modo": "mypy", "cmd": c, "segundos": seg, "resumo": resumo}
 
 
 def passo_suite(modulos):
@@ -107,6 +127,7 @@ def passo_git():
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Gates locais da TucoTeca")
     ap.add_argument("--sem-ruff", action="store_true")
+    ap.add_argument("--sem-tipos", action="store_true", help="pula o mypy dos builders")
     ap.add_argument("--sem-pytest", action="store_true", help="pula a cobertura (leva ~8 min)")
     ap.add_argument("--modulo", action="append", default=[],
                     help="restringe a suíte a módulos (ex.: test_qt)")
@@ -118,23 +139,34 @@ def main(argv=None):
     t0 = time.monotonic()
     try:
         if not a.sem_ruff:
-            print("[1/4] ruff")
+            print("[1/5] ruff")
             ok, info = passo_ruff()
             rel["passos"]["ruff"] = info
             print("  ->", "ok" if ok else "FALHOU")
             rel["ok"] &= ok
-        print("[2/4] suíte completa" + (" (módulos: %s)" % ",".join(a.modulo) if a.modulo else ""))
+        if not a.sem_tipos:
+            print("[2/5] mypy (ferramentas/)")
+            ok, info = passo_tipos()
+            rel["passos"]["tipos"] = info
+            if info.get("modo") == "pulado":
+                print("  -> pulado")
+            elif info.get("resumo"):
+                print("  ->", info["resumo"])
+            else:
+                print("  ->", "ok" if ok else "FALHOU")
+            rel["ok"] &= ok
+        print("[3/5] suíte completa" + (" (módulos: %s)" % ",".join(a.modulo) if a.modulo else ""))
         ok, info = passo_suite(a.modulo)
         rel["passos"]["suite"] = info
         print("  ->", info["resumo"] or ("ok" if ok else "FALHOU"))
         rel["ok"] &= ok
         if not a.sem_pytest:
-            print("[3/4] pytest --cobertura")
+            print("[4/5] pytest --cobertura")
             ok, info = passo_pytest()
             rel["passos"]["pytest"] = info
             print("  ->", info["resumo"] or ("ok" if ok else "FALHOU"))
             rel["ok"] &= ok
-        print("[4/4] git")
+        print("[5/5] git")
         ok, info = passo_git()
         rel["passos"]["git"] = info
         print("  ->", "limpo" if ok and not info["sujo"] else
