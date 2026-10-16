@@ -17,6 +17,7 @@ import os
 import shutil
 import tarfile
 import urllib.request
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -36,10 +37,14 @@ def sha_arquivo(p: Path) -> str:
 # --------------------------------------------------------------------------
 # escritor .tar.xz unificado
 # --------------------------------------------------------------------------
-def _iter_arq_para_tar(raiz: Path):
-    """Itera arquivos recursivamente sob raiz (sem symlinks, sem recursão explícita)."""
+def _iter_para_tar(raiz: Path) -> Iterator[Path]:
+    """Itera diretórios e arquivos sob raiz, em ordem, sem symlinks.
+
+    Diretórios entram como membros próprios (recursive=False) para que a
+    extração recrie também pastas vazias (ex.: dados/backups do payload).
+    """
     for p in sorted(raiz.rglob("*")):
-        if p.is_file() and not p.is_symlink():
+        if not p.is_symlink() and (p.is_dir() or p.is_file()):
             yield p
 
 
@@ -67,7 +72,7 @@ def escrever_tarxz(
     """
     saida.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(saida, "w:xz", preset=6, format=tarfile.PAX_FORMAT) as t:
-        for p in _iter_arq_para_tar(raiz):
+        for p in _iter_para_tar(raiz):
             if filtro and not filtro(p):
                 continue
             # caminho relativo no tarball
@@ -131,7 +136,7 @@ def baixar_verificado(
         tmp.unlink(missing_ok=True)
         raise SystemExit(f"falha ao baixar {nome}: {e}")
 
-    if destino.stat().st_size < minimo:
+    if tmp.stat().st_size < minimo:
         tmp.unlink(missing_ok=True)
         raise SystemExit(f"{nome} veio pequeno demais (link quebrou?)")
 

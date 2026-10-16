@@ -249,7 +249,7 @@ def empacotar_tarxz_linux(build: Path, data: str) -> Path:
     """Payload .tar.xz da árvore Linux (mesmo formato do Windows)."""
     DIST.mkdir(parents=True, exist_ok=True)
     saida = DIST / f"tucoteca-linux-{data}.tar.xz"
-    escrever_tarxz(build.parent, saida, strip_parente=1)
+    escrever_tarxz(build.parent, saida, strip_parente=0)
     return saida
 
 

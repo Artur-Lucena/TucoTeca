@@ -35,6 +35,10 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+AQUI = Path(__file__).resolve().parent
+sys.path.insert(0, str(AQUI))
+from build_utils import escrever_tarxz
+
 REPO = Path(__file__).resolve().parent.parent.parent
 CACHE = Path(__file__).resolve().parent / ".cache"
 BUILD = Path(__file__).resolve().parent / ".build" / "hub"
@@ -482,16 +486,12 @@ def empacotar_tarxz(build: Path, nome: str) -> Path:
     """Payload .tar.xz (LZMA2 stdlib): base dos instaladores Win/Linux.
 
     tar.xz abre nativo no Linux (tar -xJf), no Windows (7-Zip) e no
-    Mac (tar) — ~30-40% menor que o .zip com o mesmo conteúdo.
+    Mac (tar) — ~30-40% menor que o .zip com o mesmo conteúdo. Usa o
+    escritor único (build_utils.escrever_tarxz), o mesmo dos builders
+    Linux/Mac.
     """
-    import tarfile
     DIST.mkdir(parents=True, exist_ok=True)
-    saida = DIST / nome
-    with tarfile.open(saida, "w:xz", preset=6, format=tarfile.PAX_FORMAT) as t:
-        for arq in sorted(build.rglob("*")):
-            t.add(arq, arq.relative_to(build), recursive=False)
-    print(f"[ok] {saida.name} — {saida.stat().st_size / 1048576:.1f} MB")
-    return saida
+    return escrever_tarxz(build, DIST / nome, strip_parente=0)
 
 
 def _achar_iscc() -> str:
