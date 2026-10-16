@@ -13,8 +13,27 @@ ScrollView {
         RowLayout {
             Layout.fillWidth: true; spacing: 18
             Rectangle {
+                id: continueCard
                 Layout.fillWidth: true; Layout.preferredHeight: 190
                 radius: Theme.radius; color: Theme.surface; border.color: Theme.line
+                clip: true
+                Image {
+                    anchors.fill: parent
+                    source: hub.recentes.length ? (hub.recentes[0].capa_url || "") : ""
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true; opacity: 0.42
+                    sourceSize: Qt.size(900, 380)
+                }
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.radius
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0; color: "#f20a1220" }
+                        GradientStop { position: 0.55; color: Theme.overlay }
+                        GradientStop { position: 1; color: "#a00a1220" }
+                    }
+                }
                 ColumnLayout {
                     anchors.fill: parent; anchors.margins: 22; spacing: 8
                     Text { text: "CONTINUAR"; color: Theme.accent; font { pixelSize: Theme.fs(12); weight: Font.Bold; letterSpacing: 2 } }
@@ -64,9 +83,14 @@ ScrollView {
             Repeater {
                 model: home.shell.navSections.filter(function(s) { return s.key !== "inicio" }).concat(hub.aparencia.modo_simples ? [] : [{key: "paleta", title: "Busca global"}])
                 Rectangle {
+                    id: quickCard
                     required property var modelData
                     Layout.fillWidth: true; Layout.preferredHeight: hub.aparencia.modo_simples ? 140 : 118
-                    radius: Theme.radius; color: Theme.surface; border.color: Theme.line
+                    radius: Theme.radius
+                    color: quickHover.hovered ? Theme.raised : Theme.surface
+                    border.color: quickHover.hovered ? Theme.accentAlt : Theme.line
+                    HoverHandler { id: quickHover }
+                    Behavior on color { ColorAnimation { duration: Theme.motion } }
                     RowLayout {
                         anchors.fill: parent; anchors.margins: 20
                         Text { text: modelData.title; color: Theme.text; font { pixelSize: Theme.fs(17); weight: Font.DemiBold } Layout.fillWidth: true }
@@ -82,7 +106,11 @@ ScrollView {
                 model: hub.recentes
                 Rectangle {
                     required property var modelData
-                    Layout.fillWidth: true; Layout.preferredHeight: 96; color: Theme.surface; radius: Theme.radius
+                    Layout.fillWidth: true; Layout.preferredHeight: 96; radius: Theme.radius
+                    color: recentHover.hovered ? Theme.raised : Theme.surface
+                    border.color: recentHover.hovered ? Theme.accentAlt : Theme.line
+                    HoverHandler { id: recentHover }
+                    Behavior on color { ColorAnimation { duration: Theme.motion } }
                     RowLayout {
                         anchors.fill: parent; anchors.margins: 12; spacing: 12
                         Image { source: modelData.capa_url || ""; Layout.preferredWidth: 50; Layout.preferredHeight: 68; fillMode: Image.PreserveAspectCrop; asynchronous: true }

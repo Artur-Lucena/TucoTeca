@@ -288,8 +288,11 @@ ApplicationWindow {
     }
 
     header: Rectangle {
-        height: 88
-        color: Theme.bg
+        height: 84
+        gradient: Gradient {
+            GradientStop { position: 0; color: Theme.bg }
+            GradientStop { position: 1; color: Theme.surface }
+        }
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.line }
         RowLayout {
             id: headerRow
@@ -332,9 +335,12 @@ ApplicationWindow {
                     ToolTip.text: "Abrir " + modelData.title
                     Rectangle {
                         anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter }
-                        width: parent.width - 26; height: 2; radius: 1
+                        width: Theme.navIndicatorW; height: Theme.navIndicatorH; radius: 1
                         color: Theme.accent
-                        visible: parent.selected
+                        opacity: parent.selected ? 1 : 0
+                        scale: parent.selected ? 1 : 0.4
+                        Behavior on opacity { NumberAnimation { duration: Theme.motion; easing.type: Easing.OutCubic } }
+                        Behavior on scale { NumberAnimation { duration: Theme.motion; easing.type: Easing.OutCubic } }
                     }
                 }
             }
@@ -404,7 +410,7 @@ ApplicationWindow {
             visible: hub.secao === "jogos" && hub.quantidade > 0 && window.height >= 740
             Layout.fillWidth: true
             Layout.preferredHeight: window.height < 800 ? 136 : 182
-            radius: Theme.radius
+            radius: Theme.heroRadius
             color: Theme.surface
             clip: true
             Image {
@@ -417,12 +423,13 @@ ApplicationWindow {
             }
             Rectangle {
                 anchors.fill: parent
-                radius: Theme.radius
+                radius: Theme.heroRadius
                 gradient: Gradient {
                     orientation: Gradient.Horizontal
-                    GradientStop { position: 0; color: "#192e46" }
-                    GradientStop { position: 0.5; color: "#f0162538" }
-                    GradientStop { position: 1; color: "#20132132" }
+                    GradientStop { position: 0; color: "#f009101c" }
+                    GradientStop { position: 0.32; color: Theme.overlay }
+                    GradientStop { position: 0.68; color: "#8a0d1626" }
+                    GradientStop { position: 1; color: "#3c0d1626" }
                 }
             }
             RowLayout {
@@ -602,7 +609,18 @@ ApplicationWindow {
                 sourceComponent: hub.secao === "inicio" ? inicioComponent : hub.secao === "jogos" ? jogosComponent :
                     hub.secao === "musicas" ? musicasComponent : hub.secao === "videos" ? videosComponent :
                     hub.secao === "youtube" ? youtubeComponent : hub.secao === "integracoes" ? integracoesComponent : colecaoComponent
-                onLoaded: { if (item && (hub.secao === "jogos" || item.objectName === "collectionList")) item.currentIndex = hub.indiceSelecionado }
+                onLoaded: {
+                    if (item && (hub.secao === "jogos" || item.objectName === "collectionList")) item.currentIndex = hub.indiceSelecionado
+                    sectionReveal.restart()
+                }
+                // Fade suave de entrada a cada troca de seção (o Loader recarrega o item).
+                NumberAnimation on opacity {
+                    id: sectionReveal
+                    from: 0; to: 1
+                    duration: Theme.motion
+                    easing.type: Easing.OutCubic
+                    running: false
+                }
             }
 
             ColumnLayout {
@@ -899,8 +917,6 @@ ApplicationWindow {
             ActionButton { text: "Provedores online: capas, conquistas e Spotify"; Layout.fillWidth: true; onClicked: providers.open() }
             ActionButton { text: "Ferramentas de mídia: imagem, áudio e vídeo"; Layout.fillWidth: true; onClicked: mediaTools.open() }
             VolumeControl { Layout.fillWidth: true }
-            ActionButton { text: "Abrir ferramentas clássicas"; Layout.fillWidth: true; enabled: !hub.ocupado && !hub.emJogo; onClicked: hub.classico() }
-            Text { text: "A interface clássica reúne importação avançada, mods, emuladores, CSV, pacotes e manutenção. A troca encerra esta interface e mantém a mesma coleção."; color: Theme.muted; Layout.fillWidth: true; wrapMode: Text.WordWrap; font.pixelSize: Theme.subtitle }
             Rectangle { Layout.fillWidth: true; height: 1; color: Theme.line }
             Text { text: "F11  Tela cheia     Ctrl+1…7  Categorias\nCtrl+F  Buscar     Ctrl+K  Busca global     Setas  Navegar\nEnter  Jogar/Tocar/Assistir     Espaço  Detalhes"; color: Theme.muted; lineHeight: 1.5; font.pixelSize: Theme.fs(13) }
             Text { text: hub.controlesConectados.length ? "Controle conectado: " + hub.controlesConectados.join(", ") : "Nenhum controle XInput detectado. Conecte-o; ele é reconhecido sem reiniciar."; color: Theme.muted; font.pixelSize: Theme.fs(13); wrapMode: Text.WordWrap; Layout.fillWidth: true }

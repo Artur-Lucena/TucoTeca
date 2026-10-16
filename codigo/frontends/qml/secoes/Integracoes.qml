@@ -14,9 +14,14 @@ ScrollView {
         Repeater {
             model: hub.integracoes
             Rectangle {
+                id: integrationCard
                 required property var modelData
                 Layout.fillWidth: true; Layout.preferredHeight: 238
-                radius: Theme.radius; color: Theme.surface; border.color: Theme.line
+                radius: Theme.radius
+                color: integHover.hovered ? Theme.raised : Theme.surface
+                border.color: integHover.hovered ? Theme.accentAlt : Theme.line
+                HoverHandler { id: integHover }
+                Behavior on color { ColorAnimation { duration: Theme.motion } }
                 ColumnLayout {
                     anchors.fill: parent; anchors.margins: 23; spacing: 12
                     RowLayout {

@@ -9,11 +9,11 @@ QtObject {
     property real escala: 1.0
     function fs(n) { return Math.max(8, Math.round(n * escala)) }
 
-    readonly property color bg: tema === "claro" ? "#eef2f8" : "#0b1019"
-    readonly property color surface: tema === "claro" ? "#ffffff" : "#131c2a"
-    readonly property color raised: tema === "claro" ? "#f4f7fc" : "#1b283b"
-    readonly property color hover: tema === "claro" ? "#e4ecf7" : "#24364e"
-    readonly property color line: tema === "claro" ? "#c9d6e6" : "#2a3b51"
+    readonly property color bg: tema === "claro" ? "#eef2f8" : "#090e16"
+    readonly property color surface: tema === "claro" ? "#ffffff" : "#111a29"
+    readonly property color raised: tema === "claro" ? "#f4f7fc" : "#18263a"
+    readonly property color hover: tema === "claro" ? "#e4ecf7" : "#22344b"
+    readonly property color line: tema === "claro" ? "#c9d6e6" : "#27384f"
     readonly property color text: tema === "claro" ? "#101827" : "#f4f7fc"
     readonly property color muted: tema === "claro" ? "#4a5a70" : "#a2b2c8"
     readonly property color accent: tema === "claro" ? "#0e7fa8" : "#6cd5f5"
@@ -39,4 +39,25 @@ QtObject {
     readonly property int btnAlto: fs(densidade === "bigpicture" ? 54 : densidade === "compacto" ? 44 : 48)
     readonly property int btnTexto: fs(densidade === "bigpicture" ? 16 : densidade === "compacto" ? 14 : 15)
     readonly property int btnMargem: fs(20)
+
+    // --- Camada visual "cinematográfica" (Hydra-style), 100% aditiva. ---
+    // 2º accent para gradientes (accent -> accentAlt) em botões primários,
+    // marca e destaques de hover; mantém contraste com ink/text.
+    readonly property color accentAlt: tema === "claro" ? "#3f6fd8" : "#638bff"
+    // Cantos dedicados a cards/hero (o radius geral segue para pílulas/linhas).
+    readonly property int cardRadius: 14
+    readonly property int heroRadius: 18
+    // Sombra em camadas: a cor e as opacidades de duas elipses deslocadas que
+    // ficam atrás do card; o lift é quanto o card sobe no hover (-3px).
+    readonly property color shadow: tema === "claro" ? "#7c8ea6" : "#000000"
+    readonly property real shadowAlphaNear: tema === "claro" ? 0.22 : 0.34
+    readonly property real shadowAlphaFar: tema === "claro" ? 0.14 : 0.22
+    readonly property int shadowOffsetNear: 3
+    readonly property int shadowOffsetFar: 7
+    readonly property int shadowLift: 3
+    // Scrim/overlay de hero e de arte de fundo (AARRGGBB; alfa no próprio hex).
+    readonly property color overlay: tema === "claro" ? "#e6eef2f8" : "#e60a1220"
+    // Traço do item de navegação selecionado.
+    readonly property int navIndicatorW: 26
+    readonly property int navIndicatorH: 2
 }

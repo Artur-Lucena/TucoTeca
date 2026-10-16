@@ -10,7 +10,7 @@ import QtWebEngine
 // - perfil off-the-record (sem cookies/persistência de terceiros);
 // - download de vídeo é sempre ação explícita do usuário, pelo Hub;
 // - sem Addons instalado, o Main.qml usa Loader com sourceComponent vazio
-//   e mostra o diálogo clássico (fallback da variante essencial).
+//   e mostra o diálogo de fallback (variante essencial).
 Item {
     id: raiz
     property url urlInicial: "https://www.youtube.com/"

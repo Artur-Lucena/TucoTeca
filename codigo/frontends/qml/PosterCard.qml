@@ -9,26 +9,63 @@ Item {
     signal activated()
     signal details()
     property bool hovered: pointer.containsMouse
+    // Deslocamento vertical do pôster no hover (~-3px), animado.
+    property real lift: card.hovered ? -Theme.shadowLift : 0
+    Behavior on lift { NumberAnimation { duration: Theme.motion; easing.type: Easing.OutCubic } }
+    // Capa ausente: matiz determinística a partir do título (mesmo jogo == mesma arte).
+    function matiz(texto) {
+        var t = String(texto || "?")
+        var h = 0
+        for (var i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) % 360
+        return h
+    }
     Accessible.role: Accessible.Button
     Accessible.name: game.titulo || "Jogo"
     Accessible.onPressAction: card.chosen()
+    // Sombra em camadas (duas elipses deslocadas) atrás do pôster.
+    Rectangle {
+        anchors {
+            left: parent.left; right: parent.right; top: parent.top
+            leftMargin: 11; rightMargin: 11
+            topMargin: 7 + card.lift + Theme.shadowOffsetFar
+        }
+        height: parent.height - 66
+        radius: Theme.cardRadius
+        color: Theme.shadow
+        opacity: card.hovered ? Theme.shadowAlphaFar + 0.10 : Theme.shadowAlphaFar
+    }
+    Rectangle {
+        anchors {
+            left: parent.left; right: parent.right; top: parent.top
+            leftMargin: 8; rightMargin: 8
+            topMargin: 7 + card.lift + Theme.shadowOffsetNear
+        }
+        height: parent.height - 66
+        radius: Theme.cardRadius
+        color: Theme.shadow
+        opacity: card.hovered ? Theme.shadowAlphaNear + 0.12 : Theme.shadowAlphaNear
+    }
     Rectangle {
         id: art
-        anchors { left: parent.left; right: parent.right; top: parent.top; margins: 7 }
+        anchors {
+            left: parent.left; right: parent.right; top: parent.top
+            leftMargin: 7; rightMargin: 7; topMargin: 7 + card.lift
+        }
         height: parent.height - 66
-        radius: 12
+        radius: Theme.cardRadius
         color: Theme.raised
-        border.color: card.selected ? Theme.accent : card.hovered ? "#64849c" : Theme.line
+        border.color: card.selected ? Theme.accent : card.hovered ? Theme.accentAlt : Theme.line
         border.width: card.selected ? 3 : 1
         scale: card.hovered ? 1.018 : 1
         Behavior on scale { NumberAnimation { duration: Theme.motion; easing.type: Easing.OutCubic } }
+        Behavior on border.color { ColorAnimation { duration: Theme.motion } }
         Rectangle {
             anchors.fill: parent
             anchors.margins: 4
             radius: 9
             gradient: Gradient {
-                GradientStop { position: 0; color: "#28435c" }
-                GradientStop { position: 1; color: "#182034" }
+                GradientStop { position: 0; color: Qt.hsla((card.matiz(card.game.titulo) % 360) / 360, 0.42, 0.36, 1) }
+                GradientStop { position: 1; color: Qt.hsla(((card.matiz(card.game.titulo) + 36) % 360) / 360, 0.48, 0.15, 1) }
             }
         }
         Text {
@@ -36,7 +73,7 @@ Item {
             width: parent.width - 30
             text: (card.game.titulo || "?").substring(0, 2).toUpperCase()
             font { family: Theme.family; pixelSize: Theme.fs(50); weight: Font.Light }
-            color: "#6a8aa7"
+            color: Qt.hsla((card.matiz(card.game.titulo) % 360) / 360, 0.34, 0.74, 1)
             horizontalAlignment: Text.AlignHCenter
         }
         Image {

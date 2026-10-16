@@ -32,12 +32,30 @@ Button {
         elide: Text.ElideRight
     }
     background: Rectangle {
+        id: fundo
         radius: control.height / 2
-        color: control.primary ? (control.hovered ? "#9be7ff" : Theme.accent) :
+        color: control.primary ? Theme.accent :
                control.down || control.selected ? Theme.hover :
                control.hovered ? Theme.raised : control.quiet ? "transparent" : Theme.surface
-        border.width: control.activeFocus ? 2 : 1
-        border.color: control.activeFocus ? Theme.accent : control.quiet ? "transparent" : Theme.line
+        border.width: control.activeFocus ? 2 :
+                      control.quiet && !control.hovered && !control.down && !control.selected ? 0 : 1
+        border.color: control.activeFocus ? Theme.accent :
+                      control.selected ? Theme.accent :
+                      control.primary ? "transparent" : Theme.line
         Behavior on color { ColorAnimation { duration: Theme.motion } }
+        // Gradiente sutil accent -> accentAlt; só no primário, por cima da cor
+        // (mantém raio em pílula e o mesmo fundo lido pelos testes).
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            visible: control.primary
+            opacity: control.hovered ? 1 : 0.88
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0; color: Theme.accent }
+                GradientStop { position: 1; color: Theme.accentAlt }
+            }
+            Behavior on opacity { NumberAnimation { duration: Theme.motion } }
+        }
     }
 }
