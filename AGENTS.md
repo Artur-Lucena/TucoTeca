@@ -6,19 +6,19 @@ Antes de editar, confirme o diretório e `git status --short --branch`.
 
 | Pasta | Branch esperado | Responsabilidade |
 |---|---|---|
-| `assistentes/Assistente 1` | `assistentes/a1-1.1.0` | Interface Qt, controle e ferramentas dos emuladores |
-| `assistentes/Assistente 2` | `assistentes/a2-1.1.0` | Núcleo, Everything e integrações |
-| `assistentes/Assistente 3` | `assistentes/a3-1.1.0` | Testes, segurança, CI e documentação |
+| `areas/Assistente 1` | `assistentes/a1-1.1.0` | Interface Qt, controle e ferramentas dos emuladores |
+| `areas/Assistente 2` | `assistentes/a2-1.1.0` | Núcleo, Everything e integrações |
+| `areas/Assistente 3` | `assistentes/a3-1.1.0` | Testes, segurança, CI e documentação |
 
 Nos worktrees acima, leia `.assistente/TAREFAS.md` e o roadmap compartilhado em
-`../ROADMAP.md`. Leia também `CONTRIBUTING.md` e a arquitetura pertinente.
+`../ROADMAP.md`. Leia também `docs/CONTRIBUTING.md` e a arquitetura pertinente.
 Se pasta/branch não coincidir, ou os arquivos de coordenação estiverem ausentes,
 pare e peça orientação; não troque branch nem recrie a estrutura automaticamente.
 Fora dessas três áreas, estas regras são gerais e a atribuição é do coordenador.
 
 Duas outras pastas existem e **não** recebem prompt de assistente:
-`revisao/` (branch `revisao/assistentes-1.1.0`, área de revisão do coordenador)
-e `Dev/trabalho` (branch `dev/trabalho`, área de trabalho do coordenador).
+`areas/revisao/` (branch `revisao/assistentes-1.1.0`, área de revisão do coordenador)
+e `areas/trabalho` (branch `dev/trabalho`, área de trabalho do coordenador).
 
 Branches da rodada anterior — `assistentes/assistente-1`,
 `assistentes/assistente-2`, `assistentes/assistente-3` e

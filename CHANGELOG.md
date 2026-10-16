@@ -5,7 +5,7 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
-Planejamento da 1.1.0 segue no roadmap da coordenação (`assistentes/ROADMAP.md`).
+Planejamento da 1.1.0 segue no roadmap da coordenação (`areas/ROADMAP.md`).
 
 ## [1.0.2] — 14/10/2026
 

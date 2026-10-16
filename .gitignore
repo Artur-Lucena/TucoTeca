@@ -40,8 +40,8 @@ htmlcov/
 .ruff_cache/
 .venv/
 
-# Infraestrutura local dos assistentes (nao publicar)
-/assistentes/
+# Infraestrutura local das areas de trabalho (nao publicar)
+/areas/
 /.assistente/
 /INICIAR_CHAT.cmd
 /INICIAR_CHAT.sh
