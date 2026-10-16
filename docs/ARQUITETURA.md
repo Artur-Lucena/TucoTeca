@@ -18,7 +18,7 @@ flowchart TD
   Compat --> Network[rede / adaptadores remotos explícitos]
   Services --> Personal[saves / perfis / estatísticas / arquivos]
   DB --> Dados[dados / estado do usuário]
-  Builders[montar_* / copiar_app] --> Dist[dist / artefatos]
+  Builders[montar_* / build_utils / copiar_app] --> Dist[dist / artefatos]
 ```
 
 Os frontends usam a mesma persistência. As regras ficam no núcleo; a GUI
@@ -119,6 +119,7 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 | `frontends/app_tui.py` + `tui_*.py` | Tui em mixins por domínio (entry point e `tui.curses` patchável preservados) |
 | `frontends/despacho.py` | callbacks de workers entregues pela thread Tk |
 | `frontends/aparencia.py` | tema local, elementos nine-slice, barras adaptáveis e painéis roláveis |
+| `ferramentas/build_utils.py` | comum aos builders: SHA-256 de arquivo, escritor único de `.tar.xz` (Win/Linux/Mac, com diretórios) e download verificado (cache + `.part` atômico) |
 | `ferramentas/diagnosticar.py` | sintaxe/exports/dependências/pastas/SQLite somente-leitura |
 | `ferramentas/empacotar_fontes.py` | entrega da árvore atual + SHA-256 sem coleção |
 | `ferramentas/montar_portatil.py` | Windows, Python embutido/Tk, ZIP/tar.xz/Inno e `copiar_app` |
@@ -283,4 +284,6 @@ preservados). A decomposição futura deve seguir domínios
 (catálogo, áudio, diálogos, sessões), mantendo contratos e fixtures antes
 de mover métodos. Desejos, Hydra, sessões manuais e adaptadores remotos já
 foram extraídos; isso não significa decomposição integral dos módulos grandes.
-`despacho.py` e `copiar_app` são fronteiras já extraídas.
+`despacho.py` e `copiar_app` são fronteiras já extraídas; `build_utils.py`
+concentra o que os três builders compartilham (SHA-256, escritor único de
+`.tar.xz` e download verificado), sem duplicar lógica de empacotamento.
