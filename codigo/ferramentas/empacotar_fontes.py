@@ -16,11 +16,11 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[2]
 IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git", ".provas",
              ".pytest_cache", ".ruff_cache", ".venv"}
-RAIZ_ARQUIVOS = {"README.md", "CONTRIBUTING.md", "LICENSE", ".gitignore", ".gitattributes",
+RAIZ_ARQUIVOS = {"README.md", "docs/CONTRIBUTING.md", "LICENSE", ".gitignore", ".gitattributes",
                  "BibliotecaHub.bat", "BibliotecaHub.sh", "BibliotecaHubMac.command",
-                  "Montar-Universal.bat", "requirements-ui.txt"}
-RAIZ_ARQUIVOS.update({"TucoTeca.bat", "VERSION", "CHANGELOG.md", "SECURITY.md",
-                      "pyproject.toml", "conftest.py", "requirements-extras.txt"})
+                  "codigo/ferramentas/Montar-Universal.bat", "codigo/ferramentas/requirements-ui.txt"}
+RAIZ_ARQUIVOS.update({"TucoTeca.bat", "VERSION", "CHANGELOG.md", "docs/SECURITY.md",
+                      "pyproject.toml", "conftest.py", "codigo/ferramentas/requirements-extras.txt"})
 EXTENSOES = {"codigo": {".py", ".iss", ".qml"}, "docs": {".md"},
               ".github": {".yml", ".yaml", ".md"}, "midia": {".png", ".jpg", ".jpeg"}}
 

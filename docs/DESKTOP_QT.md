@@ -137,7 +137,7 @@ ações explícitas do usuário.
 ## Desenvolvimento e verificação
 
 ```powershell
-py -3.14 -m pip install -r requirements-ui.txt
+py -3.14 -m pip install -r codigo/ferramentas/requirements-ui.txt
 py -3.14 codigo/frontends/desktop.py
 py -3.14 codigo/frontends/desktop.py --big-picture
 py -3.14 codigo/frontends/desktop.py --classico
@@ -157,7 +157,7 @@ rodar sem Qt (casos de GUI Qt são marcados como pulados).
 ## Empacotamento e licenças
 
 `copiar_app()` inclui Python, QML e `qmldir`. O pacote de fontes inclui
-`requirements-ui.txt`. `montar_superhub.py` inclui PySide6-Essentials e
+`codigo/ferramentas/requirements-ui.txt`. `montar_superhub.py` inclui PySide6-Essentials e
 shiboken6 6.10.2, recursos/plugins e metadados/licenças das distribuições,
 e executa o selftest do dispatcher no runtime montado. O builder exige
 essas versões no ambiente de build. Portáteis mínimos sem Qt usam tkinter.

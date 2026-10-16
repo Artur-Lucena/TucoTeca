@@ -3,7 +3,7 @@
 ## Ambiente e primeiro ciclo
 
 1. Use Python 3.10+ para o núcleo; o desktop principal é Qt/PySide6
-   (`requirements-ui.txt`). `requirements-extras.txt` adiciona Chromium e
+   (`codigo/ferramentas/requirements-ui.txt`). `codigo/ferramentas/requirements-extras.txt` adiciona Chromium e
    QtMultimedia para a variante completa (não implementa gamepad).
    Tk é usado pelas ferramentas clássicas.
    O desenvolvimento local Windows usa Python oficial 3.14.
@@ -34,7 +34,7 @@ python3 codigo/ferramentas/testes/executar.py --modulo test_linux_portabilidade
 
 `--selftest` usa tela simulada e também pode rodar no Windows sem curses.
 Para a TUI interativa Linux, execute `./BibliotecaHub.sh` em um terminal.
-Matriz de compatibilidade e procedimentos: [revisão Linux](docs/REVISAO_LINUX_W11.md).
+Matriz de compatibilidade e procedimentos: [revisão Linux](REVISAO_LINUX_W11.md).
 
 ## Pontos de entrada para mudanças
 
@@ -52,13 +52,13 @@ Matriz de compatibilidade e procedimentos: [revisão Linux](docs/REVISAO_LINUX_W
 - Desktop Qt: `app_qt.py`, `qt_bridge/` e `servicos_ui/` (pacotes com mixins
   por domínio; a superfície Qt — sinais/properties — mora em
   `qt_bridge/__init__.py`) e `qml/`.
-  Instale `requirements-ui.txt`; arquitetura e matriz de migração em
-  [DESKTOP_QT](docs/DESKTOP_QT.md). Testes: `executar.py --modulo test_qt`.
+  Instale `codigo/ferramentas/requirements-ui.txt`; arquitetura e matriz de migração em
+  [DESKTOP_QT](DESKTOP_QT.md). Testes: `executar.py --modulo test_qt`.
 - Terminal Linux/macOS: `app_tui.py` + mixins `tui_*.py`.
 - Clássico Windows (congelado): `app_win.py` + mixins `app_win_*.py`.
 - Layout dos bundles: `montar_portatil.copiar_app`, usado pelos três builders.
 
-O índice detalhado está em [ARQUITETURA](docs/ARQUITETURA.md).
+O índice detalhado está em [ARQUITETURA](ARQUITETURA.md).
 
 ## Convenções
 
@@ -199,7 +199,7 @@ uma alteração na UI não deve absorver silenciosamente trabalho paralelo.
    Essa publicação é explícita — nenhum script do projeto publica sozinho.
 
 O procedimento detalhado e o inventário de anexos estão em
-[docs/RELEASES.md](docs/RELEASES.md).
+[RELEASES.md](RELEASES.md).
 
 O pacote de coleção do Hub continua sendo o caminho para levar a biblioteca
 pessoal entre máquinas; a release nunca a inclui.

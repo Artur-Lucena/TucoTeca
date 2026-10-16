@@ -229,7 +229,7 @@ def incluir_qt(raiz: Path, extras="essencial"):
     for nome in nomes:
         dist = distribution(nome)
         if dist.version != "6.10.2":
-            raise ValueError("Instale requirements-ui.txt antes de montar o runtime Qt.")
+            raise ValueError("Instale codigo/ferramentas/requirements-ui.txt antes de montar o runtime Qt.")
         for arquivo in dist.files or []:
             if ".." in arquivo.parts or "__pycache__" in arquivo.parts or arquivo.suffix == ".pyc":
                 continue

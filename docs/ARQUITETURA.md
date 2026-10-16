@@ -31,14 +31,14 @@ locais deliberados para desfazer ciclos entre banco, scanners e providers.
 ```text
 Tucoteca/
 ├── README.md                         entrada funcional e técnica
-├── CONTRIBUTING.md                   ambiente, testes e colaboração
 ├── LICENSE                           licença do código do Hub
 ├── TucoTeca.bat                       entrada Windows; BibliotecaHub.bat é alias
 ├── BibliotecaHub.sh/Mac.command       entradas Linux/macOS legadas
-├── Montar-Universal.bat               entrada de empacotamento
 ├── .github/workflows/                matriz de testes
 ├── docs/
 │   ├── ARQUITETURA.md                 este mapa
+│   ├── CONTRIBUTING.md                ambiente, testes e colaboração
+│   ├── SECURITY.md                    canal de contato de segurança
 │   └── REVISAO_TECNICA.md             achados e evidência da revisão
 ├── codigo/
 │   ├── bib_core.py                   fachada de compatibilidade
@@ -47,6 +47,8 @@ Tucoteca/
 │   ├── frontends/                    Qt, clássico e TUI
 │   │   └── qml/secoes/               telas carregadas por Loader
 │   ├── ferramentas/                  diagnóstico, entrega e builders
+│   │   ├── Montar-Universal.bat       entrada de empacotamento
+│   │   ├── requirements-*.txt         dependências de interface
 │   │   └── testes/                   casos e runner em sandbox
 │   └── historico/                    arquivo local, ignorado
 ├── midia/fontes-capas/                opcional: placeholders gerados localmente

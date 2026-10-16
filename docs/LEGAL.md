@@ -52,7 +52,7 @@ Algumas integrações acessam serviços que têm termos próprios. Ao usá-las, 
   respectivos titulares e são usados apenas para exibição na sua biblioteca
   pessoal.
 - Remoção de conteúdo indevido: se você é titular de direitos sobre algo
-  citado no projeto, entre em contato pelo canal indicado em `SECURITY.md` e o
+  citado no projeto, entre em contato pelo canal indicado em `docs/SECURITY.md` e o
   material será revisado.
 
 ## Escopo de uso

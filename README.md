@@ -13,7 +13,7 @@ precisar estar online para abri-la. É um projeto pessoal de Tuco e Isa,
 feito para o uso do dia a dia — com os limites documentados, não escondidos.
 
 [Baixar a release privada](https://github.com/Artur-Lucena/Projeto-Launcher/releases/tag/v1.0.2)
-· [Como começar](#primeiros-passos) · [Desenvolvimento](CONTRIBUTING.md)
+· [Como começar](#primeiros-passos) · [Desenvolvimento](docs/CONTRIBUTING.md)
 
 - **A coleção é sua.** Fica em `dados/`, na sua máquina. Nenhum servidor
   próprio, nenhuma telemetria, nenhum login obrigatório.
@@ -48,7 +48,7 @@ Compare o resultado com a linha correspondente em `SHA256SUMS.txt`.
 No Windows, com Python instalado:
 
 ```powershell
-py -3.14 -m pip install -r requirements-ui.txt
+py -3.14 -m pip install -r codigo/ferramentas/requirements-ui.txt
 py -3.14 codigo/frontends/desktop.py
 ```
 
@@ -140,8 +140,8 @@ Algumas coisas continuam fora do escopo desta versão:
 | Recurso | O que precisa |
 |---|---|
 | Núcleo, banco e testes | Python 3.10+ (só biblioteca padrão) |
-| Interface principal | PySide6-Essentials 6.10.2 (`requirements-ui.txt`) |
-| YouTube embutido e vídeo interno | `requirements-extras.txt` (PySide6-Addons, variante completa) |
+| Interface principal | PySide6-Essentials 6.10.2 (`codigo/ferramentas/requirements-ui.txt`) |
+| YouTube embutido e vídeo interno | `codigo/ferramentas/requirements-extras.txt` (PySide6-Addons, variante completa) |
 | Interface clássica | tkinter/Tcl/Tk |
 | TUI no Linux | curses (biblioteca padrão do Python) |
 | Imagens JPG/WebP | Pillow (opcional; PNG/GIF funcionam sem ele) |
@@ -236,7 +236,7 @@ display são marcados como `SKIP`, não como falha.
 
 A mesma suíte roda na CI do GitHub em Windows e Linux, Python 3.10 e 3.14, com
 e sem Qt, mais uma verificação de segredos no histórico. O guia de colaboração
-é o [CONTRIBUTING.md](CONTRIBUTING.md).
+é o [CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ## Privacidade e legal
 
@@ -271,4 +271,4 @@ Confira se o ZIP foi extraído inteiro e abra `Debug-Console.bat` para ver a
 mensagem de erro. Para desenvolvimento, use `codigo/ferramentas/diagnosticar.py`.
 Ao relatar um problema, informe a versão, a variante, seu sistema e os passos
 para reproduzir — não anexe seu banco, saves ou credenciais. Use os modelos
-de issue deste repositório; para informações sensíveis, consulte [SECURITY.md](SECURITY.md).
+de issue deste repositório; para informações sensíveis, consulte [SECURITY.md](docs/SECURITY.md).

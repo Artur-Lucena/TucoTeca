@@ -1,7 +1,7 @@
 # Índice da documentação
 
 Mapa por tema dos documentos em `docs/`. Comece por `ARQUITETURA.md` para
-se localizar; o fluxo de colaboração está em `CONTRIBUTING.md` (raiz).
+se localizar; o fluxo de colaboração está em `docs/CONTRIBUTING.md`.
 
 ## Mapa e interface
 

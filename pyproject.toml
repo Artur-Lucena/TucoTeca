@@ -72,7 +72,7 @@ select = ["E", "F", "W", "I"]
 #        emuladores<->sessoes_manuais, musicas<->rede.metadados,
 #        baixar<->rede.binarios) ou antecedem o ajuste de sys.path nos
 #        builders. Mover para o topo quebraria o carregamento do nucleo;
-#        a convencao esta documentada em CONTRIBUTING.md e ARQUITETURA.md.
+#        a convencao esta documentada em docs/CONTRIBUTING.md e docs/ARQUITETURA.md.
 # F403 - as fachadas de pacote (scans/, emuladores/) reexportam via
 #        `import *` + `__all__` para preservar os contratos das fatias F1/F2;
 #        bib_core.py passou a usar imports nomeados (lista literal __all__).

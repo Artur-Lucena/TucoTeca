@@ -591,7 +591,7 @@ def teste_qt_fontes_e_builders_incluem_recursos_qml():
     import montar_portatil as montar
     repo = Path(__file__).parents[3]
     fontes = {p.relative_to(repo).as_posix() for p in pacote.listar_fontes(repo)}
-    for nome in ("requirements-ui.txt", "codigo/frontends/qml/qmldir",
+    for nome in ("codigo/ferramentas/requirements-ui.txt", "codigo/frontends/qml/qmldir",
                  "codigo/frontends/qml/Main.qml", "codigo/frontends/desktop.py"):
         afirmar(nome in fontes, "entrega sem " + nome)
     dest = Path(tempfile.mkdtemp()) / "app"
