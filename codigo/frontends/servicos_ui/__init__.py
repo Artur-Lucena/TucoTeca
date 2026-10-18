@@ -34,6 +34,7 @@ from .mix_saneamento import MixSaneamento
 from .mix_scans import MixScans
 from .mix_sessoes import MixSessoes
 from .mix_torrents import MixTorrents
+from .modulos import Modulo, modulos_padrao
 from .sistema import _sem_acento, busca_global, capa_url, resumo_sistema, saude_colecao
 
 
@@ -61,6 +62,7 @@ class ServicoBiblioteca(MixNucleo, MixScans, MixSaneamento, MixSessoes,
 
 __all__ = ["ServicoBiblioteca", "Integracao", "RegistroIntegracoes",
            "INTEGRACAO_TIPOS", "CHAVES_PADRAO", "_CORES",
+           "Modulo", "modulos_padrao",
            "_arquivo_personalizadas", "carregar_personalizadas",
            "_validar_personalizada", "salvar_personalizada",
            "remover_personalizada", "integracoes_padrao", "url_integracao",

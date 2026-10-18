@@ -124,15 +124,17 @@ imprime `[ok] selftest Electron: N jogos; ponte, módulos e Início carregados`;
 
 **Arquivos:** criar `codigo/frontends/servicos_ui/modulos.py`, `codigo/ferramentas/testes/test_modulos_hub.py`; editar `codigo/frontends/servicos_ui/__init__.py` (reexport).
 
-- [ ] Escrever `test_modulos_hub.py` primeiro, com o padrão de isolamento dos testes existentes:
+- [x] Escrever `test_modulos_hub.py` primeiro, com o padrão de isolamento dos testes existentes
+      (o 3º teste cobre nomes/descrições/ícones — superset do planejado):
       `teste_modulos_padrao_chaves_e_ordem` (8 módulos, chaves/ordem exatas do HUD),
       `teste_apresentar_json_safe` (`json.dumps` passa; campos `chave,nome,descricao,icone,ordem`),
       `teste_descricoes_presentes` (toda descrição não vazia — espelho do `Main.qml`).
-- [ ] Rodar e ver falhar:
-      `py -3.14 -B codigo/ferramentas/testes/executar.py --modulo test_modulos_hub`
-- [ ] Implementar `modulos.py` (dataclass congelado + `modulos_padrao()`) e reexport no
-      `__init__.py`. Textos de descrição: usar as "dicas" do `Main.qml` (linhas 48-56) como base.
-- [ ] Gate: módulo verde + `ruff check codigo` limpo nos arquivos novos.
+- [x] Rodar e ver falhar: `py -3.14 -B codigo/ferramentas/testes/executar.py --modulo test_modulos_hub`
+      → falhou 3/3 com `ModuleNotFoundError: servicos_ui.modulos` (motivo certo).
+- [x] Implementar `modulos.py` (dataclass congelado + `modulos_padrao()`) e reexport no
+      `__init__.py` (import + `__all__`). Textos de descrição vieram das "dicas" do `Main.qml`.
+- [x] Gate: 3/3 PASS + `ruff check codigo conftest.py` limpo no repo inteiro
+      (`ruff` roda da venv `.provas/venv-ruff` — o Python global não tem o pacote).
 
 **Commit 2:** `frontend: registro de modulos do desktop (F0)`
 
