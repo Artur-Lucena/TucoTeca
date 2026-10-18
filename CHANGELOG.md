@@ -29,6 +29,13 @@ no Windows; a TUI curses continua para Linux/macOS.
   preload isolado, protocolo `tucoteca-img://` restrito à coleção, selftest
   com screenshot) e tela Início com "Continuar jogando". Documentado em
   `docs/DESKTOP_ELECTRON.md`; o Qt Quick segue como desktop atual até a F5.
+- Shell do desktop Electron (F1): paleta de busca global `Ctrl+K`/`Ctrl+F`
+  (busca no núcleo via ponte, sem acento), atalhos pessoais `Ctrl+1..8`,
+  notificações com sino/contador, perfis Tuco/Isa persistidos em
+  `dados/preferencias-pessoais.json`, gamepad via Gamepad API do Chromium,
+  menu do app (Sobre/Exibir/Ajuda, `F12` DevTools, `Alt` mostra a barra) e
+  queda/reconexão da ponte sem reiniciar (banner com **Reconectar**; lock
+  órfão de pid morto no mesmo host/SO é assumido, lock vivo segue recusado).
 
 ### Alterado
 

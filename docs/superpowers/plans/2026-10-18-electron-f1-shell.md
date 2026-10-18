@@ -729,7 +729,7 @@ git commit -m "electron: reabertura da ponte sem travar a UI (F1)"
 - Produces: `montarMenu(opcoes: { raiz: string; aoAbrirSobre: () => void })` devolvendo
   `MenuItemConstructorOptions[]` (função pura de template, testável por leitura).
 
-- [ ] **Step 1: Implementar `menu.ts` + `setApplicationMenu`**
+- [x] **Step 1: Implementar `menu.ts` + `setApplicationMenu`**
   - Menu: **TucoTeca** (Sobre…, Separador, Sair role `quit`); **Exibir** (Recarregar `CmdOrCtrl+R`
     role `reload`, Ferramentas de desenvolvedor `F12` com `toggleDevTools`, Separador, zoom
     in/out/reset, Tela cheia `F11` role `togglefullscreen`); **Ajuda** (Documentação →
@@ -737,25 +737,38 @@ git commit -m "electron: reabertura da ponte sem travar a UI (F1)"
     `shell.openPath`, Aviso legal → `docs/LEGAL.md`).
   - "Sobre": `dialog.showMessageBox` com versão (`VERSION`), home da coleção e versão do Electron.
   - `autoHideMenuBar` continua true (menu acessível com Alt; aceleradores funcionam sempre).
+  - Notas: teste `menu.test.ts` (RED→verde, `vi.mock('electron')`); o hack
+    `before-input-event` de F12 do F0 saiu (o acelerador do menu é o caminho oficial);
+    "Sobre" lê o `VERSION` da raiz e mostra home + versão do Electron.
 
-- [ ] **Step 2: Rodada completa** (`git diff --check` antes):
-  - `py -3.14 -B codigo/ferramentas/testes/executar.py` — esperado 526+/526 (novos casos da Task 1).
-  - `.provas/venv-ruff/Scripts/ruff.exe check codigo conftest.py`.
-  - `npm --prefix codigo/frontends/electron run test/typecheck/build` — esperado 55+ testes.
-  - Selftest com home semeada: `[ok] selftest Electron: 3 jogos …` rc 0 + screenshot revisado
-    (chip de perfil e sino visíveis); home vazia sem erro.
+- [x] **Step 2: Rodada completa** (`git diff --check` antes):
+  - `py -3.14 -B codigo/ferramentas/testes/executar.py` — 526/526 (6 pulados) ✓.
+  - `.provas/venv-ruff/Scripts/ruff.exe check codigo conftest.py` — "All checks passed!" ✓.
+  - `npm --prefix codigo/frontends/electron run test/typecheck/build` — 55/55 vitest,
+    typecheck e build verdes ✓.
+  - Selftest semeada: `[ok] selftest Electron: 3 jogos …` rc 0; screenshot
+    `f1-selftest.png` revisado (chip Tuco e sino/contador visíveis) ✓. Home vazia:
+    `0 jogos` rc 0 (`f1-selftest-vazio.png`) ✓.
 
-- [ ] **Step 3: Checklist manual (documentar resultados no relatório)**
-  - `npm run dev` com `BIBLIOTECA_HOME` de prova: Ctrl+K abre/`Esc` fecha; digitar "pokemon"
-    acha o jogo semeado; Enter navega; Ctrl+1..8 trocam seção; chip alterna TukO/Isa e persiste
-    (`preferencias-pessoais.json` no home de prova); Ctrl+R recarrega sem processo Python órfão;
-    matar o Python → banner → Reconectar volta; `Alt` mostra o menu; F11 tela cheia.
-  - Gamepad: sem hardware — registrar como não provado fisicamente.
+- [x] **Step 3: Checklist do shell** (automatizado em `.provas/electron/prova-shell.ps1` +
+  `prova-queda.ps1`; adaptações honestas):
+  - Ctrl+K abre / `Esc` fecha ✓; a busca achou "Celeste" (a home de prova tem
+    Celeste/Hollow Knight/Stardew Valley — não existe "pokemon" no seed); Enter navegou
+    para Jogos ✓; `Ctrl+3`/`Ctrl+1` trocaram de seção ✓; o chip alternou para Isa e
+    persistiu em `preferencias-pessoais.json` (e voltou a Tuco) ✓; `Ctrl+R` recarregou sem
+    processo Python órfão ✓; matar o Python → banner → Reconectar voltou (prova da Task 5) ✓.
+  - `F11` e `Alt` são atalhos nativos: tecla via CDP não os dispara e a janela perde o
+    primeiro plano durante a prova — a rodada final usa `keybd_event` com foco verificado
+    (`f1-janela-fullscreen.png`; `f1-janela-menu.png` com TucoTeca/Exibir/Ajuda na moldura).
+  - Gamepad: sem hardware — não provado fisicamente (só unidade), registrado no relatório.
 
-- [ ] **Step 4: Docs** — `docs/DESKTOP_ELECTRON.md`: novos métodos da ponte na tabela, atalhos,
-  gamepad (API do Chromium; limites), reconexão e menu; changelog "Não lançado" ganha a fatia F1.
+- [x] **Step 4: Docs** — `docs/DESKTOP_ELECTRON.md` ganhou a fatia F1 (título, métodos
+  `nucleo.buscar`/`preferencias.*` na tabela, nova seção "Shell da F1": paleta, atalhos,
+  notificações, perfis, gamepad, reconexão e menu, além das provas E2E); o changelog
+  "Não lançado" ganhou a fatia F1 em **Adicionado**.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** — `electron: menu, provas e docs da F1` (hash no ledger do SDD);
+  entraram também `menu.test.ts` (TDD) e estas notas.
 
 ```bash
 git add codigo/frontends/electron/src/main/menu.ts codigo/frontends/electron/src/main/index.ts docs/DESKTOP_ELECTRON.md CHANGELOG.md

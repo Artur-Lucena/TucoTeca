@@ -1,8 +1,9 @@
-import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from 'electron'
-import { existsSync, writeFileSync } from 'node:fs'
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'electron'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { registrarProtocoloMidia } from './arquivos'
 import { lockOrfao } from './lock'
+import { montarMenu } from './menu'
 import { ClientePonte } from './ponte'
 
 protocol.registerSchemesAsPrivileged([
@@ -83,6 +84,40 @@ function falhar(mensagem: string, codigo: number): void {
   app.exit(codigo)
 }
 
+function lerVersao(): string {
+  try {
+    const texto = readFileSync(join(RAIZ, 'VERSION'), 'utf8').trim()
+    return texto === '' ? 'desconhecida' : texto
+  } catch {
+    return 'desconhecida'
+  }
+}
+
+function mostrarSobre(): void {
+  const versao = lerVersao()
+  const detalhe = [
+    `Versão ${versao}`,
+    `Coleção: ${HOME}`,
+    `Electron ${process.versions.electron}`,
+  ].join('\n')
+  const opcoes = {
+    type: 'info' as const,
+    title: 'Sobre o TucoTeca',
+    message: 'TucoTeca',
+    detail: detalhe,
+    buttons: ['Fechar'],
+  }
+  const [janela] = BrowserWindow.getAllWindows()
+  if (janela) void dialog.showMessageBox(janela, opcoes)
+  else void dialog.showMessageBox(opcoes)
+}
+
+function instalarMenu(): void {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(montarMenu({ raiz: RAIZ, aoAbrirSobre: mostrarSobre })),
+  )
+}
+
 function criarJanela(): BrowserWindow {
   const janela = new BrowserWindow({
     width: 1440,
@@ -145,6 +180,7 @@ async function principal(): Promise<void> {
   }
 
   registrarProtocoloMidia(() => HOME)
+  instalarMenu()
 
   ipcMain.handle('ponte:chamar', (_evento, metodo: string, params?: Record<string, unknown>) => {
     const cliente = ponte
@@ -199,13 +235,6 @@ async function principal(): Promise<void> {
   process.stdout.write(`[ok] selftest Electron: ${jogos} jogos; ponte, módulos e Início carregados\n`)
   app.exit(0)
 }
-
-// F12 abre o DevTools (dev e diagnostico local; sem menu visivel).
-app.on('browser-window-created', (_evento, janela) => {
-  janela.webContents.on('before-input-event', (_e, entrada) => {
-    if (entrada.type === 'keyDown' && entrada.key === 'F12') janela.webContents.toggleDevTools()
-  })
-})
 
 const primeira = app.requestSingleInstanceLock()
 if (!primeira) {
