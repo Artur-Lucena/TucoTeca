@@ -1019,6 +1019,50 @@ def teste_ponte_videos_importar_cria_job():
     afirmar(r["ok"] is True and "trabalho" in r["resultado"], r)
 
 
+def teste_ponte_youtube_buscar_offline():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-youtube-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    antigo = __import__("os").environ.get("BIBLIOTECA_REDE")
+    __import__("os").environ["BIBLIOTECA_REDE"] = "0"
+    try:
+        r = _chamar(ponte, {"id": 240, "metodo": "videos.buscar_online",
+                            "params": {"termo": "celeste", "limite": 5}})
+    finally:
+        if antigo is None:
+            __import__("os").environ.pop("BIBLIOTECA_REDE", None)
+        else:
+            __import__("os").environ["BIBLIOTECA_REDE"] = antigo
+    afirmar(r["ok"] is False and "rede" in r["erro"].lower(), r)
+
+
+def teste_ponte_youtube_baixar_cria_job():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-youtube-2-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    r = _chamar(ponte, {"id": 241, "metodo": "videos.baixar",
+                        "params": {"video_id": "abc123"}})
+    afirmar(r["ok"] is True and "trabalho" in r["resultado"], r)
+
+
+def teste_ponte_youtube_baixar_mp3_cria_job():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-youtube-3-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    r = _chamar(ponte, {"id": 242, "metodo": "videos.baixar_mp3",
+                        "params": {"video": {"video_id": "abc123", "titulo": "X"}}})
+    afirmar(r["ok"] is True and "trabalho" in r["resultado"], r)
+
+
 def teste_ponte_registrar_horas():
     class ServicoHoras(ServicoFalso):
         def registrar_sessao(self, gid, horas):

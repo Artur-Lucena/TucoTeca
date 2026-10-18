@@ -284,6 +284,16 @@ def _videos_reproduzir(servico, params) -> dict:
     return servico.reproduzir_video(ident, reprodutor.strip())
 
 
+def _videos_buscar_online(servico, params) -> list:
+    termo = params.get("termo", "")
+    if not isinstance(termo, str) or not termo.strip():
+        raise ValueError("termo deve ser um texto")
+    limite = params.get("limite", 10)
+    if isinstance(limite, bool) or not isinstance(limite, int) or limite <= 0:
+        raise ValueError("limite deve ser um inteiro positivo")
+    return servico.buscar_videos_online(termo.strip(), limite)
+
+
 def _conquistas_avaliar(servico, params) -> dict:
     ident = _inteiro(params, "id")
     return servico.avaliar_conquistas(ident)
@@ -506,6 +516,7 @@ METODOS = {
     "videos.local": _videos_local,
     "videos.salvar_posicao": _videos_salvar_posicao,
     "videos.reproduzir": _videos_reproduzir,
+    "videos.buscar_online": _videos_buscar_online,
     "conquistas.avaliar": _conquistas_avaliar,
     "capas.buscar": _capas_buscar,
     "capas.aplicar": _capas_aplicar,
@@ -639,6 +650,8 @@ class Ponte:
             "musicas.baixar_fila": self._musicas_baixar_fila,
             "torrents.importar": self._torrents_importar,
             "videos.importar": self._videos_importar,
+            "videos.baixar": self._videos_baixar,
+            "videos.baixar_mp3": self._videos_baixar_mp3,
             "jogos.importar": self._importar_jogos,
         })
         self.metodos = base
@@ -787,6 +800,44 @@ class Ponte:
         titulo = Path(pasta).name or "pasta"
         return {"trabalho": self.trabalhos.iniciar(f"Importar jogos {titulo}", tarefa,
                                                   escopo="jogos")}
+
+    def _videos_baixar(self, servico, params) -> dict:
+        video_id = params.get("video_id")
+        if not isinstance(video_id, str) or not video_id.strip():
+            raise ValueError("video_id deve ser um texto")
+        video_id = video_id.strip()
+
+        def tarefa(progresso, cancelado):
+            if cancelado.is_set():
+                raise ValueError("Download cancelado.")
+            progresso(10)
+            resultado = servico.baixar_video_online(video_id, progresso)
+            progresso(100)
+            detalhe = dict(resultado) if isinstance(resultado, dict) else {}
+            detalhe.setdefault("aviso", "Vídeo baixado.")
+            return detalhe
+
+        return {"trabalho": self.trabalhos.iniciar(f"Baixar vídeo {video_id}", tarefa,
+                                                  escopo="videos")}
+
+    def _videos_baixar_mp3(self, servico, params) -> dict:
+        video = params.get("video")
+        if not isinstance(video, dict):
+            raise ValueError("video deve ser um objeto")
+
+        def tarefa(progresso, cancelado):
+            if cancelado.is_set():
+                raise ValueError("Download cancelado.")
+            progresso(10)
+            resultado = servico.baixar_mp3(video, progresso)
+            progresso(100)
+            detalhe = dict(resultado) if isinstance(resultado, dict) else {}
+            detalhe.setdefault("aviso", "MP3 baixado.")
+            return detalhe
+
+        titulo = str(video.get("titulo") or "video")
+        return {"trabalho": self.trabalhos.iniciar(f"Baixar MP3 {titulo}", tarefa,
+                                                  escopo="videos")}
 
     def _jogo_registrar_horas(self, servico, params) -> dict:
         ident = _inteiro(params, "id")

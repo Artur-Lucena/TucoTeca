@@ -28,6 +28,7 @@ import { Integracoes } from './vistas/Integracoes'
 import { Jogos } from './vistas/Jogos'
 import { Musicas } from './vistas/Musicas'
 import { Videos } from './vistas/Videos'
+import { YouTube } from './vistas/YouTube'
 import { Placeholder } from './vistas/Placeholder'
 
 const DESTINO_DO_ITEM: Record<string, string> = {
@@ -364,6 +365,8 @@ export function App() {
               <Downloads aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
             ) : ativo.chave === 'videos' ? (
               <Videos aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
+            ) : ativo.chave === 'youtube' ? (
+              <YouTube aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
             ) : ativo.chave === 'configuracoes' ? (
               <Configuracoes aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
             ) : (
