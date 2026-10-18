@@ -244,7 +244,9 @@ git commit -m "frontend: busca e preferencias na ponte (F1)"
   (regra do Review Focus 3: com a paleta aberta, `Ctrl+K`/`Ctrl+F` fecham e atalhos de seção são
   ignorados); `reduzirPaleta`, `paletaInicial`, tipos `ItemBusca`/`EstadoPaleta`/`EventoPaleta`.
 
-- [ ] **Step 1: Testes que falham** — `atalhos.test.ts`:
+- [x] **Step 1: Testes que falham** — `atalhos.test.ts` e `estado/paleta.test.ts` (uma
+      expectativa do plano estava errada: `selecionar 99` prende ao último item, não a 0 — teste
+      corrigido antes de implementar):
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -344,13 +346,17 @@ describe('reduzirPaleta', () => {
 })
 ```
 
-- [ ] **Step 2: Rodar e ver falhar** — `npm --prefix codigo/frontends/electron run test` (módulos não existem).
+- [x] **Step 2: Rodar e ver falhar** — 2 suítes falharam por import ausente; 28 antigos verdes.
 
-- [ ] **Step 3: Implementar `atalhos.ts`** — `combinacao` normaliza: `key` de 1 caractere vira maiúsculo; mapa `Arrow*→Up/Down/Left/Right`, `' '→Space`, `PageUp→PgUp`, `PageDown→PgDown`, demais nomes válidos do validador Python (Enter, Escape, Tab, Backspace, Delete, Home, End) e `F1..F35`; monta `Ctrl+Alt+Shift+Meta+Tecla` nessa ordem. `acaoDoAtalho` inverte `atalhos` (`paleta`/`buscar` → `{tipo:'paleta'}`; chave de seção → `{tipo:'secao'}`; qualquer outra ação, inclusive `tela_cheia`, → `null`). `decidirAtalho(paletaAberta, comb, atalhos)` aplica a regra de foco do Review Focus 3.
+- [x] **Step 3: Implementar `atalhos.ts`** — `combinacao` normaliza: `key` de 1 caractere vira maiúsculo; mapa `Arrow*→Up/Down/Left/Right`, `' '→Space`, `PageUp→PgUp`, `PageDown→PgDown`, demais nomes válidos do validador Python (Enter, Escape, Tab, Backspace, Delete, Home, End) e `F1..F35`; monta `Ctrl+Alt+Shift+Meta+Tecla` nessa ordem. `acaoDoAtalho` inverte `atalhos` (`paleta`/`buscar` → `{tipo:'paleta'}`; chave de seção → `{tipo:'secao'}`; qualquer outra ação, inclusive `tela_cheia`, → `null`). `decidirAtalho(paletaAberta, comb, atalhos)` aplica a regra de foco do Review Focus 3.
 
-- [ ] **Step 4: Implementar `estado/paleta.ts`** — tipos e `reduzirPaleta` conforme os testes; `carregando: boolean` só de conveniência: `digitou` liga, `resultados` desliga; `resultados` com `evento.termo !== estado.termo` retorna o estado intacto; `baixo/cima` com lista vazia mantém `selecionado` em 0.
+- [x] **Step 4: Implementar `estado/paleta.ts`** — tipos e `reduzirPaleta` conforme os testes (guard de resposta obsoleta por termo; `prender` cobre clamp e inválidos); `carregando: boolean` só de conveniência: `digitou` liga, `resultados` desliga; `baixo/cima` com lista vazia mantém `selecionado` em 0.
 
-- [ ] **Step 5: Implementar `Paleta.tsx` + wiring no `app.tsx` + CSS**
+- [x] **Step 5: Implementar `Paleta.tsx` + wiring no `app.tsx` + CSS** — props finais:
+  `{estado, aoDigitar, aoMover, aoDestacar, aoConfirmar, aoFechar}` (em vez de `itens visíveis`/
+  `aoSelecionar`); busca só a partir de 1 caractere (vazio mostra o convite, Review Focus 1);
+  atalhos de seção ignorados com a paleta aberta; Enter/clique confirmam e navegam para a seção do
+  item (detalhe fica na F2).
   - `Paleta` recebe `{ estado, itens visíveis, aoSelecionar(item), aoFechar() }`; renderiza input
     auto-focus, lista com `imagemUrl(capa_url)` e `sub`; item ativo com destaque; rodapé com dica
     "Enter abre · Esc fecha". Termo vazio mostra "Digite para buscar na coleção" (Review Focus 1).
@@ -363,13 +369,13 @@ describe('reduzirPaleta', () => {
     `download→downloads`), troca a seção e fecha a paleta (abrir detalhe chega na F2 — anotar).
   - Atalhos de seção (`Ctrl+1..8`) trocam a seção ativa.
 
-- [ ] **Step 6: Verdes** — `npm … run test` (esperado 40+ testes), `npm … run typecheck`, `build`.
+- [x] **Step 6: Verdes** — 38/38 vitest, `typecheck` e `build` verdes.
 
-- [ ] **Step 7: Prova visual** — selftest com home semeada + screenshot; conferir estado
-  fechado sem regressão (a paleta é aberta por tecla; prova aberta fica no checklist manual da
-  Task 6).
+- [x] **Step 7: Prova visual** — `[ok] selftest Electron: 3 jogos…` rc=0; PNG de
+  `.provas/electron/f1-shell.png` com hash idêntico ao `f0-inicio.png` (fechado não muda nada —
+  zero regressão, como esperado).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit** — feito (hash da tarefa no ledger do SDD).
 
 ```bash
 git add codigo/frontends/electron/src/renderer/src/atalhos.ts codigo/frontends/electron/src/renderer/src/atalhos.test.ts codigo/frontends/electron/src/renderer/src/estado/paleta.ts codigo/frontends/electron/src/renderer/src/estado/paleta.test.ts codigo/frontends/electron/src/renderer/src/componentes/Paleta.tsx codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/renderer/src/estilo.css

@@ -239,3 +239,122 @@ body {
 .erro {
   border-color: #6b2b2b;
 }
+
+.paleta-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+  background: rgba(8, 10, 16, 0.55);
+}
+
+.paleta {
+  width: min(640px, 92vw);
+  overflow: hidden;
+  background: var(--cartao);
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.paleta-campo {
+  width: 100%;
+  padding: 16px 18px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 16px;
+}
+
+.paleta-campo::placeholder {
+  color: var(--texto2);
+}
+
+.paleta-dica {
+  margin: 0;
+  padding: 18px;
+  color: var(--texto2);
+  font-size: 13px;
+  text-align: center;
+}
+
+.paleta-lista {
+  max-height: 46vh;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.paleta-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.paleta-item.ativo {
+  background: var(--realce-suave);
+}
+
+.paleta-capa,
+.paleta-inicial {
+  flex-shrink: 0;
+  width: 34px;
+  height: 44px;
+  border-radius: 6px;
+}
+
+.paleta-capa {
+  object-fit: cover;
+  background: #12141a;
+}
+
+.paleta-inicial {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--texto2);
+  font-weight: 600;
+}
+
+.paleta-textos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.paleta-textos .titulo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paleta-textos .meta {
+  overflow: hidden;
+  color: var(--texto2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paleta-rodape {
+  padding: 8px 14px;
+  border-top: 1px solid var(--borda);
+  color: var(--texto2);
+  font-size: 11px;
+}
