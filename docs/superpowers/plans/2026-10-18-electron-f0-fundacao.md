@@ -243,13 +243,18 @@ com `codigo/frontends` no path), sem subprocesso.
 **Arquivos:** criar `docs/DESKTOP_ELECTRON.md`; editar `docs/ARQUITETURA.md` (ponteiro curto);
 `CHANGELOG.md` (linha em "Não lançado" registrando a F0).
 
-- [ ] Escrever o doc: diagrama (main/preload/renderer/ponte), protocolo NDJSON, métodos F0,
+- [x] Escrever o doc: diagrama (main/preload/renderer/ponte), protocolo NDJSON, métodos F0,
       contrato de módulos, segurança (isolamento de contexto, protocolo de mídia, sem TCP),
       fluxo dev (`npm install`, `dev`, `selftest`, provas), o que a F1..F6 ainda fará.
-- [ ] Rodada completa: suíte Python inteira
+      Extra: `docs/INDICE.md` ganhou o ponteiro (o índice não listava o doc novo) e a tabela de
+      frontends do `docs/ARQUITETURA.md` ganhou `ponte.py`/`electron/`.
+- [x] Rodada completa: suíte Python inteira
       (`py -3.14 -B codigo/ferramentas/testes/executar.py`), `ruff check codigo conftest.py`,
       `git diff --check`, `npm run test/typecheck/build`.
-- [ ] Relatório final da F0 no chat: resultados, limitações honestas, pendências (F1+).
+      Feito: 522/522 casos (6 pulos por ambiente), ruff e diff-check limpos, vitest 28/28,
+      typecheck e build verdes.
+- [x] Relatório final da F0 no chat: resultados, limitações honestas, pendências (F1+).
+      Entregue no chat ao fechar esta tarefa (ver commit 6).
 
 **Commit 6:** `docs: arquitetura do desktop Electron (F0)`
 

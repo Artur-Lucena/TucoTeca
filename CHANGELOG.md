@@ -22,6 +22,13 @@ no Windows; a TUI curses continua para Linux/macOS.
   lista ordenada em `apresentar()`; as 7 integrações padrão foram classificadas
   e as personalizadas derivam do tipo + URL.
 - `docs/ROADMAP.md` como fonte de planejamento da 1.1.0.
+- Fundação do desktop Electron (F0): ponte NDJSON `codigo/frontends/ponte.py`
+  (stdin/stdout, sem porta TCP) com `nucleo.ping`/`nucleo.snapshot`/
+  `modulos.listar`; registro de módulos em `servicos_ui/modulos.py`; app
+  electron-vite + Preact em `codigo/frontends/electron/` (instância única,
+  preload isolado, protocolo `tucoteca-img://` restrito à coleção, selftest
+  com screenshot) e tela Início com "Continuar jogando". Documentado em
+  `docs/DESKTOP_ELECTRON.md`; o Qt Quick segue como desktop atual até a F5.
 
 ### Alterado
 

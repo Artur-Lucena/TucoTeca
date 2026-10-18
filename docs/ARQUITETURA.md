@@ -23,6 +23,9 @@ Os frontends usam a mesma persistência. As regras ficam no núcleo; a GUI
 constrói widgets/ações e a TUI conduz menus. A fachada `bib_core` reexporta
 APIs para preservar consumidores antigos. Os módulos possuem alguns imports
 locais deliberados para desfazer ciclos entre banco, scanners e providers.
+O desktop Qt Quick segue como padrão no Windows; a fatia F0 do desktop
+Electron (ponte NDJSON + shell Preact) está em
+[DESKTOP_ELECTRON.md](DESKTOP_ELECTRON.md).
 
 ## Árvore comentada
 
@@ -115,6 +118,8 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 | `frontends/qt_emulacao.py` | Mods, texturas, cheats e presets do Azahar para o jogo selecionado; cada ação recarrega o estado |
 | `frontends/servicos_ui/` (pacote) | Casos de uso desktop, `resumo_sistema`, `busca_global`, registro |
 | `frontends/qml/` | shell `Main.qml`, `secoes/`, componentes, diálogos, navegador/player opcionais |
+| `frontends/ponte.py` | Ponte NDJSON (stdin/stdout, sem TCP) entre o desktop Electron e os casos de uso; lock com evento `bloqueio` e paridade de selftest |
+| `frontends/electron/` | Desktop Electron em construção (F0): processo principal, preload isolado e renderer Preact sobre IPC; telas por módulo |
 | `frontends/app_tui.py` + `tui_*.py` | Tui em mixins por domínio (entry point e `tui.curses` patchável preservados) |
 | `ferramentas/build_utils.py` | comum aos builders: SHA-256 de arquivo, escritor único de `.tar.xz` (Win/Linux/Mac, com diretórios) e download verificado (cache + `.part` atômico) |
 | `ferramentas/diagnosticar.py` | sintaxe/exports/dependências/pastas/SQLite somente-leitura |
