@@ -295,29 +295,34 @@ git commit -m "electron: tela Jogos com filtros e ordem por perfil (F2)"
   da paleta tipo `jogo` → `secao=jogos` + detalhe; Desfazer global (barra de status) alimentado por
   `lixeira.estado` e pelos recibos de exclusão.
 
-- [ ] **Step 1: RED** — `detalhe.test.tsx`? Manter simples: funções puras em
-  `estado/jogos.ts` (`validarNota(texto) → number|null`, `normalizarEtiquetas(texto)`) com testes;
-  estado do drawer em `app.tsx` testado via funções puras onde valer no módulo.
+- [x] **Step 1: RED** — funções puras em `estado/jogos.ts` (`validarNota` inteiro 0–10 — o núcleo
+  recusa decimal —, `validarHoras` > 0, `normalizarEtiquetas` espelhando `normalizar_etiquetas`) e
+  reducer de `estado/trabalhos.ts` (`reduzirTrabalhos`, `jogoEmAndamento`) com testes; RED com 2
+  arquivos / 6 testes falhando.
 
-- [ ] **Step 2: Implementar** — drawer com capa/título/plataforma·status/horas·nota/etiquetas,
-  botões Jogar, ★ Favoritar, Editar (form: título, exe, args/ROM, status, nota 0–10, etiquetas),
-  Registrar horas (input > 0), Remover (confirm + aviso de músicas quando aplicável), Observações
-  (textarea + Salvar). Duplo clique no card joga; Espaço/clique direito abrem o detalhe; Enter na
-  grade joga. Estado "jogando…" enquanto o job existir (via `estado/trabalhos.ts` da Task 7 —
-  **nesta tarefa criar já o módulo mínimo** para o jogo); ao fim: toast + `recarregar()`.
-  Desfazer global na barra de status quando `lixeira.estado.disponivel`.
+- [x] **Step 2: Implementar** — `DetalheJogo.tsx` (capa/título/plataforma·status/horas·nota/
+  etiquetas; botões Jogar, ★ Favoritar, Remover; form título/exe/args/status/nota inteira/etiquetas;
+  registrar horas > 0; observações), estado do drawer no `app.tsx` (`detalheId`, `revisao`,
+  `lixeira`), duplo clique no card joga, Espaço/clique direito abrem o detalhe, Enter na grade joga,
+  módulo mínimo `estado/trabalhos.ts` (evento `trabalho` → signal; "jogando…"/botão desabilitado);
+  ao fim: toast (`detalhe.aviso`) + `atualizarTudo()`; Desfazer global na barra de status via
+  `lixeira.estado`. `main/ponte.ts` não mudou: o forward do `main/index.ts` já é genérico por nome
+  de evento (ruling do pre-flight).
 
-- [ ] **Step 3: GREEN + typecheck.**
+- [x] **Step 3: GREEN + typecheck** — vitest 79/79; `tsc` e build ok.
 
-- [ ] **Step 4: Prova E2E** — home de prova: abrir paleta, Enter em "Celeste" → detalhe; favoritar;
-  editar nota/etiquetas (persistiu no `jogo.ler`); Remover → Desfazer e item volta; Jogar com o
-  jogo sintético → banner "jogando" some quando a sessão termina (~35 s), horas somadas, toast de
-  backup pós-sessão. Screenshots `f2-detalhe.png`, `f2-desfazer.png`.
+- [x] **Step 4: Prova E2E** — `.provas/electron/prova-f2-t4-detalhe.ps1` (home `home-f2-t4`): paleta
+  + Enter em "Celeste" → detalhe; favoritar (jogo.ler favorito=true); nota 8,5 recusada (núcleo só
+  aceita inteiro) e 9 salva; etiquetas normalizadas; 0,25 h registradas (11,5 h); Remover → barra
+  "Celeste foi removido. Desfazer" e grade sem Celeste; Desfazer → volta com id novo (4)
+  mantendo nota/etiquetas; Espaço abre o detalhe e Esc fecha; Jogar Stardew (ping ~35 s) → banner
+  "jogando", botão desabilitado, banner some no fim, horas 87,01 e toast de backup pós-sessão no
+  painel de avisos. Screenshots `f2-detalhe.png`, `f2-desfazer.png` e `f2-jogando.png`. PROVA OK.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
-git add codigo/frontends/electron/src/renderer/src/componentes/DetalheJogo.tsx codigo/frontends/electron/src/renderer/src/estado/trabalhos.ts codigo/frontends/electron/src/renderer/src/estado/trabalhos.test.ts codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/main/ponte.ts codigo/frontends/electron/src/renderer/src/estilo.css
+git add codigo/frontends/electron/src/renderer/src/componentes/DetalheJogo.tsx codigo/frontends/electron/src/renderer/src/componentes/PosterCard.tsx codigo/frontends/electron/src/renderer/src/estado/trabalhos.ts codigo/frontends/electron/src/renderer/src/estado/trabalhos.test.ts codigo/frontends/electron/src/renderer/src/estado/jogos.ts codigo/frontends/electron/src/renderer/src/estado/jogos.test.ts codigo/frontends/electron/src/renderer/src/estado/notificacoes.ts codigo/frontends/electron/src/renderer/src/vistas/Jogos.tsx codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/renderer/src/estilo.css
 git commit -m "electron: detalhe do jogo, jogar e desfazer (F2)"
 ```
 

@@ -3,12 +3,20 @@ import type { ModuloDTO } from '../../shared/protocolo'
 import { combinacao, decidirAtalho } from './atalhos'
 import { AvisoPonte } from './componentes/AvisoPonte'
 import { BarraLateral } from './componentes/BarraLateral'
+import { DetalheJogo } from './componentes/DetalheJogo'
 import { Paleta } from './componentes/Paleta'
 import { LeitorControle, type EstadoPad } from './controle'
 import { reduzirConexao, type EstadoConexao } from './estado/conexao'
 import { erroCarga, recarregar, snapshot } from './estado/dados'
-import { avisosDoResumo, dispensarAviso, juntarAvisos, type Aviso } from './estado/notificacoes'
+import { avisosDoResumo, dispensarAviso, juntarAvisos, textoDeFalha, type Aviso } from './estado/notificacoes'
 import { paletaInicial, reduzirPaleta, type ItemBusca } from './estado/paleta'
+import {
+  aplicarEventoTrabalho,
+  jogoEmAndamento,
+  listaTrabalhos,
+  type EventoTrabalho,
+  type Trabalho,
+} from './estado/trabalhos'
 import { Inicio } from './vistas/Inicio'
 import { Jogos } from './vistas/Jogos'
 import { Placeholder } from './vistas/Placeholder'
@@ -30,6 +38,20 @@ export function App() {
   const [avisos, setAvisos] = useState<Aviso[]>([])
   const [perfil, setPerfil] = useState('Tuco')
   const [conexao, setConexao] = useState<EstadoConexao>('ok')
+  const [detalheId, setDetalheId] = useState<number | null>(null)
+  const [revisao, setRevisao] = useState(0)
+  const [lixeira, setLixeira] = useState<LixeiraEstado | null>(null)
+
+  /** Recarrega o snapshot, o desfazer pendente e avisa as vistas (gaveta). */
+  const atualizarTudo = async () => {
+    await recarregar()
+    setRevisao((atual) => atual + 1)
+    try {
+      setLixeira(normalizarLixeira(await window.tucoteca.chamar('lixeira.estado')))
+    } catch {
+      setLixeira(null)
+    }
+  }
 
   useEffect(() => {
     void (async () => {
@@ -48,6 +70,16 @@ export function App() {
           if (typeof prefs.ativo === 'string') setPerfil(prefs.ativo)
         } catch {
           // sem atalhos/perfil pessoais o shell segue funcionando; chegam na próxima carga
+        }
+        try {
+          listaTrabalhos.value = await window.tucoteca.chamar<Trabalho[]>('trabalhos.listar')
+        } catch {
+          // sem trabalhos pendentes o rodapé nem aparece
+        }
+        try {
+          setLixeira(normalizarLixeira(await window.tucoteca.chamar('lixeira.estado')))
+        } catch {
+          // sem recibo de exclusão pendente
         }
         window.tucoteca.pronto({ jogos: snapshot.value?.jogos?.length ?? 0 })
       } catch (falha) {
@@ -102,6 +134,27 @@ export function App() {
       const aviso = avisoDeEvento(dados)
       if (aviso !== null) setAvisos((atual) => juntarAvisos(atual, [aviso]))
     })
+  }, [])
+
+  useEffect(() => {
+    return window.tucoteca.assinar('trabalho', (dados) => {
+      const evento = dados as EventoTrabalho | null
+      if (evento === null || typeof evento.id !== 'number') return
+      aplicarEventoTrabalho(evento)
+      if (evento.motivo !== 'fim') return
+      const aviso = typeof evento.detalhe?.aviso === 'string' ? evento.detalhe.aviso : ''
+      const erro = evento.estado === 'erro' ? String(evento.erro ?? 'A tarefa falhou.') : ''
+      const texto = aviso !== '' ? aviso : erro
+      if (texto !== '') {
+        setAvisos((atual) =>
+          juntarAvisos(atual, [
+            { id: `trabalho-${evento.id}`, texto, tom: erro !== '' ? 'atencao' : 'info' },
+          ]),
+        )
+      }
+      void atualizarTudo()
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- atualizarTudo só usa setters
   }, [])
 
   useEffect(() => {
@@ -205,6 +258,32 @@ export function App() {
     }
   }
 
+  const jogar = async (id: number) => {
+    try {
+      await window.tucoteca.chamar('jogo.jogar', { id })
+    } catch (falha) {
+      setAvisos((atual) =>
+        juntarAvisos(atual, [{ id: `jogar-${id}`, texto: textoDeFalha(falha), tom: 'atencao' }]),
+      )
+    }
+  }
+
+  const desfazer = async () => {
+    try {
+      await window.tucoteca.chamar('item.desfazer')
+      setAvisos((atual) =>
+        juntarAvisos(atual, [{ id: 'desfazer', texto: 'Exclusão desfeita.', tom: 'info' }]),
+      )
+      await atualizarTudo()
+    } catch (falha) {
+      setAvisos((atual) =>
+        juntarAvisos(atual, [
+          { id: 'desfazer-erro', texto: `Não desfiz: ${textoDeFalha(falha)}`, tom: 'atencao' },
+        ]),
+      )
+    }
+  }
+
   if (erro) {
     return (
       <section class="painel erro">
@@ -225,29 +304,65 @@ export function App() {
 
   const colecao = snapshot.value
   const ativo = modulos.find((modulo) => modulo.chave === secao) ?? modulos[0]
+  const jogando = jogoEmAndamento(listaTrabalhos.value)
   return (
     <>
       <AvisoPonte estado={conexao} aoReconectar={reconectar} />
-      <main class="shell">
-        <BarraLateral
-          modulos={modulos}
-          ativa={ativo?.chave ?? ''}
-          aoTrocar={setSecao}
-          avisos={avisos}
-          aoDispensarAviso={(id) => setAvisos((atual) => dispensarAviso(atual, id))}
-          perfil={perfil}
-          aoTrocarPerfil={alternarPerfil}
+      <div class="app">
+        <main class="shell">
+          <BarraLateral
+            modulos={modulos}
+            ativa={ativo?.chave ?? ''}
+            aoTrocar={setSecao}
+            avisos={avisos}
+            aoDispensarAviso={(id) => setAvisos((atual) => dispensarAviso(atual, id))}
+            perfil={perfil}
+            aoTrocarPerfil={alternarPerfil}
+          />
+          <section class="conteudo">
+            {ativo === undefined || ativo.chave === 'inicio' ? (
+              <Inicio snapshot={colecao ?? {}} />
+            ) : ativo.chave === 'jogos' ? (
+              <Jogos
+                focoBusca={focoBusca}
+                perfil={perfil}
+                aoAbrirJogo={(id) => setDetalheId(id)}
+                aoJogarJogo={(id) => void jogar(id)}
+              />
+            ) : (
+              <Placeholder modulo={ativo} />
+            )}
+          </section>
+        </main>
+        {(jogando !== null || lixeira?.disponivel === true) && (
+          <footer class="status">
+            {jogando !== null && (
+              <span class="status-jogando">● {jogando.rotulo}… aguarde a sessão fechar</span>
+            )}
+            {lixeira?.disponivel === true && (
+              <span class="status-desfazer">
+                {lixeira.titulo !== '' ? `${lixeira.titulo} foi removido.` : 'Item removido.'}
+                <button type="button" onClick={() => void desfazer()}>
+                  Desfazer
+                </button>
+              </span>
+            )}
+          </footer>
+        )}
+      </div>
+      {detalheId !== null && (
+        <DetalheJogo
+          id={detalheId}
+          revisao={revisao}
+          aoFechar={() => setDetalheId(null)}
+          aoMudou={() => void atualizarTudo()}
+          aoAvisar={(texto, tom = 'info') =>
+            setAvisos((atual) =>
+              juntarAvisos(atual, [{ id: `detalhe-${String(Date.now())}`, texto, tom }]),
+            )
+          }
         />
-        <section class="conteudo">
-          {ativo === undefined || ativo.chave === 'inicio' ? (
-            <Inicio snapshot={colecao ?? {}} />
-          ) : ativo.chave === 'jogos' ? (
-            <Jogos focoBusca={focoBusca} perfil={perfil} />
-          ) : (
-            <Placeholder modulo={ativo} />
-          )}
-        </section>
-      </main>
+      )}
       {paleta.aberta && (
         <Paleta
           estado={paleta}
@@ -261,8 +376,13 @@ export function App() {
           aoConfirmar={(indice) => {
             const item = paleta.itens[indice ?? paleta.selecionado]
             if (item === undefined) return
-            const chave = DESTINO_DO_ITEM[item.tipo]
-            if (chave !== undefined) setSecao(chave)
+            if (item.tipo === 'jogo' && Number.isFinite(Number(item.id))) {
+              setSecao('jogos')
+              setDetalheId(Number(item.id))
+            } else {
+              const chave = DESTINO_DO_ITEM[item.tipo]
+              if (chave !== undefined) setSecao(chave)
+            }
             setPaleta((atual) => reduzirPaleta(atual, { tipo: 'fechar' }))
           }}
           aoFechar={() => setPaleta((atual) => reduzirPaleta(atual, { tipo: 'fechar' }))}
@@ -270,6 +390,20 @@ export function App() {
       )}
     </>
   )
+}
+
+interface LixeiraEstado {
+  disponivel: boolean
+  titulo: string
+  tipo: string
+}
+
+/** Recibo de exclusão do núcleo; `null` quando não há nada para desfazer. */
+function normalizarLixeira(estado: unknown): LixeiraEstado | null {
+  if (estado === null || typeof estado !== 'object') return null
+  const objeto = estado as { disponivel?: unknown; titulo?: unknown; tipo?: unknown }
+  if (objeto.disponivel !== true) return null
+  return { disponivel: true, titulo: String(objeto.titulo ?? ''), tipo: String(objeto.tipo ?? '') }
 }
 
 /** Evento `aviso` vindo da ponte (texto simples ou `{id, texto, tom}`). */

@@ -93,3 +93,59 @@ export function ordenarJogos(jogos: JogoDaLista[], ordem: OrdemJogo): JogoDaList
   }
   return copia
 }
+
+/** Status de jogo do núcleo (mesma lista do formulário do Qt). */
+export const STATUS_JOGOS = ['backlog', 'jogando', 'zerado', 'pausado', 'abandonado'] as const
+
+export type StatusJogo = (typeof STATUS_JOGOS)[number]
+
+/** Limites de etiqueta do núcleo (`banco/jogos.py`): 30 chars, 20 etiquetas. */
+const ETIQUETA_MAX = 30
+const ETIQUETAS_MAX = 20
+
+function numeroNaFaixa(texto: unknown, minimo: number, maximo: number): number | null {
+  if (typeof texto === 'number') {
+    return Number.isFinite(texto) && texto >= minimo && texto <= maximo ? texto : null
+  }
+  const bruto = String(texto ?? '').trim().replace(',', '.')
+  if (bruto === '' || !/^-?\d+(\.\d+)?$/.test(bruto)) return null
+  const valor = Number(bruto)
+  return Number.isFinite(valor) && valor >= minimo && valor <= maximo ? valor : null
+}
+
+/** Nota do formulário: inteiro 0–10 (o núcleo recusa decimal em `banco/jogos.py`). */
+export function validarNota(texto: unknown): number | null {
+  const valor = numeroNaFaixa(texto, 0, 10)
+  return valor !== null && Number.isInteger(valor) ? valor : null
+}
+
+/** Horas registradas na mão: número finito > 0 (aceita vírgula). */
+export function validarHoras(texto: unknown): number | null {
+  if (typeof texto === 'number') {
+    return Number.isFinite(texto) && texto > 0 ? texto : null
+  }
+  const bruto = String(texto ?? '').trim().replace(',', '.')
+  if (bruto === '' || !/^\d+(\.\d+)?$/.test(bruto)) return null
+  const valor = Number(bruto)
+  return Number.isFinite(valor) && valor > 0 ? valor : null
+}
+
+/** Espelha `normalizar_etiquetas` do núcleo: split, dedup casefold, ordem e limites. */
+export function normalizarEtiquetas(valor: unknown): string {
+  const partes = Array.isArray(valor) ? valor : [valor]
+  const vistas = new Map<string, string>()
+  for (const parte of partes) {
+    for (const bruta of String(parte ?? '').split(/[;,]+/)) {
+      let etiqueta = bruta.replace(/\u0000/g, '').trim().replace(/\s+/g, ' ')
+      if (etiqueta === '') continue
+      etiqueta = etiqueta.slice(0, ETIQUETA_MAX).trim()
+      if (etiqueta === '') continue
+      const chave = etiqueta.toLocaleLowerCase()
+      if (!vistas.has(chave)) vistas.set(chave, etiqueta)
+      if (vistas.size >= ETIQUETAS_MAX) break
+    }
+  }
+  return [...vistas.values()]
+    .sort((a, b) => a.toLocaleLowerCase().localeCompare(b.toLocaleLowerCase()))
+    .join(', ')
+}

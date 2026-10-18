@@ -32,9 +32,13 @@ interface Props {
   focoBusca?: number
   /** Troca de perfil recarrega o filtro salvo do perfil novo. */
   perfil?: string
+  /** Abre o detalhe do jogo (botão Abrir, clique direito e Espaço). */
+  aoAbrirJogo?: (id: number) => void
+  /** Joga o jogo selecionado (botão Jogar, duplo clique e Enter). */
+  aoJogarJogo?: (id: number) => void
 }
 
-export function Jogos({ focoBusca = 0, perfil = '' }: Props) {
+export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo }: Props) {
   const [filtro, setFiltro] = useState<FiltroJogo>('todos')
   const [ordem, setOrdem] = useState<OrdemJogo>('titulo')
   const [busca, setBusca] = useState('')
@@ -88,8 +92,18 @@ export function Jogos({ focoBusca = 0, perfil = '' }: Props) {
     const aoTeclar = (evento: KeyboardEvent) => {
       if (evento.ctrlKey || evento.altKey || evento.metaKey) return
       if (document.querySelector('.paleta-fundo') !== null) return
+      if (document.querySelector('.detalhe-fundo') !== null) return
       const alvo = evento.target as HTMLElement | null
       if (alvo !== null && alvo !== campo.current && alvo.closest('input, textarea, select') !== null) {
+        return
+      }
+      const escolhido = lista[indice]
+      const id = escolhido?.id === undefined ? null : Number(escolhido.id)
+      if (evento.key === 'Enter' || evento.key === ' ') {
+        if (alvo === campo.current || id === null) return // digitando na busca
+        evento.preventDefault()
+        if (evento.key === 'Enter') aoJogarJogo?.(id)
+        else aoAbrirJogo?.(id)
         return
       }
       const colunas = colunasDaGrade(grade.current)
@@ -107,7 +121,7 @@ export function Jogos({ focoBusca = 0, perfil = '' }: Props) {
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [lista.length, focoBusca])
+  }, [lista, indice, aoAbrirJogo, aoJogarJogo])
 
   return (
     <div class="jogos">
@@ -156,14 +170,23 @@ export function Jogos({ focoBusca = 0, perfil = '' }: Props) {
         </div>
       ) : (
         <div class="grade" ref={grade}>
-          {lista.map((jogo, posicao) => (
-            <PosterCard
-              key={String(jogo.uuid ?? jogo.id ?? posicao)}
-              jogo={jogo}
-              selecionado={posicao === indice}
-              aoSelecionar={() => setSelecionado(posicao)}
-            />
-          ))}
+          {lista.map((jogo, posicao) => {
+            const id = jogo.id === undefined ? null : Number(jogo.id)
+            return (
+              <PosterCard
+                key={String(jogo.uuid ?? jogo.id ?? posicao)}
+                jogo={jogo}
+                selecionado={posicao === indice}
+                aoSelecionar={() => setSelecionado(posicao)}
+                aoAbrir={
+                  id === null || aoAbrirJogo === undefined ? undefined : () => aoAbrirJogo(id)
+                }
+                aoJogar={
+                  id === null || aoJogarJogo === undefined ? undefined : () => aoJogarJogo(id)
+                }
+              />
+            )
+          })}
         </div>
       )}
     </div>

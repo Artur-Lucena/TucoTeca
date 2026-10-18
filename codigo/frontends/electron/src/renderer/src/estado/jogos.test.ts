@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filtrarJogos, ordenarJogos } from './jogos'
+import { filtrarJogos, normalizarEtiquetas, ordenarJogos, validarHoras, validarNota } from './jogos'
 
 const jogo = (campos: Record<string, unknown>) => ({ titulo: 'Jogo', ...campos })
 
@@ -133,5 +133,58 @@ describe('ordenarJogos', () => {
     const original = [...colecao]
     ordenarJogos(original, 'horas')
     expect(titulos(original)).toEqual(titulos(colecao))
+  })
+})
+
+describe('validarNota', () => {
+  it('aceita inteiro 0–10', () => {
+    expect(validarNota('7')).toBe(7)
+    expect(validarNota(' 7 ')).toBe(7)
+    expect(validarNota('0')).toBe(0)
+    expect(validarNota('10')).toBe(10)
+    expect(validarNota(8)).toBe(8)
+  })
+
+  it('recusa fora da faixa, decimal (núcleo é inteiro), texto e vazio', () => {
+    expect(validarNota('')).toBeNull()
+    expect(validarNota('   ')).toBeNull()
+    expect(validarNota('abc')).toBeNull()
+    expect(validarNota('-1')).toBeNull()
+    expect(validarNota('11')).toBeNull()
+    expect(validarNota('8,5')).toBeNull()
+    expect(validarNota('8.5')).toBeNull()
+    expect(validarNota(null)).toBeNull()
+  })
+})
+
+describe('validarHoras', () => {
+  it('aceita número positivo com vírgula ou ponto', () => {
+    expect(validarHoras('1,5')).toBe(1.5)
+    expect(validarHoras('0.25')).toBe(0.25)
+    expect(validarHoras('3')).toBe(3)
+  })
+
+  it('recusa zero, negativo, texto e vazio', () => {
+    expect(validarHoras('0')).toBeNull()
+    expect(validarHoras('-2')).toBeNull()
+    expect(validarHoras('')).toBeNull()
+    expect(validarHoras('duas')).toBeNull()
+    expect(validarHoras(undefined)).toBeNull()
+  })
+})
+
+describe('normalizarEtiquetas', () => {
+  it('separa por vírgula/ponto-e-vírgula, dedupa e ordena', () => {
+    expect(normalizarEtiquetas('rpg, canon')).toBe('canon, rpg')
+    expect(normalizarEtiquetas('  Metroidvania ;; rpg ,metroidvania ')).toBe('Metroidvania, rpg')
+    expect(normalizarEtiquetas('ação, ação')).toBe('ação')
+    expect(normalizarEtiquetas('')).toBe('')
+    expect(normalizarEtiquetas(null)).toBe('')
+  })
+
+  it('limita tag a 30 chars e a 20 etiquetas', () => {
+    const tags = Array.from({ length: 25 }, (_, i) => `tag${i}`).join(', ')
+    expect(normalizarEtiquetas(tags).split(', ')).toHaveLength(20)
+    expect(normalizarEtiquetas('x'.repeat(40))).toHaveLength(30)
   })
 })

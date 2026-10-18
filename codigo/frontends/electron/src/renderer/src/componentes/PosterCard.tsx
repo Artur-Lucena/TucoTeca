@@ -14,7 +14,12 @@ export function PosterCard({ jogo, selecionado, aoSelecionar, aoAbrir, aoJogar }
     <article
       class={`cartao poster ${selecionado ? 'selecionado' : ''}`}
       onClick={aoSelecionar}
-      onDblClick={aoAbrir}
+      onDblClick={aoJogar}
+      onContextMenu={(evento) => {
+        if (aoAbrir === undefined) return
+        evento.preventDefault()
+        aoAbrir()
+      }}
     >
       <div class="capa">
         {url ? (
@@ -62,7 +67,7 @@ export function PosterCard({ jogo, selecionado, aoSelecionar, aoAbrir, aoJogar }
   )
 }
 
-function iniciais(titulo?: string): string {
+export function iniciais(titulo?: string): string {
   const partes = String(titulo ?? '?').trim().split(/\s+/)
   return `${partes[0]?.charAt(0) ?? '?'}${partes[1]?.charAt(0) ?? ''}`.toUpperCase()
 }

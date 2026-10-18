@@ -67,3 +67,10 @@ export function juntarAvisos(atual: Aviso[], novos: Aviso[]): Aviso[] {
 export function dispensarAviso(atual: Aviso[], id: string): Aviso[] {
   return atual.filter((aviso) => aviso.id !== id)
 }
+
+/** Texto limpo de falha do IPC: tira o embrulho "Error invoking remote method …". */
+export function textoDeFalha(falha: unknown): string {
+  const objeto = falha as { message?: unknown } | null
+  const bruto = String(objeto?.message ?? falha ?? '').trim()
+  return bruto.replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, '') || 'Algo deu errado.'
+}
