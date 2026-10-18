@@ -953,6 +953,71 @@ def teste_ponte_torrents_importar_cria_job():
     afirmar(job["rotulo"].startswith("Importar download"), job)
 
 
+def teste_ponte_videos_local_sem_arquivo():
+    from contextlib import closing
+
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-videos-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    # semeia um vídeo com path inexistente
+    with closing(core.get_db(db)) as con:
+        core.criar_video(con, {"titulo": "Video Teste", "canal": "Canal",
+                               "duracao_s": 120, "video_path": str(tmp / "nao-existe.mp4")})
+    ponte = Ponte(ServicoBiblioteca(db))
+    snap = _chamar(ponte, {"id": 230, "metodo": "nucleo.snapshot"})["resultado"]
+    vid = snap["videos"][0]
+    r = _chamar(ponte, {"id": 231, "metodo": "videos.local", "params": {"id": vid["id"]}})
+    afirmar(r["ok"] is False and "ausente" in r["erro"], r)
+
+
+def teste_ponte_videos_salvar_posicao_valida_sha():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-videos-2-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    sha_invalido = _chamar(ponte, {"id": 232, "metodo": "videos.salvar_posicao",
+                                   "params": {"sha": "abc", "posicao": 10}})
+    afirmar(sha_invalido["ok"] is False and "sha" in sha_invalido["erro"], sha_invalido)
+    sha_ok = "a" * 64
+    r = _chamar(ponte, {"id": 233, "metodo": "videos.salvar_posicao",
+                        "params": {"sha": sha_ok, "posicao": 10.5}})
+    afirmar(r["ok"] is True and r["resultado"] == {"ok": True}, r)
+
+
+def teste_ponte_videos_reproduzir_invalido():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-videos-3-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    r = _chamar(ponte, {"id": 234, "metodo": "videos.reproduzir",
+                        "params": {"id": 9999, "reprodutor": "auto"}})
+    afirmar(r["ok"] is False, r)
+    r2 = _chamar(ponte, {"id": 235, "metodo": "videos.reproduzir",
+                         "params": {"id": 1, "reprodutor": "inexistente"}})
+    afirmar(r2["ok"] is False, r2)
+
+
+def teste_ponte_videos_importar_cria_job():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-videos-4-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    pasta = tmp / "videos-teste"
+    pasta.mkdir()
+    (pasta / "video.mp4").write_bytes(b"\x00" * 10)
+    ponte = Ponte(ServicoBiblioteca(db))
+    r = _chamar(ponte, {"id": 236, "metodo": "videos.importar",
+                        "params": {"pasta": str(pasta)}})
+    afirmar(r["ok"] is True and "trabalho" in r["resultado"], r)
+
+
 def teste_ponte_registrar_horas():
     class ServicoHoras(ServicoFalso):
         def registrar_sessao(self, gid, horas):

@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 import threading
 from datetime import datetime
@@ -254,6 +255,35 @@ def _torrents_organizar(servico, params) -> dict:
     return servico.organizar_download(caminho.strip())
 
 
+def _videos_local(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    dados = servico.video_local(ident)
+    return {"id": dados.get("id", ident), "titulo": dados.get("titulo", ""),
+            "posicao": dados.get("posicao", 0), "sha": dados.get("sha", "")}
+
+
+def _videos_salvar_posicao(servico, params) -> dict:
+    sha = params.get("sha")
+    if not isinstance(sha, str) or re.fullmatch(r"[0-9a-f]{64}", sha) is None:
+        raise ValueError("sha deve ser hexadecimal de 64 caracteres")
+    posicao = params.get("posicao")
+    if isinstance(posicao, bool) or not isinstance(posicao, (int, float)):
+        raise ValueError("posicao deve ser um número")
+    posicao = float(posicao)
+    if not math.isfinite(posicao) or posicao < 0:
+        raise ValueError("posicao deve ser não-negativa")
+    servico.salvar_posicao_video(sha, posicao)
+    return {"ok": True}
+
+
+def _videos_reproduzir(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    reprodutor = params.get("reprodutor", "auto")
+    if not isinstance(reprodutor, str) or not reprodutor.strip():
+        raise ValueError("reprodutor deve ser um texto")
+    return servico.reproduzir_video(ident, reprodutor.strip())
+
+
 def _filtro(servico, params) -> dict:
     return servico.filtro()
 
@@ -315,6 +345,9 @@ METODOS = {
     "torrents.controlar": _torrents_controlar,
     "torrents.fora_destino": _torrents_fora_destino,
     "torrents.organizar": _torrents_organizar,
+    "videos.local": _videos_local,
+    "videos.salvar_posicao": _videos_salvar_posicao,
+    "videos.reproduzir": _videos_reproduzir,
 }
 
 
@@ -425,6 +458,7 @@ class Ponte:
             "musicas.importar": self._musicas_importar,
             "musicas.baixar_fila": self._musicas_baixar_fila,
             "torrents.importar": self._torrents_importar,
+            "videos.importar": self._videos_importar,
         })
         self.metodos = base
 
@@ -532,6 +566,26 @@ class Ponte:
         titulo = Path(caminho).name or "download"
         return {"trabalho": self.trabalhos.iniciar(f"Importar download {titulo}", tarefa,
                                                   escopo="torrents")}
+
+    def _videos_importar(self, servico, params) -> dict:
+        pasta = params.get("pasta")
+        if not isinstance(pasta, str) or not pasta.strip():
+            raise ValueError("pasta deve ser um caminho de texto")
+        pasta = pasta.strip()
+
+        def tarefa(progresso, cancelado):
+            if cancelado.is_set():
+                raise ValueError("Importação cancelada.")
+            progresso(10)
+            resultado = servico.importar_videos(pasta)
+            progresso(100)
+            detalhe = dict(resultado) if isinstance(resultado, dict) else {}
+            detalhe.setdefault("aviso", "Vídeos importados.")
+            return detalhe
+
+        titulo = Path(pasta).name or "pasta"
+        return {"trabalho": self.trabalhos.iniciar(f"Importar vídeos {titulo}", tarefa,
+                                                  escopo="videos")}
 
     def _jogo_registrar_horas(self, servico, params) -> dict:
         ident = _inteiro(params, "id")

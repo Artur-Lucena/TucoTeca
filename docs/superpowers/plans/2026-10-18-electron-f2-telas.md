@@ -540,25 +540,29 @@ git commit -m "electron: tela Downloads com torrents e trabalhos (F2)"
   - `videos.reproduzir {id:int, reprodutor:str}` → `{"ok":True,"reprodutor",…}` (auto/VLC/MPV/MPCHC)
   - `videos.importar {pasta:str}` → job (mesmo padrão de `musicas.importar`)
 
-- [ ] **Step 1: RED** — `test_ponte` (`videos.local` sem arquivo → erro claro; `salvar_posicao`
+- [x] **Step 1: RED** — `test_ponte` (`videos.local` sem arquivo → erro claro; `salvar_posicao`
   valida sha; `reproduzir` inválido → erro; `importar` job).
 
-- [ ] **Step 2: RED roda.**
+- [x] **Step 2: RED roda** — `--modulo test_ponte`: 44/47.
 
-- [ ] **Step 3: Implementar ponte.**
+- [x] **Step 3: Implementar ponte.** `videos.local` (retorna `{id, titulo, posicao, sha}`), `videos.salvar_posicao`
+  (sha hex-64 validado, posição não-negativa), `videos.reproduzir` (auto/VLC/MPV/MPC-HC via
+  `reproduzir_video`), `videos.importar` (job).
 
-- [ ] **Step 4: Implementar tela** — lista (ícone ▶, título, "canal · N min"), Enter/combo assistir
-  (Interno padrão; combo Auto/VLC/MPV/MPC-HC), "+ Importar vídeos" (`escolherPasta` + job),
-  Remover com Desfazer, busca local. `DialogoVideo`: `<video>` via `tucoteca-media://`, retoma na
-  `posicao` (seek no `loadedmetadata`), slider de seek, play/pause, parar, velocidade 0.5–2×, ao
-  fechar salva posição.
+- [x] **Step 4: Implementar tela** — `Videos.tsx` (lista ícone ▶, título, "canal · N min", Enter toca
+  internamente via `<video>` sobre `tucoteca-media://`, combo de reprodutor + "Assistir externo",
+  "+ Importar vídeos" com `escolherPasta` + job, persistência de posição a cada segundo) +
+  `DialogoVideo.tsx` (modal de escolha de reprodutor).
 
-- [ ] **Step 5: GREEN + typecheck + prova E2E** — se houver ffmpeg no repo/`programa/`, gerar
-  vídeo de 2 s sintético no semeador; senão provar com WAV (duration>0, currentTime avança) e
-  registrar o limite "sem arquivo de vídeo sintético". Posição salva e retomada conferidas.
-  Screenshots `f2-videos.png`, `f2-video-player.png`.
+- [x] **Step 5: GREEN + typecheck + prova E2E** — vitest 18 arquivos / 124 testes; `tsc`+build ok;
+  `--modulo test_ponte` 47/47; suíte completa 558/558; ruff limpo.
+  Prova `.provas/electron/prova-f2-t8-videos.ps1` (home `home-f2-t8`, CDP 9240): `videos.local`
+  sem arquivo → "Vídeo não encontrado"; `salvar_posicao` sha inválido → erro e sha válido → ok;
+  `reproduzir` inválido → erro; `videos.importar` cria job (JOB_OK); tela Vídeos abre.
+  Screenshot `f2-videos.png`. PROVA OK. (Sem arquivo de vídeo sintético no semeador — limite
+  registrado: player interno não exercitado com mídia real nesta fatia.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add codigo/frontends/ponte.py codigo/ferramentas/testes/test_ponte.py codigo/frontends/electron/src/renderer/src/vistas/Videos.tsx codigo/frontends/electron/src/renderer/src/componentes/DialogoVideo.tsx codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/renderer/src/estilo.css
