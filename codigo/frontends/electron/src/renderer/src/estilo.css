@@ -1,13 +1,14 @@
 :root {
   color-scheme: dark;
-  --fundo: #101218;
-  --painel: #171a22;
-  --cartao: #1d212b;
-  --borda: #262b38;
+  --fundo: #0d0d12;
+  --painel: #13131a;
+  --cartao: #1a1a24;
+  --borda: #2a2a3a;
   --texto: #e8eaf0;
   --texto2: #98a1b3;
-  --realce: #4f8cff;
-  --realce-suave: rgba(79, 140, 255, 0.14);
+  --realce: #7c5cff;
+  --realce-suave: rgba(124, 92, 255, 0.16);
+  --perigo: #ff5c7a;
 }
 
 * {
