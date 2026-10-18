@@ -418,12 +418,13 @@ body {
 }
 
 .avisos-painel {
-  max-height: 220px;
+  max-height: 420px;
   margin-bottom: 6px;
   overflow-y: auto;
   background: var(--cartao);
   border: 1px solid var(--borda);
   border-radius: 10px;
+  box-shadow: var(--sombra);
 }
 
 .avisos-painel ul {
@@ -1226,6 +1227,54 @@ body {
   font-size: 12px;
 }
 
+.form-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-md);
+  padding: var(--espaco-lg);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--cartao);
+  box-shadow: var(--sombra-sm);
+  max-width: 640px;
+  margin-bottom: var(--espaco-lg);
+}
+.form-config h2 {
+  margin: 0 0 var(--espaco-sm);
+  font-size: 16px;
+  font-weight: 600;
+}
+.form-config label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xs);
+  font-size: 13px;
+  color: var(--texto2);
+}
+.form-config input,
+.form-config select {
+  padding: 8px 12px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transicao);
+}
+.form-config input:focus,
+.form-config select:focus {
+  border-color: var(--realce);
+}
+.form-config .stats {
+  padding: var(--espaco-sm);
+  background: var(--painel);
+  border-radius: var(--raio-sm);
+  font-size: 12px;
+  overflow-x: auto;
+}
+
 .form-desejo,
 .form-integracao {
   display: flex;
@@ -1686,3 +1735,7 @@ body {
   gap: 6px;
   flex: none;
 }
+
+/* Desejos capa */
+.desejo-capa { flex: none; width: 80px; height: 30px; overflow: hidden; border-radius: 6px; background: var(--cartao); }
+.desejo-capa img { width: 100%; height: 100%; object-fit: cover; }

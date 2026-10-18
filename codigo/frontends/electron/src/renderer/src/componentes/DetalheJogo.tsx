@@ -160,8 +160,11 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
 
   const avaliarConquistas = async () => {
     try {
-      const r = await window.tucoteca.chamar<Record<string, unknown>>('conquistas.avaliar', { id })
-      aoAvisar(`Conquistas avaliadas: ${JSON.stringify(r)}`)
+      const r = await window.tucoteca.chamar<{ desbloqueadas?: number; total?: number; avaliaveis?: number }>(
+        'conquistas.avaliar',
+        { id },
+      )
+      aoAvisar(`Conquistas: ${r?.desbloqueadas ?? 0}/${r?.total ?? 0} desbloqueadas.`)
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }
@@ -184,8 +187,10 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
 
   const ferramentasJogo = async () => {
     try {
-      const r = await window.tucoteca.chamar<Record<string, unknown>>('ferramentas.jogo', { id })
-      aoAvisar(`Ferramentas: ${JSON.stringify(r)}`)
+      const r = await window.tucoteca.chamar<{ saves?: unknown[]; snapshots?: unknown[] }>('ferramentas.jogo', { id })
+      const saves = Array.isArray(r?.saves) ? r.saves.length : 0
+      const snaps = Array.isArray(r?.snapshots) ? r.snapshots.length : 0
+      aoAvisar(`Ferramentas: ${saves} save(s), ${snaps} snapshot(s).`)
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }
@@ -193,8 +198,9 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
 
   const diagnosticar = async () => {
     try {
-      const r = await window.tucoteca.chamar<Record<string, unknown>>('jogo.diagnosticar', { id })
-      aoAvisar(`Diagnóstico: ${JSON.stringify(r)}`)
+      const r = await window.tucoteca.chamar<{ exe?: { estado?: string } }>('jogo.diagnosticar', { id })
+      const estado = r?.exe?.estado ?? 'ok'
+      aoAvisar(`Diagnóstico: executável ${estado}.`)
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }

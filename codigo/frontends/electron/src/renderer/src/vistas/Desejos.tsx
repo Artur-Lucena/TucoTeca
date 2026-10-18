@@ -208,6 +208,7 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
           {lista.map((desejo, posicao) => {
             const appid = desejo.appid === undefined ? '' : String(desejo.appid)
             const preco = formatarPreco(precos[appid])
+            const capa = appid !== '' ? `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg` : ''
             return (
               <li
                 key={String(desejo.id ?? posicao)}
@@ -215,6 +216,11 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
                 onClick={() => setSelecionado(posicao)}
                 onDblClick={() => void abrirSteam()}
               >
+                {capa !== '' && (
+                  <span class="desejo-capa">
+                    <img src={capa} alt="" loading="lazy" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
+                  </span>
+                )}
                 <span class="desejo-textos">
                   <strong>{String(desejo.titulo ?? '')}</strong>
                   <span>{appid === '' ? 'Steam' : `Steam · ${appid}`}</span>
