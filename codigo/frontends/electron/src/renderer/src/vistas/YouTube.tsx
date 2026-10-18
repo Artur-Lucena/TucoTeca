@@ -23,12 +23,11 @@ export function YouTube({ aoAvisar, aoMudou }: Props) {
   const [termo, setTermo] = useState('')
   const [resultados, setResultados] = useState<ResultadoYouTube[]>([])
   const [buscando, setBuscando] = useState(false)
-  const [erro, setErro] = useState('')
+  const [videoAtual, setVideoAtual] = useState<string | null>(null)
 
   useEffect(() => {
     if (termo.trim().length < 2) {
       setResultados([])
-      setErro('')
       return
     }
     const timer = window.setTimeout(() => {
@@ -41,10 +40,9 @@ export function YouTube({ aoAvisar, aoMudou }: Props) {
           )
           const lista = Array.isArray(r) ? r : (r?.itens ?? [])
           setResultados(lista)
-          setErro('')
         } catch (falha) {
           setResultados([])
-          setErro(textoDeFalha(falha))
+          aoAvisar(textoDeFalha(falha), 'atencao')
         } finally {
           setBuscando(false)
         }
@@ -92,7 +90,16 @@ export function YouTube({ aoAvisar, aoMudou }: Props) {
         </div>
       </header>
 
-      {erro !== '' && <p class="aviso">{erro}</p>}
+      {videoAtual !== null && (
+        <div class="yt-player">
+          <iframe
+            src={`https://www.youtube.com/embed/${videoAtual}?autoplay=1`}
+            title="YouTube player"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+          />
+        </div>
+      )}
       {buscando && <p class="aviso">Buscando…</p>}
 
       {resultados.length > 0 && (
@@ -106,6 +113,9 @@ export function YouTube({ aoAvisar, aoMudou }: Props) {
                 </span>
               </div>
               <div class="yt-acoes">
+                <button type="button" class="acao" onClick={() => setVideoAtual(item.video_id ?? null)}>
+                  Assistir
+                </button>
                 <button type="button" class="acao" onClick={() => void baixar(item)}>
                   Baixar
                 </button>
