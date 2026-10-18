@@ -1,5 +1,19 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
+import type { ApiTucoteca } from '../shared/api'
+import { converterUrlMidia } from '../shared/midia'
 
-contextBridge.exposeInMainWorld('tucoteca', {
-  versao: 'f0',
-})
+const api: ApiTucoteca = {
+  chamar: (metodo, params) => ipcRenderer.invoke('ponte:chamar', metodo, params),
+  assinar: (evento, ouvinte) => {
+    const canal = `ponte:evento:${evento}`
+    const escuta = (_cena: unknown, dados: unknown) => ouvinte(dados)
+    ipcRenderer.on(canal, escuta)
+    return () => {
+      ipcRenderer.removeListener(canal, escuta)
+    }
+  },
+  pronto: (dados) => ipcRenderer.send('tucoteca:pronto', dados),
+  imagemUrl: (url) => converterUrlMidia(url),
+}
+
+contextBridge.exposeInMainWorld('tucoteca', api)

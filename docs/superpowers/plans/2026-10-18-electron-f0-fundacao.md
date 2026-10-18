@@ -177,28 +177,28 @@ com `codigo/frontends` no path), sem subprocesso.
 `src/renderer/src/app.tsx` (chamada real de `nucleo.ping` + `nucleo.snapshot` e sinal `pronto`)
 + testes `ponte.test.ts`, `arquivos.test.ts`, `midia.test.ts`.
 
-- [ ] Testes vitest primeiro (funções puras, sem Electron real):
+- [x] Testes vitest primeiro (funções puras, sem Electron real) — 23 verdes:
       `Pendentes` (resolve em ordem inversa, id órfão ignorado, timeout, rejeição em massa),
       `SeparadorLinhas` (chunk partido no meio da linha, várias por chunk, CRLF),
       `descobrirPython` (ordem env → runtime → py -3.14; `existe` injetado),
-      `caminhoPermitido` (dentro da home ok; `..` e fora bloqueiam; Windows sem diferenciar caixa),
+      `caminhoPermitido` (foi para `src/main/caminhos.test.ts` — ver ruling),
       `converterUrlMidia` (`file://` → `tucoteca-img://`, http passa, vazio → "").
-- [ ] Implementar `ClientePonte`: spawn, leitura NDJSON por buffer, `chamar<T>` com
-      timeout (30 s default), `assinar(evento)`, retorno de `[evento]`; em fim de processo →
-      rejeita pendentes e chama `aoEncerrar`; `encerrar()` = fecha stdin, espera 3 s, mata
-      (`taskkill /T` no Windows se preciso).
-- [ ] Implementar `arquivos.ts`: `registerSchemesAsPrivileged` (antes do ready) +
-      `protocol.handle('tucoteca-img', …)` servindo via `net.fetch(pathToFileURL(…))` só sob a home.
-- [ ] `main/index.ts`: instância única (`requestSingleInstanceLock`), janela, `TUCOTECA_USERDATA`,
-      IPC `ponte:chamar`/`ponte:assinar`/`tucoteca:pronto`, bloqueio de lock → janela mínima com
-      motivo + exit 2 no selftest, fl uxo `--selftest/--screenshot` (captura `webContents.capturePage`),
-      encerramento limpo da ponte.
-- [ ] `preload`: `window.tucoteca = { chamar, assinar, pronto, imagemUrl }` (contextBridge, sem Node no renderer).
-- [ ] Gate: `npm run test`, `npm run typecheck` verdes; `npm run build` ok.
-      Prova de fumaça ponta a ponta: subir main com `--selftest` e home temporária vazia → esperado
-      `[ok] selftest Electron: 0 jogos; …` e código 0 (o renderer mínimo desta tarefa chama
-      `nucleo.ping`/`nucleo.snapshot` pela ponte, reporta a contagem de jogos e só então sinaliza
-      `pronto`).
+- [x] Implementar `ClientePonte`: spawn, leitura NDJSON por buffer, `chamar<T>` com
+      timeout (30 s default), eventos via `aoEvento` (wildcard; o preload mantém `assinar(evento)`);
+      em fim de processo → rejeita pendentes e chama `aoEncerrar`; `encerrar()` = fecha stdin,
+      espera 3 s, `taskkill /T` no Windows — provado ponta a ponta no selftest abaixo.
+- [x] Implementar `arquivos.ts`: `registerSchemesAsPrivileged` (antes do ready) +
+      `protocol.handle('tucoteca-img', …)` servindo via `net.fetch(pathToFileURL(…))` só sob a home
+      (validação pura em `caminhos.ts`, testável sem Electron).
+- [x] `main/index.ts`: instância única (`requestSingleInstanceLock`), janela, `TUCOTECA_USERDATA`,
+      IPC `ponte:chamar`/eventos/`tucoteca:pronto`, ping de aquecimento antes da janela, bloqueio de
+      lock → `dialog.showErrorBox` + exit 2 (equivalente à janela mínima do Qt), fluxo
+      `--selftest/--screenshot` (captura `webContents.capturePage`), encerramento limpo da ponte.
+- [x] `preload`: `window.tucoteca = { chamar, assinar, pronto, imagemUrl }` (contextBridge, sem Node no renderer).
+- [x] Gate: 23/23 testes, `typecheck` e `build` verdes; smoke ponta a ponta real (home e userData
+      em `.provas/electron/`): `[ok] selftest Electron: 0 jogos; ponte, módulos e Início carregados`
+      com rc=0; caminho de falha com `TUCOTECA_PYTHON` inexistente →
+      `[erro] ponte indisponível: … ENOENT`, rc=1 (sem travar).
 
 **Commit 4:** `electron: processo principal, preload e cliente da ponte (F0)`
 
