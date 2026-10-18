@@ -10,7 +10,16 @@
     "start": "electron .",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
-    "selftest": "electron-vite build && electron . --selftest"
+    "selftest": "electron-vite build && electron . --selftest",
+    "dist": "electron-vite build && electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "com.tucoteca.app",
+    "productName": "TucoTeca",
+    "directories": { "output": "dist" },
+    "files": ["out/**/*"],
+    "win": { "target": ["nsis"], "icon": "resources/icon.ico" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",

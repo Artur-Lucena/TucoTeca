@@ -17,10 +17,14 @@ class Modulo:
     descricao: str = ""
     icone: str = ""
     ordem: int = 100
+    origem: str = "embutido"
+    habilitado: bool = True
+    permissoes: tuple[str, ...] = ()
 
     def apresentar(self) -> dict:
         return {"chave": self.chave, "nome": self.nome, "descricao": self.descricao,
-                "icone": self.icone, "ordem": self.ordem}
+                "icone": self.icone, "ordem": self.ordem, "origem": self.origem,
+                "habilitado": self.habilitado, "permissoes": list(self.permissoes)}
 
 
 def modulos_padrao() -> list[Modulo]:

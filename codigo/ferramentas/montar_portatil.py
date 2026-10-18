@@ -48,13 +48,10 @@ APP_ARQS = (("README.md", "README.md"),
              ("codigo/bib_core.py", "bib_core.py"),
               ("codigo/frontends/app_tui.py", "app_tui.py"),
                ("codigo/frontends/desktop.py", "desktop.py"),
-               ("codigo/frontends/app_qt.py", "app_qt.py"),
                 ("codigo/frontends/navegacao_controle.py", "navegacao_controle.py"),
-                 ("codigo/frontends/qt_emulacao.py", "qt_emulacao.py"),
                 ("codigo/ferramentas/__init__.py", "ferramentas/__init__.py"),
                 ("codigo/ferramentas/diagnosticar.py", "ferramentas/diagnosticar.py"),
                 ("codigo/ferramentas/empacotar_fontes.py", "ferramentas/empacotar_fontes.py"),
-                 ("codigo/ferramentas/provar_qt_runtime.py", "provar_qt_runtime.py"),
                  ("codigo/ferramentas/provar_integracoes_locais.py", "provar_integracoes_locais.py"),
                 ("codigo/ferramentas/provar_qbit_runtime.py", "provar_qbit_runtime.py"),
 
@@ -65,11 +62,8 @@ APP_ARQS = (("README.md", "README.md"),
                  ("codigo/frontends/tui_player.py", "tui_player.py"),
                  ("codigo/frontends/tui_scans.py", "tui_scans.py"))
 
-# Pacotes-diretório do app (F2/F3 do O2): viajam como árvore, igual ao
-# bib_nucleo, em vez de arquivo avulso. Novos pacotes entram aqui, não no
-# APP_ARQS — os validadores expandem via arquivos_app().
-APP_PACOTES = (("codigo/frontends/servicos_ui", "servicos_ui"),
-               ("codigo/frontends/qt_bridge", "qt_bridge"))
+# Pacotes-diretório do app: viajam como árvore. servicos_ui segue; qt_bridge removido (F5).
+APP_PACOTES = (("codigo/frontends/servicos_ui", "servicos_ui"),)
 
 
 def arquivos_app(repo=None):
