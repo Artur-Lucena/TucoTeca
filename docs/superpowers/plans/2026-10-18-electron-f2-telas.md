@@ -246,29 +246,35 @@ git commit -m "electron: trabalhos com eventos e jogar na ponte (F2)"
   - Regra de `Ctrl+F`: seção com busca visível (`jogos`, `musicas`, `desejos`, `videos`) foca o
     campo; nas demais abre a paleta (ajuste em `atalhos.ts`/`app.tsx` + teste)
 
-- [ ] **Step 1: RED** — `jogos.test.ts`: filtro por plataforma, favoritos, pendências (por
+- [x] **Step 1: RED** — `jogos.test.ts`: filtro por plataforma, favoritos, pendências (por
   `idsPendentes`), busca sem acento/multi-palavra, ordenação por título/horas/recentes (empate
-  estável por título), lista vazia. `dados.test.ts`: `recarregar()` junta snapshot+saúde e mantém o
-  anterior em erro.
+  estável por título), lista vazia. `dados.test.ts`: `recarregar()` junta snapshot+saúde, mantém o
+  anterior em erro e limpa o erro no sucesso. `atalhos.test.ts` atualizado para a regra nova do
+  Ctrl+F por seção (`focar-busca` vs paleta).
 
-- [ ] **Step 2: Rodar RED** — `npm --prefix codigo/frontends/electron run test`.
+- [x] **Step 2: Rodar RED** — `npm --prefix codigo/frontends/electron run test`: 4 arquivos
+  falhando (2 módulos ausentes + 2 asserções do Ctrl+F).
 
-- [ ] **Step 3: Implementar** — store, módulos puros, `PosterCard`, `Jogos.tsx` (grade CSS com
-  `grid-template-columns: repeat(auto-fill, …)`, chips de filtro, combo de ordenação, campo de
-  busca, resumo "N de TOTAL jogos · filtros · ordem" e chip "Pendências (N)"), wire no `app.tsx`
-  (ao montar/trocar seção: ler `preferencias.filtro`; ao mudar chip/combo: `salvar_filtro` e
-  refiltro local imediato). Seleção com seta/Enter navega a grade; clique seleciona.
+- [x] **Step 3: Implementar** — `dados.ts` com signals (`@preact/signals`) de snapshot/saúde/erro,
+  módulos puros, `PosterCard`, `Jogos.tsx` (grade CSS, chips de filtro, combo de ordenação, campo
+  de busca, resumo "N de TOTAL jogos · filtros · ordem" e chip "Pendências (N)"), wire no `app.tsx`
+  (store no lugar do snapshot local; ao montar/trocar de perfil: ler `preferencias.filtro`; ao
+  mudar chip/combo: `salvar_filtro` e refiltro local imediato; Ctrl+F vira `focar-busca` nas
+  seções com busca). Seleção com setas (esquerda/direita) e clique; Enter/jogar ficam para a
+  Task 4.
 
-- [ ] **Step 4: GREEN + build + typecheck.**
+- [x] **Step 4: GREEN + build + typecheck** — vitest 69/69; `tsc` e `electron-vite build` ok.
 
-- [ ] **Step 5: Prova** — app real com home semeada; CDP: Ctrl+2, aplicar filtro "PC", ordenar
-  por horas, digitar busca "knight" → só Hollow Knight; screenshot `f2-jogos.png`; conferir
-  `preferencias-pessoais.json` com `filtro/ordem` do perfil.
+- [x] **Step 5: Prova** — `.provas/electron/prova-f2-t3-jogos.ps1` (home `home-f2`; app real em
+  CDP): Ctrl+2 → 3 cards por título; Ctrl+F foca a busca; chip "Pendências (2)" → 2 de 3; filtro
+  "PC" + ordem horas → Stardew/Hollow/Celeste; busca "knight" → só Hollow Knight; setas e clique
+  movem a seleção; perfil Isa herda o padrão e Tuco recupera "PC/horas"; prefs persistidas no
+  JSON do perfil. Screenshots `f2-jogos.png` e `f2-jogos-selecao.png`. PROVA OK.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
-git add codigo/frontends/electron/src/renderer/src/estado/dados.ts codigo/frontends/electron/src/renderer/src/estado/dados.test.ts codigo/frontends/electron/src/renderer/src/estado/jogos.ts codigo/frontends/electron/src/renderer/src/estado/jogos.test.ts codigo/frontends/electron/src/renderer/src/vistas/Jogos.tsx codigo/frontends/electron/src/renderer/src/componentes/PosterCard.tsx codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/renderer/src/estilo.css
+git add codigo/frontends/electron/src/renderer/src/estado/dados.ts codigo/frontends/electron/src/renderer/src/estado/dados.test.ts codigo/frontends/electron/src/renderer/src/estado/jogos.ts codigo/frontends/electron/src/renderer/src/estado/jogos.test.ts codigo/frontends/electron/src/renderer/src/vistas/Jogos.tsx codigo/frontends/electron/src/renderer/src/componentes/PosterCard.tsx codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/renderer/src/estilo.css codigo/frontends/electron/src/renderer/src/atalhos.ts codigo/frontends/electron/src/renderer/src/atalhos.test.ts
 git commit -m "electron: tela Jogos com filtros e ordem por perfil (F2)"
 ```
 

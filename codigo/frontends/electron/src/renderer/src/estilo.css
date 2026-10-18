@@ -501,3 +501,132 @@ body {
   opacity: 0.6;
   cursor: default;
 }
+
+/* Tela Jogos (F2) */
+.jogos .cabecalho {
+  margin-bottom: 18px;
+}
+
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.chip {
+  padding: 6px 12px;
+  border: 1px solid var(--borda);
+  border-radius: 999px;
+  background: var(--cartao);
+  color: var(--texto2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--texto);
+}
+
+.chip.ativo {
+  border-color: var(--realce);
+  background: var(--realce-suave);
+  color: var(--texto);
+}
+
+.ordem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--texto2);
+  font-size: 13px;
+}
+
+.ordem select {
+  padding: 6px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 9px;
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+}
+
+.busca {
+  flex: 1;
+  min-width: 240px;
+  padding: 7px 12px;
+  border: 1px solid var(--borda);
+  border-radius: 9px;
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.busca:focus {
+  border-color: var(--realce);
+}
+
+.busca::placeholder {
+  color: var(--texto2);
+}
+
+.poster .capa {
+  position: relative;
+}
+
+.poster {
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.poster:hover {
+  border-color: #364057;
+}
+
+.poster.selecionado {
+  border-color: var(--realce);
+  box-shadow: 0 0 0 2px var(--realce-suave);
+}
+
+.selo-favorito {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(16, 18, 24, 0.75);
+  color: #ffd166;
+  font-size: 14px;
+}
+
+.acoes {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.acao {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.acao:hover {
+  border-color: var(--realce);
+  background: var(--realce-suave);
+}

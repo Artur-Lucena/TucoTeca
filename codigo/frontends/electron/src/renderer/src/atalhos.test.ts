@@ -25,9 +25,9 @@ describe('combinacao', () => {
 describe('acaoDoAtalho', () => {
   const atalhos = { paleta: 'Ctrl+K', buscar: 'Ctrl+F', jogos: 'Ctrl+2', inicio: 'Ctrl+1' }
 
-  it('resolve paleta (Ctrl+K e Ctrl+F) e seções', () => {
+  it('resolve paleta (Ctrl+K) e busca (Ctrl+F) em separado, e seções', () => {
     expect(acaoDoAtalho('Ctrl+K', atalhos)).toEqual({ tipo: 'paleta' })
-    expect(acaoDoAtalho('Ctrl+F', atalhos)).toEqual({ tipo: 'paleta' })
+    expect(acaoDoAtalho('Ctrl+F', atalhos)).toEqual({ tipo: 'busca' })
     expect(acaoDoAtalho('Ctrl+2', atalhos)).toEqual({ tipo: 'secao', chave: 'jogos' })
   })
 
@@ -41,15 +41,28 @@ describe('acaoDoAtalho', () => {
 describe('decidirAtalho', () => {
   const atalhos = { paleta: 'Ctrl+K', buscar: 'Ctrl+F', jogos: 'Ctrl+2' }
 
-  it('fechado: paleta abre/toggle e seções navegam', () => {
-    expect(decidirAtalho(false, 'Ctrl+K', atalhos)).toEqual({ tipo: 'paleta' })
-    expect(decidirAtalho(false, 'Ctrl+2', atalhos)).toEqual({ tipo: 'secao', chave: 'jogos' })
+  it('fechado: paleta abre direto e seções navegam', () => {
+    expect(decidirAtalho(false, 'Ctrl+K', atalhos, 'jogos')).toEqual({ tipo: 'paleta' })
+    expect(decidirAtalho(false, 'Ctrl+2', atalhos, 'jogos')).toEqual({
+      tipo: 'secao',
+      chave: 'jogos',
+    })
+  })
+
+  it('fechado: Ctrl+F foca a busca da seção; sem busca na seção, abre a paleta', () => {
+    expect(decidirAtalho(false, 'Ctrl+F', atalhos, 'jogos')).toEqual({ tipo: 'focar-busca' })
+    expect(decidirAtalho(false, 'Ctrl+F', atalhos, 'musicas')).toEqual({ tipo: 'focar-busca' })
+    expect(decidirAtalho(false, 'Ctrl+F', atalhos, 'desejos')).toEqual({ tipo: 'focar-busca' })
+    expect(decidirAtalho(false, 'Ctrl+F', atalhos, 'videos')).toEqual({ tipo: 'focar-busca' })
+    expect(decidirAtalho(false, 'Ctrl+F', atalhos, 'inicio')).toEqual({ tipo: 'paleta' })
+    expect(decidirAtalho(false, 'Ctrl+F', atalhos, 'integracoes')).toEqual({ tipo: 'paleta' })
+    expect(decidirAtalho(false, 'Ctrl+F', atalhos)).toEqual({ tipo: 'paleta' })
   })
 
   it('aberta: só fecha (Ctrl+K/Ctrl+F) — seção não dispara', () => {
-    expect(decidirAtalho(true, 'Ctrl+K', atalhos)).toEqual({ tipo: 'fechar' })
-    expect(decidirAtalho(true, 'Ctrl+F', atalhos)).toEqual({ tipo: 'fechar' })
-    expect(decidirAtalho(true, 'Ctrl+2', atalhos)).toBeNull()
-    expect(decidirAtalho(true, null, atalhos)).toBeNull()
+    expect(decidirAtalho(true, 'Ctrl+K', atalhos, 'jogos')).toEqual({ tipo: 'fechar' })
+    expect(decidirAtalho(true, 'Ctrl+F', atalhos, 'jogos')).toEqual({ tipo: 'fechar' })
+    expect(decidirAtalho(true, 'Ctrl+2', atalhos, 'jogos')).toBeNull()
+    expect(decidirAtalho(true, null, atalhos, 'jogos')).toBeNull()
   })
 })

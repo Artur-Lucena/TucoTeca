@@ -5,11 +5,12 @@ import { AvisoPonte } from './componentes/AvisoPonte'
 import { BarraLateral } from './componentes/BarraLateral'
 import { Paleta } from './componentes/Paleta'
 import { LeitorControle, type EstadoPad } from './controle'
-import type { Snapshot } from './derivacoes'
 import { reduzirConexao, type EstadoConexao } from './estado/conexao'
+import { erroCarga, recarregar, snapshot } from './estado/dados'
 import { avisosDoResumo, dispensarAviso, juntarAvisos, type Aviso } from './estado/notificacoes'
 import { paletaInicial, reduzirPaleta, type ItemBusca } from './estado/paleta'
 import { Inicio } from './vistas/Inicio'
+import { Jogos } from './vistas/Jogos'
 import { Placeholder } from './vistas/Placeholder'
 
 const DESTINO_DO_ITEM: Record<string, string> = {
@@ -21,9 +22,9 @@ const DESTINO_DO_ITEM: Record<string, string> = {
 
 export function App() {
   const [modulos, setModulos] = useState<ModuloDTO[]>([])
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [secao, setSecao] = useState('inicio')
+  const [focoBusca, setFocoBusca] = useState(0)
   const [paleta, setPaleta] = useState(paletaInicial)
   const [atalhos, setAtalhos] = useState<Record<string, string>>({})
   const [avisos, setAvisos] = useState<Aviso[]>([])
@@ -35,9 +36,9 @@ export function App() {
       try {
         const lista = await window.tucoteca.chamar<ModuloDTO[]>('modulos.listar')
         setModulos(lista)
-        const dados = await window.tucoteca.chamar<Snapshot>('nucleo.snapshot')
-        setSnapshot(dados)
-        setAvisos(avisosDoResumo(dados.sistema ?? {}))
+        await recarregar()
+        if (erroCarga.value !== null) throw new Error(erroCarga.value)
+        setAvisos(avisosDoResumo(snapshot.value?.sistema ?? {}))
         try {
           const prefs = await window.tucoteca.chamar<{
             ativo?: string
@@ -48,7 +49,7 @@ export function App() {
         } catch {
           // sem atalhos/perfil pessoais o shell segue funcionando; chegam na próxima carga
         }
-        window.tucoteca.pronto({ jogos: dados.jogos?.length ?? 0 })
+        window.tucoteca.pronto({ jogos: snapshot.value?.jogos?.length ?? 0 })
       } catch (falha) {
         setErro(String(falha))
       }
@@ -57,20 +58,22 @@ export function App() {
 
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent) => {
-      const decisao = decidirAtalho(paleta.aberta, combinacao(evento), atalhos)
+      const decisao = decidirAtalho(paleta.aberta, combinacao(evento), atalhos, secao)
       if (decisao === null) return
       evento.preventDefault()
       if (decisao.tipo === 'paleta') {
         setPaleta((atual) => reduzirPaleta(atual, { tipo: 'abrir' }))
       } else if (decisao.tipo === 'fechar') {
         setPaleta((atual) => reduzirPaleta(atual, { tipo: 'fechar' }))
+      } else if (decisao.tipo === 'focar-busca') {
+        setFocoBusca((atual) => atual + 1)
       } else {
         setSecao(decisao.chave)
       }
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [paleta.aberta, atalhos])
+  }, [paleta.aberta, atalhos, secao])
 
   useEffect(() => {
     if (!paleta.aberta) return
@@ -114,9 +117,9 @@ export function App() {
     setConexao((atual) => reduzirConexao(atual, { tipo: 'reabrindo' }))
     try {
       await window.tucoteca.reabrir()
-      const dados = await window.tucoteca.chamar<Snapshot>('nucleo.snapshot')
-      setSnapshot(dados)
-      setAvisos((atual) => juntarAvisos(avisosDoResumo(dados.sistema ?? {}), atual))
+      await recarregar()
+      if (erroCarga.value !== null) throw new Error(erroCarga.value)
+      setAvisos((atual) => juntarAvisos(avisosDoResumo(snapshot.value?.sistema ?? {}), atual))
       setAvisos((atual) =>
         juntarAvisos(atual, [{ id: 'ponte-ok', texto: 'Núcleo reconectado.', tom: 'info' }]),
       )
@@ -211,7 +214,7 @@ export function App() {
     )
   }
 
-  if (!snapshot) {
+  if (snapshot.value === null) {
     return (
       <section class="painel">
         <h1>TucoTeca</h1>
@@ -220,6 +223,7 @@ export function App() {
     )
   }
 
+  const colecao = snapshot.value
   const ativo = modulos.find((modulo) => modulo.chave === secao) ?? modulos[0]
   return (
     <>
@@ -236,7 +240,9 @@ export function App() {
         />
         <section class="conteudo">
           {ativo === undefined || ativo.chave === 'inicio' ? (
-            <Inicio snapshot={snapshot} />
+            <Inicio snapshot={colecao ?? {}} />
+          ) : ativo.chave === 'jogos' ? (
+            <Jogos focoBusca={focoBusca} perfil={perfil} />
           ) : (
             <Placeholder modulo={ativo} />
           )}
