@@ -20,6 +20,8 @@ import {
   type Trabalho,
 } from './estado/trabalhos'
 import { Inicio } from './vistas/Inicio'
+import { Desejos } from './vistas/Desejos'
+import { Integracoes } from './vistas/Integracoes'
 import { Jogos } from './vistas/Jogos'
 import { Musicas } from './vistas/Musicas'
 import { Placeholder } from './vistas/Placeholder'
@@ -345,6 +347,15 @@ export function App() {
                 aoAvisar={avisar}
                 aoMudou={() => void atualizarTudo()}
               />
+            ) : ativo.chave === 'desejos' ? (
+              <Desejos
+                focoBusca={focoBusca}
+                perfil={perfil}
+                aoAvisar={avisar}
+                aoMudou={() => void atualizarTudo()}
+              />
+            ) : ativo.chave === 'integracoes' ? (
+              <Integracoes aoAvisar={avisar} aoNavegar={setSecao} />
             ) : (
               <Placeholder modulo={ativo} />
             )}

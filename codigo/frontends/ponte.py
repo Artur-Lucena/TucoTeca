@@ -142,6 +142,65 @@ def _lixeira_estado(servico, params) -> dict:
     return servico.lixeira()
 
 
+def _desejos_adicionar(servico, params) -> dict:
+    titulo = params.get("titulo")
+    appid = params.get("appid")
+    if not isinstance(titulo, str) or not titulo.strip():
+        raise ValueError("titulo deve ser um texto não vazio")
+    if isinstance(appid, bool) or not isinstance(appid, (str, int)):
+        raise ValueError("appid deve ser o número da loja")
+    appid = str(appid).strip()
+    if not appid.isdigit() or len(appid) > 20:
+        raise ValueError("appid deve ser um número")
+    return servico.adicionar_desejo(appid, titulo.strip())
+
+
+def _desejos_precos(servico, params) -> dict:
+    regiao = params.get("regiao", "")
+    if not isinstance(regiao, str):
+        raise ValueError("regiao deve ser um texto")
+    return servico.precos_desejos(regiao)
+
+
+def _integracoes_listar(servico, params) -> list:
+    return servico.integracoes.listar()
+
+
+def _integracoes_adicionar(servico, params) -> dict:
+    dados = params.get("dados")
+    if not isinstance(dados, dict):
+        raise ValueError("dados deve ser um objeto com chave, nome, tipo e url")
+    return servico.adicionar_integracao(dados)
+
+
+def _integracoes_remover(servico, params) -> dict:
+    chave = params.get("chave")
+    if not isinstance(chave, str) or not chave.strip():
+        raise ValueError("chave deve ser um texto")
+    servico.remover_integracao(chave.strip())
+    return {"ok": True, "chave": chave.strip()}
+
+
+def _integracoes_url(servico, params) -> dict:
+    chave = params.get("chave")
+    if not isinstance(chave, str) or not chave.strip():
+        raise ValueError("chave deve ser um texto")
+    termo = params.get("termo", "")
+    if not isinstance(termo, str):
+        raise ValueError("termo deve ser um texto")
+    return {"url": servico.url_integracao(chave.strip(), termo)}
+
+
+def _integracoes_buscar(servico, params) -> dict:
+    chave = params.get("chave")
+    if not isinstance(chave, str) or not chave.strip():
+        raise ValueError("chave deve ser um texto")
+    termo = params.get("termo", "")
+    if not isinstance(termo, str):
+        raise ValueError("termo deve ser um texto")
+    return servico.integracoes.buscar(chave.strip(), termo)
+
+
 def _filtro(servico, params) -> dict:
     return servico.filtro()
 
@@ -192,6 +251,13 @@ METODOS = {
     "item.excluir": _item_excluir,
     "item.desfazer": _item_desfazer,
     "lixeira.estado": _lixeira_estado,
+    "desejos.adicionar": _desejos_adicionar,
+    "desejos.precos": _desejos_precos,
+    "integracoes.listar": _integracoes_listar,
+    "integracoes.adicionar": _integracoes_adicionar,
+    "integracoes.remover": _integracoes_remover,
+    "integracoes.url": _integracoes_url,
+    "integracoes.buscar": _integracoes_buscar,
 }
 
 

@@ -203,6 +203,22 @@ async function principal(): Promise<void> {
     return resultado.filePaths[0] ?? null
   })
 
+  // Só https; com BIBLIOTECA_REDE=0 a ação é recusada (espelha o exigir_rede).
+  ipcMain.handle('app:abrir-url', async (_evento, url: string) => {
+    const texto = String(url ?? '').trim()
+    let alvo: URL
+    try {
+      alvo = new URL(texto)
+    } catch {
+      throw new Error('endereço inválido')
+    }
+    if (alvo.protocol !== 'https:') throw new Error('só endereços https podem ser abertos')
+    const desligada = ['0', 'false', 'nao', 'não', 'off']
+      .includes((process.env.BIBLIOTECA_REDE ?? '1').trim().toLowerCase())
+    if (desligada) throw new Error('Rede desligada (BIBLIOTECA_REDE=0): abrir link externo precisa de rede.')
+    await shell.openExternal(alvo.toString())
+  })
+
   ipcMain.handle('ponte:reabrir', async () => {
     if (reabrindoPonte) return
     const atual = ponte

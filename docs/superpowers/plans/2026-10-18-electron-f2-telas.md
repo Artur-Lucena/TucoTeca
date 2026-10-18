@@ -423,30 +423,43 @@ git commit -m "electron: tela Musicas com player local e importacao (F2)"
     {chave:str, termo?:str}` / `integracoes.buscar {chave:str, termo:str}` (termo ≥ 2)
   - IPC `app:abrir-url(url)` (só https; caso contrário rejeita)
 
-- [ ] **Step 1: RED (Python)** — `teste_ponte_desejos_adicionar_remover_desfazer`,
-  `teste_ponte_desejos_precos_sem_rede` (mock/off → `{}`), `teste_ponte_integracoes_listar_e_url`,
-  `teste_ponte_integracoes_personalizada_adiciona_e_remove` (chave nova persiste no
-  `integracoes-usuario.json` do home de prova), `teste_ponte_integracoes_buscar_termo_curto_erro`.
+- [x] **Step 1: RED (Python)** — `teste_ponte_desejos_adicionar_remover_desfazer`,
+  `teste_ponte_desejos_precos_sem_rede` (rede off → `{}`), `teste_ponte_integracoes_listar_e_url`
+  (7 padrão + URL com `{q}`/sem termo + persistência no `integracoes-usuario.json`),
+  `teste_ponte_integracoes_entradas_invalidas` (entradas inválidas, chave reservada, termo curto,
+  chave desconhecida).
 
-- [ ] **Step 2: RED roda.**
+- [x] **Step 2: RED roda** — `--modulo test_ponte`: 35/39 (4 novos falhando por método desconhecido);
+  vitest: 2 arquivos novos falhando (`Cannot find module './desejos'/'./integracoes'`).
 
-- [ ] **Step 3: Implementar ponte + IPC.**
+- [x] **Step 3: Implementar ponte + IPC.** Ponte: `desejos.adicionar` (appid numérico +
+  título), `desejos.precos` (região validada), `integracoes.listar/adicionar/remover/url/buscar`
+  (seams sobre `servico.integracoes` e os métodos do serviço); IPC `app:abrir-url` (só https;
+  recusa com `BIBLIOTECA_REDE=0`), `shared/api.ts`+preload `abrirUrl`. Ruling: `servicos_ui/__init__.py`
+  não mudou — o atributo `integracoes` (registro) já existia; a ponte chama `servico.integracoes.*`.
 
-- [ ] **Step 4: Implementar telas.** Desejos: lista (título, "Steam · appid", preço quando
-  consultado), "Steam ↗" (abre `https://store.steampowered.com/app/<appid>`), "Ver preços"
-  (spinner → tabela; vazio → toast "sem rede"), "+ Adicionar" (modal nome + appid numérico),
-  Remover com Desfazer. Nota visível: sincronizar Steam/importar wishlist/buscar fonte ainda não
-  nesta fatia (entra nas pendências). Integrações: grade de cartões (inicial colorida, nome,
-  descrição, capacidades), botão principal por tipo (`url` com `{q}` pede termo; sem `{q}` abre
-  externo; `download` navega para Downloads; `config`/`musicas_online` → toast "ainda não nesta
-  fatia"), campo de busca por integração de catálogo (resultados com link), "+ Adicionar"
-  (validações do serviço mostradas no formulário), Remover em personalizadas.
+- [x] **Step 4: Implementar telas.** `Desejos.tsx` (lista título/"Steam · appid"/preço, "Steam ↗",
+  "Ver preços" com aviso "sem rede", "+ Adicionar" com form nome+appid, Remover com Desfazer;
+  nota visível das pendências Steam/wishlist/fontes). `Integracoes.tsx` (grade de cartões com
+  inicial colorida/nome/descrição/capacidades, botão principal por tipo: `url` com `{q}` pede termo
+  e abre; sem `{q}` abre externo; `download` navega para Downloads; `emulador`/`musicas_online`/
+  `provedores` → toast "ainda não nesta fatia"; busca por catálogo com resultados+links;
+  "+ Adicionar" com validações do serviço no formulário; Remover em personalizadas). `app.tsx`
+  conecta as seções; CSS novo.
 
-- [ ] **Step 5: GREEN + testes web + typecheck; prova E2E** (adicionar desejo, "Ver preços" com
-  rede desligada avisa; adicionar/remover integração personalizada; screenshot `f2-desejos.png`,
-  `f2-integracoes.png`).
+- [x] **Step 5: GREEN + testes web + typecheck; prova E2E** — vitest 18 arquivos / 123 testes;
+  `tsc` + build ok; `--modulo test_ponte` 39/39; suíte completa 550/550; ruff limpo.
+  Prova `.provas/electron/prova-f2-t6-desejos-integracoes.ps1` (home `home-f2-t6`, CDP 9231,
+  `BIBLIOTECA_REDE=0`): Ctrl+4 lista "428: Shibuya Scramble | Hollow Knight: Silksong"; adicionar
+  Celeste → lista cresce e toast "entrou na lista"; "Ver preços" → "Sem preços agora (sem rede...)";
+  "Steam ↗" → "Rede desligada..."; remover → Desfazer na barra; Ctrl+6 → 7 cartões; busca no
+  catálogo (steamrip) → "busca falhou: ... precisa de rede"; adicionar personalizada "Prova T6" →
+  8 cartões, toast "adicionada", persiste em `integracoes-usuario.json`; "Buscar no site" →
+  "Rede desligada"; remover → 7 cartões e sai do json; chave reservada 'steamrip' → erro-form
+  "Esta chave já é de uma integração do Hub.". Screenshots `f2-desejos.png`, `f2-integracoes.png`.
+  PROVA OK.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add codigo/frontends/ponte.py codigo/ferramentas/testes/test_ponte.py codigo/frontends/servicos_ui/__init__.py codigo/frontends/electron/src/main/index.ts codigo/frontends/electron/src/shared/api.ts codigo/frontends/electron/src/preload/index.ts codigo/frontends/electron/src/renderer/src/vistas/Desejos.tsx codigo/frontends/electron/src/renderer/src/vistas/Integracoes.tsx codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/renderer/src/estilo.css

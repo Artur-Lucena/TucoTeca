@@ -755,6 +755,144 @@ def teste_ponte_musicas_jobs_concorrentes_bloqueados():
         and e["dados"]["estado"] == "ok" for e in _linhas(saida))), saida.getvalue())
 
 
+def teste_ponte_desejos_adicionar_remover_desfazer():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-desejos-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+
+    novo = _chamar(ponte, {"id": 70, "metodo": "desejos.adicionar",
+                           "params": {"titulo": "Celeste", "appid": "504230"}})
+    afirmar(novo["ok"] is True and novo["resultado"] == {"ok": True, "novo": True}, novo)
+    denovo = _chamar(ponte, {"id": 71, "metodo": "desejos.adicionar",
+                             "params": {"titulo": "Celeste (novo)", "appid": 504230}})
+    afirmar(denovo["resultado"]["novo"] is False, denovo)
+    ruim = _chamar(ponte, {"id": 72, "metodo": "desejos.adicionar",
+                           "params": {"titulo": "X", "appid": "abc"}})
+    afirmar(ruim["ok"] is False and "número" in ruim["erro"], ruim)
+    vazio = _chamar(ponte, {"id": 73, "metodo": "desejos.adicionar",
+                            "params": {"titulo": "  ", "appid": "1"}})
+    afirmar(vazio["ok"] is False and "titulo" in vazio["erro"], vazio)
+
+    snap = _chamar(ponte, {"id": 74, "metodo": "nucleo.snapshot"})["resultado"]
+    alvo = [d for d in snap["desejos"] if d["appid"] == "504230"]
+    afirmar(len(alvo) == 1 and alvo[0]["titulo"] == "Celeste (novo)", alvo)
+
+    recibo = _chamar(ponte, {"id": 75, "metodo": "item.excluir",
+                             "params": {"categoria": "desejos", "id": alvo[0]["id"]}})
+    afirmar(recibo["ok"] is True and recibo["resultado"]["desfazer"]["titulo"] == "Celeste (novo)",
+            recibo)
+    estado = _chamar(ponte, {"id": 76, "metodo": "lixeira.estado"})
+    afirmar(estado["resultado"]["disponivel"] is True, estado)
+    snap = _chamar(ponte, {"id": 77, "metodo": "nucleo.snapshot"})["resultado"]
+    afirmar([d for d in snap["desejos"] if d["appid"] == "504230"] == [], snap["desejos"])
+    voltou = _chamar(ponte, {"id": 78, "metodo": "item.desfazer"})
+    afirmar(voltou["ok"] is True and voltou["resultado"]["titulo"] == "Celeste (novo)", voltou)
+    snap = _chamar(ponte, {"id": 79, "metodo": "nucleo.snapshot"})["resultado"]
+    afirmar(any(d["appid"] == "504230" for d in snap["desejos"]), snap["desejos"])
+
+
+def teste_ponte_desejos_precos_sem_rede():
+    import os
+
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-precos-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    _chamar(ponte, {"id": 80, "metodo": "desejos.adicionar",
+                    "params": {"titulo": "Silksong", "appid": "1030300"}})
+    antigo = os.environ.get("BIBLIOTECA_REDE")
+    os.environ["BIBLIOTECA_REDE"] = "0"
+    try:
+        r = _chamar(ponte, {"id": 81, "metodo": "desejos.precos", "params": {}})
+        tipo = _chamar(ponte, {"id": 82, "metodo": "desejos.precos", "params": {"regiao": 7}})
+    finally:
+        if antigo is None:
+            os.environ.pop("BIBLIOTECA_REDE", None)
+        else:
+            os.environ["BIBLIOTECA_REDE"] = antigo
+    afirmar(r["ok"] is True and r["resultado"] == {}, r)
+    afirmar(tipo["ok"] is False and "regiao" in tipo["erro"], tipo)
+
+
+def teste_ponte_integracoes_listar_e_url():
+    import json as _json
+
+    from servicos_ui import ServicoBiblioteca, _arquivo_personalizadas
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-integra-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+
+    r = _chamar(ponte, {"id": 90, "metodo": "integracoes.listar"})
+    afirmar(r["ok"] is True, r)
+    itens = r["resultado"]
+    chaves = [i["chave"] for i in itens]
+    for esperada in ("steamrip", "fitgirl", "azahar", "desmume", "qbittorrent", "spotify", "capas"):
+        afirmar(esperada in chaves, chaves)
+    item = next(i for i in itens if i["chave"] == "steamrip")
+    afirmar(item["nome"] == "SteamRip" and item["tipo"] == "catalogo", item)
+    afirmar("buscar" not in item and item["capacidades"] == ["busca"], item)
+
+    sem_url = _chamar(ponte, {"id": 91, "metodo": "integracoes.url", "params": {"chave": "steamrip"}})
+    afirmar(sem_url["ok"] is False and "URL" in sem_url["erro"], sem_url)
+
+    try:
+        dados = {"chave": "prova-t6-site", "nome": "Prova T6", "descricao": "Site de teste",
+                 "tipo": "catalogo", "url": "https://exemplo.test/buscar?q={q}"}
+        criado = _chamar(ponte, {"id": 92, "metodo": "integracoes.adicionar",
+                                 "params": {"dados": dados}})
+        afirmar(criado["ok"] is True and criado["resultado"]["chave"] == "prova-t6-site", criado)
+        arquivo = _arquivo_personalizadas()
+        afirmar(arquivo.name == "integracoes-usuario.json", arquivo)
+        salvo = _json.loads(arquivo.read_text(encoding="utf-8"))
+        afirmar(any(d.get("chave") == "prova-t6-site" for d in salvo), salvo)
+        com_termo = _chamar(ponte, {"id": 93, "metodo": "integracoes.url",
+                                    "params": {"chave": "prova-t6-site", "termo": "zelda breath"}})
+        afirmar(com_termo["resultado"]["url"] == "https://exemplo.test/buscar?q=zelda+breath",
+                com_termo)
+        sem_termo = _chamar(ponte, {"id": 94, "metodo": "integracoes.url",
+                                    "params": {"chave": "prova-t6-site"}})
+        afirmar(sem_termo["resultado"]["url"] == "https://exemplo.test/buscar?q=", sem_termo)
+        na_lista = _chamar(ponte, {"id": 95, "metodo": "integracoes.listar"})["resultado"]
+        afirmar(any(i["chave"] == "prova-t6-site" and i["personalizada"] for i in na_lista), na_lista)
+    finally:
+        _chamar(ponte, {"id": 96, "metodo": "integracoes.remover",
+                        "params": {"chave": "prova-t6-site"}})
+    de_novo = _chamar(ponte, {"id": 97, "metodo": "integracoes.remover",
+                              "params": {"chave": "prova-t6-site"}})
+    afirmar(de_novo["ok"] is False and "padrão" in de_novo["erro"], de_novo)
+
+
+def teste_ponte_integracoes_entradas_invalidas():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-integra-2-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    casos = [
+        ("integracoes.adicionar", {"dados": "nada"}, "dados"),
+        ("integracoes.adicionar", {"dados": {"chave": "steamrip", "nome": "Steam Rip",
+                                             "tipo": "link", "url": "https://exemplo.test/"}},
+         "já é de uma integração"),
+        ("integracoes.adicionar", {"dados": {"chave": "ok-chave", "nome": "Prova X",
+                                             "tipo": "link"}}, "URL"),
+        ("integracoes.remover", {"chave": ""}, "chave"),
+        ("integracoes.url", {}, "chave"),
+        ("integracoes.buscar", {"chave": "steamrip", "termo": "a"}, "dois caracteres"),
+        ("integracoes.buscar", {"chave": "nao-existe", "termo": "zelda"}, "pesquisa"),
+    ]
+    for indice, (metodo, params, trecho) in enumerate(casos, start=100):
+        r = _chamar(ponte, {"id": indice, "metodo": metodo, "params": params})
+        afirmar(r["ok"] is False and trecho in r["erro"], (metodo, params, r))
+
+
 def teste_ponte_registrar_horas():
     class ServicoHoras(ServicoFalso):
         def registrar_sessao(self, gid, horas):

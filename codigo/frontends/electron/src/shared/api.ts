@@ -6,5 +6,6 @@ export interface ApiTucoteca {
   imagemUrl(url: string): string
   mediaUrl(caminho: string): string
   escolherPasta(): Promise<string | null>
+  abrirUrl(url: string): Promise<void>
   reabrir(): Promise<void>
 }
