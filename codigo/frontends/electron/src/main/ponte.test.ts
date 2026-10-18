@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
 import type { RespostaPonte } from '../shared/protocolo'
-import { Pendentes, SeparadorLinhas, descobrirPython } from './ponte'
+import {
+  ClientePonte,
+  Pendentes,
+  SeparadorLinhas,
+  descobrirPython,
+  type FabricaProcesso,
+} from './ponte'
 
 describe('SeparadorLinhas', () => {
   it('junta pedaço partido no meio da linha', () => {
@@ -101,5 +109,61 @@ describe('descobrirPython', () => {
   it('outras plataformas usam python3', () => {
     const r = descobrirPython('/raiz', { env: {}, plataforma: 'linux', existe: () => true })
     expect(r).toEqual({ comando: 'python3', prefixo: [] })
+  })
+})
+
+class ProcessoFake extends EventEmitter {
+  stdout = new PassThrough()
+  stderr = new PassThrough()
+  stdin = new PassThrough()
+  pid = 4242
+  respondido: string[] = []
+  constructor() {
+    super()
+    this.stdin.on('data', (pedaco: Buffer) => this.respondido.push(pedaco.toString('utf8')))
+  }
+  responder(objeto: unknown): void {
+    this.stdout.write(`${JSON.stringify(objeto)}\n`)
+  }
+  sair(codigo: number): void {
+    this.emit('exit', codigo)
+  }
+  kill(): boolean {
+    return true
+  }
+}
+
+function clienteComFake() {
+  const processo = new ProcessoFake()
+  const cliente = new ClientePonte(
+    { raiz: 'C:/raiz' },
+    { criarProcesso: (() => processo) as unknown as FabricaProcesso },
+  )
+  cliente.iniciar()
+  return { processo, cliente }
+}
+
+describe('ClientePonte — queda e rejeição', () => {
+  it('rejeita chamadas pendentes e avisa quando o processo morre', async () => {
+    const { processo, cliente } = clienteComFake()
+    const encerrou: unknown[] = []
+    cliente.aoEncerrar((info) => encerrou.push(info))
+    const pendente = cliente.chamar('nucleo.ping')
+    expect(processo.respondido[0]).toContain('"nucleo.ping"')
+    processo.sair(1)
+    await expect(pendente).rejects.toThrow('encerrou')
+    expect(encerrou).toEqual([{ codigo: 1, erro: undefined }])
+    await expect(cliente.chamar('nucleo.ping')).rejects.toThrow('não iniciada')
+  })
+
+  it('resposta fora de ordem resolve por id; id órfão é ignorado', async () => {
+    const { processo, cliente } = clienteComFake()
+    const primeira = cliente.chamar('a')
+    const segunda = cliente.chamar('b')
+    processo.responder({ id: 2, ok: true, resultado: 'B' })
+    processo.responder({ id: 1, ok: true, resultado: 'A' })
+    processo.responder({ id: 99, ok: true, resultado: 'órfã' })
+    await expect(primeira).resolves.toBe('A')
+    await expect(segunda).resolves.toBe('B')
   })
 })

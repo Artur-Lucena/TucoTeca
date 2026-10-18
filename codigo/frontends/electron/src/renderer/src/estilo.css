@@ -470,3 +470,34 @@ body {
   background: rgba(255, 255, 255, 0.04);
   color: var(--texto);
 }
+
+.aviso-ponte {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #5a2323;
+  color: #ffe3e3;
+  font-size: 13px;
+}
+
+.aviso-ponte button {
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 227, 227, 0.5);
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.aviso-ponte button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

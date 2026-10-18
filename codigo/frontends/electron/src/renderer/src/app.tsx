@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'preact/hooks'
 import type { ModuloDTO } from '../../shared/protocolo'
 import { combinacao, decidirAtalho } from './atalhos'
+import { AvisoPonte } from './componentes/AvisoPonte'
 import { BarraLateral } from './componentes/BarraLateral'
 import { Paleta } from './componentes/Paleta'
 import { LeitorControle, type EstadoPad } from './controle'
 import type { Snapshot } from './derivacoes'
+import { reduzirConexao, type EstadoConexao } from './estado/conexao'
 import { avisosDoResumo, dispensarAviso, juntarAvisos, type Aviso } from './estado/notificacoes'
 import { paletaInicial, reduzirPaleta, type ItemBusca } from './estado/paleta'
 import { Inicio } from './vistas/Inicio'
@@ -26,6 +28,7 @@ export function App() {
   const [atalhos, setAtalhos] = useState<Record<string, string>>({})
   const [avisos, setAvisos] = useState<Aviso[]>([])
   const [perfil, setPerfil] = useState('Tuco')
+  const [conexao, setConexao] = useState<EstadoConexao>('ok')
 
   useEffect(() => {
     void (async () => {
@@ -97,6 +100,35 @@ export function App() {
       if (aviso !== null) setAvisos((atual) => juntarAvisos(atual, [aviso]))
     })
   }, [])
+
+  useEffect(() => {
+    return window.tucoteca.assinar('ponte-estado', (dados) => {
+      const estado = (dados as { estado?: unknown } | null)?.estado
+      if (estado === 'caiu' || estado === 'reabrindo' || estado === 'ok') {
+        setConexao((atual) => reduzirConexao(atual, { tipo: estado }))
+      }
+    })
+  }, [])
+
+  const reconectar = async () => {
+    setConexao((atual) => reduzirConexao(atual, { tipo: 'reabrindo' }))
+    try {
+      await window.tucoteca.reabrir()
+      const dados = await window.tucoteca.chamar<Snapshot>('nucleo.snapshot')
+      setSnapshot(dados)
+      setAvisos((atual) => juntarAvisos(avisosDoResumo(dados.sistema ?? {}), atual))
+      setAvisos((atual) =>
+        juntarAvisos(atual, [{ id: 'ponte-ok', texto: 'Núcleo reconectado.', tom: 'info' }]),
+      )
+    } catch (falha) {
+      setConexao((atual) => reduzirConexao(atual, { tipo: 'caiu' }))
+      setAvisos((atual) =>
+        juntarAvisos(atual, [
+          { id: 'ponte-erro', texto: `Não reconectei: ${String(falha)}`, tom: 'atencao' },
+        ]),
+      )
+    }
+  }
 
   useEffect(() => {
     const leitor = new LeitorControle()
@@ -191,6 +223,7 @@ export function App() {
   const ativo = modulos.find((modulo) => modulo.chave === secao) ?? modulos[0]
   return (
     <>
+      <AvisoPonte estado={conexao} aoReconectar={reconectar} />
       <main class="shell">
         <BarraLateral
           modulos={modulos}

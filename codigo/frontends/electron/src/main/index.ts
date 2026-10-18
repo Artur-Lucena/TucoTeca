@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from 'electron'
 import { existsSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { registrarProtocoloMidia } from './arquivos'
+import { lockOrfao } from './lock'
 import { ClientePonte } from './ponte'
 
 protocol.registerSchemesAsPrivileged([
@@ -34,9 +35,47 @@ function lerFlags(): Flags {
 const flags = lerFlags()
 const RAIZ = resolve(process.env.TUCOTECA_RAIZ || join(app.getAppPath(), '..', '..', '..'))
 const HOME = process.env.BIBLIOTECA_HOME || RAIZ
+const CAMINHO_LOCK = join(HOME, '.biblioteca.lock')
 
 let ponte: ClientePonte | null = null
 let fechando = false
+let bloqueioAtual: string | null = null
+let reabrindoPonte = false
+
+function enviarEstadoPonte(estado: 'ok' | 'caiu' | 'reabrindo'): void {
+  for (const janela of BrowserWindow.getAllWindows()) {
+    janela.webContents.send('ponte:evento:ponte-estado', { estado })
+  }
+}
+
+/** Cria um cliente novo, sobe a ponte e faz o ping de aquecimento. */
+async function conectar(ignorarLockExtra = false): Promise<void> {
+  const cliente = new ClientePonte({
+    raiz: RAIZ,
+    db: flags.db ?? undefined,
+    ignorarLock: flags.ignorarLock || ignorarLockExtra,
+  })
+  ponte = cliente
+  bloqueioAtual = null
+
+  cliente.aoEvento((evento, dados) => {
+    if (evento === 'bloqueio') {
+      const erro = (dados as { erro?: string } | undefined)?.erro
+      bloqueioAtual = erro ?? 'A coleção já está aberta em outro programa.'
+    }
+    for (const janela of BrowserWindow.getAllWindows()) {
+      janela.webContents.send(`ponte:evento:${evento}`, dados)
+    }
+  })
+
+  cliente.aoEncerrar(() => {
+    // Encerramento pedido pelo próprio app não é queda.
+    if (!cliente.finalizando) enviarEstadoPonte('caiu')
+  })
+
+  cliente.iniciar()
+  await cliente.chamar('nucleo.ping')
+}
 
 function falhar(mensagem: string, codigo: number): void {
   process.stderr.write(`[erro] ${mensagem}\n`)
@@ -94,30 +133,11 @@ async function principal(): Promise<void> {
     return
   }
 
-  const cliente = new ClientePonte({
-    raiz: RAIZ,
-    db: flags.db ?? undefined,
-    ignorarLock: flags.ignorarLock,
-  })
-  ponte = cliente
-
-  let bloqueio: string | null = null
-  cliente.aoEvento((evento, dados) => {
-    if (evento === 'bloqueio') {
-      const erro = (dados as { erro?: string } | undefined)?.erro
-      bloqueio = erro ?? 'A coleção já está aberta em outro programa.'
-    }
-    for (const janela of BrowserWindow.getAllWindows()) {
-      janela.webContents.send(`ponte:evento:${evento}`, dados)
-    }
-  })
-
-  cliente.iniciar()
   try {
-    await cliente.chamar('nucleo.ping')
+    await conectar()
   } catch (erro) {
-    if (bloqueio) {
-      falhar(bloqueio, 2)
+    if (bloqueioAtual) {
+      falhar(bloqueioAtual, 2)
       return
     }
     falhar(`ponte indisponível: ${(erro as Error).message}`, 1)
@@ -126,9 +146,29 @@ async function principal(): Promise<void> {
 
   registrarProtocoloMidia(() => HOME)
 
-  ipcMain.handle('ponte:chamar', (_evento, metodo: string, params?: Record<string, unknown>) =>
-    cliente.chamar(metodo, params),
-  )
+  ipcMain.handle('ponte:chamar', (_evento, metodo: string, params?: Record<string, unknown>) => {
+    const cliente = ponte
+    if (!cliente) return Promise.reject(new Error('a ponte ainda não iniciou'))
+    if (cliente.encerrado) return Promise.reject(new Error('a ponte encerrou — clique em Reconectar'))
+    return cliente.chamar(metodo, params)
+  })
+
+  ipcMain.handle('ponte:reabrir', async () => {
+    if (reabrindoPonte) return
+    const atual = ponte
+    if (atual && !atual.encerrado) return
+    reabrindoPonte = true
+    enviarEstadoPonte('reabrindo')
+    try {
+      await conectar(lockOrfao(CAMINHO_LOCK))
+      enviarEstadoPonte('ok')
+    } catch (erro) {
+      enviarEstadoPonte('caiu')
+      throw new Error(bloqueioAtual ?? (erro as Error).message)
+    } finally {
+      reabrindoPonte = false
+    }
+  })
 
   let aguardandoPronto: ((dados: unknown) => void) | null = null
   const pronto = new Promise<unknown>((resolver) => {

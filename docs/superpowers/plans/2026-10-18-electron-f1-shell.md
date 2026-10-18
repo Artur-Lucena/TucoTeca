@@ -579,8 +579,9 @@ git commit -m "electron: navegacao por controle no shell (F1)"
   `ponte-estado` (`'caiu' | 'reabrindo' | 'ok'`); preload `reabrir(): Promise<void>`; renderer
   `reduzirConexao` + banner.
 
-- [ ] **Step 1: Testes que falham** — em `ponte.test.ts` (novos `describe`s com processo fake;
-  o import existente do arquivo ganha `ClientePonte`):
+- [x] **Step 1: Testes que falham** — em `ponte.test.ts` (novos `describe`s com processo fake;
+  o import existente do arquivo ganha `ClientePonte`) e em `lock.test.ts` (lock órfão). O cast do
+  fake virou `as unknown as FabricaProcesso` (tipo exportado do `ponte.ts`, ver Step 3):
 
 ```ts
 import { EventEmitter } from 'node:events'
@@ -657,18 +658,20 @@ describe('reduzirConexao', () => {
 })
 ```
 
-- [ ] **Step 2: RED** — `npm … run test`.
+- [x] **Step 2: RED** — 3 suítes falharam por import ausente (ponte ×2, conexao, lock); antigos verdes.
 
-- [ ] **Step 3: `ClientePonte` com spawn injetável** — construtor aceita
-  `deps.criarProcesso`; `iniciar()` usa `deps?.criarProcesso ?? spawn`; o resto do F0 permanece
-  (buffer NDJSON, pendentes por id, timeout 30 s, `encerrar()` com taskkill). Ajustar tipos para
-  aceitar `ChildProcess`-like (o fake não é um ChildProcess real — tipar a dependência como
-  `(comando: string, args: string[], opcoes: object) => ProcessoFilhoMinimo`, com interface local
-  mínima `{stdin, stdout, stderr, on, once, kill, pid}`).
+- [x] **Step 3: `ClientePonte` com spawn injetável** — construtor aceita
+  `deps.criarProcesso`; `iniciar()` usa `deps.criarProcesso ?? spawn`; o resto do F0 permanece
+  (buffer NDJSON, pendentes por id, timeout 30 s, `encerrar()` com taskkill). Desvio do plano: o
+  tipo ficou `FabricaProcesso = typeof spawn` (a interface mínima local não compila: o parâmetro
+  de opções é contravariante com o `spawn` real) e o cast no teste cobre o fake. Novo
+  `main/lock.ts`: `lockOrfao(caminho)` (mesmo host/SO + pid morto) para o Reconectar assumir o
+  lock deixado por crash — o `adquirir_lock` do núcleo recusa lock morto fresco (regra de 24 h)
+  e sem isso a reabertura falharia no cenário que ela existe para cobrir.
 
-- [ ] **Step 4: `conexao.ts`** — conforme teste.
+- [x] **Step 4: `conexao.ts`** — conforme teste.
 
-- [ ] **Step 5: Main — conexão/reconexão + menu deixado para a Task 6**
+- [x] **Step 5: Main — conexão/reconexão + menu deixado para a Task 6**
   - Extrair `conectar(): Promise<void>`: cria `ClientePonte`, `aoEvento` (bloqueio → diálogo+
     exit 2 como na F0; demais eventos → `webContents.send('ponte:evento:…')`), `aoEncerrar` →
     `enviarEstado('caiu')`, `iniciar()`, `chamar('nucleo.ping')`.
@@ -679,21 +682,32 @@ describe('reduzirConexao', () => {
   - `enviarEstado(estado)` manda `tucoteca:ponte-estado` para todas as janelas (preload expõe via
     `assinar('ponte-estado', …)` usando o canal existente `ponte:evento:ponte-estado`).
   - `window-all-closed` continua encerrando a ponte (sem órfãos: `encerrar()` com kill).
+  - Na reabertura: `conectar(lockOrfao(CAMINHO_LOCK))` assume lock de pid morto; `aoEncerrar` só
+    manda `caiu` quando `!cliente.finalizando` (encerramento pedido não é queda).
 
-- [ ] **Step 6: Renderer — banner e reabertura**
+- [x] **Step 6: Renderer — banner e reabertura** (mensagens exatas do plano; sucesso refaz o
+  snapshot sem reload e gera aviso info "Núcleo reconectado."; falha vira aviso `atencao` e
+  mantém `caiu`)
   - `AvisoPonte`: quando `caiu`, faixa fixa no topo "O núcleo caiu — a coleção não está acessível.
     [Reconectar]"; enquanto `reabrindo`, botão desabilitado "Reconectando…".
   - `App`: estado `conexao` via `reduzirConexao`; `assinar('ponte-estado')` atualiza; sucesso da
     reabertura refaz `nucleo.snapshot` e substitui o snapshot (sem recarregar a página);
     `window.tucoteca.reabrir()` é chamado pelo botão.
 
-- [ ] **Step 7: Verdes** — `test` (ponte fake + conexão), `typecheck`, `build`.
+- [x] **Step 7: Verdes** — 53/53 vitest, `typecheck` e `build` verdes.
 
-- [ ] **Step 8: Prova manual de queda** (checklist da Task 6 roda junto): em `npm run dev` com
-  home de prova, `taskkill /PID <pid-do-python> /T /F` → banner aparece; Reconectar → volta;
-  sair do app não deixa processo Python (conferir `Get-CimInstance Win32_Process`).
+- [x] **Step 8: Prova E2E de queda** (automatizada em vez de manual:
+  `.provas/electron/prova-queda.ps1` + `cdp.mjs`, app real com CDP na porta 9222): `taskkill /T /F`
+  no Python → banner (evidência `f1-ponte-caida.png`) → ping da ponte morta rejeita com erro claro
+  → clique em Reconectar → banner some → ping responde na home de prova → saída limpa sem
+  processo Python nem lock. Rodada final `PROVA OK` (rc=0).
+  **Incidente honesto**: a 1ª rodada do script usava `$home` (variável readonly do PowerShell) —
+  a atribuição falhou e o app criou uma home default VAZIA em `C:\Users\Tuco` (que não existia;
+  nada de dado pessoal foi aberto — criação toda às 08:06:48 comprovada por timestamp). Os
+  artefatos criados foram removidos e o script agora valida que `BIBLIOTECA_HOME` fica dentro de
+  `.provas` e que o ping aponta para a home de prova.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit** — feito (hash da tarefa no ledger do SDD).
 
 ```bash
 git add codigo/frontends/electron/src/main/ponte.ts codigo/frontends/electron/src/main/ponte.test.ts codigo/frontends/electron/src/main/index.ts codigo/frontends/electron/src/shared/api.ts codigo/frontends/electron/src/preload/index.ts codigo/frontends/electron/src/renderer/src/estado/conexao.ts codigo/frontends/electron/src/renderer/src/estado/conexao.test.ts codigo/frontends/electron/src/renderer/src/componentes/AvisoPonte.tsx codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/renderer/src/estilo.css

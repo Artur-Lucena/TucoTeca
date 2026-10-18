@@ -99,6 +99,13 @@ export interface OpcoesPonte {
   timeoutMs?: number
 }
 
+/** Fábrica do processo filho; nos testes entra um fake no lugar do `spawn`. */
+export type FabricaProcesso = typeof spawn
+
+export interface DepsClientePonte {
+  criarProcesso?: FabricaProcesso
+}
+
 /** Processo filho Python + protocolo NDJSON por stdin/stdout. */
 export class ClientePonte {
   private processo: ChildProcess | null = null
@@ -109,9 +116,11 @@ export class ClientePonte {
   private encerrandoPedido = false
   private readonly timeoutMs: number
   private readonly opcoes: OpcoesPonte
+  private readonly deps: DepsClientePonte
 
-  constructor(opcoes: OpcoesPonte) {
+  constructor(opcoes: OpcoesPonte, deps: DepsClientePonte = {}) {
     this.opcoes = opcoes
+    this.deps = deps
     this.timeoutMs = opcoes.timeoutMs ?? 30000
   }
 
@@ -128,7 +137,8 @@ export class ClientePonte {
     const args = [...prefixo, '-B', join(this.opcoes.raiz, 'codigo', 'frontends', 'ponte.py')]
     if (this.opcoes.db) args.push('--db', this.opcoes.db)
     if (this.opcoes.ignorarLock) args.push('--ignorar-lock')
-    const processo = spawn(comando, args, {
+    const criar = this.deps.criarProcesso ?? spawn
+    const processo = criar(comando, args, {
       env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONIOENCODING: 'utf-8' },
       stdio: ['pipe', 'pipe', 'pipe'],
     })

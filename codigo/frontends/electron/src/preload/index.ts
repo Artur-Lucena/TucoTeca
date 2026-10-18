@@ -14,6 +14,7 @@ const api: ApiTucoteca = {
   },
   pronto: (dados) => ipcRenderer.send('tucoteca:pronto', dados),
   imagemUrl: (url) => converterUrlMidia(url),
+  reabrir: () => ipcRenderer.invoke('ponte:reabrir'),
 }
 
 contextBridge.exposeInMainWorld('tucoteca', api)
