@@ -6,6 +6,8 @@ direto (`import ponte`) e dirigida com entrada/saída de texto em memória.
 import io
 import json
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 import bib_core as core
@@ -223,6 +225,20 @@ def _semear_banco(db: Path) -> None:
     con.close()
 
 
+def _esperar(condicao, limite=5.0):
+    """Aguarda um estado assíncrono (jobs) sem depender de sleep fixo."""
+    fim = time.time() + limite
+    while time.time() < fim:
+        if condicao():
+            return True
+        time.sleep(0.03)
+    return condicao()
+
+
+def _linhas(saida):
+    return [json.loads(t) for t in saida.getvalue().splitlines() if t.strip()]
+
+
 def teste_ponte_saude_e_jogo_ler():
     from servicos_ui import ServicoBiblioteca
     tmp = Path(tempfile.mkdtemp(prefix="suite-saude-"))
@@ -369,3 +385,228 @@ def teste_ponte_filtro_padrao_e_por_perfil():
     tipo = _chamar(ponte, {"id": 48, "metodo": "preferencias.salvar_filtro",
                            "params": {"filtro": 7, "ordem": "titulo"}})
     afirmar(tipo["ok"] is False and "texto" in tipo["erro"], tipo)
+
+
+def teste_ponte_trabalhos_eventos_e_cancelamento():
+    saida = io.StringIO()
+    ponte = Ponte(ServicoFalso())
+
+    def tarefa(progresso, cancelado):
+        for pct in (0, 40, 80):
+            progresso(pct)
+            if cancelado.wait(1.0):
+                return {"parou": True}
+        progresso(100)
+        return {"feito": True}
+
+    def iniciar(servico, params):
+        return {"trabalho": ponte.trabalhos.iniciar("Tarefa de teste", tarefa,
+                                                    cancelavel=True, escopo="teste")}
+
+    ponte.metodos["t.iniciar"] = iniciar
+    ponte.servir(io.StringIO('{"id": 50, "metodo": "t.iniciar"}\n'), saida)
+    resposta = next(e for e in _linhas(saida) if e.get("id") == 50)
+    afirmar(resposta["ok"] is True, resposta)
+    trabalho = resposta["resultado"]["trabalho"]
+    ident = trabalho["id"]
+    afirmar(trabalho["estado"] == "rodando" and trabalho["cancelavel"] is True, trabalho)
+    afirmar(_esperar(lambda: any(
+        e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+        and e["dados"].get("motivo") == "progresso" and e["dados"]["pct"] == 80
+        for e in _linhas(saida))), saida.getvalue())
+    lista = ponte.despachar("trabalhos.listar", {})
+    afirmar(lista["ok"] is True and lista["resultado"][0]["id"] == ident, lista)
+    cancelado = ponte.despachar("trabalhos.cancelar", {"id": ident})
+    afirmar(cancelado["ok"] is True, cancelado)
+    afirmar(cancelado["resultado"]["estado"] in ("rodando", "cancelando"), cancelado)
+    afirmar(_esperar(lambda: any(
+        e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+        and e["dados"]["estado"] == "cancelado" for e in _linhas(saida))), saida.getvalue())
+    eventos = [e["dados"] for e in _linhas(saida) if e.get("evento") == "trabalho"]
+    pcts = [d["pct"] for d in eventos if d.get("motivo") == "progresso"]
+    afirmar(pcts == [0, 40, 80], pcts)
+    afirmar(eventos[-1]["estado"] == "cancelado", eventos[-1])
+    afirmar(eventos[-1]["detalhe"] == {"parou": True}, eventos[-1])
+
+
+def teste_ponte_trabalhos_cancelar_invalido():
+    saida = io.StringIO()
+    ponte = Ponte(ServicoFalso())
+    soltar = threading.Event()
+
+    def tarefa(progresso, cancelado):
+        soltar.wait(3)
+        return {"ok": True}
+
+    def iniciar(servico, params):
+        return {"trabalho": ponte.trabalhos.iniciar("Tarefa firme", tarefa)}
+
+    ponte.metodos["t.iniciar"] = iniciar
+    ponte.servir(io.StringIO('{"id": 55, "metodo": "t.iniciar"}\n'), saida)
+    resposta = next(e for e in _linhas(saida) if e.get("id") == 55)
+    ident = resposta["resultado"]["trabalho"]["id"]
+    firme = ponte.despachar("trabalhos.cancelar", {"id": ident})
+    afirmar(firme["ok"] is False and "cancelada" in firme["erro"], firme)
+    desconhecido = ponte.despachar("trabalhos.cancelar", {"id": 999})
+    afirmar(desconhecido["ok"] is False and "não existe" in desconhecido["erro"], desconhecido)
+    invalido = ponte.despachar("trabalhos.cancelar", {"id": "x"})
+    afirmar(invalido["ok"] is False and "inteiro" in invalido["erro"], invalido)
+    soltar.set()
+    afirmar(_esperar(lambda: any(
+        e.get("evento") == "trabalho" and e["dados"]["estado"] == "ok"
+        for e in _linhas(saida))), saida.getvalue())
+
+
+class ServicoJogo(ServicoFalso):
+    """Serviço fake que simula o ciclo de jogo sem abrir processo nenhum."""
+
+    auto_backup = True
+    rastreado = True
+    horas = 2.5
+
+    def __init__(self):
+        self.soltar = threading.Event()
+        self.registros = {}
+
+    def jogo(self, gid):
+        return {"id": gid, "titulo": "Jogo de Mentira", "executable_path": "x.cmd"}
+
+    def iniciar_jogo(self, gid, ao_fim):
+        ao_fim(self.horas, self.rastreado)
+        self.soltar.wait(5)
+        return {"ok": True, "aviso": "Jogo iniciado. Boa diversão!"}
+
+    def registrar_sessao(self, gid, horas):
+        self.registros["sessao"] = (gid, horas)
+        return {"ok": True}
+
+    def aparencia(self):
+        return {"auto_backup": self.auto_backup}
+
+    def backup_pos_sessao(self, gid):
+        self.registros["backup"] = gid
+        return {"ok": True, "saves": {"ok": True, "arquivos": 2}}
+
+
+def _jogar_ate_o_fim(ponte, saida, pedido_id):
+    resposta = next(e for e in _linhas(saida) if e.get("id") == pedido_id)
+    afirmar(resposta["ok"] is True, resposta)
+    ident = resposta["resultado"]["trabalho"]["id"]
+    ponte.servico.soltar.set()
+    afirmar(_esperar(lambda: any(
+        e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+        and e["dados"]["estado"] in ("ok", "erro", "cancelado") for e in _linhas(saida))),
+        saida.getvalue())
+    fim = next(e["dados"] for e in _linhas(saida)
+               if e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+               and e["dados"]["estado"] in ("ok", "erro", "cancelado"))
+    return fim
+
+
+def teste_ponte_jogar_em_thread():
+    saida = io.StringIO()
+    servico = ServicoJogo()
+    ponte = Ponte(servico)
+    ponte.servir(io.StringIO('{"id": 51, "metodo": "jogo.jogar", "params": {"id": 7}}\n'),
+                 saida)
+    resposta = next(e for e in _linhas(saida) if e.get("id") == 51)
+    afirmar(resposta["ok"] is True, resposta)
+    trabalho = resposta["resultado"]["trabalho"]
+    afirmar(trabalho["estado"] == "rodando", trabalho)
+    afirmar(trabalho["rotulo"] == "Jogar Jogo de Mentira", trabalho)
+    segundo = ponte.despachar("jogo.jogar", {"id": 8})
+    afirmar(segundo["ok"] is False and "andamento" in segundo["erro"], segundo)
+    fim = _jogar_ate_o_fim(ponte, saida, 51)
+    afirmar(fim["estado"] == "ok", fim)
+    afirmar(servico.registros["sessao"] == (7, 2.5), servico.registros)
+    afirmar(servico.registros.get("backup") == 7, servico.registros)
+    afirmar("arquivo(s)" in fim["detalhe"]["aviso"], fim["detalhe"])
+    afirmar(fim["detalhe"]["horas"] == 2.5 and fim["detalhe"]["rastreado"] is True, fim["detalhe"])
+    invalido = ponte.despachar("jogo.jogar", {"id": "x"})
+    afirmar(invalido["ok"] is False and "inteiro" in invalido["erro"], invalido)
+
+
+def teste_ponte_jogar_opt_out_backup():
+    saida = io.StringIO()
+    servico = ServicoJogo()
+    servico.auto_backup = False
+    ponte = Ponte(servico)
+    ponte.servir(io.StringIO('{"id": 56, "metodo": "jogo.jogar", "params": {"id": 9}}\n'),
+                 saida)
+    fim = _jogar_ate_o_fim(ponte, saida, 56)
+    afirmar("backup" not in servico.registros, servico.registros)
+    afirmar(servico.registros["sessao"] == (9, 2.5), servico.registros)
+    afirmar(fim["estado"] == "ok", fim)
+
+
+def teste_ponte_jogar_sem_rastreio_avisa():
+    saida = io.StringIO()
+    servico = ServicoJogo()
+    servico.rastreado = False
+    ponte = Ponte(servico)
+    ponte.servir(io.StringIO('{"id": 57, "metodo": "jogo.jogar", "params": {"id": 10}}\n'),
+                 saida)
+    fim = _jogar_ate_o_fim(ponte, saida, 57)
+    afirmar("sessao" not in servico.registros, servico.registros)
+    afirmar("sem rastreio" in fim["detalhe"]["aviso"], fim["detalhe"])
+
+
+def teste_ponte_jogar_erro_vira_trabalho_erro():
+    saida = io.StringIO()
+    servico = ServicoJogo()
+
+    def quebrar(gid, ao_fim):
+        ao_fim(0.0, False)
+        raise ValueError("Não foi possível iniciar o jogo.")
+
+    servico.iniciar_jogo = quebrar
+    ponte = Ponte(servico)
+    ponte.servir(io.StringIO('{"id": 58, "metodo": "jogo.jogar", "params": {"id": 11}}\n'),
+                 saida)
+    fim = _jogar_ate_o_fim(ponte, saida, 58)
+    afirmar(fim["estado"] == "erro", fim)
+    afirmar("Não foi possível iniciar" in fim["erro"], fim)
+
+
+def teste_ponte_jogar_espera_o_fim_assincrono():
+    saida = io.StringIO()
+    servico = ServicoJogo()
+
+    def iniciar_jogo(gid, ao_fim):
+        def depois():
+            time.sleep(0.3)
+            ao_fim(1.25, True)
+
+        threading.Thread(target=depois, daemon=True).start()
+        return {"ok": True, "aviso": ""}
+
+    servico.iniciar_jogo = iniciar_jogo
+    ponte = Ponte(servico)
+    ponte.servir(io.StringIO('{"id": 59, "metodo": "jogo.jogar", "params": {"id": 12}}\n'),
+                 saida)
+    resposta = next(e for e in _linhas(saida) if e.get("id") == 59)
+    afirmar(resposta["ok"] is True, resposta)
+    ident = resposta["resultado"]["trabalho"]["id"]
+    lista = ponte.despachar("trabalhos.listar", {})
+    em_curso = next(t for t in lista["resultado"] if t["id"] == ident)
+    afirmar(em_curso["estado"] == "rodando", em_curso)
+    afirmar(_esperar(lambda: any(
+        e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+        and e["dados"]["estado"] == "ok" for e in _linhas(saida))), saida.getvalue())
+    afirmar(servico.registros["sessao"] == (12, 1.25), servico.registros)
+    afirmar(servico.registros.get("backup") == 12, servico.registros)
+
+
+def teste_ponte_registrar_horas():
+    class ServicoHoras(ServicoFalso):
+        def registrar_sessao(self, gid, horas):
+            return {"ok": True, "gid": gid, "horas": horas}
+
+    ponte = Ponte(ServicoHoras())
+    r = _chamar(ponte, {"id": 53, "metodo": "jogo.registrar_horas",
+                        "params": {"id": 3, "horas": 1.5}})
+    afirmar(r["ok"] is True and r["resultado"]["horas"] == 1.5, r)
+    for ruim in ({"id": 3, "horas": 0}, {"id": 3, "horas": -1}, {"id": 3, "horas": "x"},
+                 {"id": "x", "horas": 1}):
+        erro = _chamar(ponte, {"id": 54, "metodo": "jogo.registrar_horas", "params": ruim})
+        afirmar(erro["ok"] is False, erro)

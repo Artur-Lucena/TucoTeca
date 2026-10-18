@@ -30,6 +30,19 @@ MUSICAS = [
     ("Sunset Lover", "Petit Biscuit", "semente-p1-0002"),
 ]
 DESEJOS = [("428: Shibuya Scramble", 310360), ("Hollow Knight: Silksong", 1030300)]
+# Jogo de prova: um processo inofensivo que "joga" por ~35 s (ping local em
+# loopback, sem jogo, sem rede externa). Passa do limiar de sessão rastreada
+# (LIMIAR_SESSAO_S = 30 do núcleo) para as horas contarem de verdade.
+JOGO_DE_PROVA = "Stardew Valley"
+LAUNCH_PROVA = "-n 36 127.0.0.1"
+
+
+def _executavel_de_prova() -> str:
+    """Binário do sistema usado como 'jogo' sintético (só no Windows)."""
+    if os.name != "nt":
+        return ""
+    return str(Path(os.environ.get("SystemRoot", r"C:\Windows"))
+               / "System32" / "ping.exe")
 
 
 def main(argv=None) -> int:
@@ -57,7 +70,11 @@ def main(argv=None) -> int:
     con = core.get_db(core.DEFAULT_DB)
     try:
         for titulo, horas, ultima in JOGOS:
-            jogo = core.criar_jogo(con, {"titulo": titulo, "executable_path": ""})
+            probe = titulo == JOGO_DE_PROVA and _executavel_de_prova()
+            jogo = core.criar_jogo(con, {
+                "titulo": titulo,
+                "executable_path": _executavel_de_prova() if probe else "",
+                "launch_options": LAUNCH_PROVA if probe else ""})
             if horas:
                 core.adicionar_horas(con, jogo["id"], horas)
             nome_capa = f"semente-{jogo['id']}.png"

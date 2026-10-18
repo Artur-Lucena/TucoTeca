@@ -41,8 +41,8 @@ TucoTeca. Ledger das tarefas em `.superpowers/sdd/2026-10-18-electron-f2-telas/p
 - Playback do Electron é do **renderer** (`HTMLAudio`/`<video>`); `player.py` (MCI) continua sendo
   o da TUI — divergência documentada, não se toca no player do núcleo.
 - Provas só com `BIBLIOTECA_HOME`/`TUCOTECA_USERDATA` temporários sob `.provas/electron/…`; nunca a
-  coleção real. Dados de prova sempre sintéticos (WAV gerado com `wave`, `.cmd` de mentira,
-  `BT_backup` sintético, PNG do placeholder).
+  coleção real. Dados de prova sempre sintéticos (WAV gerado com `wave`, processo de jogo
+  inofensivo (ping em loopback), `BT_backup` sintético, PNG do placeholder).
 - Suíte: `py -3.14 -B codigo/ferramentas/testes/executar.py [--modulo test_x]`. Lint:
   `.provas/venv-ruff/Scripts/ruff.exe check codigo conftest.py`; `git diff --check`.
 - Typecheck = `npm --prefix codigo/frontends/electron run typecheck`; testes web =
@@ -90,7 +90,7 @@ codigo/frontends/electron/src/
     componentes/PosterCard.tsx, DetalheJogo.tsx, PlayerRodape.tsx, DialogoVideo.tsx
     componentes/Atividade.tsx                   indicador de job no rodapé + Parar
     app.tsx, estilo.css                         wire geral (seções, desfazer, toasts, busca)
-codigo/ferramentas/semear_prova_electron.py     + WAV sintético, .cmd de jogo, BT_backup falso
+codigo/ferramentas/semear_prova_electron.py     + WAV sintético, jogo sintético (ping), BT_backup falso
 codigo/ferramentas/testes/test_ponte.py         + casos das Tasks 1/2/5/6/7/8
 .provas/electron/prova-f2.ps1                   checklist E2E consolidado (Task 9)
 docs/DESKTOP_ELECTRON.md / CHANGELOG.md         atualizados na Task 9
@@ -160,14 +160,15 @@ git commit -m "electron: ponte do jogo e filtro por perfil (F2)"
 
 **Files:**
 - Modify: `codigo/frontends/ponte.py`; Test: `codigo/ferramentas/testes/test_ponte.py`
-- Extend proof seed (jogo com `.cmd`): `codigo/ferramentas/semear_prova_electron.py` — o jogo
-  "Stardew Valley" ganha `executable_path` apontando para `jogar-teste.cmd` criado no destino
-  (script de prova: `@echo off` + `ping -n 4 127.0.0.1 >nul`, encerra sozinho, nada real).
+- Extend proof seed (jogo sintético): `codigo/ferramentas/semear_prova_electron.py` — o jogo
+  "Stardew Valley" ganha `executable_path` = `ping.exe` do sistema com `launch_options`
+  `-n 36 127.0.0.1` (~35 s em loopback; nada real e passa do `LIMIAR_SESSAO_S = 30`). Correção de
+  plano: o núcleo usa `Popen` sem shell, então um `.cmd` não executaria.
 
 **Interfaces:**
-- Consumes: `ServicoBiblioteca.iniciar_jogo(gid, ao_fim)` (bloqueia até o jogo sair; `ao_fim(horas,
-  rastreado)`), `registrar_sessao`, `backup_pos_sessao`, `aparencia()`; `qt_bridge/mix_jogos.py:401-459`
-  como referência de comportamento.
+- Consumes: `ServicoBiblioteca.iniciar_jogo(gid, ao_fim)` (não bloqueia: lança e um vigia chama
+  `ao_fim(horas, rastreado)` quando o processo sai), `registrar_sessao`, `backup_pos_sessao`,
+  `aparencia()`; `qt_bridge/mix_jogos.py:401-459` como referência de comportamento.
 - Produces:
   - `trabalhos.listar {}` → `[{"id","rotulo","estado","pct","cancelavel","iniciado_em","aviso"}]`
     (`estado` ∈ `rodando|cancelando|ok|erro|cancelado`)
@@ -178,37 +179,42 @@ git commit -m "electron: ponte do jogo e filtro por perfil (F2)"
     (`dados.detalhe` com `horas`, `rastreado`, `aviso` quando houver)
   - Um único jogo por vez (`escopo="jogo"`): segundo `jogo.jogar` → `ok=false "já em jogo"`
 
-- [ ] **Step 1: Casos RED** — `teste_ponte_trabalhos_eventos_e_cancelamento` (serviço fake com
-  função longa de mentira: job com progresso 0→50→100 e cancelável — `trabalhos.cancelar` com
-  `threading.Event`; assert das linhas de evento capturadas na saída), `teste_ponte_jogar_em_thread`
-  (fake `iniciar_jogo` bloqueia num `Event`; a resposta volta imediatamente com o job; liberar →
-  `registrar_sessao` chamado com as horas e backup pós-sessão; evento de fim), e
-  `teste_ponte_jogar_recusa_segundo`.
+- [x] **Step 1: Casos RED** — `teste_ponte_trabalhos_eventos_e_cancelamento` (job fake com
+  progresso 0→40→80 e cancelável — `trabalhos.cancelar` com `threading.Event`; asserts das linhas
+  de evento capturadas na saída), `teste_ponte_trabalhos_cancelar_invalido`,
+  `teste_ponte_jogar_em_thread` (fake `iniciar_jogo` bloqueia num `Event`; a resposta volta
+  imediatamente com o job; recusa do segundo `jogo.jogar`; liberar → `registrar_sessao` chamado
+  com as horas e backup pós-sessão; evento de fim), `teste_ponte_jogar_espera_o_fim_assincrono`
+  (o vigia chama `ao_fim` depois; o job fica `rodando` até lá), `teste_ponte_jogar_opt_out_backup`,
+  `teste_ponte_jogar_sem_rastreio_avisa`, `teste_ponte_jogar_erro_vira_trabalho_erro` e
+  `teste_ponte_registrar_horas`.
 
-- [ ] **Step 2: Rodar RED** — falhas "trabalhos … desconhecido".
+- [x] **Step 2: Rodar RED** — falhas "trabalhos … desconhecido"; 8 casos novos falhando.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
-Classe `Trabalhos` em `ponte.py`: `iniciar(rotulo, funcao, escopo=None, cancelavel=False)` com
+Classe `Trabalhos` em `ponte.py`: `iniciar(rotulo, funcao, cancelavel=False, escopo=None)` com
 thread daemon; `funcao(progresso, cancelado)`; `progresso(pct)` atualiza o job (arredonda 0–100) e
 emite evento só quando o valor muda; `cancelado` é `threading.Event`; exceções → estado `erro` com
-`str(erro)`. `servir` ganha `saida_lock` compartilhado (escrita de resposta e evento na mesma
-seção crítica); `Ponte.__init__(…, trabalhos=None)` para injeção nos testes. `jogo.jogar` inicia
-job `escopo="jogo"` que chama `iniciar_jogo(gid, ao_fim_capturador)`, e ao retornar (espelhando
-`_fim_jogo`): se `rastreado`, `registrar_sessao(gid, horas)` e, se
+`str(erro)`. `servir` escreve resposta e evento sob o mesmo `threading.RLock` (`Ponte._escrita`);
+`Ponte.__init__(…, trabalhos=None)` para injeção nos testes. `jogo.jogar` inicia job `escopo="jogo"`
+que chama `iniciar_jogo(gid, ao_fim)`, espera o vigia chamar `ao_fim` (`fim.wait()`) e então,
+espelhando `_fim_jogo`: se `rastreado`, `registrar_sessao(gid, horas)` e, se
 `aparencia().get("auto_backup", True)`, `backup_pos_sessao(gid)` (falha vira `aviso` no detalhe,
-nunca derruba o job). `jogo.registrar_horas` valida `horas` finito > 0.
+nunca derruba o job); sem rastreio → aviso "Sessão sem rastreio…". `jogo.registrar_horas` valida
+`horas` finito > 0.
 
-- [ ] **Step 4: Rodar GREEN** — `--modulo test_ponte` completo.
+- [x] **Step 4: Rodar GREEN** — `--modulo test_ponte` completo: 29/29.
 
-- [ ] **Step 5: Prova local com o `.cmd`**
+- [x] **Step 5: Prova local com o jogo sintético**
 
-Semear home de prova (com o `.cmd`) e, com o app real em CDP, chamar
-`window.tucoteca.chamar('jogo.jogar', {id: …})`; esperar evento de fim (~3 s) e confirmar horas
-somadas no snapshot e jogo liberado para novo `jogo.jogar`. Registrar limite: prova com executável
-sintético (nada de jogo real).
+`.provas/electron/prova-f2-t2-jogar.ps1` (home `home-f2` semeada; app real em CDP): ouvinte de
+eventos no renderer, `jogo.jogar` responde imediato com o trabalho, segundo `jogo.jogar` é recusado
+"andamento", fim da sessão em ~35 s (estado `ok`, 0,01 h, `rastreado=true`, aviso de backup),
+snapshot 87 → 87,01 h e eventos `inicio/fim` no renderer. PROVA OK. Limite: executável sintético
+(`ping.exe` ~35 s), nada de jogo real, UAC ou emulador.
 
-- [ ] **Step 6: Gates e commit**
+- [x] **Step 6: Gates e commit**
 
 ```powershell
 py -3.14 -B codigo/ferramentas/testes/executar.py --modulo test_ponte
@@ -299,8 +305,8 @@ git commit -m "electron: tela Jogos com filtros e ordem por perfil (F2)"
 
 - [ ] **Step 4: Prova E2E** — home de prova: abrir paleta, Enter em "Celeste" → detalhe; favoritar;
   editar nota/etiquetas (persistiu no `jogo.ler`); Remover → Desfazer e item volta; Jogar com o
-  `.cmd` → banner "jogando" some em ~3 s, horas somadas, toast de backup pós-sessão. Screenshots
-  `f2-detalhe.png`, `f2-desfazer.png`.
+  jogo sintético → banner "jogando" some quando a sessão termina (~35 s), horas somadas, toast de
+  backup pós-sessão. Screenshots `f2-detalhe.png`, `f2-desfazer.png`.
 
 - [ ] **Step 5: Commit**
 
@@ -528,7 +534,7 @@ git commit -m "electron: tela Videos com player interno (F2)"
 
 - [ ] **Step 1: `prova-f2.ps1`** — um app real (CDP) com home semeada estendida: seções Jogos/
   Músicas/Desejos/Downloads/Integrações/Vídeos abertas por Ctrl+1..8 e clicadas; paleta → detalhe
-  de jogo; favoritar/editar/excluir/desfazer; jogar com o `.cmd`; tocar WAV e ver `currentTime`;
+  de jogo; favoritar/editar/excluir/desfazer; jogar com o jogo sintético (~35 s); tocar WAV e ver `currentTime`;
   importar WAVs; importar torrent 100% e conferir jogo novo; play/pause de torrent sem API não
   aparece; F11 e Alt continuam (reuso do helper de foco da F1). Fotos `f2-*.png` + "PROVA F2 OK".
 
@@ -575,6 +581,6 @@ git commit -m "electron: telas restantes e docs da F2"
 - Volume do rodapé é o volume **do player** (o volume global Windows não foi portado).
 - Vídeo interno depende de codec suportado pelo Chromium/Electron; sem vídeo sintético a prova de
   renderização visual registra o limite.
-- Prova de "jogar" usa `.cmd` sintético; nada de jogo real, UAC ou emulador.
+- Prova de "jogar" usa processo sintético (`ping.exe` em loopback, ~35 s); nada de jogo real, UAC ou emulador.
 - Torrent: pausar/retomar só com API do qBittorrent ligada (na prova, fixture local não tem API).
 - Gamepad continua navegando só as seções (navegação dentro de listas fica para depois).
