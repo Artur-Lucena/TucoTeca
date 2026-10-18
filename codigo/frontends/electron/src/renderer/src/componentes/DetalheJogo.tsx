@@ -158,6 +158,48 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
     }
   }
 
+  const avaliarConquistas = async () => {
+    try {
+      const r = await window.tucoteca.chamar<Record<string, unknown>>('conquistas.avaliar', { id })
+      aoAvisar(`Conquistas avaliadas: ${JSON.stringify(r)}`)
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
+  const buscarCapas = async () => {
+    try {
+      const r = await window.tucoteca.chamar<{ candidatos?: unknown[] }>('capas.buscar', {
+        categoria: 'jogos',
+        id,
+        provedor: '',
+        atualizar: false,
+      })
+      const total = Array.isArray(r?.candidatos) ? r.candidatos.length : 0
+      aoAvisar(total > 0 ? `${total} capa(s) encontrada(s).` : 'Nenhuma capa encontrada.')
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
+  const ferramentasJogo = async () => {
+    try {
+      const r = await window.tucoteca.chamar<Record<string, unknown>>('ferramentas.jogo', { id })
+      aoAvisar(`Ferramentas: ${JSON.stringify(r)}`)
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
+  const diagnosticar = async () => {
+    try {
+      const r = await window.tucoteca.chamar<Record<string, unknown>>('jogo.diagnosticar', { id })
+      aoAvisar(`Diagnóstico: ${JSON.stringify(r)}`)
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
   const remover = async () => {
     if (jogo === null) return
     const titulo = String(jogo.titulo ?? 'o jogo')
@@ -302,6 +344,24 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                 />
                 <button type="button" class="acao" onClick={() => void registrarHoras()}>
                   Registrar
+                </button>
+              </div>
+            </section>
+
+            <section>
+              <h3>Conquistas e capas</h3>
+              <div class="detalhe-linha">
+                <button type="button" class="acao" onClick={() => void avaliarConquistas()}>
+                  Avaliar conquistas
+                </button>
+                <button type="button" class="acao" onClick={() => void buscarCapas()}>
+                  Buscar capas
+                </button>
+                <button type="button" class="acao" onClick={() => void ferramentasJogo()}>
+                  Ferramentas
+                </button>
+                <button type="button" class="acao" onClick={() => void diagnosticar()}>
+                  Diagnosticar
                 </button>
               </div>
             </section>
