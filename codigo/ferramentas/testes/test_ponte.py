@@ -597,6 +597,164 @@ def teste_ponte_jogar_espera_o_fim_assincrono():
     afirmar(servico.registros.get("backup") == 12, servico.registros)
 
 
+class ServicoMusicas(ServicoFalso):
+    """Serviço fake dos jobs de música (importação e fila de downloads)."""
+
+    def __init__(self):
+        self.pastas = []
+        self.baixar_erro = ""
+        self.vistos = []
+
+    def importar_musicas(self, pasta):
+        self.pastas.append(str(pasta))
+        return {"novos": 2, "ignorados": 1, "erros": [], "capas": 0}
+
+    def baixar_musicas(self, cancelar, progresso=None):
+        if self.baixar_erro:
+            raise ValueError(self.baixar_erro)
+        for pct in (10, 50, 90):
+            if cancelar.is_set():
+                break
+            self.vistos.append(pct)
+            if progresso:
+                progresso({"pct": pct, "rotulo": "1/2 · Banda — Faixa"})
+            time.sleep(0.05)
+        return {"novas": 0, "erros": [], "cancelado": cancelar.is_set()}
+
+
+def teste_ponte_musicas_importar_cria_job():
+    saida = io.StringIO()
+    servico = ServicoMusicas()
+    ponte = Ponte(servico)
+    linha = json.dumps({"id": 60, "metodo": "musicas.importar",
+                        "params": {"pasta": "C:\\Provas\\musicas"}})
+    ponte.servir(io.StringIO(linha + "\n"), saida)
+    resposta = next(e for e in _linhas(saida) if e.get("id") == 60)
+    afirmar(resposta["ok"] is True, resposta)
+    trabalho = resposta["resultado"]["trabalho"]
+    afirmar(trabalho["escopo"] == "musicas" and trabalho["cancelavel"] is False, trabalho)
+    afirmar(_esperar(lambda: any(
+        e.get("evento") == "trabalho" and e["dados"]["id"] == trabalho["id"]
+        and e["dados"]["estado"] == "ok" for e in _linhas(saida))), saida.getvalue())
+    fim = next(e["dados"] for e in _linhas(saida)
+               if e.get("evento") == "trabalho" and e["dados"]["id"] == trabalho["id"]
+               and e["dados"]["motivo"] == "fim")
+    afirmar(fim["detalhe"]["novos"] == 2, fim)
+    afirmar("2 nova" in fim["detalhe"]["aviso"], fim)
+    afirmar(servico.pastas == ["C:\\Provas\\musicas"], servico.pastas)
+
+
+def teste_ponte_musicas_importar_pasta_invalida():
+    ponte = Ponte(ServicoMusicas())
+    for ruim in ({}, {"pasta": ""}, {"pasta": "   "}, {"pasta": 7}):
+        r = _chamar(ponte, {"id": 61, "metodo": "musicas.importar", "params": ruim})
+        afirmar(r["ok"] is False and "pasta" in r["erro"], r)
+
+
+def teste_ponte_musicas_importar_real_copia_wav():
+    import wave
+
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-musicas-"))
+    origem = tmp / "origem"
+    origem.mkdir()
+    with wave.open(str(origem / "sintetica.wav"), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(8000)
+        w.writeframes(b"\x00\x00" * 800)
+    db = tmp / "hub.db"
+    core.get_db(db).close()
+
+    saida = io.StringIO()
+    ponte = Ponte(ServicoBiblioteca(db))
+    linha = json.dumps({"id": 62, "metodo": "musicas.importar",
+                        "params": {"pasta": str(origem)}})
+    ponte.servir(io.StringIO(linha + "\n"), saida)
+    resposta = next(e for e in _linhas(saida) if e.get("id") == 62)
+    afirmar(resposta["ok"] is True, resposta)
+    ident = resposta["resultado"]["trabalho"]["id"]
+    afirmar(_esperar(lambda: any(
+        e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+        and e["dados"]["estado"] in ("ok", "erro", "cancelado") for e in _linhas(saida))),
+        saida.getvalue())
+    fim = next(e["dados"] for e in _linhas(saida)
+               if e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+               and e["dados"]["motivo"] == "fim")
+    afirmar(fim["estado"] == "ok" and fim["detalhe"]["novos"] == 1, fim)
+    snap = ponte.despachar("nucleo.snapshot", {})
+    titulos = [str(m["titulo"]).lower() for m in snap["resultado"]["musicas"]]
+    afirmar(any("sintetica" in t for t in titulos), titulos)
+
+
+def teste_ponte_musicas_baixar_fila_progresso_e_cancelamento():
+    saida = io.StringIO()
+    servico = ServicoMusicas()
+    ponte = Ponte(servico)
+    ponte.servir(io.StringIO('{"id": 63, "metodo": "musicas.baixar_fila"}\n'), saida)
+    resposta = next(e for e in _linhas(saida) if e.get("id") == 63)
+    afirmar(resposta["ok"] is True, resposta)
+    trabalho = resposta["resultado"]["trabalho"]
+    afirmar(trabalho["cancelavel"] is True and trabalho["escopo"] == "musicas", trabalho)
+    ident = trabalho["id"]
+    afirmar(_esperar(lambda: any(
+        e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+        and e["dados"].get("motivo") == "progresso" and e["dados"]["pct"] == 10
+        for e in _linhas(saida))), saida.getvalue())
+    cancelado = ponte.despachar("trabalhos.cancelar", {"id": ident})
+    afirmar(cancelado["ok"] is True, cancelado)
+    afirmar(_esperar(lambda: any(
+        e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+        and e["dados"]["estado"] == "cancelado" for e in _linhas(saida))), saida.getvalue())
+    fim = next(e["dados"] for e in _linhas(saida)
+               if e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+               and e["dados"]["motivo"] == "fim")
+    afirmar("ancelado" in fim["detalhe"]["aviso"], fim)
+
+
+def teste_ponte_musicas_baixar_fila_erro_claro():
+    saida = io.StringIO()
+    servico = ServicoMusicas()
+    servico.baixar_erro = "Instale yt-dlp em Dependências de áudio antes de baixar a fila."
+    ponte = Ponte(servico)
+    ponte.servir(io.StringIO('{"id": 64, "metodo": "musicas.baixar_fila"}\n'), saida)
+    resposta = next(e for e in _linhas(saida) if e.get("id") == 64)
+    afirmar(resposta["ok"] is True, resposta)
+    ident = resposta["resultado"]["trabalho"]["id"]
+    afirmar(_esperar(lambda: any(
+        e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+        and e["dados"]["estado"] == "erro" for e in _linhas(saida))), saida.getvalue())
+    fim = next(e["dados"] for e in _linhas(saida)
+               if e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+               and e["dados"]["motivo"] == "fim")
+    afirmar("yt-dlp" in fim["erro"], fim)
+
+
+def teste_ponte_musicas_jobs_concorrentes_bloqueados():
+    saida = io.StringIO()
+    servico = ServicoMusicas()
+    soltar = threading.Event()
+
+    def importar_lento(pasta):
+        soltar.wait(3)
+        return {"novos": 1, "ignorados": 0, "erros": [], "capas": 0}
+
+    servico.importar_musicas = importar_lento
+    ponte = Ponte(servico)
+    linha = json.dumps({"id": 65, "metodo": "musicas.importar", "params": {"pasta": "x"}})
+    ponte.servir(io.StringIO(linha + "\n"), saida)
+    resposta = next(e for e in _linhas(saida) if e.get("id") == 65)
+    afirmar(resposta["ok"] is True, resposta)
+    ident = resposta["resultado"]["trabalho"]["id"]
+    segundo = _chamar(ponte, {"id": 66, "metodo": "musicas.baixar_fila"})
+    afirmar(segundo["ok"] is False and "andamento" in segundo["erro"], segundo)
+    soltar.set()
+    afirmar(_esperar(lambda: any(
+        e.get("evento") == "trabalho" and e["dados"]["id"] == ident
+        and e["dados"]["estado"] == "ok" for e in _linhas(saida))), saida.getvalue())
+
+
 def teste_ponte_registrar_horas():
     class ServicoHoras(ServicoFalso):
         def registrar_sessao(self, gid, horas):

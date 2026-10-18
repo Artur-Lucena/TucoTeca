@@ -353,34 +353,48 @@ git commit -m "electron: detalhe do jogo, jogar e desfazer (F2)"
     `trabalhos.cancelar` aciona o `threading.Event` cooperativo (é o consumidor real que fecha a
     pendência "jobs com progresso/cancelamento")
 
-- [ ] **Step 1: RED** — `midia.test.ts` (parse/validação de caminho dentro da home; `Range:
-  bytes=0-99`→206 `{start:0,end:99}`; `bytes=100-`→ até o fim; fim além do tamanho → recorte;
-  malformado → 416; sem Range → 200), `player.test.ts` (transporte, modos, fim de faixa, fila
-  vazia), `test_ponte` (`musicas.importar` cria job e importa WAV sintético;
-  `musicas.baixar_fila` sem yt-dlp/rede → job termina em erro claro; com serviço fake de
-  progresso/cancelamento → eventos com pct e cancelado cooperativo — mesmo padrão da Task 2).
+- [x] **Step 1: RED** — `main/midia.test.ts` (Range 200/206/416, recorte no fim, malformados;
+  `tipoDoArquivo`; `caminhoDaUrlMidia` com `..`, fora da home, host errado e posix),
+  `shared/midia.test.ts` (`mediaUrl` com escape de `\`, espaço/acento e vazio), `estado/player.test.ts`
+  (transporte sem wrap, modos, fim de faixa, fila vazia) e 6 casos em `test_ponte.py`
+  (`musicas.importar` cria job e pasta inválida; importar de verdade copia WAV sintético;
+  `musicas.baixar_fila` com progresso/cancelamento, erro claro e jobs concorrentes bloqueados).
 
-- [ ] **Step 2: RED roda.**
+- [x] **Step 2: RED roda** — vitest: 3 arquivos falhando ("Cannot find module './midia'",
+  "'./player'", "mediaUrl is not a function"); `test_ponte`: 29/35 (6 novos falhando por método
+  desconhecido).
 
-- [ ] **Step 3: Implementar** — handler com `fs.createReadStream`/`Readable.toWeb` e
-  `Content-Type` por extensão; `app.commandLine.appendSwitch('autoplay-policy',
-  'no-user-gesture-required')`; `PlayerRodape` (capa, título, artista, tempo `m:ss / m:ss`,
-  barra clicável para seek, ❮ ▶/Ⅱ ❯ ■, modo, fila com ▶ no atual, volume do player);
-  `Musicas.tsx` (lista com capa/título/artista·álbum, Enter toca, busca local, "Tocar",
-  "Remover" com aviso de que apaga o arquivo, "+ Importar pasta" → `escolherPasta` +
-  `musicas.importar` → toast + `recarregar`; painel "Fila de downloads" com a fila do snapshot e
-  botão "Baixar pendentes" → `musicas.baixar_fila` (barra de progresso do job + Parar no
-  `Atividade`; o `Atividade` completo chega na Task 7 — aqui basta o mínimo do job na lista);
-  semear WAVs de 2 s (440 Hz, `wave` stdlib) e ligar `musica_path`.
+- [x] **Step 3: Implementar** — `main/midia.ts` puro (parse de `Range`, MIME por extensão, URL →
+  caminho validado por `caminhoPermitido`); `registrarProtocoloMedia` em `main/arquivos.ts`
+  (`createReadStream` + `Readable.toWeb`, 206 com `Content-Range`, 416 com `bytes */total`, 403
+  fora da coleção — arquivo da task que o plano não listava; o handler mora ao lado do de imagens);
+  esquema `tucoteca-media` privilegiado (`secure`/`stream`), autoplay liberado por
+  `app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')`, IPC
+  `dialogo:escolher-pasta`; `mediaUrl`/`escolherPasta` no `shared/api.ts`+preload; `estado/player.ts`
+  (fila/índice/modo/estado + ações `tocarFila/alternar/proxima/anterior/parar/cicloModo/pularPara`,
+  fim de faixa respeita o modo, sorteador injetável nos testes); `PlayerRodape.tsx` (capa, tempo
+  `m:ss / m:ss`, seek, ❮ ▶/Ⅱ ❯ ■, modo, volume, fila com ▶ no atual; `autoplay` + restart no
+  repetir); `Musicas.tsx` (busca local, Enter toca, ▶ Tocar, Remover com aviso de que apaga o
+  arquivo e sem Desfazer, "+ Importar pasta" via `escolherPasta`, painel "Fila de downloads" +
+  "Baixar pendentes" com barra do job e Parar); seeder grava WAVs de 2 s (440/523 Hz, `wave`
+  stdlib) com `musica_path` e sha reais.
 
-- [ ] **Step 4: GREEN + typecheck + build.**
+- [x] **Step 4: GREEN + typecheck + build** — vitest 16 arquivos / 107 testes; `tsc` ok; build ok;
+  `--modulo test_ponte` 35/35; suíte completa 546/546; ruff limpo.
 
-- [ ] **Step 5: Prova E2E** — clicar em "Weightless" → `<audio>` com `currentTime > 0`,
-  rodapé com tempo andando, próximo/anterior/modo alternando (assert de estado), remover uma
-  música → aviso; importar pasta sintética via bridge → lista cresce. Screenshots
-  `f2-musicas.png`, `f2-player.png`.
+- [x] **Step 5: Prova E2E** — `.provas/electron/prova-f2-t5-musicas.ps1` (home `home-f2-t5`, CDP
+  9230): Ctrl+3 lista "Weightless | Sunset Lover" (ordem do núcleo); Enter toca com `src` em
+  `tucoteca-media://arquivo/...`, `currentTime` 0,13→0,47 s e duração 2 s; Ctrl+F foca a busca;
+  próxima/anterior sem wrap; modo cicla Sequência → Repetir → Aleatório; pausa e seek para 1 s
+  (Range do protocolo); remover Sunset Lover → some da lista, arquivo apagado do disco, **sem**
+  barra Desfazer (fora da lixeira) e toast "foi removida"; importar via bridge — o botão usa diálogo
+  nativo não automatizável, a prova chama o mesmo `musicas.importar` — reflete "sintetica-660 |
+  Weightless", `musica_path` presente e toast "1 nova(s), 0 ignorada(s)."; "Baixar pendentes" com
+  fila vazia → toast "0 nova(s) baixada(s)." (sem rede). Screenshots `f2-player.png` e
+  `f2-musicas.png`. PROVA OK.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** — "electron: tela Musicas com player local e importacao (F2)"
+  (19 arquivos; paths extras `main/arquivos.ts` e `renderer/index.html` do CSP `media-src`).
 
 ```powershell
 git add codigo/frontends/electron/src/main/midia.ts codigo/frontends/electron/src/main/midia.test.ts codigo/frontends/electron/src/main/index.ts codigo/frontends/electron/src/shared/midia.ts codigo/frontends/electron/src/shared/midia.test.ts codigo/frontends/electron/src/shared/api.ts codigo/frontends/electron/src/preload/index.ts codigo/frontends/electron/src/renderer/src/estado/player.ts codigo/frontends/electron/src/renderer/src/estado/player.test.ts codigo/frontends/electron/src/renderer/src/componentes/PlayerRodape.tsx codigo/frontends/electron/src/renderer/src/vistas/Musicas.tsx codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/renderer/src/estilo.css codigo/frontends/ponte.py codigo/ferramentas/testes/test_ponte.py codigo/ferramentas/semear_prova_electron.py

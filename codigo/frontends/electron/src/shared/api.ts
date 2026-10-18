@@ -4,5 +4,7 @@ export interface ApiTucoteca {
   assinar(evento: string, ouvinte: (dados: unknown) => void): () => void
   pronto(dados: unknown): void
   imagemUrl(url: string): string
+  mediaUrl(caminho: string): string
+  escolherPasta(): Promise<string | null>
   reabrir(): Promise<void>
 }

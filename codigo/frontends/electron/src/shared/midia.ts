@@ -10,3 +10,10 @@ export function converterUrlMidia(url: string): string {
     return ''
   }
 }
+
+/** URL do protocolo de mídia para um caminho local ('' quando vazio). */
+export function mediaUrl(caminho: string): string {
+  const texto = String(caminho ?? '').trim()
+  if (texto === '') return ''
+  return `tucoteca-media://arquivo/${encodeURIComponent(texto.replace(/\\/g, '/'))}`
+}

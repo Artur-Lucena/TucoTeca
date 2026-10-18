@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { ApiTucoteca } from '../shared/api'
-import { converterUrlMidia } from '../shared/midia'
+import { converterUrlMidia, mediaUrl } from '../shared/midia'
 
 const api: ApiTucoteca = {
   chamar: (metodo, params) => ipcRenderer.invoke('ponte:chamar', metodo, params),
@@ -14,6 +14,8 @@ const api: ApiTucoteca = {
   },
   pronto: (dados) => ipcRenderer.send('tucoteca:pronto', dados),
   imagemUrl: (url) => converterUrlMidia(url),
+  mediaUrl: (caminho) => mediaUrl(caminho),
+  escolherPasta: () => ipcRenderer.invoke('dialogo:escolher-pasta'),
   reabrir: () => ipcRenderer.invoke('ponte:reabrir'),
 }
 

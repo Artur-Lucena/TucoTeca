@@ -12,10 +12,14 @@ Depois, rode o selftest do Electron com BIBLIOTECA_HOME apontando para lá.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
 import os
 import shutil
+import struct
 import sys
+import wave
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -26,8 +30,8 @@ JOGOS = [
     ("Stardew Valley", 87.0, None),
 ]
 MUSICAS = [
-    ("Weightless", "Marconi Union", "semente-p1-0001"),
-    ("Sunset Lover", "Petit Biscuit", "semente-p1-0002"),
+    ("Weightless", "Marconi Union", "Weightless", 440.0),
+    ("Sunset Lover", "Petit Biscuit", "Presence", 523.25),
 ]
 DESEJOS = [("428: Shibuya Scramble", 310360), ("Hollow Knight: Silksong", 1030300)]
 # Jogo de prova: um processo inofensivo que "joga" por ~35 s (ping local em
@@ -43,6 +47,20 @@ def _executavel_de_prova() -> str:
         return ""
     return str(Path(os.environ.get("SystemRoot", r"C:\Windows"))
                / "System32" / "ping.exe")
+
+
+def _wav(caminho: Path, freq: float, segundos: float = 2.0, taxa: int = 8000) -> str:
+    """Grava um WAV sintético (seno) dentro da coleção de prova; devolve o sha256."""
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(caminho), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(taxa)
+        quadros = bytearray()
+        for n in range(int(segundos * taxa)):
+            quadros += struct.pack("<h", int(12000 * math.sin(2 * math.pi * freq * n / taxa)))
+        w.writeframes(bytes(quadros))
+    return hashlib.sha256(caminho.read_bytes()).hexdigest()
 
 
 def main(argv=None) -> int:
@@ -84,8 +102,11 @@ def main(argv=None) -> int:
                 con.execute("UPDATE jogos SET ultima_execucao=? WHERE id=?",
                             (ultima, jogo["id"]))
         con.commit()
-        for titulo, artista, sha in MUSICAS:
-            core.criar_musica(con, {"titulo": titulo, "artista": artista, "musica_sha": sha})
+        for indice, (titulo, artista, album, freq) in enumerate(MUSICAS, start=1):
+            wav = core.MUSICAS_DIR / f"semente-p1-{indice:04d}.wav"
+            sha = _wav(wav, freq)
+            core.criar_musica(con, {"titulo": titulo, "artista": artista, "album": album,
+                                    "musica_path": str(wav), "musica_sha": sha})
         for titulo, appid in DESEJOS:
             core.adicionar_desejo(con, appid, titulo)
     finally:

@@ -299,6 +299,8 @@ class Ponte:
             "trabalhos.cancelar": self._trabalhos_cancelar,
             "jogo.jogar": self._jogo_jogar,
             "jogo.registrar_horas": self._jogo_registrar_horas,
+            "musicas.importar": self._musicas_importar,
+            "musicas.baixar_fila": self._musicas_baixar_fila,
         })
         self.metodos = base
 
@@ -345,6 +347,47 @@ class Ponte:
             return detalhe
 
         return {"trabalho": self.trabalhos.iniciar(f"Jogar {titulo}", tarefa, escopo="jogo")}
+
+    def _musicas_importar(self, servico, params) -> dict:
+        pasta = params.get("pasta")
+        if not isinstance(pasta, str) or not pasta.strip():
+            raise ValueError("pasta deve ser um caminho de texto")
+        pasta = pasta.strip()
+        rotulo = "Importar músicas: " + (Path(pasta).name or pasta)
+
+        def tarefa(progresso, cancelado):
+            resultado = servico.importar_musicas(pasta)
+            detalhe = dict(resultado) if isinstance(resultado, dict) else {}
+            detalhe["aviso"] = (f'{detalhe.get("novos", 0)} nova(s), '
+                                f'{detalhe.get("ignorados", 0)} ignorada(s).')
+            return detalhe
+
+        return {"trabalho": self.trabalhos.iniciar(rotulo, tarefa, escopo="musicas")}
+
+    def _musicas_baixar_fila(self, servico, params) -> dict:
+        def tarefa(progresso, cancelado):
+            def cb(dados):
+                # `baixar_musicas` chama o progresso com um dict {pct, rotulo, id}.
+                if isinstance(dados, dict):
+                    progresso(dados.get("pct", 0))
+                else:
+                    progresso(dados)
+
+            resultado = servico.baixar_musicas(cancelado, cb)
+            detalhe = dict(resultado) if isinstance(resultado, dict) else {}
+            novas = detalhe.get("novas", 0)
+            erros = [str(e) for e in (detalhe.get("erros") or [])]
+            if cancelado.is_set():
+                detalhe["aviso"] = f"Download cancelado. {novas} nova(s) até aqui."
+            else:
+                aviso = f"{novas} nova(s) baixada(s)."
+                if erros:
+                    aviso += " " + erros[0] + (f" (+{len(erros) - 1})" if len(erros) > 1 else "")
+                detalhe["aviso"] = aviso
+            return detalhe
+
+        return {"trabalho": self.trabalhos.iniciar("Baixar fila de músicas", tarefa,
+                                                    cancelavel=True, escopo="musicas")}
 
     def _jogo_registrar_horas(self, servico, params) -> dict:
         ident = _inteiro(params, "id")

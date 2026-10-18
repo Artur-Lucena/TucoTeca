@@ -1,14 +1,18 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { registrarProtocoloMidia } from './arquivos'
+import { registrarProtocoloMedia, registrarProtocoloMidia } from './arquivos'
 import { lockOrfao } from './lock'
 import { montarMenu } from './menu'
 import { ClientePonte } from './ponte'
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'tucoteca-img', privileges: { secure: true, standard: false, stream: true } },
+  { scheme: 'tucoteca-media', privileges: { secure: true, standard: false, stream: true } },
 ])
+
+// O player do rodapé toca sozinho ao trocar/tocar faixa (sem gesto do usuário).
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
 // Provas não escrevem em %APPDATA%: o TUCOTECA_USERDATA manda o userData p/ outro lugar.
 if (process.env.TUCOTECA_USERDATA) app.setPath('userData', resolve(process.env.TUCOTECA_USERDATA))
@@ -180,6 +184,7 @@ async function principal(): Promise<void> {
   }
 
   registrarProtocoloMidia(() => HOME)
+  registrarProtocoloMedia(() => HOME)
   instalarMenu()
 
   ipcMain.handle('ponte:chamar', (_evento, metodo: string, params?: Record<string, unknown>) => {
@@ -187,6 +192,15 @@ async function principal(): Promise<void> {
     if (!cliente) return Promise.reject(new Error('a ponte ainda não iniciou'))
     if (cliente.encerrado) return Promise.reject(new Error('a ponte encerrou — clique em Reconectar'))
     return cliente.chamar(metodo, params)
+  })
+
+  ipcMain.handle('dialogo:escolher-pasta', async () => {
+    const [janela] = BrowserWindow.getAllWindows()
+    const resultado = janela
+      ? await dialog.showOpenDialog(janela, { properties: ['openDirectory'] })
+      : await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    if (resultado.canceled) return null
+    return resultado.filePaths[0] ?? null
   })
 
   ipcMain.handle('ponte:reabrir', async () => {

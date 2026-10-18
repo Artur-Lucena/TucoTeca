@@ -5,11 +5,13 @@ import { AvisoPonte } from './componentes/AvisoPonte'
 import { BarraLateral } from './componentes/BarraLateral'
 import { DetalheJogo } from './componentes/DetalheJogo'
 import { Paleta } from './componentes/Paleta'
+import { PlayerRodape } from './componentes/PlayerRodape'
 import { LeitorControle, type EstadoPad } from './controle'
 import { reduzirConexao, type EstadoConexao } from './estado/conexao'
 import { erroCarga, recarregar, snapshot } from './estado/dados'
 import { avisosDoResumo, dispensarAviso, juntarAvisos, textoDeFalha, type Aviso } from './estado/notificacoes'
 import { paletaInicial, reduzirPaleta, type ItemBusca } from './estado/paleta'
+import { player } from './estado/player'
 import {
   aplicarEventoTrabalho,
   jogoEmAndamento,
@@ -19,6 +21,7 @@ import {
 } from './estado/trabalhos'
 import { Inicio } from './vistas/Inicio'
 import { Jogos } from './vistas/Jogos'
+import { Musicas } from './vistas/Musicas'
 import { Placeholder } from './vistas/Placeholder'
 
 const DESTINO_DO_ITEM: Record<string, string> = {
@@ -268,6 +271,11 @@ export function App() {
     }
   }
 
+  /** Toast global das vistas/detalhe (id por texto evita duplicar o mesmo aviso). */
+  const avisar = (texto: string, tom: 'info' | 'atencao' = 'info') => {
+    setAvisos((atual) => juntarAvisos(atual, [{ id: texto, texto, tom }]))
+  }
+
   const desfazer = async () => {
     try {
       await window.tucoteca.chamar('item.desfazer')
@@ -305,6 +313,7 @@ export function App() {
   const colecao = snapshot.value
   const ativo = modulos.find((modulo) => modulo.chave === secao) ?? modulos[0]
   const jogando = jogoEmAndamento(listaTrabalhos.value)
+  const filaPlayer = player.value.fila
   return (
     <>
       <AvisoPonte estado={conexao} aoReconectar={reconectar} />
@@ -329,11 +338,19 @@ export function App() {
                 aoAbrirJogo={(id) => setDetalheId(id)}
                 aoJogarJogo={(id) => void jogar(id)}
               />
+            ) : ativo.chave === 'musicas' ? (
+              <Musicas
+                focoBusca={focoBusca}
+                perfil={perfil}
+                aoAvisar={avisar}
+                aoMudou={() => void atualizarTudo()}
+              />
             ) : (
               <Placeholder modulo={ativo} />
             )}
           </section>
         </main>
+        {filaPlayer.length > 0 && <PlayerRodape />}
         {(jogando !== null || lixeira?.disponivel === true) && (
           <footer class="status">
             {jogando !== null && (
@@ -356,11 +373,7 @@ export function App() {
           revisao={revisao}
           aoFechar={() => setDetalheId(null)}
           aoMudou={() => void atualizarTudo()}
-          aoAvisar={(texto, tom = 'info') =>
-            setAvisos((atual) =>
-              juntarAvisos(atual, [{ id: `detalhe-${String(Date.now())}`, texto, tom }]),
-            )
-          }
+          aoAvisar={avisar}
         />
       )}
       {paleta.aberta && (
