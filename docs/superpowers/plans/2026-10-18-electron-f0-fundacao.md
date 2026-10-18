@@ -145,14 +145,17 @@ com `codigo/frontends` no path), sem subprocesso.
 
 **Arquivos:** criar `codigo/frontends/ponte.py`, `codigo/ferramentas/testes/test_ponte.py`.
 
-- [ ] `test_ponte.py` primeiro:
+- [x] `test_ponte.py` primeiro (11 testes — superset do previsto; `teste_servir_processa_varias_linhas`
+      cobre a serialização linha a linha, no lugar do `teste_executar_linha_resposta_serializada`):
       `teste_ping_responde`, `teste_metodo_desconhecido`, `teste_linha_invalida_tem_id_null`,
       `teste_linha_em_branco_ignorada`, `teste_excecao_vira_erro_e_ponte_sobrevive`,
       `teste_executar_linha_resposta_serializada` (id ecoado),
       `teste_snapshot_real_em_home_temporario` (cria db com `core.get_db` + `core.criar_jogo`,
       monta `ServicoBiblioteca`, confere jogo no snapshot e `capa_url`),
       `teste_modulos_listar_via_ponte`.
-- [ ] Falhar primeiro (módulo `ponte` inexistente), depois implementar:
+- [x] Falhar primeiro (11/11 `ModuleNotFoundError: No module named 'ponte'`), depois implementar
+      (tabela global `METODOS` + `Ponte(servico, metodos=None)` em vez do `registrar(ponte, servico)`
+      — mesmo contrato, menos superfície):
       `Ponte(servico)` com `despachar(metodo, params) -> dict`, `executar_linha(linha) -> str|None`;
       `iniciar(argv=None, entrada=None, saida=None, servico_factory=None) -> int` (parse de
       `--db`, `--ignorar-lock`; `garantir_dirs`; `adquirir_lock`; bloqueio → evento
@@ -160,10 +163,10 @@ com `codigo/frontends` no path), sem subprocesso.
       `entrada` linha a linha, escrevendo e dando `flush` a cada resposta);
       `registrar(ponte, servico)` monta a tabela dos 3 métodos F0; `preparar_ambiente()` usa
       `ferramentas.abrir_hub.preparar()` (reuso, sem duplicar a leitura do manifesto de runtime).
-- [ ] `__main__`: `raise SystemExit(iniciar(sys.argv[1:]))`.
-- [ ] Gate: `executar.py --modulo test_ponte` verde + `ruff check codigo` limpo + prova manual:
-      `$env:BIBLIOTECA_HOME='.provas\electron\home-manual'; '{"id":1,"metodo":"nucleo.ping"}' | py -3.14 -B codigo/frontends/ponte.py`
-      → uma linha JSON `ok:true` e saída limpa (sem lixo no stdout).
+- [x] `__main__`: `raise SystemExit(iniciar(sys.argv[1:]))` (feito; `main()` extra ficou de fora).
+- [x] Gate: 11/11 PASS + `ruff check codigo conftest.py` limpo + prova manual real na pasta
+      `.provas/electron/home-manual` (ping/snapshot/módulos/JSON inválido; `rc=0`; lock liberado;
+      `dados/` criados na pasta de prova — incidente do `$home` registrado no ledger).
 
 **Commit 3:** `frontend: ponte NDJSON entre Electron e o nucleo Python (F0)`
 
