@@ -480,7 +480,7 @@ git commit -m "electron: notificacoes e perfil no shell (F1)"
 - Produces: `EstadoPad {cima,baixo,a,b}`, `AcaoControle`, `LeitorControle` com
   `reiniciar(estado)`/`avaliar(estado, agoraMs)`.
 
-- [ ] **Step 1: Teste que falha** — `controle.test.ts`:
+- [x] **Step 1: Teste que falha** — `controle.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -531,26 +531,25 @@ describe('LeitorControle', () => {
 })
 ```
 
-- [ ] **Step 2: RED** — `npm … run test`.
+- [x] **Step 2: RED** — 1 suíte falhou por import ausente; 43 antigos verdes.
 
-- [ ] **Step 3: Implementar `controle.ts`** — classe com estado interno: `exigeNeutro`,
+- [x] **Step 3: Implementar `controle.ts`** — classe com estado interno: `exigeNeutro`,
   `antes` (pad anterior), `direcao: 'cima'|'baixo'|null`, `proximaEm`. Ordem de avaliação:
   neutro obrigatório → direções (juntas: nenhuma ação e zera repetição) → repique por tempo →
   bordas de `a`/`b` (cada uma dispara no máximo uma vez por pressão; avaliadas só quando as
   direções não produziram ação no mesmo tick, o que torna `avaliar` determinístico para o teste
   do Step 1).
 
-- [ ] **Step 4: Wiring no `app.tsx`** — hook `useControle(aoTrocarSecao, secaoAtiva)`: a cada
-  120 ms, se `document.hasFocus()`, lê o primeiro pad conectado
-  (`navigator.getGamepads().find(Boolean)`) e monta o `EstadoPad` (D-pad e eixo Y
-  `axes[1] < -0.5 / > 0.5`; botões 0 = a, 1 = b); `reiniciar` na montagem, no
-  `gamepadconnected` e no `window.focus`. Ações: cima/baixo navegam as seções na ordem do
-  registry; `ativar` abre a paleta; `voltar` volta ao Início. Sem hardware não há prova física —
-  anotar no relatório e no checklist manual.
+- [x] **Step 4: Wiring no `app.tsx`** — efeito com `setInterval` de 100 ms (em vez de um hook
+  nomeado): lê o primeiro pad conectado, `EstadoPad` do D-pad + eixo Y (`axes[1] < -0.5 / > 0.5`);
+  botões 0 = a, 1 = b; `reiniciar` na montagem, no `gamepadconnected` e no `focus`; cima/baixo
+  navegam as seções na ordem do registry (wrap-around), `ativar` abre a paleta, `voltar` volta ao
+  Início. Sem `estilo.css` (indicador era opcional). Sem hardware não há prova física — anotado no
+  relatório e no checklist manual.
 
-- [ ] **Step 5: Verdes** — `test` + `typecheck` + `build`.
+- [x] **Step 5: Verdes** — 47/47 vitest, `typecheck` e `build` verdes.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** — feito (hash da tarefa no ledger do SDD).
 
 ```bash
 git add codigo/frontends/electron/src/renderer/src/controle.ts codigo/frontends/electron/src/renderer/src/controle.test.ts codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/renderer/src/estilo.css

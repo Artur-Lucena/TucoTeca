@@ -3,6 +3,7 @@ import type { ModuloDTO } from '../../shared/protocolo'
 import { combinacao, decidirAtalho } from './atalhos'
 import { BarraLateral } from './componentes/BarraLateral'
 import { Paleta } from './componentes/Paleta'
+import { LeitorControle, type EstadoPad } from './controle'
 import type { Snapshot } from './derivacoes'
 import { avisosDoResumo, dispensarAviso, juntarAvisos, type Aviso } from './estado/notificacoes'
 import { paletaInicial, reduzirPaleta, type ItemBusca } from './estado/paleta'
@@ -96,6 +97,56 @@ export function App() {
       if (aviso !== null) setAvisos((atual) => juntarAvisos(atual, [aviso]))
     })
   }, [])
+
+  useEffect(() => {
+    const leitor = new LeitorControle()
+    const neutro: EstadoPad = { cima: false, baixo: false, a: false, b: false }
+
+    const lerPad = (): EstadoPad | null => {
+      for (const pad of navigator.getGamepads()) {
+        if (!pad || !pad.connected) continue
+        const eixo = pad.axes[1] ?? 0
+        return {
+          cima: pad.buttons[12]?.pressed === true || eixo < -0.5,
+          baixo: pad.buttons[13]?.pressed === true || eixo > 0.5,
+          a: pad.buttons[0]?.pressed === true,
+          b: pad.buttons[1]?.pressed === true,
+        }
+      }
+      return null
+    }
+    const reiniciar = () => leitor.reiniciar(lerPad() ?? neutro)
+    reiniciar()
+    window.addEventListener('gamepadconnected', reiniciar)
+    window.addEventListener('focus', reiniciar)
+
+    const navegar = (delta: 1 | -1) => {
+      setSecao((atual) => {
+        if (modulos.length === 0) return atual
+        const bruto = modulos.findIndex((modulo) => modulo.chave === atual)
+        const indice = bruto === -1 ? 0 : bruto
+        const proximo = (indice + delta + modulos.length) % modulos.length
+        return modulos[proximo]?.chave ?? atual
+      })
+    }
+
+    const relogio = window.setInterval(() => {
+      if (!document.hasFocus()) return
+      const estado = lerPad()
+      if (estado === null) return
+      const acao = leitor.avaliar(estado, performance.now())
+      if (acao === 'cima') navegar(-1)
+      else if (acao === 'baixo') navegar(1)
+      else if (acao === 'ativar') setPaleta((atual) => reduzirPaleta(atual, { tipo: 'abrir' }))
+      else if (acao === 'voltar') setSecao('inicio')
+    }, 100)
+
+    return () => {
+      window.clearInterval(relogio)
+      window.removeEventListener('gamepadconnected', reiniciar)
+      window.removeEventListener('focus', reiniciar)
+    }
+  }, [modulos])
 
   const alternarPerfil = async () => {
     const outro = perfil === 'Tuco' ? 'Isa' : 'Tuco'
