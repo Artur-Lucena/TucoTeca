@@ -276,6 +276,72 @@ def _videos_salvar_posicao(servico, params) -> dict:
     return {"ok": True}
 
 
+def _musicas_buscar_online(servico, params) -> list:
+    termo = params.get("termo", "")
+    if not isinstance(termo, str) or not termo.strip():
+        raise ValueError("termo deve ser um texto")
+    fonte = params.get("fonte", "todas")
+    if fonte not in ("todas", "spotify", "youtube"):
+        raise ValueError("fonte deve ser todas, spotify ou youtube")
+    atualizar = bool(params.get("atualizar", False))
+    return servico.buscar_musicas_online(termo.strip(), fonte, atualizar)
+
+
+def _musicas_enfileirar(servico, params) -> dict:
+    itens = params.get("itens")
+    if not isinstance(itens, list):
+        raise ValueError("itens deve ser uma lista")
+    return servico.enfileirar_musicas(itens)
+
+
+def _musicas_letras(servico, params) -> dict:
+    artista = params.get("artista", "")
+    titulo = params.get("titulo", "")
+    if not isinstance(artista, str) or not isinstance(titulo, str):
+        raise ValueError("artista e titulo devem ser texto")
+    album = params.get("album", "")
+    if not isinstance(album, str):
+        raise ValueError("album deve ser texto")
+    duracao = params.get("duracao_s", 0)
+    if isinstance(duracao, bool) or not isinstance(duracao, (int, float)):
+        raise ValueError("duracao_s deve ser numero")
+    return servico.buscar_letras(artista, titulo, album, duracao)
+
+
+def _musicas_eq(servico, params) -> dict:
+    caminho = params.get("caminho")
+    if not isinstance(caminho, str) or not caminho.strip():
+        raise ValueError("caminho deve ser um texto")
+    preset = params.get("preset", "bass")
+    if not isinstance(preset, str):
+        raise ValueError("preset deve ser um texto")
+    return servico.aplicar_eq_musica(caminho.strip(), preset)
+
+
+def _capas_importar_selecionados(servico, params) -> dict:
+    itens = params.get("itens")
+    if not isinstance(itens, list):
+        raise ValueError("itens deve ser uma lista")
+    return servico.importar_selecionados(itens)
+
+
+def _pacotes_importar(servico, params) -> dict:
+    pasta = params.get("pasta")
+    if not isinstance(pasta, str) or not pasta.strip():
+        raise ValueError("pasta deve ser um texto")
+    exe = params.get("exe", "")
+    if not isinstance(exe, str):
+        raise ValueError("exe deve ser um texto")
+    return servico.importar_pacote(pasta.strip(), exe)
+
+
+def _pacotes_abrir_instalador(servico, params) -> dict:
+    exe = params.get("exe")
+    if not isinstance(exe, str) or not exe.strip():
+        raise ValueError("exe deve ser um texto")
+    return servico.abrir_instalador_pacote(exe.strip())
+
+
 def _videos_reproduzir(servico, params) -> dict:
     ident = _inteiro(params, "id")
     reprodutor = params.get("reprodutor", "auto")
@@ -539,6 +605,13 @@ METODOS = {
     "desejos.sincronizar_steam": _sincronizar_steam,
     "desejos.importar_wishlist": _importar_wishlist,
     "desejos.buscar_fontes": _buscar_fontes_desejo,
+    "musicas.buscar_online": _musicas_buscar_online,
+    "musicas.enfileirar": _musicas_enfileirar,
+    "musicas.letras": _musicas_letras,
+    "musicas.eq": _musicas_eq,
+    "capas.importar_selecionados": _capas_importar_selecionados,
+    "pacotes.importar": _pacotes_importar,
+    "pacotes.abrir_instalador": _pacotes_abrir_instalador,
 }
 
 
