@@ -186,5 +186,31 @@ class MixNucleo:
         prefs.trocar_perfil(nome)
         return self.preferencias()
 
+    _FILTROS = ("todos", "favoritos", "jogando", "PC", "3DS", "NDS", "pendencias")
+    _ORDENS = ("titulo", "recentes", "horas")
+
+    def filtro(self):
+        """Filtro/ordenação da tela Jogos do perfil ativo (com default seguro)."""
+        from bib_nucleo.preferencias_pessoais import ler_preferencias
+        dados = ler_preferencias()
+        perfil = dados["perfis"][dados["ativo"]]
+        filtro = perfil.get("filtro") if perfil.get("filtro") in self._FILTROS else "todos"
+        ordem = perfil.get("ordem") if perfil.get("ordem") in self._ORDENS else "titulo"
+        return {"filtro": filtro, "ordem": ordem}
+
+    def salvar_filtro(self, filtro, ordem):
+        from bib_nucleo import preferencias_pessoais as prefs
+        prefs.salvar_filtro(filtro, ordem)
+        return self.filtro()
+
+    def lixeira(self):
+        """Estado do desfazer: recibo mais recente ainda restaurável."""
+        from bib_nucleo import lixeira as lixeira_nucleo
+        recibo = lixeira_nucleo.ultima()
+        if not recibo:
+            return {"disponivel": False, "titulo": "", "tipo": ""}
+        return {"disponivel": True, "titulo": recibo.get("titulo", ""),
+                "tipo": recibo.get("tipo", "")}
+
 
 __all__ = ["MixNucleo"]

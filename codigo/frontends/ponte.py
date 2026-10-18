@@ -78,13 +78,95 @@ def _trocar_perfil(servico, params) -> dict:
     return servico.trocar_perfil(nome)
 
 
+def _inteiro(params, chave) -> int:
+    valor = params.get(chave)
+    if isinstance(valor, bool) or not isinstance(valor, int):
+        raise ValueError(f"{chave} deve ser um inteiro")
+    return valor
+
+
+def _com_perfil(jogo):
+    """Aplica o perfil ativo (favorito por pessoa) ao dicionário do jogo."""
+    from bib_nucleo.preferencias_pessoais import aplicar_perfil
+    return aplicar_perfil([jogo])[0]
+
+
+def _saude(servico, params) -> dict:
+    return servico.saude()
+
+
+def _jogo_ler(servico, params) -> dict:
+    return _com_perfil(servico.jogo(_inteiro(params, "id")))
+
+
+def _jogo_salvar(servico, params) -> dict:
+    dados = params.get("dados", {})
+    if not isinstance(dados, dict):
+        raise ValueError("dados deve ser um objeto JSON")
+    ident = params.get("id")
+    if ident is not None:
+        ident = _inteiro(params, "id")
+    return _com_perfil(servico.salvar_jogo(ident, dados))
+
+
+def _jogo_favoritar(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    servico.favorito(ident)
+    return _com_perfil(servico.jogo(ident))
+
+
+def _jogo_observacoes(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    texto = params.get("texto", "")
+    if not isinstance(texto, str):
+        raise ValueError("texto deve ser texto")
+    return _com_perfil(servico.salvar_observacoes(ident, texto))
+
+
+def _item_excluir(servico, params) -> dict:
+    categoria = params.get("categoria", "")
+    if categoria not in ("jogos", "desejos", "videos", "musicas"):
+        raise ValueError("categoria deve ser jogos, desejos, videos ou musicas")
+    return servico.excluir(categoria, _inteiro(params, "id"))
+
+
+def _item_desfazer(servico, params) -> dict:
+    return servico.desfazer_exclusao()
+
+
+def _lixeira_estado(servico, params) -> dict:
+    return servico.lixeira()
+
+
+def _filtro(servico, params) -> dict:
+    return servico.filtro()
+
+
+def _salvar_filtro(servico, params) -> dict:
+    filtro = params.get("filtro", "")
+    ordem = params.get("ordem", "")
+    if not isinstance(filtro, str) or not isinstance(ordem, str):
+        raise ValueError("filtro e ordem devem ser texto")
+    return servico.salvar_filtro(filtro, ordem)
+
+
 METODOS = {
     "nucleo.ping": _ping,
     "nucleo.snapshot": _snapshot,
     "nucleo.buscar": _buscar,
+    "nucleo.saude": _saude,
     "modulos.listar": _modulos,
     "preferencias.ler": _preferencias,
     "preferencias.trocar_perfil": _trocar_perfil,
+    "preferencias.filtro": _filtro,
+    "preferencias.salvar_filtro": _salvar_filtro,
+    "jogo.ler": _jogo_ler,
+    "jogo.salvar": _jogo_salvar,
+    "jogo.favoritar": _jogo_favoritar,
+    "jogo.observacoes": _jogo_observacoes,
+    "item.excluir": _item_excluir,
+    "item.desfazer": _item_desfazer,
+    "lixeira.estado": _lixeira_estado,
 }
 
 

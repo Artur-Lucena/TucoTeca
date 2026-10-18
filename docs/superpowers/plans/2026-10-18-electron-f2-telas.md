@@ -120,7 +120,7 @@ docs/DESKTOP_ELECTRON.md / CHANGELOG.md         atualizados na Task 9
   - `preferencias.filtro {}` → `{"filtro","ordem"}` do perfil ativo
   - `preferencias.salvar_filtro {filtro:str, ordem:str}` → `{"filtro","ordem"}` (inválido → `ok=false`)
 
-- [ ] **Step 1: Casos RED em `test_ponte.py`**
+- [x] **Step 1: Casos RED em `test_ponte.py`**
 
 Acrescentar (serviço real em home temporário, como os casos da F1):
 `teste_ponte_saude_e_jogo_ler`, `teste_ponte_jogo_salvar_cria_e_atualiza`,
@@ -131,10 +131,10 @@ jogo volta com o mesmo título), `teste_ponte_filtro_padrao_e_por_perfil` (defau
 `{"filtro":"todos","ordem":"titulo"}`; salvar `favoritos/recentes` em Isa não muda Tuco; valores
 inválidos → `ok=false` sem quebrar a ponte).
 
-- [ ] **Step 2: Rodar RED** — `py -3.14 -B codigo/ferramentas/testes/executar.py --modulo test_ponte`;
+- [x] **Step 2: Rodar RED** — `py -3.14 -B codigo/ferramentas/testes/executar.py --modulo test_ponte`;
   esperado: falhas "método desconhecido".
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `mix_nucleo.py`: `filtro()` (ler `ler_preferencias()["perfis"][ativo]` com default
 `todos/titulo`), `salvar_filtro(filtro, ordem)` (delega a `preferencias_pessoais.salvar_filtro` e
@@ -144,9 +144,9 @@ devolve `filtro()`), `lixeira()` (delega a `lixeira.ultima()`; sem recibo →
 `_filtro`, `_salvar_filtro` registradas em `METODOS`; validação de `params` no estilo `_buscar`
 (int não-bool; str); `jogo.favoritar` chama `favorito(gid)` e devolve `jogo(gid)`.
 
-- [ ] **Step 4: Rodar GREEN** — mesmo comando; tudo passa (15 antigos + novos).
+- [x] **Step 4: Rodar GREEN** — mesmo comando; tudo passa (15 antigos + novos).
 
-- [ ] **Step 5: Gates e commit**
+- [x] **Step 5: Gates e commit**
 
 ```powershell
 py -3.14 -B codigo/ferramentas/testes/executar.py --modulo test_ponte

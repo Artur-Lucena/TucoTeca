@@ -215,3 +215,157 @@ def teste_preferencias_via_ponte_e_nome_invalido():
     tipo_errado = _chamar(ponte, {"id": 18, "metodo": "preferencias.trocar_perfil",
                                   "params": {"nome": 7}})
     afirmar(tipo_errado["ok"] is False and "texto" in tipo_errado["erro"], tipo_errado)
+
+
+def _semear_banco(db: Path) -> None:
+    """Garante o schema antes das mutações dirigidas pela ponte (F2)."""
+    con = core.get_db(db)
+    con.close()
+
+
+def teste_ponte_saude_e_jogo_ler():
+    from servicos_ui import ServicoBiblioteca
+    tmp = Path(tempfile.mkdtemp(prefix="suite-saude-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    con = core.get_db(db)
+    try:
+        criado = core.criar_jogo(con, {"titulo": "Jogo Sondado", "executable_path": ""})
+    finally:
+        con.close()
+    ponte = Ponte(ServicoBiblioteca(db))
+    r = _chamar(ponte, {"id": 20, "metodo": "jogo.ler", "params": {"id": criado["id"]}})
+    afirmar(r["ok"] is True and r["resultado"]["titulo"] == "Jogo Sondado", r)
+    saude = _chamar(ponte, {"id": 21, "metodo": "nucleo.saude"})
+    afirmar(saude["ok"] is True, saude)
+    afirmar(saude["resultado"]["total"] == 1, saude)
+    afirmar(criado["id"] in saude["resultado"]["ids_pendentes"], saude)
+    faltante = _chamar(ponte, {"id": 22, "metodo": "jogo.ler", "params": {"id": 999}})
+    afirmar(faltante["ok"] is False and "biblioteca" in faltante["erro"], faltante)
+    invalido = _chamar(ponte, {"id": 23, "metodo": "jogo.ler", "params": {"id": "x"}})
+    afirmar(invalido["ok"] is False and "inteiro" in invalido["erro"], invalido)
+
+
+def teste_ponte_jogo_salvar_cria_e_atualiza():
+    from servicos_ui import ServicoBiblioteca
+    tmp = Path(tempfile.mkdtemp(prefix="suite-salvar-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    criado = _chamar(ponte, {"id": 24, "metodo": "jogo.salvar",
+                             "params": {"dados": {"titulo": "Criado pela Ponte", "nota": 7}}})
+    afirmar(criado["ok"] is True, criado)
+    ident = criado["resultado"]["id"]
+    afirmar(criado["resultado"]["titulo"] == "Criado pela Ponte", criado)
+    editado = _chamar(ponte, {"id": 25, "metodo": "jogo.salvar",
+                              "params": {"id": ident,
+                                         "dados": {"status": "jogando", "nota": ""}}})
+    afirmar(editado["ok"] is True, editado)
+    afirmar(editado["resultado"]["status"] == "jogando", editado)
+    afirmar(editado["resultado"]["nota"] is None, editado)
+    afirmar(editado["resultado"]["titulo"] == "Criado pela Ponte", editado)
+    ruim = _chamar(ponte, {"id": 26, "metodo": "jogo.salvar", "params": {"dados": "x"}})
+    afirmar(ruim["ok"] is False and "dados" in ruim["erro"], ruim)
+    tipo_ruim = _chamar(ponte, {"id": 27, "metodo": "jogo.salvar",
+                                "params": {"id": "3", "dados": {}}})
+    afirmar(tipo_ruim["ok"] is False and "inteiro" in tipo_ruim["erro"], tipo_ruim)
+
+
+def teste_ponte_favorito_por_perfil():
+    from servicos_ui import ServicoBiblioteca
+    tmp = Path(tempfile.mkdtemp(prefix="suite-favorito-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    servico = ServicoBiblioteca(db)
+    ponte = Ponte(servico)
+    criado = _chamar(ponte, {"id": 28, "metodo": "jogo.salvar",
+                             "params": {"dados": {"titulo": "Favorito de Prova"}}})["resultado"]
+    ident = criado["id"]
+    ativo = servico.preferencias()["ativo"]
+    outro = "Isa" if ativo == "Tuco" else "Tuco"
+    try:
+        marco = _chamar(ponte, {"id": 29, "metodo": "jogo.favoritar", "params": {"id": ident}})
+        afirmar(marco["ok"] is True and marco["resultado"]["favorito"] is True, marco)
+        servico.trocar_perfil(outro)
+        dele = _chamar(ponte, {"id": 30, "metodo": "jogo.ler", "params": {"id": ident}})
+        afirmar(dele["resultado"]["favorito"] is False, dele)
+        alterno = _chamar(ponte, {"id": 31, "metodo": "jogo.favoritar", "params": {"id": ident}})
+        afirmar(alterno["resultado"]["favorito"] is (not dele["resultado"]["favorito"]), alterno)
+    finally:
+        servico.trocar_perfil(ativo)
+    volta = _chamar(ponte, {"id": 32, "metodo": "jogo.ler", "params": {"id": ident}})
+    afirmar(volta["resultado"]["favorito"] is True, volta)
+
+
+def teste_ponte_observacoes_trunca():
+    from servicos_ui import ServicoBiblioteca
+    tmp = Path(tempfile.mkdtemp(prefix="suite-obs-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    criado = _chamar(ponte, {"id": 33, "metodo": "jogo.salvar",
+                             "params": {"dados": {"titulo": "Diario de Prova"}}})["resultado"]
+    r = _chamar(ponte, {"id": 34, "metodo": "jogo.observacoes",
+                        "params": {"id": criado["id"], "texto": "x" * 5000}})
+    afirmar(r["ok"] is True, r)
+    afirmar(r["resultado"]["observacoes"] == "x" * 4000, len(r["resultado"]["observacoes"]))
+    ruim = _chamar(ponte, {"id": 35, "metodo": "jogo.observacoes",
+                           "params": {"id": criado["id"], "texto": 5}})
+    afirmar(ruim["ok"] is False and "texto" in ruim["erro"], ruim)
+
+
+def teste_ponte_excluir_desfazer_e_lixeira():
+    from servicos_ui import ServicoBiblioteca
+    tmp = Path(tempfile.mkdtemp(prefix="suite-lixeira-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    criado = _chamar(ponte, {"id": 36, "metodo": "jogo.salvar",
+                             "params": {"dados": {"titulo": "Jogo da Lixeira"}}})["resultado"]
+    recibo = _chamar(ponte, {"id": 37, "metodo": "item.excluir",
+                             "params": {"categoria": "jogos", "id": criado["id"]}})
+    afirmar(recibo["ok"] is True, recibo)
+    afirmar(recibo["resultado"]["desfazer"]["titulo"] == "Jogo da Lixeira", recibo)
+    estado = _chamar(ponte, {"id": 38, "metodo": "lixeira.estado"})
+    afirmar(estado["resultado"]["disponivel"] is True, estado)
+    afirmar(estado["resultado"]["titulo"] == "Jogo da Lixeira", estado)
+    voltou = _chamar(ponte, {"id": 39, "metodo": "item.desfazer"})
+    afirmar(voltou["ok"] is True and voltou["resultado"]["titulo"] == "Jogo da Lixeira", voltou)
+    depois = _chamar(ponte, {"id": 40, "metodo": "lixeira.estado"})
+    afirmar(depois["resultado"]["titulo"] != "Jogo da Lixeira", depois)
+    titulos = [j["titulo"] for j in
+               _chamar(ponte, {"id": 41, "metodo": "nucleo.snapshot"})["resultado"]["jogos"]]
+    afirmar("Jogo da Lixeira" in titulos, titulos)
+    categoria_ruim = _chamar(ponte, {"id": 42, "metodo": "item.excluir",
+                                     "params": {"categoria": "x", "id": 1}})
+    afirmar(categoria_ruim["ok"] is False and "categoria" in categoria_ruim["erro"], categoria_ruim)
+
+
+def teste_ponte_filtro_padrao_e_por_perfil():
+    from servicos_ui import ServicoBiblioteca
+    tmp = Path(tempfile.mkdtemp(prefix="suite-filtro-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    servico = ServicoBiblioteca(db)
+    ponte = Ponte(servico)
+    padrao = _chamar(ponte, {"id": 43, "metodo": "preferencias.filtro"})
+    afirmar(padrao["ok"] is True, padrao)
+    afirmar(padrao["resultado"] == {"filtro": "todos", "ordem": "titulo"}, padrao)
+    ativo = servico.preferencias()["ativo"]
+    outro = "Isa" if ativo == "Tuco" else "Tuco"
+    salvo = _chamar(ponte, {"id": 44, "metodo": "preferencias.salvar_filtro",
+                            "params": {"filtro": "favoritos", "ordem": "horas"}})
+    afirmar(salvo["ok"] is True, salvo)
+    afirmar(salvo["resultado"] == {"filtro": "favoritos", "ordem": "horas"}, salvo)
+    servico.trocar_perfil(outro)
+    do_outro = _chamar(ponte, {"id": 45, "metodo": "preferencias.filtro"})
+    afirmar(do_outro["resultado"] == {"filtro": "todos", "ordem": "titulo"}, do_outro)
+    servico.trocar_perfil(ativo)
+    de_volta = _chamar(ponte, {"id": 46, "metodo": "preferencias.filtro"})
+    afirmar(de_volta["resultado"] == {"filtro": "favoritos", "ordem": "horas"}, de_volta)
+    ruim = _chamar(ponte, {"id": 47, "metodo": "preferencias.salvar_filtro",
+                           "params": {"filtro": "qualquer", "ordem": "titulo"}})
+    afirmar(ruim["ok"] is False and "Filtro" in ruim["erro"], ruim)
+    tipo = _chamar(ponte, {"id": 48, "metodo": "preferencias.salvar_filtro",
+                           "params": {"filtro": 7, "ordem": "titulo"}})
+    afirmar(tipo["ok"] is False and "texto" in tipo["erro"], tipo)
