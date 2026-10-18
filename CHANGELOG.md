@@ -435,3 +435,18 @@ de integração encontrados após a portação inicial.
   varredura de segredos (gitleaks) na CI.
 - `frontends/desktop.py`: garante o próprio diretório no `sys.path`
   (entry point instalável).
+
+
+### Adicionado (F2 — telas restantes do desktop Electron)
+
+- Telas Jogos, Musicas, Desejos, Downloads, Integracoes e Videos no shell Electron,
+  com paleta, atalhos Ctrl+1..8, notificacoes e perfis Tuco/Isa.
+- Protocolo de midia `tucoteca-media://arquivo/` com Range (200/206/403/416), player do
+  rodape e importacao de pasta de musicas.
+- Desejos com precos via cache Steam, adicionar/remover com desfazer e abrir na loja.
+- Downloads com torrents (progresso, pausar/retomar via API, organizar, importar
+  concluidos) e componente Atividade (jobs) no rodape.
+- Integracoes com cartoes, busca por catalogo e personalizadas persistidas.
+- Videos com lista, player interno e reprodutor externo (VLC/MPV/MPC-HC).
+- IPCs `dialogo:escolher-pasta`, `app:abrir-url` (so https) e `app:abrir-pasta`.
+- Trabalhos (jobs) com progresso/cancelamento na ponte; detalhe do jogo pela paleta.

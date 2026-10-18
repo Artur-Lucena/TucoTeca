@@ -163,3 +163,36 @@ segue fora do escopo; gamepad provado só por unidade (sem controle físico na
 máquina); a paleta busca em memória (12 itens/limite — coleções grandes podem
 querer FTS depois); o selftest não substitui prova física de áudio nem serviços
 remotos; a F1 não empacota, não assina e não substitui o Qt como desktop padrão.
+
+
+## O que a F2 entrega (telas restantes)
+
+Entregue na F2 (Tasks 1-9, commits `3e13f3f`..`00439bd`): telas Jogos (grade com
+filtro por perfil, favoritos, pendencias, detalhe com horas/nota/etiquetas/observacoes,
+jogar e desfazer), Musicas (lista, player do rodape com protocolo de midia e Range,
+importar pasta, fila de downloads), Desejos (lista, precos via cache Steam, adicionar/
+remover com desfazer, abrir na loja), Downloads (torrents com progresso, pausar/retomar
+via API, organizar, importar concluidos), Integracoes (cartoes, busca por catalogo,
+personalizadas persistidas) e Videos (lista, player interno sobre `tucoteca-media://`,
+reprodutor externo). Trabalhos (jobs) com progresso/cancelamento na ponte e o
+componente `Atividade` no rodape; detalhe do jogo abre pela paleta (`Enter`).
+
+Protocolo de midia: `tucoteca-media://arquivo/<caminho>` servido pelo main com
+`200`/`206` (Range)/`403`/`416`; `mediaUrl()` no shared; autoplay liberado via
+`app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')`; CSP com
+`media-src 'self' tucoteca-media:`. IPCs novos: `dialogo:escolher-pasta`,
+`app:abrir-url` (so https, respeita `BIBLIOTECA_REDE=0`) e `app:abrir-pasta`
+(valida que o caminho esta sob a home).
+
+Divergencias documentadas: o player de musica e do renderer (HTMLAudio sobre o protocolo
+de midia), nao o MCI do Qt/TUI (`player.py` segue TUI-only); o volume global do Windows
+ainda nao foi portado (pendencia). Musicas nao entram na lixeira (remover apaga o
+arquivo, sem desfazer). TUI curses e Qt permanecem (F5 retira o Qt).
+
+Ainda nao (fatias seguintes): F3 modulos de terceiros; F4 empacotamento e assinatura;
+F5 retirada do Qt e do `BIBLIOTECA_WEBENGINE`; F6 release 1.2.0. Pendencias nomeadas
+da F2 (F2b/F3): importacao/scan/drag&drop de jogos, capas, conquistas, mods/emulacao,
+saves/ferramentas, Spotify/musicas online/fila/letras, YouTube embutido/busca/download,
+catalogo pacotes/UAC, configuracoes/tema, export/import da colecao, sincronizar
+Steam/wishlist/precos offline, "Iniciar cliente"/"Pacotes locais", volume global Windows,
+gamepad dentro de listas.

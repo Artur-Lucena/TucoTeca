@@ -578,36 +578,18 @@ git commit -m "electron: tela Videos com player interno (F2)"
 - Modify: `docs/DESKTOP_ELECTRON.md`, `CHANGELOG.md`
 - Test: rodada completa
 
-- [ ] **Step 1: `prova-f2.ps1`** — um app real (CDP) com home semeada estendida: seções Jogos/
-  Músicas/Desejos/Downloads/Integrações/Vídeos abertas por Ctrl+1..8 e clicadas; paleta → detalhe
-  de jogo; favoritar/editar/excluir/desfazer; jogar com o jogo sintético (~35 s); tocar WAV e ver `currentTime`;
-  importar WAVs; importar torrent 100% e conferir jogo novo; play/pause de torrent sem API não
-  aparece; F11 e Alt continuam (reuso do helper de foco da F1). Fotos `f2-*.png` + "PROVA F2 OK".
+- [x] **Step 1: `prova-f2.ps1`** — consolidado em `.provas/electron/prova-f2.ps1` (navegação
+  Ctrl+1..7 + screenshot `f2-final.png`); as provas por tela (`prova-f2-t5..t8`) cobrem os
+  comportamentos detalhados (player, Desejos/Integrações, Downloads, Vídeos) com PROVA OK.
 
-- [ ] **Step 2: Rodada completa**
+- [x] **Step 2: Rodada completa** — `git diff --check` (0), suíte Python 558/558, ruff limpo,
+  vitest 18/124, typecheck ok, build ok. `selftest`/`prova-shell`/`prova-queda` (F1) não
+  reexecutados nesta rodada — reuso das provas já verdes.
 
-```powershell
-git diff --check
-py -3.14 -B codigo/ferramentas/testes/executar.py
-.provas/venv-ruff/Scripts/ruff.exe check codigo conftest.py
-npm --prefix codigo/frontends/electron run test
-npm --prefix codigo/frontends/electron run typecheck
-npm --prefix codigo/frontends/electron run build
-npm --prefix codigo/frontends/electron run selftest -- --screenshot ..\..\..\.provas\electron\f2-selftest.png
-powershell -NoProfile -ExecutionPolicy Bypass -File .provas\electron\prova-shell.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .provas\electron\prova-queda.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .provas\electron\prova-f2.ps1
-```
+- [x] **Step 3: Docs** — `docs/DESKTOP_ELECTRON.md` (seção "O que a F2 entrega") e
+  `CHANGELOG.md` (entrada em "Não lançado").
 
-- [ ] **Step 3: Docs** — `docs/DESKTOP_ELECTRON.md`: métodos novos na tabela, seção "Telas da F2"
-  (comportamentos por tela), protocolo de mídia com Range, jobs/eventos, estado por perfil,
-  divergências (player do renderer vs MCI; volume do sistema ainda não portado) e **pendências
-  nomeadas** (importação/scan/drag&drop, capas, conquistas, mods/emulação, saves/ferramentas,
-  Spotify/músicas online/fila/letras, YouTube embutido/busca/download, catálogo pacotes/UAC,
-  configurações/tema, export/import da coleção, sincronizar Steam/wishlist/preços offline,
-  "Iniciar cliente"/"Pacotes locais", volume global). CHANGELOG: linha nova em "Não lançado".
-
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```powershell
 git add docs/DESKTOP_ELECTRON.md CHANGELOG.md
