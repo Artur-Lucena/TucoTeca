@@ -398,7 +398,9 @@ git commit -m "electron: paleta de busca Ctrl+K com atalhos (F1)"
   `dispensarAviso(lista, id)`; `BarraLateral` ganha props `{ avisosPendentes: number,
   aoAbrirAvisos(), perfil: string, aoTrocarPerfil(nome) }`.
 
-- [ ] **Step 1: Teste que falha** — `notificacoes.test.ts`:
+- [x] **Step 1: Teste que falha** — `notificacoes.test.ts`; uma regra extra ficou explícita no
+      teste: `backup` ausente no resumo NÃO vira aviso — só `'sem backup'` (senão um resumo sem a
+      chave encheria o sino):
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -439,23 +441,26 @@ describe('juntarAvisos / dispensarAviso', () => {
 })
 ```
 
-- [ ] **Step 2: RED** — `npm … run test`.
+- [x] **Step 2: RED** — 1 suíte falhou por import ausente; 38 antigos verdes.
 
-- [ ] **Step 3: Implementar `notificacoes.ts`** — regras do teste; `juntarAvisos` mantém teto de
+- [x] **Step 3: Implementar `notificacoes.ts`** — regras do teste; `juntarAvisos` mantém teto de
   50 itens (descarta os mais antigos).
 
-- [ ] **Step 4: Implementar `Avisos.tsx` + rodapé da `BarraLateral` + wiring**
+- [x] **Step 4: Implementar `Avisos.tsx` + rodapé da `BarraLateral` + wiring** — props finais da
+  `BarraLateral`: `{avisos, aoDispensarAviso, perfil, aoTrocarPerfil}` (painel vive dentro do
+  `Avisos`; sem `avisosPendentes`/`aoAbrirAvisos`); `avisoDeEvento` normaliza o evento da ponte:
   - `Avisos`: botão sino com contador; painel com lista + dispensar individual quando aberto.
   - Rodapé da sidebar: chip `Tuco`/`Isa` (clique alterna via `preferencias.trocar_perfil`) — Review
     Focus 5: recusa mantém o chip atual e vira aviso de erro.
   - No `App`: estado `avisos` inicializado com `avisosDoResumo(snapshot.sistema)` após o snapshot;
-    `useEffect` com `assinar('aviso', dados => setAvisos(l => juntarAvisos(l, [normalizar(dados)])))`;
-    troca de perfil gera aviso info `Perfil trocado para Isa`.
+    `useEffect` com `assinar('aviso', dados => setAvisos(l => juntarAvisos(l, [avisoDeEvento(dados)])))`;
+    troca de perfil gera aviso info `Perfil trocado para <nome>`.
 
-- [ ] **Step 5: Verdes** — `test` + `typecheck` + `build`; selftest com screenshot (chip e sino
-  visíveis).
+- [x] **Step 5: Verdes** — 43/43 vitest, `typecheck` e `build` verdes; selftest `[ok] … 3 jogos`
+  rc=0 com `f1-notificacoes.png` revisado (sino com contador **1** = backup ausente na home de
+  prova; chip Tuco no rodapé).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** — feito (hash da tarefa no ledger do SDD).
 
 ```bash
 git add codigo/frontends/electron/src/renderer/src/estado/notificacoes.ts codigo/frontends/electron/src/renderer/src/estado/notificacoes.test.ts codigo/frontends/electron/src/renderer/src/componentes/Avisos.tsx codigo/frontends/electron/src/renderer/src/componentes/BarraLateral.tsx codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/renderer/src/estilo.css

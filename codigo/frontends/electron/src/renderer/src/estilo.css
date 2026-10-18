@@ -52,6 +52,7 @@ body {
 
 .barra-lateral nav {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
 }
@@ -357,4 +358,115 @@ body {
   border-top: 1px solid var(--borda);
   color: var(--texto2);
   font-size: 11px;
+}
+
+.rodape-lateral {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--borda);
+}
+
+.avisos {
+  position: relative;
+}
+
+.avisos-botao {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--texto2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.avisos-botao:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--texto);
+}
+
+.avisos-contador {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--realce);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.avisos-painel {
+  max-height: 220px;
+  margin-bottom: 6px;
+  overflow-y: auto;
+  background: var(--cartao);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+}
+
+.avisos-painel ul {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+
+.avisos-painel li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.avisos-painel li.atencao {
+  color: #ffd7a1;
+  background: rgba(255, 176, 79, 0.08);
+}
+
+.avisos-dispensar {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--texto2);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.avisos-vazio {
+  margin: 0;
+  padding: 10px;
+  color: var(--texto2);
+  font-size: 12px;
+  text-align: center;
+}
+
+.perfil {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--texto2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.perfil:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--texto);
 }

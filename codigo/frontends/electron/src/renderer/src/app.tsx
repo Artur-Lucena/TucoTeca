@@ -4,6 +4,7 @@ import { combinacao, decidirAtalho } from './atalhos'
 import { BarraLateral } from './componentes/BarraLateral'
 import { Paleta } from './componentes/Paleta'
 import type { Snapshot } from './derivacoes'
+import { avisosDoResumo, dispensarAviso, juntarAvisos, type Aviso } from './estado/notificacoes'
 import { paletaInicial, reduzirPaleta, type ItemBusca } from './estado/paleta'
 import { Inicio } from './vistas/Inicio'
 import { Placeholder } from './vistas/Placeholder'
@@ -22,6 +23,8 @@ export function App() {
   const [secao, setSecao] = useState('inicio')
   const [paleta, setPaleta] = useState(paletaInicial)
   const [atalhos, setAtalhos] = useState<Record<string, string>>({})
+  const [avisos, setAvisos] = useState<Aviso[]>([])
+  const [perfil, setPerfil] = useState('Tuco')
 
   useEffect(() => {
     void (async () => {
@@ -30,13 +33,16 @@ export function App() {
         setModulos(lista)
         const dados = await window.tucoteca.chamar<Snapshot>('nucleo.snapshot')
         setSnapshot(dados)
+        setAvisos(avisosDoResumo(dados.sistema ?? {}))
         try {
-          const prefs = await window.tucoteca.chamar<{ atalhos?: Record<string, string> }>(
-            'preferencias.ler',
-          )
+          const prefs = await window.tucoteca.chamar<{
+            ativo?: string
+            atalhos?: Record<string, string>
+          }>('preferencias.ler')
           setAtalhos(prefs.atalhos ?? {})
+          if (typeof prefs.ativo === 'string') setPerfil(prefs.ativo)
         } catch {
-          // sem atalhos pessoais o shell segue funcionando; eles chegam na próxima carga
+          // sem atalhos/perfil pessoais o shell segue funcionando; chegam na próxima carga
         }
         window.tucoteca.pronto({ jogos: dados.jogos?.length ?? 0 })
       } catch (falha) {
@@ -84,6 +90,35 @@ export function App() {
     }
   }, [paleta.aberta, paleta.termo])
 
+  useEffect(() => {
+    return window.tucoteca.assinar('aviso', (dados) => {
+      const aviso = avisoDeEvento(dados)
+      if (aviso !== null) setAvisos((atual) => juntarAvisos(atual, [aviso]))
+    })
+  }, [])
+
+  const alternarPerfil = async () => {
+    const outro = perfil === 'Tuco' ? 'Isa' : 'Tuco'
+    try {
+      const dados = await window.tucoteca.chamar<{ ativo?: string }>('preferencias.trocar_perfil', {
+        nome: outro,
+      })
+      const ativo = typeof dados.ativo === 'string' ? dados.ativo : outro
+      setPerfil(ativo)
+      setAvisos((atual) =>
+        juntarAvisos(atual, [
+          { id: `perfil-${ativo}`, texto: `Perfil trocado para ${ativo}.`, tom: 'info' },
+        ]),
+      )
+    } catch (falha) {
+      setAvisos((atual) =>
+        juntarAvisos(atual, [
+          { id: 'perfil-erro', texto: `Não troquei de perfil: ${String(falha)}`, tom: 'atencao' },
+        ]),
+      )
+    }
+  }
+
   if (erro) {
     return (
       <section class="painel erro">
@@ -106,7 +141,15 @@ export function App() {
   return (
     <>
       <main class="shell">
-        <BarraLateral modulos={modulos} ativa={ativo?.chave ?? ''} aoTrocar={setSecao} />
+        <BarraLateral
+          modulos={modulos}
+          ativa={ativo?.chave ?? ''}
+          aoTrocar={setSecao}
+          avisos={avisos}
+          aoDispensarAviso={(id) => setAvisos((atual) => dispensarAviso(atual, id))}
+          perfil={perfil}
+          aoTrocarPerfil={alternarPerfil}
+        />
         <section class="conteudo">
           {ativo === undefined || ativo.chave === 'inicio' ? (
             <Inicio snapshot={snapshot} />
@@ -137,4 +180,23 @@ export function App() {
       )}
     </>
   )
+}
+
+/** Evento `aviso` vindo da ponte (texto simples ou `{id, texto, tom}`). */
+function avisoDeEvento(dados: unknown): Aviso | null {
+  if (typeof dados === 'string') {
+    const texto = dados.trim()
+    return texto === '' ? null : { id: texto, texto, tom: 'info' }
+  }
+  if (dados !== null && typeof dados === 'object') {
+    const objeto = dados as { id?: unknown; texto?: unknown; tom?: unknown }
+    const texto = String(objeto.texto ?? '').trim()
+    if (texto === '') return null
+    return {
+      id: String(objeto.id ?? texto),
+      texto,
+      tom: objeto.tom === 'atencao' ? 'atencao' : 'info',
+    }
+  }
+  return null
 }
