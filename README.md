@@ -59,8 +59,7 @@ mostra uma mensagem pedindo para instalar `codigo/ferramentas/requirements-ui.tx
 o modo clássico foi removido e abrem o Qt.
 
 **Linux:** `./BibliotecaHub.sh` em um terminal abre a TUI; precisa de Python 3.10+.
-**macOS:** `BibliotecaHubMac.command` abre a interface Qt; é experimental
-e não há bundle macOS validado nesta release.
+**macOS:** `Instalar-Mac.command` instala e cria `/Applications/TucoTeca.app`; abra o app normalmente (1ª vez clique direito > Abrir). Ventura 13.0+ suportado.
 
 Para experimentar os fontes sem encostar na coleção real:
 

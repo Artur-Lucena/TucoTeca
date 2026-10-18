@@ -90,13 +90,22 @@ if ! python3 -c 'import sys; assert sys.version_info>=(3,10)' 2>/dev/null; then
   exit 0
 fi
 python3 -c 'import PySide6' 2>/dev/null || {
-  echo "[aviso] sem PySide6: a GUI não abre; instale com 'python3 -m pip install PySide6'."
+  echo "[hub] instalando PySide6 (precisa de rede, uma vez)..."
+  python3 -m pip install --upgrade pip >/dev/null 2>&1
+  python3 -m pip install PySide6-Essentials==6.10.2 || echo "[aviso] PySide6 não instalou; GUI pode não abrir."
 }
 
 # 2. App (código do Hub)
 mkdir -p "$DEST" || falha "não criei $DEST."
 tar -xJf "$AQUI/PAYLOAD" -C "$DEST" || falha "extração do app falhou."
 HUB="$DEST/tucoteca"
+
+# 2b. Bundle .app para /Applications (abrir como app normal)
+if [ -d "$HUB/TucoTeca.app" ]; then
+  rm -rf "/Applications/TucoTeca.app"
+  ditto "$HUB/TucoTeca.app" "/Applications/TucoTeca.app" 2>/dev/null || cp -R "$HUB/TucoTeca.app" "/Applications/TucoTeca.app"
+  xattr -dr com.apple.quarantine "/Applications/TucoTeca.app" 2>/dev/null
+fi
 
 # 3. Emuladores (.app oficiais, sem modificação)
 deszipar() { # $1=zip $2=destino $3=versao-arq $4=versao
@@ -144,17 +153,13 @@ echo "     (1ª vez: clique direito > Abrir, por causa do Gatekeeper)"
 exit 0
 """
 
-LEIAME_MAC = """TucoTeca no Mac (experimental — ainda não testado num Mac real).
+LEIAME_MAC = """TucoTeca no Mac (experimental).
 
 INSTALAÇÃO (tudo offline, nesta pasta):
 1. Duplo-clique em Instalar-Mac.command (1ª vez: clique direito > Abrir).
-2. Ele pede o Python oficial se faltar (pkg incluído: python-3.14.7;
-   tem o 3.10.11 p/ macs mais velhos — troque o nome no instalador).
-3. Emuladores oficiais inclusos: Azahar 2126.1.2 (3DS),
-   DeSmuME 0.9.13 (NDS).
+2. Ele pede o Python oficial se faltar (pkg incluído).
+3. Abra o app em /Applications/TucoTeca.app (1ª vez: clique direito > Abrir).
 4. A coleção fica em ~/Applications/TucoTeca/tucoteca/dados.
-
-ATUALIZAR DEPOIS: botão ⬇ dentro do app (baixa build oficial sozinho).
 """
 
 
@@ -173,6 +178,37 @@ def montar_base_mac(trab: Path | None = None) -> tuple[Path, dict]:
     copiar_app(app, repo=REPO)
     (base / "BibliotecaHubMac.command").write_text(COMMAND_LAUNCHER,
                                                    encoding="utf-8")
+    # Bundle .app para abrir como app normal (sem Terminal)
+    appbundle = base / "TucoTeca.app"
+    macos_dir = appbundle / "Contents" / "MacOS"
+    res_dir = appbundle / "Contents" / "Resources"
+    macos_dir.mkdir(parents=True)
+    res_dir.mkdir(parents=True)
+    launcher = macos_dir / "TucoTeca"
+    launcher.write_text("""#!/bin/sh
+HUB="$(cd "$(dirname "$0")/../.." && pwd)/.."
+HUB="$(cd "$HUB" && pwd)"
+export BIBLIOTECA_HOME="$HUB"
+exec python3 "$HUB/app/desktop.py" "$@"
+""", encoding="utf-8")
+    try:
+        os.chmod(launcher, 0o755)
+    except OSError:
+        pass
+    import plistlib
+    plist = {
+        "CFBundleName": "TucoTeca",
+        "CFBundleDisplayName": "TucoTeca",
+        "CFBundleIdentifier": "com.tucoteca.hub",
+        "CFBundleVersion": "1.0.3",
+        "CFBundleShortVersionString": "1.0.3",
+        "CFBundleExecutable": "TucoTeca",
+        "CFBundlePackageType": "APPL",
+        "LSMinimumSystemVersion": "13.0",
+        "NSHighResolutionCapable": True,
+    }
+    with (appbundle / "Contents" / "Info.plist").open("wb") as f:
+        plistlib.dump(plist, f)
     for sub in ("dados", "dados/backups", "dados/capas", "dados/presets",
                 "dados/sessoes"):
         (base / sub).mkdir(parents=True, exist_ok=True)

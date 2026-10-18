@@ -112,6 +112,7 @@ def teste_mac_payload_e_instalador():
             nomes = t.getnames()
         for alvo in ("tucoteca/VERSAO.txt",
                      "tucoteca/BibliotecaHubMac.command",
+                     "tucoteca/TucoTeca.app/Contents/Info.plist",
                      "tucoteca/app/desktop.py"):
             afirmar(alvo in nomes, nomes)
     finally:
