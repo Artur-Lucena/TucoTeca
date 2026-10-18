@@ -171,5 +171,20 @@ class MixNucleo:
             raise ValueError("Executável local não encontrado.")
         return tamanho_pasta(exe.parent)
 
+    def buscar(self, termo, limite=12):
+        snap = self.snapshot()
+        return busca_global(snap["jogos"], snap["musicas"], snap["desejos"], [],
+                            str(termo or ""), int(limite))
+
+    def preferencias(self):
+        from bib_nucleo.preferencias_pessoais import PERFIS, ler_preferencias
+        dados = ler_preferencias()
+        return {"ativo": dados["ativo"], "perfis": list(PERFIS), "atalhos": dados["atalhos"]}
+
+    def trocar_perfil(self, nome):
+        from bib_nucleo import preferencias_pessoais as prefs
+        prefs.trocar_perfil(nome)
+        return self.preferencias()
+
 
 __all__ = ["MixNucleo"]

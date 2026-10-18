@@ -57,10 +57,34 @@ def _modulos(servico, params) -> list:
     return [m.apresentar() for m in modulos_padrao()]
 
 
+def _buscar(servico, params) -> list:
+    termo = params.get("termo", "")
+    if not isinstance(termo, str):
+        raise ValueError("termo deve ser texto")
+    limite = params.get("limite", 12)
+    if isinstance(limite, bool) or not isinstance(limite, int) or not 1 <= limite <= 50:
+        raise ValueError("limite deve ser um inteiro entre 1 e 50")
+    return servico.buscar(termo, limite)
+
+
+def _preferencias(servico, params) -> dict:
+    return servico.preferencias()
+
+
+def _trocar_perfil(servico, params) -> dict:
+    nome = params.get("nome", "")
+    if not isinstance(nome, str):
+        raise ValueError("nome deve ser texto")
+    return servico.trocar_perfil(nome)
+
+
 METODOS = {
     "nucleo.ping": _ping,
     "nucleo.snapshot": _snapshot,
+    "nucleo.buscar": _buscar,
     "modulos.listar": _modulos,
+    "preferencias.ler": _preferencias,
+    "preferencias.trocar_perfil": _trocar_perfil,
 }
 
 

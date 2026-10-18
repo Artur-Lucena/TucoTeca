@@ -96,7 +96,9 @@ docs/DESKTOP_ELECTRON.md / CHANGELOG.md        atualizados na Task 6
   - Ponte: `nucleo.buscar` (params `{termo, limite?}` → lista), `preferencias.ler` (→ dict),
     `preferencias.trocar_perfil` (params `{nome}` → dict; nome inválido → `ok:false`).
 
-- [ ] **Step 1: Escrever os testes que falham** (append em `test_ponte.py`):
+- [x] **Step 1: Escrever os testes que falham** (append em `test_ponte.py`) — 4 casos novos
+      (despacho com limite, busca real sem acento/termo vazio, prefs ler/trocar com restauração
+      do sandbox, nome inválido e tipo errado).
 
 ```python
 def teste_buscar_despacha_para_o_servico():
@@ -165,9 +167,11 @@ def teste_preferencias_via_ponte_e_nome_invalido():
     afirmar(erro["ok"] is False and "Tuco ou Isa" in erro["erro"], erro)
 ```
 
-- [ ] **Step 2: Rodar e ver falhar** — `py -3.14 -B codigo/ferramentas/testes/executar.py --modulo test_ponte`; esperado: falhas por "método desconhecido"/AttributeError.
+- [x] **Step 2: Rodar e ver falhar** — 11/15: `nucleo.buscar` desconhecido (2), serviço sem
+      `preferencias` (1), resposta sem `resultado` (1).
 
-- [ ] **Step 3: Implementar os métodos em `mix_nucleo.py`** (antes de `__all__`):
+- [x] **Step 3: Implementar os métodos em `mix_nucleo.py`** (antes de `__all__`) — troca via
+      `prefs.trocar_perfil(nome)` (import aliasado para não sombrear o método):
 
 ```python
 def buscar(self, termo, limite=12):
@@ -186,7 +190,8 @@ def trocar_perfil(self, nome):
     return self.preferencias()
 ```
 
-- [ ] **Step 4: Implementar os handlers em `ponte.py`** (junto dos existentes e no `METODOS`):
+- [x] **Step 4: Implementar os handlers em `ponte.py`** (junto dos existentes e no `METODOS`) —
+      `limite` também recusa `bool` (subclasse de `int`):
 
 ```python
 def _buscar(servico, params):
@@ -211,10 +216,9 @@ def _trocar_perfil(servico, params):
 `METODOS` ganha `"nucleo.buscar": _buscar, "preferencias.ler": _preferencias,
 "preferencias.trocar_perfil": _trocar_perfil`.
 
-- [ ] **Step 5: Verdes + gates** — `--modulo test_ponte` (esperado 15/15);
-  `ruff check codigo` limpo; `git diff --check`.
+- [x] **Step 5: Verdes + gates** — 15/15, `ruff check codigo` limpo, `git diff --check` limpo.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** — feito (hash da tarefa no ledger do SDD).
 
 ```bash
 git add codigo/frontends/servicos_ui/mix_nucleo.py codigo/frontends/ponte.py codigo/ferramentas/testes/test_ponte.py

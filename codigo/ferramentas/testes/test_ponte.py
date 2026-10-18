@@ -133,3 +133,85 @@ def teste_iniciar_serve_com_factory():
     afirmar(rc == 0, rc)
     r = json.loads(saida.getvalue().strip())
     afirmar(r["id"] == 9 and r["ok"] is True, r)
+
+
+def teste_buscar_despacha_para_o_servico():
+    class ComBusca(ServicoFalso):
+        def buscar(self, termo, limite=12):
+            return [{"tipo": "jogo", "id": 1, "titulo": f"eco:{termo}",
+                     "limite": limite}]
+
+    ponte = Ponte(ComBusca())
+    r = _chamar(ponte, {"id": 12, "metodo": "nucleo.buscar",
+                        "params": {"termo": "zelda", "limite": 5}})
+    afirmar(r["ok"] is True, r)
+    afirmar(r["resultado"] == [{"tipo": "jogo", "id": 1, "titulo": "eco:zelda",
+                                "limite": 5}], r)
+    padrao = _chamar(ponte, {"id": 12, "metodo": "nucleo.buscar",
+                             "params": {"termo": "zelda"}})
+    afirmar(padrao["resultado"][0]["limite"] == 12, padrao)
+    invalido = _chamar(ponte, {"id": 12, "metodo": "nucleo.buscar",
+                               "params": {"termo": "zelda", "limite": 0}})
+    afirmar(invalido["ok"] is False and "limite" in invalido["erro"], invalido)
+
+
+def teste_buscar_real_acha_jogo_sem_acento():
+    from servicos_ui import ServicoBiblioteca
+    tmp = Path(tempfile.mkdtemp(prefix="suite-busca-"))
+    db = tmp / "hub.db"
+    con = core.get_db(db)
+    try:
+        core.criar_jogo(con, {"titulo": "Pokémon X", "executable_path": ""})
+    finally:
+        con.close()
+    ponte = Ponte(ServicoBiblioteca(db))
+    r = _chamar(ponte, {"id": 13, "metodo": "nucleo.buscar",
+                        "params": {"termo": "pokemon"}})
+    afirmar(r["ok"] is True, r)
+    afirmar([i["titulo"] for i in r["resultado"]] == ["Pokémon X"], r)
+    afirmar(r["resultado"][0]["tipo"] == "jogo", r)
+    vazio = _chamar(ponte, {"id": 14, "metodo": "nucleo.buscar",
+                            "params": {"termo": "  "}})
+    afirmar(vazio["ok"] is True and vazio["resultado"] == [], vazio)
+
+
+def teste_preferencias_ler_e_trocar():
+    from servicos_ui import ServicoBiblioteca
+    tmp = Path(tempfile.mkdtemp(prefix="suite-prefs-"))
+    servico = ServicoBiblioteca(tmp / "hub.db")
+    inicial = servico.preferencias()
+    afirmar(list(inicial["perfis"]) == ["Tuco", "Isa"], inicial)
+    afirmar(inicial["ativo"] in ("Tuco", "Isa"), inicial)
+    afirmar(inicial["atalhos"]["paleta"] == "Ctrl+K", inicial["atalhos"])
+    original = inicial["ativo"]
+    outro = "Isa" if original == "Tuco" else "Tuco"
+    afirmar(servico.trocar_perfil(outro)["ativo"] == outro, "troca")
+    afirmar(servico.preferencias()["ativo"] == outro, "troca não persistiu")
+    servico.trocar_perfil(original)  # devolve o sandbox ao estado anterior
+
+
+def teste_preferencias_via_ponte_e_nome_invalido():
+    class ComPrefs(ServicoFalso):
+        ativo = "Tuco"
+
+        def preferencias(self):
+            return {"ativo": type(self).ativo, "perfis": ["Tuco", "Isa"], "atalhos": {}}
+
+        def trocar_perfil(self, nome):
+            if nome not in ("Tuco", "Isa"):
+                raise ValueError("Perfil precisa ser Tuco ou Isa.")
+            type(self).ativo = nome
+            return self.preferencias()
+
+    ponte = Ponte(ComPrefs())
+    afirmar(_chamar(ponte, {"id": 15, "metodo": "preferencias.ler"})["resultado"]["ativo"]
+            == "Tuco", "ler")
+    r = _chamar(ponte, {"id": 16, "metodo": "preferencias.trocar_perfil",
+                        "params": {"nome": "Isa"}})
+    afirmar(r["ok"] is True and r["resultado"]["ativo"] == "Isa", r)
+    erro = _chamar(ponte, {"id": 17, "metodo": "preferencias.trocar_perfil",
+                           "params": {"nome": "Ninguem"}})
+    afirmar(erro["ok"] is False and "Tuco ou Isa" in erro["erro"], erro)
+    tipo_errado = _chamar(ponte, {"id": 18, "metodo": "preferencias.trocar_perfil",
+                                  "params": {"nome": 7}})
+    afirmar(tipo_errado["ok"] is False and "texto" in tipo_errado["erro"], tipo_errado)
