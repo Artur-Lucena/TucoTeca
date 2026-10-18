@@ -20,6 +20,7 @@ import {
   type EventoTrabalho,
   type Trabalho,
 } from './estado/trabalhos'
+import { Configuracoes } from './vistas/Configuracoes'
 import { Inicio } from './vistas/Inicio'
 import { Desejos } from './vistas/Desejos'
 import { Downloads } from './vistas/Downloads'
@@ -363,6 +364,8 @@ export function App() {
               <Downloads aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
             ) : ativo.chave === 'videos' ? (
               <Videos aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
+            ) : ativo.chave === 'configuracoes' ? (
+              <Configuracoes aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
             ) : (
               <Placeholder modulo={ativo} />
             )}

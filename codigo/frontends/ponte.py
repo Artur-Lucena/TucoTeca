@@ -284,6 +284,164 @@ def _videos_reproduzir(servico, params) -> dict:
     return servico.reproduzir_video(ident, reprodutor.strip())
 
 
+def _conquistas_avaliar(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    return servico.avaliar_conquistas(ident)
+
+
+def _capas_buscar(servico, params) -> dict:
+    categoria = params.get("categoria")
+    if categoria not in ("jogos", "musicas", "desejos"):
+        raise ValueError("categoria deve ser jogos, musicas ou desejos")
+    ident = _inteiro(params, "id")
+    provedor = params.get("provedor", "")
+    if not isinstance(provedor, str):
+        raise ValueError("provedor deve ser um texto")
+    atualizar = bool(params.get("atualizar", False))
+    return servico.buscar_capas(categoria, ident, provedor, atualizar)
+
+
+def _capas_aplicar(servico, params) -> dict:
+    categoria = params.get("categoria")
+    if categoria not in ("jogos", "musicas", "desejos"):
+        raise ValueError("categoria deve ser jogos, musicas ou desejos")
+    ident = _inteiro(params, "id")
+    candidato = params.get("candidato")
+    if not isinstance(candidato, dict):
+        raise ValueError("candidato deve ser um objeto")
+    return servico.aplicar_capa(categoria, ident, candidato)
+
+
+def _capas_libretro(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    return servico.buscar_capa_libretro(ident)
+
+
+def _emulacao_status(servico, params) -> dict:
+    return servico.emus_status()
+
+
+def _emulacao_consultar(servico, params) -> dict:
+    chave = params.get("chave")
+    if not isinstance(chave, str) or not chave.strip():
+        raise ValueError("chave deve ser um texto")
+    return servico.emu_consultar(chave.strip())
+
+
+def _emulacao_atualizar(servico, params) -> dict:
+    chave = params.get("chave")
+    if not isinstance(chave, str) or not chave.strip():
+        raise ValueError("chave deve ser um texto")
+    info = params.get("info", {})
+    if not isinstance(info, dict):
+        raise ValueError("info deve ser um objeto")
+    return servico.emu_atualizar(chave.strip(), info)
+
+
+def _ferramentas_jogo(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    return servico.ferramentas_jogo(ident)
+
+
+def _diagnosticar_jogo(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    return servico.diagnosticar_jogo(ident)
+
+
+def _disco_jogo(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    return servico.disco_jogo(ident)
+
+
+def _configurar_saves(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    caminhos = params.get("caminhos")
+    if not isinstance(caminhos, list):
+        raise ValueError("caminhos deve ser uma lista")
+    return servico.configurar_saves(ident, caminhos)
+
+
+def _abrir_ferramenta(servico, params) -> dict:
+    tipo = params.get("tipo")
+    if tipo not in ("imagens", "equalizadores", "videos"):
+        raise ValueError("tipo deve ser imagens, equalizadores ou videos")
+    nome = params.get("nome")
+    if not isinstance(nome, str) or not nome.strip():
+        raise ValueError("nome deve ser um texto")
+    caminho = params.get("caminho", "")
+    if not isinstance(caminho, str):
+        raise ValueError("caminho deve ser um texto")
+    return servico.abrir_ferramenta_midia(tipo, nome.strip(), caminho)
+
+
+def _aparencia(servico, params) -> dict:
+    return servico.aparencia()
+
+
+def _definir_aparencia(servico, params) -> dict:
+    tema = params.get("tema", "")
+    densidade = params.get("densidade", "")
+    auto_backup = params.get("auto_backup", None)
+    if not isinstance(tema, str) or not isinstance(densidade, str):
+        raise ValueError("tema e densidade devem ser texto")
+    return servico.definir_aparencia(tema, densidade, auto_backup)
+
+
+def _configurar_provedores(servico, params) -> dict:
+    steam = params.get("steam", "")
+    steamgrid = params.get("steamgrid", "")
+    spotify_id = params.get("spotify_id", "")
+    spotify_secret = params.get("spotify_secret", "")
+    for v in (steam, steamgrid, spotify_id, spotify_secret):
+        if not isinstance(v, str):
+            raise ValueError("todos os campos devem ser texto")
+    return servico.configurar_provedores(steam, steamgrid, spotify_id, spotify_secret)
+
+
+def _estatisticas(servico, params) -> dict:
+    return servico.estatisticas()
+
+
+def _backups(servico, params) -> dict:
+    manter = params.get("manter", 10)
+    if isinstance(manter, bool) or not isinstance(manter, int):
+        raise ValueError("manter deve ser inteiro")
+    return servico.backups(manter)
+
+
+def _exportar_colecao(servico, params) -> dict:
+    pasta = params.get("pasta")
+    if not isinstance(pasta, str) or not pasta.strip():
+        raise ValueError("pasta deve ser um texto")
+    return servico.exportar_colecao_para(pasta.strip())
+
+
+def _importar_colecao(servico, params) -> dict:
+    caminho = params.get("caminho")
+    if not isinstance(caminho, str) or not caminho.strip():
+        raise ValueError("caminho deve ser um texto")
+    restaurar_saves = bool(params.get("restaurar_saves", False))
+    return servico.importar_colecao(caminho.strip(), restaurar_saves)
+
+
+def _sincronizar_steam(servico, params) -> dict:
+    return servico.sincronizar_desejos_steam()
+
+
+def _importar_wishlist(servico, params) -> dict:
+    caminho = params.get("caminho")
+    if not isinstance(caminho, str) or not caminho.strip():
+        raise ValueError("caminho deve ser um texto")
+    return servico.importar_wishlist(caminho.strip())
+
+
+def _buscar_fontes_desejo(servico, params) -> dict:
+    titulo = params.get("titulo")
+    if not isinstance(titulo, str) or not titulo.strip():
+        raise ValueError("titulo deve ser um texto")
+    return servico.buscar_fontes_desejo(titulo.strip())
+
+
 def _filtro(servico, params) -> dict:
     return servico.filtro()
 
@@ -348,6 +506,28 @@ METODOS = {
     "videos.local": _videos_local,
     "videos.salvar_posicao": _videos_salvar_posicao,
     "videos.reproduzir": _videos_reproduzir,
+    "conquistas.avaliar": _conquistas_avaliar,
+    "capas.buscar": _capas_buscar,
+    "capas.aplicar": _capas_aplicar,
+    "capas.libretro": _capas_libretro,
+    "emulacao.status": _emulacao_status,
+    "emulacao.consultar": _emulacao_consultar,
+    "emulacao.atualizar": _emulacao_atualizar,
+    "ferramentas.jogo": _ferramentas_jogo,
+    "jogo.diagnosticar": _diagnosticar_jogo,
+    "jogo.disco": _disco_jogo,
+    "saves.configurar": _configurar_saves,
+    "ferramentas.abrir": _abrir_ferramenta,
+    "aparencia.ler": _aparencia,
+    "aparencia.salvar": _definir_aparencia,
+    "provedores.configurar": _configurar_provedores,
+    "estatisticas.ler": _estatisticas,
+    "backups.listar": _backups,
+    "colecao.exportar": _exportar_colecao,
+    "colecao.importar": _importar_colecao,
+    "desejos.sincronizar_steam": _sincronizar_steam,
+    "desejos.importar_wishlist": _importar_wishlist,
+    "desejos.buscar_fontes": _buscar_fontes_desejo,
 }
 
 
@@ -459,6 +639,7 @@ class Ponte:
             "musicas.baixar_fila": self._musicas_baixar_fila,
             "torrents.importar": self._torrents_importar,
             "videos.importar": self._videos_importar,
+            "jogos.importar": self._importar_jogos,
         })
         self.metodos = base
 
@@ -586,6 +767,26 @@ class Ponte:
         titulo = Path(pasta).name or "pasta"
         return {"trabalho": self.trabalhos.iniciar(f"Importar vídeos {titulo}", tarefa,
                                                   escopo="videos")}
+
+    def _importar_jogos(self, servico, params) -> dict:
+        pasta = params.get("pasta")
+        if not isinstance(pasta, str) or not pasta.strip():
+            raise ValueError("pasta deve ser um texto")
+        pasta = pasta.strip()
+
+        def tarefa(progresso, cancelado):
+            if cancelado.is_set():
+                raise ValueError("Importação cancelada.")
+            progresso(10)
+            resultado = servico.importar_jogos(pasta)
+            progresso(100)
+            detalhe = dict(resultado) if isinstance(resultado, dict) else {}
+            detalhe.setdefault("aviso", "Jogos importados.")
+            return detalhe
+
+        titulo = Path(pasta).name or "pasta"
+        return {"trabalho": self.trabalhos.iniciar(f"Importar jogos {titulo}", tarefa,
+                                                  escopo="jogos")}
 
     def _jogo_registrar_horas(self, servico, params) -> dict:
         ident = _inteiro(params, "id")

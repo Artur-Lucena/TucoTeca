@@ -54,4 +54,7 @@ def modulos_padrao() -> list[Modulo]:
         Modulo("youtube", "YouTube",
                "Navegue no YouTube aqui dentro; baixar é sempre ação sua.",
                "youtube", 80),
+        Modulo("configuracoes", "Configurações",
+               "Aparência, provedores, estatísticas, backups e coleção.",
+               "configuracoes", 90),
     ]
