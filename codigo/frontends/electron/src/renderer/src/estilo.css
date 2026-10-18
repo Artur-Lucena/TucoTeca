@@ -1,0 +1,40 @@
+:root {
+  color-scheme: dark;
+  --fundo: #12141a;
+  --fundo2: #1a1d26;
+  --borda: #262b38;
+  --texto: #e8eaf0;
+  --texto2: #9aa3b2;
+  --realce: #3b82f6;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.andaime {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  text-align: center;
+}
+
+.andaime h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  letter-spacing: 0.5px;
+}
+
+.andaime p {
+  margin: 0;
+  color: var(--texto2);
+}

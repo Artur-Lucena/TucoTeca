@@ -1,0 +1,28 @@
+{
+  "name": "tucoteca-electron",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interface Electron do TucoTeca (F0 — fundacao)",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run",
+    "selftest": "electron-vite build && electron . --selftest"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^26.6.5",
+    "electron": "^44.9.0",
+    "electron-vite": "^6.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.11.3",
+    "preact": "^11.0.1"
+  }
+}

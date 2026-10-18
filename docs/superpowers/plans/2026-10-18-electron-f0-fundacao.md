@@ -106,16 +106,17 @@ imprime `[ok] selftest Electron: N jogos; ponte, módulos e Início carregados`;
 
 **Arquivos:** criar `codigo/frontends/electron/{package.json,electron.vite.config.ts,tsconfig*.json,.gitignore}`, `codigo/frontends/electron/src/main/index.ts`, `src/preload/index.ts`, `src/renderer/index.html`, `src/renderer/src/{main.tsx,app.tsx,estilo.css}`.
 
-- [ ] `git status --short --branch` limpo (só `.kilo/` e `kilo.json` alheios, untracked) e
+- [x] `git status --short --branch` limpo (só `.kilo/` e `kilo.json` alheios, untracked) e
       `git switch -c revisao/electron-1.2.0`.
-- [ ] Criar os arquivos do andaime (janela simples, sem ponte ainda): janela 1440×920, mínimo
+- [x] Criar os arquivos do andaime (janela simples, sem ponte ainda): janela 1440×920, mínimo
       960×640, fundo `#12141a`, `autoHideMenuBar`, `contextIsolation: true`, `sandbox: true`,
       `nodeIntegration: false`; devtools só em dev (`app.commandLine`/atalho F12).
-- [ ] `npm install` no `codigo/frontends/electron` (electron, electron-vite, vite, typescript,
+- [x] `npm install` no `codigo/frontends/electron` (electron, electron-vite, vite, typescript,
       preact, @preact/signals; vitest em devDependencies). `package-lock.json` versionado.
-- [ ] Scripts npm: `dev`, `build`, `typecheck` (tsc -b dos dois tsconfig), `test` (vitest run),
-      `selftest` (`electron-vite build && electron . --selftest`).
-- [ ] Gate: `npm run typecheck` e `npm run build` verdes; `npm run dev` abre a janela vazia (conferir e fechar).
+- [x] Scripts npm: `dev`, `build`, `typecheck` (tsc --noEmit nos dois tsconfig — ver ruling),
+      `test` (vitest run) e `selftest` (`electron-vite build && electron . --selftest`).
+- [x] Gate: `npm run typecheck` e `npm run build` verdes; janela abre e fecha limpa
+      (conferido em `npm run start` e `npm run dev`: 4 processos Electron vivos, mortos sem sobra).
 
 **Commit 1:** `electron: andaime do app (electron-vite + TS + Preact)`
 
