@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ModuloDTO } from '../../shared/protocolo'
 import { combinacao, decidirAtalho } from './atalhos'
 import { AvisoPonte } from './componentes/AvisoPonte'
+import { Atividade } from './componentes/Atividade'
 import { BarraLateral } from './componentes/BarraLateral'
 import { DetalheJogo } from './componentes/DetalheJogo'
 import { Paleta } from './componentes/Paleta'
@@ -21,6 +22,7 @@ import {
 } from './estado/trabalhos'
 import { Inicio } from './vistas/Inicio'
 import { Desejos } from './vistas/Desejos'
+import { Downloads } from './vistas/Downloads'
 import { Integracoes } from './vistas/Integracoes'
 import { Jogos } from './vistas/Jogos'
 import { Musicas } from './vistas/Musicas'
@@ -356,12 +358,15 @@ export function App() {
               />
             ) : ativo.chave === 'integracoes' ? (
               <Integracoes aoAvisar={avisar} aoNavegar={setSecao} />
+            ) : ativo.chave === 'downloads' ? (
+              <Downloads aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
             ) : (
               <Placeholder modulo={ativo} />
             )}
           </section>
         </main>
         {filaPlayer.length > 0 && <PlayerRodape />}
+        <Atividade aoAvisar={avisar} />
         {(jogando !== null || lixeira?.disponivel === true) && (
           <footer class="status">
             {jogando !== null && (

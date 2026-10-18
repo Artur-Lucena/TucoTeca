@@ -219,6 +219,19 @@ async function principal(): Promise<void> {
     await shell.openExternal(alvo.toString())
   })
 
+  ipcMain.handle('app:abrir-pasta', async (_evento, caminho: string) => {
+    const texto = String(caminho ?? '').trim()
+    if (texto === '') throw new Error('caminho vazio')
+    const resolvido = resolve(texto)
+    const home = resolve(HOME)
+    const sep = process.platform === 'win32' ? '\\' : '/'
+    if (resolvido !== home && !resolvido.startsWith(home + sep)) {
+      throw new Error('caminho fora da coleção')
+    }
+    const erro = await shell.openPath(resolvido)
+    if (erro) throw new Error(erro)
+  })
+
   ipcMain.handle('ponte:reabrir', async () => {
     if (reabrindoPonte) return
     const atual = ponte

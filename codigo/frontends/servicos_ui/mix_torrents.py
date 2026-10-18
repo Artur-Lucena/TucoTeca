@@ -76,8 +76,25 @@ class MixTorrents:
             return core.importar_lista(con, itens)
         return self.alterar(trabalho)
 
-    def importar_repack_local(self, caminho):
-        return self.alterar(lambda con: core.importar_repack(con, caminho))
+    def listar_torrents(self):
+        return core.listar_torrents()
+
+    def torrent_controlar(self, ident, acao):
+        from bib_nucleo import qbit
+        acao = str(acao or "").strip()
+        ident = str(ident or "").strip()
+        r = qbit.qbit_controlar(ident, acao)
+        if not r.get("ok"):
+            raise ValueError(r.get("erro", "Não foi possível controlar o torrent."))
+        return {"ok": True}
+
+    def fora_do_destino(self, caminho):
+        from bib_nucleo.rede import repacks
+        return not repacks.dentro_do_destino(caminho)
+
+    def organizar_download(self, caminho):
+        from bib_nucleo.rede import repacks
+        return repacks.organizar_no_destino(caminho)
 
 
 __all__ = ["MixTorrents"]

@@ -201,6 +201,59 @@ def _integracoes_buscar(servico, params) -> dict:
     return servico.integracoes.buscar(chave.strip(), termo)
 
 
+def _torrents_listar(servico, params) -> dict:
+    leitura = servico.listar_torrents()
+    torrents = leitura.get("torrents") if isinstance(leitura, dict) else []
+    erros = list(leitura.get("erros") or []) if isinstance(leitura, dict) else []
+    itens = []
+    for t in (torrents or []):
+        if not isinstance(t, dict):
+            continue
+        try:
+            pct = float(t.get("pct", 0) or 0)
+        except (TypeError, ValueError):
+            pct = 0.0
+        pct = min(max(pct, 0.0), 100.0)
+        completo = bool(t.get("completo"))
+        itens.append({
+            "hash": t.get("hash", ""),
+            "nome": t.get("nome", ""),
+            "estado": "completo" if completo else "baixando",
+            "pct": round(pct, 1),
+            "feito": t.get("feito", 0),
+            "total": t.get("total", 0),
+            "fonte_progresso": t.get("fonte_progresso", ""),
+            "velocidade": t.get("velocidade", 0),
+            "eta": t.get("eta", None),
+            "save_path": t.get("save_path", ""),
+        })
+    return {"itens": itens, "erros": erros}
+
+
+def _torrents_controlar(servico, params) -> dict:
+    ident = params.get("ident")
+    acao = params.get("acao")
+    if not isinstance(ident, str) or not ident.strip():
+        raise ValueError("ident deve ser o hash do torrent")
+    if acao not in ("pausar", "retomar"):
+        raise ValueError("acao deve ser pausar ou retomar")
+    return servico.torrent_controlar(ident.strip(), acao)
+
+
+def _torrents_fora_destino(servico, params) -> dict:
+    caminho = params.get("caminho")
+    if not isinstance(caminho, str) or not caminho.strip():
+        raise ValueError("caminho deve ser um texto")
+    return {"fora": servico.fora_do_destino(caminho.strip())}
+
+
+def _torrents_organizar(servico, params) -> dict:
+    caminho = params.get("caminho")
+    if not isinstance(caminho, str) or not caminho.strip():
+        raise ValueError("caminho deve ser um texto")
+    return servico.organizar_download(caminho.strip())
+
+
 def _filtro(servico, params) -> dict:
     return servico.filtro()
 
@@ -258,6 +311,10 @@ METODOS = {
     "integracoes.remover": _integracoes_remover,
     "integracoes.url": _integracoes_url,
     "integracoes.buscar": _integracoes_buscar,
+    "torrents.listar": _torrents_listar,
+    "torrents.controlar": _torrents_controlar,
+    "torrents.fora_destino": _torrents_fora_destino,
+    "torrents.organizar": _torrents_organizar,
 }
 
 
@@ -367,6 +424,7 @@ class Ponte:
             "jogo.registrar_horas": self._jogo_registrar_horas,
             "musicas.importar": self._musicas_importar,
             "musicas.baixar_fila": self._musicas_baixar_fila,
+            "torrents.importar": self._torrents_importar,
         })
         self.metodos = base
 
@@ -454,6 +512,26 @@ class Ponte:
 
         return {"trabalho": self.trabalhos.iniciar("Baixar fila de músicas", tarefa,
                                                     cancelavel=True, escopo="musicas")}
+
+    def _torrents_importar(self, servico, params) -> dict:
+        caminho = params.get("caminho")
+        if not isinstance(caminho, str) or not caminho.strip():
+            raise ValueError("caminho deve ser um texto")
+        caminho = caminho.strip()
+
+        def tarefa(progresso, cancelado):
+            if cancelado.is_set():
+                raise ValueError("Importação cancelada.")
+            progresso(10)
+            resultado = servico.importar_torrent(caminho)
+            progresso(100)
+            detalhe = dict(resultado) if isinstance(resultado, dict) else {}
+            detalhe.setdefault("aviso", "Download importado.")
+            return detalhe
+
+        titulo = Path(caminho).name or "download"
+        return {"trabalho": self.trabalhos.iniciar(f"Importar download {titulo}", tarefa,
+                                                  escopo="torrents")}
 
     def _jogo_registrar_horas(self, servico, params) -> dict:
         ident = _inteiro(params, "id")

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ativo,
   jogoEmAndamento,
   reduzirTrabalhos,
   type EventoTrabalho,
@@ -49,6 +50,16 @@ describe('reduzirTrabalhos', () => {
   it('evento de id desconhecido entra no fim (reconexão não perde nada)', () => {
     const lista = reduzirTrabalhos([trabalho({ id: 1 })], evento({ id: 7, rotulo: 'Novo' }))
     expect(lista.map((t) => t.id)).toEqual([1, 7])
+  })
+})
+
+describe('ativo', () => {
+  it('primeiro rodando/cancelando, senão null', () => {
+    expect(ativo([])).toBeNull()
+    expect(ativo([trabalho({ estado: 'ok' })])).toBeNull()
+    const lista = [trabalho({ id: 1, estado: 'ok' }), trabalho({ id: 2, estado: 'rodando' }), trabalho({ id: 3, estado: 'rodando' })]
+    expect(ativo(lista)?.id).toBe(2)
+    expect(ativo([trabalho({ id: 1, estado: 'cancelando' })])?.id).toBe(1)
   })
 })
 

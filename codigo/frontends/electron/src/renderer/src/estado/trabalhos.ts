@@ -44,6 +44,16 @@ export function jogoEmAndamento(lista: Trabalho[]): Trabalho | null {
   )
 }
 
+/** O primeiro trabalho ainda ativo (rodando ou cancelando), ou null. */
+export function ativo(lista: Trabalho[]): Trabalho | null {
+  return lista.find((item) => item.estado === 'rodando' || item.estado === 'cancelando') ?? null
+}
+
+/** Pede cancelamento cooperativo de um trabalho (a ponte marca `cancelando`). */
+export async function cancelarTrabalho(id: number): Promise<void> {
+  await window.tucoteca.chamar('trabalhos.cancelar', { id })
+}
+
 /** Lista viva dos trabalhos (os eventos da ponte alimentam este signal). */
 export const listaTrabalhos = signal<Trabalho[]>([])
 

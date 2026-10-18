@@ -7,5 +7,6 @@ export interface ApiTucoteca {
   mediaUrl(caminho: string): string
   escolherPasta(): Promise<string | null>
   abrirUrl(url: string): Promise<void>
+  abrirPasta(caminho: string): Promise<void>
   reabrir(): Promise<void>
 }

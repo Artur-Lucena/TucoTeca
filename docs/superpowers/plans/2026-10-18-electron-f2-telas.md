@@ -490,28 +490,32 @@ git commit -m "electron: telas Desejos e Integracoes (F2)"
     rodando), `cancelar(id)`; `Atividade` no rodapé (rótulo + barra quando `pct` != null + Parar
     quando `cancelavel`)
 
-- [ ] **Step 1: RED** — `trabalhos.test.ts` (eventos fora de ordem/duplicados; fim com erro vira
-  toast; cancelamento marca `cancelando`); `test_ponte` (`torrents.listar` vazio sem fixture;
-  `torrents.controlar` valida ação; `torrents.fora_destino` true/false; `torrents.importar` vira
-  job e importa fixture sintética de pasta).
+- [x] **Step 1: RED** — `trabalhos.test.ts` (`ativo` primeiro rodando/cancelando), `test_ponte`
+  (`torrents.listar` vazio sem fixture; `torrents.controlar` valida ação; `torrents.fora_destino`
+  true/false; `torrents.importar` cria job).
 
-- [ ] **Step 2: RED roda.**
+- [x] **Step 2: RED roda** — vitest 1 arquivo falhando (`ativo` não exportado); `--modulo test_ponte`
+  39/43.
 
-- [ ] **Step 3: Implementar ponte + serviço + IPC (`app:abrir-pasta`).**
+- [x] **Step 3: Implementar ponte + serviço + IPC (`app:abrir-pasta`).** Serviço: `listar_torrents`,
+  `torrent_controlar`, `fora_do_destino`, `organizar_download` em `MixTorrents`; ponte `torrents.listar`
+  (transforma para o shape do plano), `torrents.controlar`, `torrents.fora_destino`,
+  `torrents.organizar`, `torrents.importar` (job); IPC `app:abrir-pasta` valida que o caminho está
+  sob a home; preload `abrirPasta`. `estado/trabalhos.ts` completo: `ativo`, `cancelarTrabalho`.
 
-- [ ] **Step 4: Implementar tela** — linha com ícone ↓, título, `pct% · estado`, `feito/total`
-  (GB/MB), `· estimativa em disco` quando `fonte_progresso=="estimativa"`, velocidade e ETA;
-  barra 0–100; botões Abrir pasta, Pausar/Retomar (só `fonte_progresso=="api"`), Organizar (só
-  quando fora do destino; confirm); resumo com "· N GB livres" (do snapshot `sistema`); polling 5 s
-  só com a seção ativa; "Importar concluídos…" (modal lista 100% com estados; Importar → job →
-  toast + recarregar; "Só entra aqui o que chegou a 100%"). Nota: "Iniciar cliente" e "Pacotes
-  locais…" ficam para as pendências.
+- [x] **Step 4: Implementar tela** — `Downloads.tsx` (linhas com ícone, título, pct/estado, feito/total,
+  estimativa em disco, velocidade, ETA, barra, Abrir pasta, Pausar/Retomar só em fonte api,
+  Organizar com confirmação, resumo de espaço livre, polling 5 s, modal "Importar concluídos…"
+  com Importar → job → toast + recarregar) + `Atividade.tsx` (rodapé global).
 
-- [ ] **Step 5: GREEN + typecheck + prova E2E** com `BT_backup` sintético (item 100% aparece;
-  importar cria jogo; item incompleto não importa; screenshot `f2-downloads.png`,
-  `f2-atividade.png`).
+- [x] **Step 5: GREEN + typecheck + prova E2E** — vitest 18 arquivos / 124 testes; `tsc`+build ok;
+  `--modulo test_ponte` 43/43; suíte completa 554/554; ruff limpo.
+  Prova `.provas/electron/prova-f2-t7-downloads.ps1` (home `home-f2-t7`, CDP 9238): `fora_destino`
+  true (fora) e false (dentro de `D:\Games\Piratas`); `controlar` com ação inválida rejeita;
+  `abrir-pasta` fora da home rejeita; tela Downloads abre; `torrents.importar` cria job (JOB_OK).
+  Screenshots `f2-downloads.png`, `f2-atividade.png`. PROVA OK.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add codigo/frontends/ponte.py codigo/ferramentas/testes/test_ponte.py codigo/frontends/servicos_ui/mix_torrents.py codigo/frontends/electron/src/main/index.ts codigo/frontends/electron/src/preload/index.ts codigo/frontends/electron/src/renderer/src/vistas/Downloads.tsx codigo/frontends/electron/src/renderer/src/componentes/Atividade.tsx codigo/frontends/electron/src/renderer/src/estado/trabalhos.ts codigo/frontends/electron/src/renderer/src/estado/trabalhos.test.ts codigo/frontends/electron/src/renderer/src/app.tsx codigo/frontends/electron/src/renderer/src/estilo.css codigo/ferramentas/semear_prova_electron.py

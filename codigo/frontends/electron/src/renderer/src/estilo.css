@@ -1346,3 +1346,102 @@ body {
 .link-resultado:hover {
   text-decoration: underline;
 }
+
+/* Downloads */
+.lista-downloads {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.linha-download {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--cartao);
+}
+
+.download-icone {
+  color: var(--realce);
+  font-size: 18px;
+}
+
+.download-textos {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.download-textos strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-textos span {
+  color: var(--texto2);
+  font-size: 12px;
+}
+
+.download-barra {
+  width: 120px;
+  height: 8px;
+  accent-color: var(--realce);
+}
+
+.download-acoes {
+  display: flex;
+  gap: 6px;
+}
+
+.modal-downloads {
+  padding: 14px;
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  background: var(--painel);
+}
+
+.lista-importar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.lista-importar li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* Atividade */
+.atividade {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--borda);
+  background: var(--painel);
+}
+
+.atividade-rotulo {
+  font-size: 13px;
+  color: var(--texto2);
+}
+
+.atividade-barra {
+  flex: 1;
+  height: 6px;
+  accent-color: var(--realce);
+}

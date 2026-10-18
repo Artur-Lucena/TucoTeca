@@ -893,6 +893,66 @@ def teste_ponte_integracoes_entradas_invalidas():
         afirmar(r["ok"] is False and trecho in r["erro"], (metodo, params, r))
 
 
+def teste_ponte_torrents_listar_vazio():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-torrents-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    r = _chamar(ponte, {"id": 200, "metodo": "torrents.listar"})
+    afirmar(r["ok"] is True and r["resultado"]["itens"] == [] and r["resultado"]["erros"] == [], r)
+
+
+def teste_ponte_torrents_controlar_valida_acao():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-torrents-2-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    ruim = _chamar(ponte, {"id": 201, "metodo": "torrents.controlar",
+                           "params": {"ident": "abc123", "acao": "deletar"}})
+    afirmar(ruim["ok"] is False and "acao" in ruim["erro"], ruim)
+    sem_hash = _chamar(ponte, {"id": 202, "metodo": "torrents.controlar",
+                               "params": {"acao": "pausar"}})
+    afirmar(sem_hash["ok"] is False and "ident" in sem_hash["erro"], sem_hash)
+    sem_acao = _chamar(ponte, {"id": 203, "metodo": "torrents.controlar",
+                               "params": {"ident": "abc123"}})
+    afirmar(sem_acao["ok"] is False and "acao" in sem_acao["erro"], sem_acao)
+
+
+def teste_ponte_torrents_fora_destino():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-torrents-3-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    ponte = Ponte(ServicoBiblioteca(db))
+    r = _chamar(ponte, {"id": 204, "metodo": "torrents.fora_destino",
+                        "params": {"caminho": str(tmp / "fora")}})
+    afirmar(r["ok"] is True and r["resultado"]["fora"] is True, r)
+    r2 = _chamar(ponte, {"id": 205, "metodo": "torrents.fora_destino", "params": {"caminho": ""}})
+    afirmar(r2["ok"] is False and "caminho" in r2["erro"], r2)
+
+
+def teste_ponte_torrents_importar_cria_job():
+    from servicos_ui import ServicoBiblioteca
+
+    tmp = Path(tempfile.mkdtemp(prefix="suite-torrents-4-"))
+    db = tmp / "hub.db"
+    _semear_banco(db)
+    pasta = tmp / "BT_backup"
+    pasta.mkdir()
+    (pasta / "jogo.exe").write_bytes(b"MZ" + b"\x00" * 10)
+    ponte = Ponte(ServicoBiblioteca(db))
+    r = _chamar(ponte, {"id": 206, "metodo": "torrents.importar",
+                        "params": {"caminho": str(pasta)}})
+    afirmar(r["ok"] is True and "trabalho" in r["resultado"], r)
+    job = r["resultado"]["trabalho"]
+    afirmar(job["rotulo"].startswith("Importar download"), job)
+
+
 def teste_ponte_registrar_horas():
     class ServicoHoras(ServicoFalso):
         def registrar_sessao(self, gid, horas):
