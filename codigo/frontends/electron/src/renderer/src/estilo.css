@@ -1,11 +1,17 @@
 :root {
   color-scheme: dark;
-  --fundo: #12141a;
-  --fundo2: #1a1d26;
+  --fundo: #101218;
+  --painel: #171a22;
+  --cartao: #1d212b;
   --borda: #262b38;
   --texto: #e8eaf0;
-  --texto2: #9aa3b2;
-  --realce: #3b82f6;
+  --texto2: #98a1b3;
+  --realce: #4f8cff;
+  --realce-suave: rgba(79, 140, 255, 0.14);
+}
+
+* {
+  box-sizing: border-box;
 }
 
 html,
@@ -19,22 +25,217 @@ body {
   background: var(--fundo);
   color: var(--texto);
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
 }
 
-.andaime {
+.shell {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  height: 100%;
+}
+
+.barra-lateral {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 12px;
+  background: var(--painel);
+  border-right: 1px solid var(--borda);
+}
+
+.marca {
+  padding: 0 10px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.barra-lateral nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--texto2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--texto);
+}
+
+.item.ativo {
+  background: var(--realce-suave);
+  color: var(--texto);
+}
+
+.icone {
   display: grid;
   place-items: center;
-  height: 100%;
-  text-align: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto2);
 }
 
-.andaime h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
-  letter-spacing: 0.5px;
+.item.ativo .icone {
+  background: var(--realce);
+  color: #fff;
 }
 
-.andaime p {
+.conteudo {
+  overflow-y: auto;
+  padding: 28px 32px 40px;
+}
+
+.cabecalho h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.cabecalho p {
   margin: 0;
   color: var(--texto2);
+}
+
+.numeros {
+  display: flex;
+  gap: 12px;
+  margin: 22px 0 28px;
+}
+
+.numero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 132px;
+  padding: 14px 16px;
+  background: var(--cartao);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+}
+
+.numero .valor {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.numero .rotulo {
+  color: var(--texto2);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.secao h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 16px;
+}
+
+.cartao {
+  overflow: hidden;
+  background: var(--cartao);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+}
+
+.capa {
+  aspect-ratio: 3 / 4;
+  background: #12141a;
+}
+
+.capa img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.capa-vazia {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--texto2);
+  background: linear-gradient(160deg, #1b2030, #151823);
+}
+
+.textos {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px 12px;
+}
+
+.titulo {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  color: var(--texto2);
+  font-size: 12px;
+}
+
+.vazio {
+  padding: 26px;
+  border: 1px dashed var(--borda);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--texto2);
+}
+
+.vazio p {
+  margin: 0;
+}
+
+.vazio .dica {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.painel {
+  max-width: 640px;
+  margin: 40px auto;
+  padding: 28px;
+  background: var(--cartao);
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+}
+
+.painel h1 {
+  margin-top: 0;
+}
+
+.painel .aviso {
+  color: var(--texto2);
+  font-size: 12px;
+}
+
+.erro {
+  border-color: #6b2b2b;
 }

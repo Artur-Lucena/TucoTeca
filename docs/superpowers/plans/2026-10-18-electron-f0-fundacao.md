@@ -208,22 +208,33 @@ com `codigo/frontends` no path), sem subprocesso.
 `vistas/Placeholder.tsx`, `componentes/{BarraLateral,Cartao,Capa}.tsx`, testes
 `derivacoes.test.ts`; ferramenta `codigo/ferramentas/semear_prova_electron.py`.
 
-- [ ] Teste primeiro: `derivacoes.test.ts` (`continuarJogando`: ordena por `ultima_execucao`
+- [x] Teste primeiro: `derivacoes.test.ts` (`continuarJogando`: ordena por `ultima_execucao`
       desc, completa por `horas` desc, limita 6, aceita menos, lida com vazio/sem capa).
-- [ ] Implementar shell: barra lateral gerada de `modulos.listar` (ícone por chave com fallback,
+      5 testes; RED visto antes da implementação (28 no total após a tarefa).
+- [x] Implementar shell: barra lateral gerada de `modulos.listar` (ícone por chave com fallback,
       item ativo), área da seção com `<Placeholder>` honesto ("porta chega na F2") para as outras
       7, e `Inicio` com: faixa de números (Jogos/Músicas/Desejos), "Continuar jogando" (cards com
       capa via `imagemUrl`), estado vazio com texto claro. Após o primeiro render do snapshot,
       chamar `tucoteca.pronto({jogos: n})`.
-- [ ] `semear_prova_electron.py`: cria home temporária com 3 jogos (título, `ultima_execucao`,
+      Desvios: sem `estado.ts` (tipos do snapshot em `derivacoes.ts`, estado no `App` com hooks)
+      e sem `Capa.tsx` (capa dentro do `Cartao`); ícone = badge com a inicial + `title` com a
+      descrição — biblioteca de ícones fica para a F1.
+- [x] `semear_prova_electron.py`: cria home temporária com 3 jogos (título, `ultima_execucao`,
       horas), 2 músicas, 2 desejos e capas PNG reusando `gerar_placeholders._png/_cor`; imprime
       `{"home": …}`. Somente dados sintéticos.
-- [ ] Prova: semear em `.provas/electron/home-f0`, rodar
+      Guarda extra: recusa destino igual à raiz do repo ou acima; `--limpar` opcional. Saída real:
+      `{"home": "…\\.provas\\electron\\home-f0", "jogos": 3, "musicas": 2, "desejos": 2}`.
+- [x] Prova: semear em `.provas/electron/home-f0`, rodar
       `electron . --selftest --screenshot .provas/electron/f0-inicio.png` com
       `BIBLIOTECA_HOME`/`TUCOTECA_USERDATA` apontados para `.provas/electron/…`
       → revisar o PNG (3 capas, contadores certos, sidebar com 8 módulos).
-- [ ] Prova 2: mesma corrida com home vazia → estado vazio correto, sem erro.
-- [ ] Gate: `npm run test` + `typecheck` verdes; screenshot conferido.
+      Feito: `[ok] selftest Electron: 3 jogos…` rc=0; PNG revisado — contadores 3/2/2, 8 módulos,
+      ordem Celeste → Hollow Knight → Stardew Valley, capas servidas por `tucoteca-img://`
+      (protocolo provado ponta a ponta).
+- [x] Prova 2: mesma corrida com home vazia → estado vazio correto, sem erro.
+      Feito (`f0-vazio.png`): `[ok] selftest Electron: 0 jogos…`, zeros + "Nada por aqui ainda."
+- [x] Gate: `npm run test` + `typecheck` verdes; screenshot conferido.
+      `test` 28/28, `typecheck` e `build` verdes; `ruff` limpo no semeador.
 
 **Commit 5:** `electron: tela Inicio com dados reais e provas (F0)`
 

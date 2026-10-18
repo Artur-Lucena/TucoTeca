@@ -1,25 +1,59 @@
 import { useEffect, useState } from 'preact/hooks'
+import type { ModuloDTO } from '../../shared/protocolo'
+import { BarraLateral } from './componentes/BarraLateral'
+import type { Snapshot } from './derivacoes'
+import { Inicio } from './vistas/Inicio'
+import { Placeholder } from './vistas/Placeholder'
 
 export function App() {
-  const [mensagem, setMensagem] = useState('conectando ao núcleo…')
+  const [modulos, setModulos] = useState<ModuloDTO[]>([])
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  const [secao, setSecao] = useState('inicio')
 
   useEffect(() => {
     void (async () => {
       try {
-        const ping = await window.tucoteca.chamar<{ versao: string }>('nucleo.ping')
-        const snapshot = await window.tucoteca.chamar<{ jogos: unknown[] }>('nucleo.snapshot')
-        setMensagem(`conectado — núcleo ${ping.versao}, ${snapshot.jogos.length} jogos`)
-        window.tucoteca.pronto({ jogos: snapshot.jogos.length })
-      } catch (erro) {
-        setMensagem(`erro: ${String(erro)}`)
+        const lista = await window.tucoteca.chamar<ModuloDTO[]>('modulos.listar')
+        setModulos(lista)
+        const dados = await window.tucoteca.chamar<Snapshot>('nucleo.snapshot')
+        setSnapshot(dados)
+        window.tucoteca.pronto({ jogos: dados.jogos?.length ?? 0 })
+      } catch (falha) {
+        setErro(String(falha))
       }
     })()
   }, [])
 
+  if (erro) {
+    return (
+      <section class="painel erro">
+        <h1>Não consegui falar com o núcleo</h1>
+        <p>{erro}</p>
+      </section>
+    )
+  }
+
+  if (!snapshot) {
+    return (
+      <section class="painel">
+        <h1>TucoTeca</h1>
+        <p>Abrindo a coleção…</p>
+      </section>
+    )
+  }
+
+  const ativo = modulos.find((modulo) => modulo.chave === secao) ?? modulos[0]
   return (
-    <main class="andaime">
-      <h1>TucoTeca</h1>
-      <p>{mensagem}</p>
+    <main class="shell">
+      <BarraLateral modulos={modulos} ativa={ativo?.chave ?? ''} aoTrocar={setSecao} />
+      <section class="conteudo">
+        {ativo === undefined || ativo.chave === 'inicio' ? (
+          <Inicio snapshot={snapshot} />
+        ) : (
+          <Placeholder modulo={ativo} />
+        )}
+      </section>
     </main>
   )
 }
