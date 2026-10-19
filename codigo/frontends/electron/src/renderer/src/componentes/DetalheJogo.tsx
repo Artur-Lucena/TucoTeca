@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import {
   STATUS_JOGOS,
   normalizarEtiquetas,
@@ -49,6 +49,14 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
   const [form, setForm] = useState<Formulario | null>(null)
   const [observacoes, setObservacoes] = useState('')
   const [horas, setHoras] = useState('')
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (modalRef.current !== null) {
+      const focavel = modalRef.current.querySelector<HTMLElement>('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')
+      focavel?.focus()
+    }
+  }, [jogo])
   const [conquistas, setConquistas] = useState<Array<Record<string, unknown>>>([])
   const [appidConquistas, setAppidConquistas] = useState('')
   const [regrasConquistas, setRegrasConquistas] = useState('')
@@ -304,7 +312,7 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
         if (evento.target === evento.currentTarget) aoFechar()
       }}
     >
-      <div class="detalhe" role="dialog" aria-label="Detalhe do jogo">
+      <div class="detalhe" role="dialog" aria-modal="true" aria-label="Detalhe do jogo" ref={modalRef}>
         {jogo === null || form === null ? (
           <p class="detalhe-carregando">Abrindo o jogo…</p>
         ) : (
@@ -324,7 +332,7 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                   <p class="detalhe-jogando">● {jogando.rotulo}… aguarde a sessão fechar</p>
                 )}
               </div>
-              <button type="button" class="fechar" title="Fechar" onClick={aoFechar}>
+              <button type="button" class="fechar" title="Fechar" aria-label="Fechar detalhe" onClick={aoFechar}>
                 ✕
               </button>
             </header>
