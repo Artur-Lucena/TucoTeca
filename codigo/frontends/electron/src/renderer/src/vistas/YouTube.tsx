@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { snapshot } from '../estado/dados'
 import { textoDeFalha } from '../estado/notificacoes'
+import { NavegadorYouTube } from '../componentes/NavegadorYouTube'
 import { listaTrabalhos } from '../estado/trabalhos'
 
 interface Props {
@@ -100,6 +101,8 @@ export function YouTube({ aoAvisar, aoMudou }: Props) {
           />
         </div>
       )}
+
+      <NavegadorYouTube />
       {buscando && <p class="aviso">Buscando…</p>}
 
       {resultados.length > 0 && (

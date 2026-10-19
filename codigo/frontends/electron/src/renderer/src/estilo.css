@@ -1739,3 +1739,18 @@ body {
 /* Desejos capa */
 .desejo-capa { flex: none; width: 80px; height: 30px; overflow: hidden; border-radius: 6px; background: var(--cartao); }
 .desejo-capa img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Conquistas */
+.conquistas-painel { display: flex; flex-direction: column; gap: var(--espaco-md); }
+.conquistas-progresso { display: flex; align-items: center; gap: var(--espaco-sm); }
+.conquistas-progresso progress { flex: 1; height: 6px; accent-color: var(--realce); }
+.conquistas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--espaco-sm); }
+.conquista-card { display: flex; flex-direction: column; gap: 4px; padding: var(--espaco-sm); border: 1px solid var(--borda); border-radius: var(--raio-sm); background: var(--cartao); }
+.conquista-card.desbloqueada { border-color: var(--sucesso); }
+.conquista-icone { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; }
+.capas-candidatas { display: flex; gap: var(--espaco-sm); flex-wrap: wrap; }
+
+/* Navegador YouTube */
+.navegador-youtube { margin: 12px 0; border: 1px solid var(--borda); border-radius: var(--raio); overflow: hidden; background: var(--cartao); }
+.navegador-barra { display: flex; align-items: center; gap: 6px; padding: 8px; border-bottom: 1px solid var(--borda); }
+.navegador-barra input { flex: 1; padding: 6px 10px; border: 1px solid var(--borda); border-radius: var(--raio-sm); background: var(--painel); color: var(--texto); font: inherit; font-size: 13px; }
