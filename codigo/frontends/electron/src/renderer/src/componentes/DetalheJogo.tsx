@@ -49,6 +49,8 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
   const [form, setForm] = useState<Formulario | null>(null)
   const [observacoes, setObservacoes] = useState('')
   const [horas, setHoras] = useState('')
+  const [capasCandidatas, setCapasCandidatas] = useState<Array<Record<string, unknown>>>([])
+  const [savesInput, setSavesInput] = useState('')
 
   useEffect(() => {
     let vivo = true
@@ -172,14 +174,40 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
 
   const buscarCapas = async () => {
     try {
-      const r = await window.tucoteca.chamar<{ candidatos?: unknown[] }>('capas.buscar', {
+      const r = await window.tucoteca.chamar<{ candidatos?: Array<Record<string, unknown>> }>('capas.buscar', {
         categoria: 'jogos',
         id,
         provedor: '',
         atualizar: false,
       })
-      const total = Array.isArray(r?.candidatos) ? r.candidatos.length : 0
-      aoAvisar(total > 0 ? `${total} capa(s) encontrada(s).` : 'Nenhuma capa encontrada.')
+      const lista = Array.isArray(r?.candidatos) ? r.candidatos : []
+      setCapasCandidatas(lista)
+      aoAvisar(lista.length > 0 ? `${lista.length} capa(s) encontrada(s).` : 'Nenhuma capa encontrada.')
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
+  const aplicarCapa = async (candidato: Record<string, unknown>) => {
+    try {
+      await window.tucoteca.chamar('capas.aplicar', { categoria: 'jogos', id, candidato })
+      aoAvisar('Capa aplicada.')
+      const atualizado = await window.tucoteca.chamar<JogoDaLista>('jogo.ler', { id })
+      setJogo(atualizado)
+      aoMudou()
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
+  const configurarSaves = async () => {
+    const caminhos = savesInput.split(',').map((c) => c.trim()).filter(Boolean)
+    try {
+      await window.tucoteca.chamar('saves.configurar', { id, caminhos })
+      setSavesInput('')
+      aoAvisar('Saves configurados.')
+      const atualizado = await window.tucoteca.chamar<JogoDaLista>('jogo.ler', { id })
+      setJogo(atualizado)
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }
@@ -368,6 +396,34 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                 </button>
                 <button type="button" class="acao" onClick={() => void diagnosticar()}>
                   Diagnosticar
+                </button>
+              </div>
+              {capasCandidatas.length > 0 && (
+                <div class="capas-candidatas">
+                  {capasCandidatas.map((c, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      class="acao"
+                      onClick={() => void aplicarCapa(c)}
+                    >
+                      Aplicar capa {i + 1}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section>
+              <h3>Saves</h3>
+              <div class="detalhe-linha">
+                <input
+                  value={savesInput}
+                  onInput={(e) => setSavesInput((e.target as HTMLInputElement).value)}
+                  placeholder="caminhos separados por vírgula"
+                />
+                <button type="button" class="acao" onClick={() => void configurarSaves()}>
+                  Configurar saves
                 </button>
               </div>
             </section>
