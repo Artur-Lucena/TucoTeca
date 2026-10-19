@@ -20,16 +20,8 @@ import {
   type EventoTrabalho,
   type Trabalho,
 } from './estado/trabalhos'
-import { Configuracoes } from './vistas/Configuracoes'
 import { Inicio } from './vistas/Inicio'
-import { Desejos } from './vistas/Desejos'
-import { Downloads } from './vistas/Downloads'
-import { Integracoes } from './vistas/Integracoes'
-import { Jogos } from './vistas/Jogos'
-import { Musicas } from './vistas/Musicas'
-import { Notificacoes } from './vistas/Notificacoes'
-import { Videos } from './vistas/Videos'
-import { YouTube } from './vistas/YouTube'
+import { Lazy } from './componentes/Lazy'
 import { Placeholder } from './vistas/Placeholder'
 
 const DESTINO_DO_ITEM: Record<string, string> = {
@@ -340,44 +332,23 @@ export function App() {
             {ativo === undefined || ativo.chave === 'inicio' ? (
               <Inicio snapshot={colecao ?? {}} />
             ) : ativo.chave === 'jogos' ? (
-              <Jogos
-                focoBusca={focoBusca}
-                perfil={perfil}
-                aoAbrirJogo={(id) => setDetalheId(id)}
-                aoJogarJogo={(id) => void jogar(id)}
-                aoAvisar={avisar}
-                aoMudou={() => void atualizarTudo()}
-              />
+              <Lazy fabrica={() => import('./vistas/Jogos')} props={{ focoBusca, perfil, aoAbrirJogo: (id: number) => setDetalheId(id), aoJogarJogo: (id: number) => void jogar(id), aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'musicas' ? (
-              <Musicas
-                focoBusca={focoBusca}
-                perfil={perfil}
-                aoAvisar={avisar}
-                aoMudou={() => void atualizarTudo()}
-              />
+              <Lazy fabrica={() => import('./vistas/Musicas')} props={{ focoBusca, perfil, aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'desejos' ? (
-              <Desejos
-                focoBusca={focoBusca}
-                perfil={perfil}
-                aoAvisar={avisar}
-                aoMudou={() => void atualizarTudo()}
-              />
+              <Lazy fabrica={() => import('./vistas/Desejos')} props={{ focoBusca, perfil, aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'integracoes' ? (
-              <Integracoes aoAvisar={avisar} aoNavegar={setSecao} />
+              <Lazy fabrica={() => import('./vistas/Integracoes')} props={{ aoAvisar: avisar, aoNavegar: setSecao }} />
             ) : ativo.chave === 'downloads' ? (
-              <Downloads aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
+              <Lazy fabrica={() => import('./vistas/Downloads')} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'videos' ? (
-              <Videos aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
+              <Lazy fabrica={() => import('./vistas/Videos')} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'youtube' ? (
-              <YouTube aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
+              <Lazy fabrica={() => import('./vistas/YouTube')} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'configuracoes' ? (
-              <Configuracoes aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
+              <Lazy fabrica={() => import('./vistas/Configuracoes')} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'notificacoes' ? (
-              <Notificacoes
-                avisos={avisos}
-                aoDispensar={(id) => setAvisos((atual) => dispensarAviso(atual, id))}
-                aoLimpar={() => setAvisos([])}
-              />
+              <Lazy fabrica={() => import('./vistas/Notificacoes')} props={{ avisos, aoDispensar: (id: string) => setAvisos((atual) => dispensarAviso(atual, id)), aoLimpar: () => setAvisos([]) }} />
             ) : (
               <Placeholder modulo={ativo} />
             )}
