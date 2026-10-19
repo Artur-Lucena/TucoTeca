@@ -11,7 +11,7 @@ export function Avisos({ avisos, aoDispensar }: Props) {
   return (
     <div class="avisos">
       {aberto && (
-        <div class="avisos-painel">
+        <div class="avisos-painel" aria-live="polite" role="status">
           {avisos.length === 0 ? (
             <p class="avisos-vazio">Nada por aqui.</p>
           ) : (
