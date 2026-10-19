@@ -16,6 +16,18 @@ export function Modal({ aberto, aoFechar, titulo, children, largura = '480px' }:
     if (!aberto) return
     const aoTeclar = (e: KeyboardEvent) => {
       if (e.key === 'Escape') aoFechar()
+      if (e.key !== 'Tab') return
+      const focaveis = ref.current?.querySelectorAll<HTMLElement>('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')
+      if (!focaveis || focaveis.length === 0) return
+      const primeiro = focaveis[0]
+      const ultimo = focaveis[focaveis.length - 1]
+      if (e.shiftKey && document.activeElement === primeiro) {
+        e.preventDefault()
+        ultimo.focus()
+      } else if (!e.shiftKey && document.activeElement === ultimo) {
+        e.preventDefault()
+        primeiro.focus()
+      }
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
