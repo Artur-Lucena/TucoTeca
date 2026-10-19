@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { snapshot } from '../estado/dados'
+import { EmptyState } from '../componentes/ui'
 import { textoDeFalha } from '../estado/notificacoes'
 import { NavegadorYouTube } from '../componentes/NavegadorYouTube'
 import { listaTrabalhos } from '../estado/trabalhos'
@@ -133,7 +134,7 @@ export function YouTube({ aoAvisar, aoMudou }: Props) {
 
       <h2>Videoteca local ({videos.length})</h2>
       {videos.length === 0 ? (
-        <p class="aviso">Nada importado ainda.</p>
+        <EmptyState icone="▶" titulo="Nada importado ainda." descricao="Busque e baixe vídeos do YouTube." />
       ) : (
         <ul class="lista-videos">
           {videos.map((video, posicao) => (

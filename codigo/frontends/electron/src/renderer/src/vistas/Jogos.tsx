@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { PosterCard } from '../componentes/PosterCard'
+import { EmptyState } from '../componentes/ui'
 import { textoDeFalha } from '../estado/notificacoes'
 import { saude, snapshot } from '../estado/dados'
 import {
@@ -186,10 +187,7 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
         />
       </div>
       {lista.length === 0 ? (
-        <div class="vazio">
-          <p>Nenhum jogo com esse filtro.</p>
-          <p class="dica">Limpe a busca ou troque o filtro.</p>
-        </div>
+        <EmptyState icone="🎮" titulo="Nenhum jogo com esse filtro." descricao="Limpe a busca ou troque o filtro." />
       ) : (
         <div class="grade" ref={grade}>
           {lista.map((jogo, posicao) => {
