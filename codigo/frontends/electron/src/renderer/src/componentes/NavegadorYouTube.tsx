@@ -22,10 +22,10 @@ export function NavegadorYouTube({ urlInicial = 'https://www.youtube.com' }: Pro
   return (
     <div class="navegador-youtube">
       <div class="navegador-barra">
-        <button type="button" class="acao" onClick={() => (webviewRef.current as any)?.goBack?.()}>
+        <button type="button" class="acao" aria-label="Voltar" onClick={() => (webviewRef.current as any)?.goBack?.()}>
           ←
         </button>
-        <button type="button" class="acao" onClick={() => (webviewRef.current as any)?.reload?.()}>
+        <button type="button" class="acao" aria-label="Recarregar" onClick={() => (webviewRef.current as any)?.reload?.()}>
           ↻
         </button>
         <input

@@ -98,21 +98,22 @@ export function PlayerRodape() {
       </div>
       <div class="player-controles">
         <div class="player-linha">
-          <button type="button" class="player-botao" title="Anterior" onClick={() => (player.value = anterior(player.value))}>
+          <button type="button" class="player-botao" title="Anterior" aria-label="Faixa anterior" onClick={() => (player.value = anterior(player.value))}>
             ❮
           </button>
           <button
             type="button"
             class="player-botao primario"
             title={estado.estado === 'tocando' ? 'Pausar' : 'Tocar'}
+            aria-label={estado.estado === 'tocando' ? 'Pausar' : 'Tocar'}
             onClick={() => (player.value = alternar(player.value))}
           >
             {estado.estado === 'tocando' ? 'Ⅱ' : '▶'}
           </button>
-          <button type="button" class="player-botao" title="Próxima" onClick={() => (player.value = proxima(player.value))}>
+          <button type="button" class="player-botao" title="Próxima" aria-label="Próxima faixa" onClick={() => (player.value = proxima(player.value))}>
             ❯
           </button>
-          <button type="button" class="player-botao" title="Parar" onClick={() => (player.value = parar(player.value))}>
+          <button type="button" class="player-botao" title="Parar" aria-label="Parar reprodução" onClick={() => (player.value = parar(player.value))}>
             ■
           </button>
           <span class="player-tempo">
