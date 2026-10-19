@@ -344,6 +344,8 @@ export function App() {
                 perfil={perfil}
                 aoAbrirJogo={(id) => setDetalheId(id)}
                 aoJogarJogo={(id) => void jogar(id)}
+                aoAvisar={avisar}
+                aoMudou={() => void atualizarTudo()}
               />
             ) : ativo.chave === 'musicas' ? (
               <Musicas

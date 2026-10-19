@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { PosterCard } from '../componentes/PosterCard'
+import { textoDeFalha } from '../estado/notificacoes'
 import { saude, snapshot } from '../estado/dados'
 import {
   FILTROS_JOGOS,
@@ -36,9 +37,13 @@ interface Props {
   aoAbrirJogo?: (id: number) => void
   /** Joga o jogo selecionado (botão Jogar, duplo clique e Enter). */
   aoJogarJogo?: (id: number) => void
+  /** Toast global. */
+  aoAvisar?: (texto: string, tom?: 'info' | 'atencao') => void
+  /** Recarrega snapshot após mutação. */
+  aoMudou?: () => void
 }
 
-export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo }: Props) {
+export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, aoAvisar, aoMudou }: Props) {
   const [filtro, setFiltro] = useState<FiltroJogo>('todos')
   const [ordem, setOrdem] = useState<OrdemJogo>('titulo')
   const [busca, setBusca] = useState('')
@@ -127,6 +132,23 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo }: 
     <div class="jogos">
       <header class="cabecalho">
         <h1>Jogos</h1>
+        <button
+          type="button"
+          class="acao"
+          onClick={async () => {
+            try {
+              const pasta = await window.tucoteca.escolherPasta()
+              if (pasta === null || pasta === '') return
+              await window.tucoteca.chamar('jogos.importar', { pasta })
+              aoAvisar?.(`Importando jogos de ${pasta}…`)
+              aoMudou?.()
+            } catch (falha) {
+              aoAvisar?.(textoDeFalha(falha), 'atencao')
+            }
+          }}
+        >
+          + Importar pasta
+        </button>
         <p>{resumoDe(lista.length, total, filtro, ordem, busca)}</p>
       </header>
       <div class="filtros">
