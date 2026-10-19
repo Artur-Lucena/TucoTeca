@@ -25,7 +25,7 @@ export function Botao({
   return (
     <button
       type={type}
-      class={`btn btn-${variant} btn-${size} ${classe}`}
+      class={`btn btn-${variant} btn-${size} acao ${classe}`}
       disabled={disabled || loading}
       onClick={onClick}
     >
