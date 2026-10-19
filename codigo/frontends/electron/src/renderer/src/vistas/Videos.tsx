@@ -47,6 +47,25 @@ export function Videos({ aoAvisar, aoMudou }: Props) {
   const indice = Math.min(selecionado, Math.max(0, lista.length - 1))
   const escolhido = lista[indice]
 
+  useEffect(() => {
+    const aoTeclar = (evento: KeyboardEvent) => {
+      if (evento.ctrlKey || evento.altKey || evento.metaKey) return
+      if (document.querySelector('.paleta-fundo') !== null) return
+      const alvo = evento.target as HTMLElement | null
+      if (alvo !== null && alvo.closest('input, textarea, select') !== null) return
+      if (evento.key !== 'ArrowDown' && evento.key !== 'ArrowUp' && evento.key !== 'Enter') return
+      evento.preventDefault()
+      if (evento.key === 'Enter') {
+        if (escolhido !== undefined) void abrirInterno(escolhido)
+        return
+      }
+      const passo = evento.key === 'ArrowDown' ? 1 : -1
+      setSelecionado((atual) => Math.max(0, Math.min(lista.length - 1, atual + passo)))
+    }
+    window.addEventListener('keydown', aoTeclar)
+    return () => window.removeEventListener('keydown', aoTeclar)
+  }, [lista.length, escolhido])
+
   const abrirInterno = async (video: VideoItem) => {
     if (video.id === undefined) return
     try {
