@@ -27,6 +27,7 @@ import { Downloads } from './vistas/Downloads'
 import { Integracoes } from './vistas/Integracoes'
 import { Jogos } from './vistas/Jogos'
 import { Musicas } from './vistas/Musicas'
+import { Notificacoes } from './vistas/Notificacoes'
 import { Videos } from './vistas/Videos'
 import { YouTube } from './vistas/YouTube'
 import { Placeholder } from './vistas/Placeholder'
@@ -371,6 +372,12 @@ export function App() {
               <YouTube aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
             ) : ativo.chave === 'configuracoes' ? (
               <Configuracoes aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
+            ) : ativo.chave === 'notificacoes' ? (
+              <Notificacoes
+                avisos={avisos}
+                aoDispensar={(id) => setAvisos((atual) => dispensarAviso(atual, id))}
+                aoLimpar={() => setAvisos([])}
+              />
             ) : (
               <Placeholder modulo={ativo} />
             )}

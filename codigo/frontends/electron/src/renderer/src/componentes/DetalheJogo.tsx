@@ -49,6 +49,10 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
   const [form, setForm] = useState<Formulario | null>(null)
   const [observacoes, setObservacoes] = useState('')
   const [horas, setHoras] = useState('')
+  const [conquistas, setConquistas] = useState<Array<Record<string, unknown>>>([])
+  const [appidConquistas, setAppidConquistas] = useState('')
+  const [regrasConquistas, setRegrasConquistas] = useState('')
+  const [mostrarRegras, setMostrarRegras] = useState(false)
   const [capasCandidatas, setCapasCandidatas] = useState<Array<Record<string, unknown>>>([])
   const [savesInput, setSavesInput] = useState('')
 
@@ -162,11 +166,32 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
 
   const avaliarConquistas = async () => {
     try {
-      const r = await window.tucoteca.chamar<{ desbloqueadas?: number; total?: number; avaliaveis?: number }>(
+      const r = await window.tucoteca.chamar<{ itens?: Array<Record<string, unknown>>; desbloqueadas?: number; total?: number }>(
         'conquistas.avaliar',
         { id },
       )
+      setConquistas(Array.isArray(r?.itens) ? r.itens : [])
       aoAvisar(`Conquistas: ${r?.desbloqueadas ?? 0}/${r?.total ?? 0} desbloqueadas.`)
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
+  const sincronizarConquistas = async () => {
+    try {
+      await window.tucoteca.chamar('conquistas.sincronizar', { id, appid: appidConquistas.trim(), save: '' })
+      aoAvisar('Catalogo de conquistas sincronizado.')
+      await avaliarConquistas()
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
+  const salvarRegras = async () => {
+    try {
+      await window.tucoteca.chamar('conquistas.regras', { id, texto: regrasConquistas })
+      aoAvisar('Regras salvas.')
+      await avaliarConquistas()
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }
@@ -400,7 +425,7 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
               </div>
               {capasCandidatas.length > 0 && (
                 <div class="capas-candidatas">
-                  {capasCandidatas.map((c, i) => (
+                  {capasCandidatas.map((c: Record<string, unknown>, i: number) => (
                     <button
                       key={i}
                       type="button"
@@ -412,6 +437,61 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                   ))}
                 </div>
               )}
+
+              <div class="conquistas-painel">
+                <div class="detalhe-linha">
+                  <input
+                    value={appidConquistas}
+                    onInput={(e) => setAppidConquistas((e.target as HTMLInputElement).value)}
+                    placeholder="App ID Steam (referência)"
+                  />
+                  <button type="button" class="acao" onClick={() => void sincronizarConquistas()}>
+                    Sincronizar catálogo
+                  </button>
+                  <button type="button" class="acao" onClick={() => void avaliarConquistas()}>
+                    Avaliar
+                  </button>
+                  <button type="button" class="acao" onClick={() => setMostrarRegras((v) => !v)}>
+                    {mostrarRegras ? 'Ocultar regras' : 'Regras'}
+                  </button>
+                </div>
+                {mostrarRegras && (
+                  <div class="detalhe-linha">
+                    <textarea
+                      value={regrasConquistas}
+                      onInput={(e) => setRegrasConquistas((e.target as HTMLTextAreaElement).value)}
+                      placeholder='{"CODIGO": {"campo": "valor"}}'
+                    />
+                    <button type="button" class="acao" onClick={() => void salvarRegras()}>
+                      Salvar regras
+                    </button>
+                  </div>
+                )}
+                {conquistas.length > 0 && (
+                  <>
+                    <div class="conquistas-progresso">
+                      <progress max={conquistas.length} value={conquistas.filter((c) => c.desbloqueada === true).length} />
+                      <span>
+                        {conquistas.filter((c) => c.desbloqueada === true).length}/{conquistas.length} desbloqueadas
+                      </span>
+                    </div>
+                    <div class="conquistas-grid">
+                      {conquistas.map((c, i) => (
+                        <div key={i} class={`conquista-card${c.desbloqueada === true ? ' desbloqueada' : ''}`}>
+                          {c.icon_url ? (
+                            <img class="conquista-icone" src={String(c.icon_url)} alt="" />
+                          ) : (
+                            <div class="conquista-icone capa-vazia">🏆</div>
+                          )}
+                          <strong>{String(c.titulo ?? c.id ?? '')}</strong>
+                          <span>{String(c.status ?? '')}</span>
+                          {c.percent ? <span class="badge">{String(c.percent)}%</span> : null}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </section>
 
             <section>

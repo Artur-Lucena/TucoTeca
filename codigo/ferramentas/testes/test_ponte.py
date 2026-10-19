@@ -112,7 +112,7 @@ def teste_modulos_listar_via_ponte():
     chaves = [m["chave"] for m in r["resultado"]]
     afirmar(chaves == ["inicio", "jogos", "musicas", "desejos",
                        "downloads", "integracoes", "videos", "youtube",
-                       "configuracoes"], chaves)
+                       "notificacoes", "configuracoes"], chaves)
 
 
 def teste_bloqueio_de_lock_na_partida():

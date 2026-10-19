@@ -365,6 +365,25 @@ def _conquistas_avaliar(servico, params) -> dict:
     return servico.avaliar_conquistas(ident)
 
 
+def _conquistas_sincronizar(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    appid = params.get("appid", "")
+    if not isinstance(appid, str):
+        raise ValueError("appid deve ser um texto")
+    save = params.get("save", "")
+    if not isinstance(save, str):
+        raise ValueError("save deve ser um texto")
+    return servico.sincronizar_conquistas(ident, appid, save)
+
+
+def _conquistas_regras(servico, params) -> dict:
+    ident = _inteiro(params, "id")
+    texto = params.get("texto", "")
+    if not isinstance(texto, str):
+        raise ValueError("texto deve ser um texto")
+    return servico.regras_conquistas(ident, texto)
+
+
 def _capas_buscar(servico, params) -> dict:
     categoria = params.get("categoria")
     if categoria not in ("jogos", "musicas", "desejos"):
@@ -584,6 +603,8 @@ METODOS = {
     "videos.reproduzir": _videos_reproduzir,
     "videos.buscar_online": _videos_buscar_online,
     "conquistas.avaliar": _conquistas_avaliar,
+    "conquistas.sincronizar": _conquistas_sincronizar,
+    "conquistas.regras": _conquistas_regras,
     "capas.buscar": _capas_buscar,
     "capas.aplicar": _capas_aplicar,
     "capas.libretro": _capas_libretro,
