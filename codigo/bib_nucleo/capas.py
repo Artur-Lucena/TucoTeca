@@ -139,7 +139,8 @@ _BUSCAS = {"steam": _steam, "steamgriddb": _steamgriddb, "wikipedia": _wikipedia
 
 
 def buscar_capas(tipo: str, item: dict, provedor="todos", atualizar=False) -> dict:
-    permitidos = PROVEDORES_JOGOS if tipo == "jogos" else PROVEDORES_MUSICAS if tipo == "musicas" else ()
+    permitidos = PROVEDORES_JOGOS if tipo in ("jogos", "desejos") else PROVEDORES_MUSICAS if tipo == "musicas" else ()
+    provedor = provedor or "todos"
     fontes = permitidos if provedor == "todos" else (provedor,)
     if not permitidos or any(p not in permitidos for p in fontes):
         raise ValueError("Provedor de capas inválido para esta categoria.")
