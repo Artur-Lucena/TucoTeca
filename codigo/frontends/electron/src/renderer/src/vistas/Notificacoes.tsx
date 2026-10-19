@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks'
+import { EmptyState } from '../componentes/ui'
 import type { Aviso } from '../estado/notificacoes'
 
 interface Props {
@@ -46,7 +47,7 @@ export function Notificacoes({ avisos, aoDispensar, aoLimpar }: Props) {
       </header>
 
       {lista.length === 0 ? (
-        <p class="aviso">Nenhuma notificação.</p>
+        <EmptyState icone="🔔" titulo="Nenhuma notificação." />
       ) : (
         <ul class="lista-notificacoes">
           {lista.map((aviso) => (

@@ -7,6 +7,7 @@ import {
   validarTituloDesejo,
   type PrecoSteam,
 } from '../estado/desejos'
+import { EmptyState } from '../componentes/ui'
 import { textoDeFalha } from '../estado/notificacoes'
 
 interface Props {
@@ -202,7 +203,7 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
       </p>
 
       {lista.length === 0 ? (
-        <p class="aviso">Nada por aqui. Adicione um appid ou sincronize a wishlist mais tarde.</p>
+        <EmptyState icone="★" titulo="Nada por aqui." descricao="Adicione um appid ou sincronize a wishlist mais tarde." />
       ) : (
         <ul class="lista-desejos">
           {lista.map((desejo, posicao) => {

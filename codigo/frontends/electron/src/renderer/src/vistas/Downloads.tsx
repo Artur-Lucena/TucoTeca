@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { snapshot } from '../estado/dados'
+import { EmptyState } from '../componentes/ui'
 import { textoDeFalha } from '../estado/notificacoes'
 import { listaTrabalhos } from '../estado/trabalhos'
 
@@ -137,7 +138,7 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
       )}
 
       {itens.length === 0 ? (
-        <p class="aviso">Nenhum torrent conhecido. Adicione torrents no qBittorrent.</p>
+        <EmptyState icone="↓" titulo="Nenhum torrent conhecido." descricao="Adicione torrents no qBittorrent." />
       ) : (
         <ul class="lista-downloads">
           {itens.map((item) => {

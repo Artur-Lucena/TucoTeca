@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { snapshot } from '../estado/dados'
+import { EmptyState } from '../componentes/ui'
 import { textoDeFalha } from '../estado/notificacoes'
 
 interface Props {
@@ -164,7 +165,7 @@ export function Videos({ aoAvisar, aoMudou }: Props) {
       )}
 
       {lista.length === 0 ? (
-        <p class="aviso">Nada por aqui. Importe uma pasta com vídeos.</p>
+        <EmptyState icone="▶" titulo="Nada por aqui." descricao="Importe uma pasta com vídeos." />
       ) : (
         <ul class="lista-videos">
           {lista.map((video, posicaoLista) => (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { snapshot } from '../estado/dados'
 import { semAcento } from '../estado/jogos'
+import { EmptyState } from '../componentes/ui'
 import { textoDeFalha } from '../estado/notificacoes'
 import { faixaAtual, player, playerInicial, tocarFila } from '../estado/player'
 import { listaTrabalhos } from '../estado/trabalhos'
@@ -221,7 +222,7 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
       )}
 
       {lista.length === 0 ? (
-        <p class="aviso">Nada por aqui. Importe uma pasta com arquivos de áudio.</p>
+        <EmptyState icone="♪" titulo="Nada por aqui." descricao="Importe uma pasta com arquivos de áudio." />
       ) : (
         <ul class="lista-musicas">
           {lista.map((musica, posicao) => {
