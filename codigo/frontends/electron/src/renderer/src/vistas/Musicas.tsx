@@ -137,7 +137,36 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
       (item) => item.escopo === 'musicas' && (item.estado === 'rodando' || item.estado === 'cancelando'),
     ) ?? null
 
-  return (
+  const [onlineTermo, setOnlineTermo] = useState('')
+  const [onlineResultados, setOnlineResultados] = useState<Array<Record<string, unknown>>>([])
+  const [onlineBuscando, setOnlineBuscando] = useState(false)
+
+  const buscarOnline = async () => {
+    if (onlineTermo.trim().length < 2) return
+    setOnlineBuscando(true)
+    try {
+      const r = await window.tucoteca.chamar<Array<Record<string, unknown>> | { itens?: Array<Record<string, unknown>> }>(
+        'musicas.buscar_online',
+        { termo: onlineTermo.trim(), fonte: 'todas', atualizar: false },
+      )
+      setOnlineResultados(Array.isArray(r) ? r : (r?.itens ?? []))
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    } finally {
+      setOnlineBuscando(false)
+    }
+  }
+
+  const enfileirarOnline = async (item: Record<string, unknown>) => {
+    try {
+      await window.tucoteca.chamar('musicas.enfileirar', { itens: [item] })
+      aoAvisar('Faixa enfileirada.')
+      aoMudou()
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+    return (
     <section class="vista musicas">
       <header class="vista-topo">
         <h1>Músicas ({lista.length})</h1>
@@ -219,6 +248,37 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
           })}
         </ul>
       )}
+
+      <section class="musicas-online">
+        <h2>Musicas online</h2>
+        <div class="vista-acoes">
+          <input
+            class="busca"
+            type="search"
+            placeholder="Buscar no Spotify/YouTube..."
+            value={onlineTermo}
+            onInput={(evento) => setOnlineTermo((evento.target as HTMLInputElement).value)}
+          />
+          <button type="button" class="acao" onClick={() => void buscarOnline()} disabled={onlineBuscando}>
+            {onlineBuscando ? 'Buscando...' : 'Buscar'}
+          </button>
+        </div>
+        {onlineResultados.length > 0 && (
+          <ul class="lista-online">
+            {onlineResultados.map((item, posicao) => (
+              <li key={posicao} class="linha">
+                <span class="musica-textos">
+                  <strong>{String(item.titulo ?? '')}</strong>
+                  <span>{String(item.artista ?? item.canal ?? '')}</span>
+                </span>
+                <button type="button" class="acao" onClick={() => void enfileirarOnline(item)}>
+                  Enfileirar
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section class="fila-musicas">
         <h2>Fila de downloads ({filaDownloads.length})</h2>
