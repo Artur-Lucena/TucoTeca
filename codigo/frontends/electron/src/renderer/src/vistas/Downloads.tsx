@@ -44,6 +44,8 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
   const [ocupados, setOcupados] = useState<Record<string, boolean>>({})
   const [modal, setModal] = useState(false)
   const [importando, setImportando] = useState<string | null>(null)
+  const [pacotePasta, setPacotePasta] = useState('')
+  const [pacoteExe, setPacoteExe] = useState('')
 
   const carregar = async () => {
     try {
@@ -191,6 +193,74 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
       {trabalhoAtivo !== undefined && trabalhoAtivo !== null && (
         <p class="aviso">Importando… {trabalhoAtivo.rotulo}</p>
       )}
+
+      <section class="pacotes">
+        <h2>Pacotes locais</h2>
+        <div class="vista-acoes">
+          <input
+            class="busca"
+            type="text"
+            placeholder="Pasta do pacote"
+            value={pacotePasta}
+            onInput={(e) => setPacotePasta((e.target as HTMLInputElement).value)}
+          />
+          <input
+            class="busca"
+            type="text"
+            placeholder="Executavel (opcional)"
+            value={pacoteExe}
+            onInput={(e) => setPacoteExe((e.target as HTMLInputElement).value)}
+          />
+          <button
+            type="button"
+            class="acao"
+            onClick={async () => {
+              try {
+                const pasta = await window.tucoteca.escolherPasta()
+                if (pasta === null || pasta === '') return
+                setPacotePasta(pasta)
+              } catch (falha) {
+                aoAvisar(textoDeFalha(falha), 'atencao')
+              }
+            }}
+          >
+            Escolher pasta
+          </button>
+          <button
+            type="button"
+            class="acao"
+            onClick={async () => {
+              if (pacotePasta.trim() === '') return
+              try {
+                await window.tucoteca.chamar('pacotes.importar', { pasta: pacotePasta.trim(), exe: pacoteExe.trim() })
+                aoAvisar('Pacote importado.')
+                setPacotePasta('')
+                setPacoteExe('')
+                aoMudou()
+              } catch (falha) {
+                aoAvisar(textoDeFalha(falha), 'atencao')
+              }
+            }}
+          >
+            Importar pacote
+          </button>
+          <button
+            type="button"
+            class="acao"
+            onClick={async () => {
+              if (pacoteExe.trim() === '') return
+              try {
+                await window.tucoteca.chamar('pacotes.abrir_instalador', { exe: pacoteExe.trim() })
+                aoAvisar('Instalador aberto.')
+              } catch (falha) {
+                aoAvisar(textoDeFalha(falha), 'atencao')
+              }
+            }}
+          >
+            Abrir instalador
+          </button>
+        </div>
+      </section>
 
       {modal && (
         <div class="modal-downloads">
