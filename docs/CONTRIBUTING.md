@@ -2,20 +2,19 @@
 
 ## Ambiente e primeiro ciclo
 
-1. Use Python 3.10+ para o núcleo; o desktop principal é Qt/PySide6
-   (`codigo/ferramentas/requirements-ui.txt`). `codigo/ferramentas/requirements-extras.txt` adiciona Chromium e
-   QtMultimedia para a variante completa (não implementa gamepad).
-   O desenvolvimento local Windows usa Python oficial 3.14.
+1. Python 3.10+ para o núcleo (desenvolvimento Windows usa o oficial 3.14) e
+   Node 24 para o desktop Electron (`codigo/frontends/electron`).
 2. Abra o terminal na raiz do projeto.
 3. Execute `python codigo/ferramentas/diagnosticar.py` e a suíte abaixo.
 4. Use uma `BIBLIOTECA_HOME` de desenvolvimento para experimentar a UI.
 
 ```powershell
 $env:BIBLIOTECA_HOME = Join-Path $env:TEMP "tucoteca-dev"
-py -3.14 -m pip install -e '.[dev,ui]'
-py -3.14 -B codigo/frontends/app_qt.py --selftest
-py -3.14 -B -m pytest --cobertura
-py -3.14 codigo/ferramentas/testes/executar.py --json "$env:TEMP\tucoteca-testes.json"
+py -3.14 -m pip install -e '.[dev]'
+py -3.14 -B codigo/ferramentas/testes/executar.py
+npm --prefix codigo/frontends/electron ci
+npm --prefix codigo/frontends/electron run dev      # janela com hot reload
+npm --prefix codigo/frontends/electron test
 ```
 
 No Linux/macOS, os mesmos scripts de núcleo/testes usam `python3`.
@@ -31,8 +30,8 @@ python3 codigo/ferramentas/testes/executar.py --modulo test_linux_portabilidade
 ```
 
 `--selftest` usa tela simulada e também pode rodar no Windows sem curses.
-Para a TUI interativa Linux, execute `./BibliotecaHub.sh` em um terminal.
-Matriz de compatibilidade e procedimentos: [revisão Linux](REVISAO_LINUX_W11.md).
+Para a TUI interativa no Linux/macOS, execute `./BibliotecaHub.sh` (ou
+`BibliotecaHubMac.command`) em um terminal.
 
 ## Pontos de entrada para mudanças
 
@@ -46,14 +45,14 @@ Matriz de compatibilidade e procedimentos: [revisão Linux](REVISAO_LINUX_W11.md
 - Integração remota: `codigo/bib_nucleo/rede/`, sob `BIBLIOTECA_REDE`.
 - Recursos pessoais: `saves.py`, `preferencias_pessoais.py`, `estatisticas.py`,
   `sessoes_manuais.py`; domínios de arquivos independentes da UI.
-- GUI/TUI: `codigo/frontends/`.
-- Desktop Qt: `app_qt.py`, `qt_bridge/` e `servicos_ui/` (pacotes com mixins
-  por domínio; a superfície Qt — sinais/properties — mora em
-  `qt_bridge/__init__.py`) e `qml/`.
-  Instale `codigo/ferramentas/requirements-ui.txt`; arquitetura e matriz de migração em
-  [DESKTOP_QT](DESKTOP_QT.md). Testes: `executar.py --modulo test_qt`.
+- Desktop/TUI: `codigo/frontends/`.
+- Desktop Electron: `electron/` (main, preload, renderer Preact) fala com
+  `ponte.py`, que expõe os casos de uso de `servicos_ui/` (mixins por
+  domínio). Método novo: implementar no serviço, registrar na ponte, cobrir
+  em `test_ponte.py` e chamar no renderer. Detalhes em
+  [DESKTOP_ELECTRON](DESKTOP_ELECTRON.md). Testes: `--modulo test_ponte` e `npm test`.
 - Terminal Linux/macOS: `app_tui.py` + mixins `tui_*.py`.
-- Layout dos bundles: `montar_portatil.copiar_app`, usado pelos três builders.
+- Instalador: `electron/electron-builder.config.cjs` (o que entra em `resources/tucoteca`).
 
 O índice detalhado está em [ARQUITETURA](ARQUITETURA.md).
 
@@ -68,7 +67,7 @@ O índice detalhado está em [ARQUITETURA](ARQUITETURA.md).
 - Alteração de coleção inicia com backup; substituição de arquivos finais
   usa publicação atômica quando aplicável (`arquivos.py`).
 - SQLite: conexão própria por worker; fechar em `finally`/`closing`.
-- Widgets Qt só na thread da UI; workers devolvem resultado por sinais do bridge (conexão enfileirada).
+- Renderer só fala por IPC (`window.tucoteca`); nada de Node/`file://` no renderer.
 - MCI: preparar/hash/converter fora da UI, abrir/play/status/close na thread
   dona do dispositivo. Caminhos longos usam cópia em cache temporário curto,
   nunca movem o original. Não interpretar erro de consulta como fim da faixa.
@@ -87,17 +86,18 @@ py -3.14 codigo/ferramentas/testes/executar.py
 ```powershell
 py -3.14 -B codigo/ferramentas/validar.py                 # tudo (~12 min)
 py -3.14 -B codigo/ferramentas/validar.py --sem-pytest    # rápido (~2 min)
-py -3.14 -B codigo/ferramentas/validar.py --modulo test_qt --sem-pytest
+py -3.14 -B codigo/ferramentas/validar.py --modulo test_ponte --sem-pytest
 ```
 
 Roda Ruff (venv, PATH ou `python -m`; senão substituto `py_compile` +
 trailing), o mypy dos builders (se disponível; pula sem falhar quando
-ausente), a suíte completa, a cobertura dos subprocessos e confere a árvore
+ausente), a suíte completa, a cobertura dos subprocessos, typecheck + vitest
+do Electron (quando há `node_modules`) e confere a árvore
 Git; grava o relatório em
 `.provas/gates-local-<timestamp>.json`. A matriz hospedada (`testes.yml`)
 está **desativada** — `workflow_dispatch` manual, sem custo: o billing da
 conta do GitHub bloqueia jobs automáticos e a validação local é equivalente
-para stdlib/Qt/offscreen. O que **não** existe localmente: gitleaks (binário
+para stdlib e Electron. O que **não** existe localmente: gitleaks (binário
 ausente no Windows), Python 3.10, Ubuntu e macOS — a suíte cobre caminhos
 cross-SO por patches, mas uma rodada em WSL/Linux continua sendo a paridade
 mais fiel quando disponível. Rode `validar.py` antes de commitar/mergear;
@@ -118,32 +118,24 @@ uma alteração que não passa localmente não deve ser empurrada.
 - Executáveis falsos nativos Linux/macOS precisam de `chmod(0o755)`; use
   nomes sem `.exe`. Ao simular Linux no Windows, injete `sys.platform`
   ou um proxy `os` no módulo-alvo; trocar `os.name` global altera `pathlib`.
-- Prova opcional de shell isolada: `python codigo/ferramentas/provar_linux_shell.py`.
-  No Windows usa Git Bash; `--ffmpeg` valida os seis presets com WAV sintético.
-- Testes de GUI Qt usam plataforma offscreen e pulam sem Qt/display.
 - Não execute jogos nem áudio real pela suíte; provas manuais ficam fora
   dos testes herméticos e devem descrever SO, duração e resultado.
 - Preserve os ramos Linux/macOS; casos Mac simulados não substituem um Mac real.
 
-### Provas e bundles locais
+### Provas do app empacotado
 
 ```powershell
-py -3.14 -B codigo/ferramentas/provar_qt_runtime.py --extras completo --saida .provas/qt --ffmpeg C:\caminho\ffmpeg.exe
-py -3.14 -B codigo/ferramentas/provar_integracoes_locais.py --saida .provas/locais
-py -3.14 -B codigo/ferramentas/montar_superhub.py --extras essencial --formato zip --revisao <SHA>
-py -3.14 -B codigo/ferramentas/montar_superhub.py --extras completo --formato zip --revisao <SHA>
+py -3.14 -B codigo/ferramentas/preparar_runtime_python.py
+npm --prefix codigo/frontends/electron run dist
+py -3.14 -B codigo/ferramentas/semear_prova_electron.py --destino .provas/app/home --limpar
+$env:BIBLIOTECA_HOME = "$PWD\.provas\app\home"; $env:TUCOTECA_USERDATA = "$PWD\.provas\app\ud"
+codigo\frontends\electron\dist\win-unpacked\TucoTeca.exe --selftest --screenshot .provas\app\inicio.png
 ```
 
-Chromium recebe HTML local com rede bloqueada; áudio/vídeo são sintéticos.
-O builder confere hashes, presença/ausência real dos Addons, perfis vazios,
-reprodução e API local na árvore montada e no ZIP extraído. Não pula a prova
-de áudio quando MCI falha. Smokes remotos ficam fora da suíte e registram
-versão/data/limites; contrato mockado não prova disponibilidade de um host.
-
-`--revisao` espera o SHA completo do checkout congelado; ele é gravado no
-manifesto do runtime e em `VERSAO.txt`; `VERSION` guarda a versão SemVer. Sem ele, o pacote fica
-marcado como “árvore de trabalho não identificada” — aceitável para iteração,
-não para release.
+O selftest sobe a ponte com o Python embutido, carrega a coleção sintética e
+sai com 0. Provas nativas opcionais (`provar_qbit_runtime.py`,
+`provar_rede_runtime.py`) ficam fora da suíte e registram versão/data/limites;
+contrato mockado não prova disponibilidade de um host.
 
 Lint: `ruff check codigo conftest.py` completo está **limpo** (revisão R4).
 O gate crítico continua como exigência mínima:
@@ -172,29 +164,23 @@ uma alteração na UI não deve absorver silenciosamente trabalho paralelo.
 
 ## Preparar uma release privada
 
-1. Finalize versão, README e changelog antes de congelar os fontes: árvore
-   limpa e gates locais verdes (`python -B codigo/ferramentas/validar.py`)
-   no SHA completo do commit. A CI hospedada não corre mais; o relatório
-   local em `.provas/gates-local-*.json` é a evidência do gate.
-2. Gere os dois bundles com `--revisao <SHA>` (o builder executa as provas na
-   árvore montada e no pacote extraído).
+1. Atualize `VERSION`, `pyproject.toml`, `package.json` do Electron e a seção
+   do `CHANGELOG.md` (o preparador recusa divergência). Árvore limpa e gates
+   locais verdes (`python -B codigo/ferramentas/validar.py`) no SHA do commit.
+2. Gere o instalador: `preparar_runtime_python.py` e `npm run dist`.
 3. Monte a pasta da release:
 
    ```powershell
-    py -3.14 codigo/ferramentas/preparar_release.py --revisao <SHA> --saida dist/release/v1.0.1
+   py -3.14 codigo/ferramentas/preparar_release.py --revisao <SHA> --saida dist/release/v<versão>
    ```
 
-   Sai o pacote de fontes, os bundles, os relatórios de verificação,
-   `NOTAS-RELEASE.md`, `LICENCAS.md`, `SHA256SUMS.txt` e `release.json`.
-   Revisão/versão devem coincidir nos fontes, relatórios e manifestos.
-   O script recusa destino existente e não deixa uma entrega parcial.
-4. Confirme a privacidade, crie uma tag normal e uma release em **rascunho**.
-   Anexe os arquivos, confira tamanhos/hashes no servidor e só então publique.
-   Nunca mova uma tag enviada nem use force-push para corrigir uma entrega.
-   Essa publicação é explícita — nenhum script do projeto publica sozinho.
+   Sai o instalador, o pacote de fontes, `NOTAS-RELEASE.md`, `release.json` e
+   `SHA256SUMS.txt`. O script recusa destino existente e não deixa entrega parcial.
+4. Crie uma tag normal e uma release em **rascunho**, anexe os arquivos,
+   confira tamanhos/hashes no servidor e só então publique. Nunca mova uma tag
+   enviada nem use force-push. Nenhum script do projeto publica sozinho.
 
-O procedimento detalhado e o inventário de anexos estão em
-[RELEASES.md](RELEASES.md).
+O procedimento detalhado está em [RELEASES.md](RELEASES.md).
 
 O pacote de coleção do Hub continua sendo o caminho para levar a biblioteca
 pessoal entre máquinas; a release nunca a inclui.
@@ -202,7 +188,6 @@ pessoal entre máquinas; a release nunca a inclui.
 A entrega ZIP representa **arquivos atuais**, não só o HEAD do Git. Para
 comparar uma entrega, verifique `MANIFESTO-FONTES.json`; para inspecionar
 histórico e branches, use o repositório Git fornecido pelo responsável.
-Use worktrees separados para implementação, testes e Windows. Congele os
-fontes por manifesto antes dos gates/builds; confirme os arquivos do app no
-bundle contra essa mesma revisão. Entregas são pessoais/locais, sem workflow
+Congele os fontes antes dos gates/builds; o preparador confere o app
+empacotado contra essa mesma revisão. Entregas são pessoais/locais, sem workflow
 de release pública, force-push ou reescrita adicional de histórico.

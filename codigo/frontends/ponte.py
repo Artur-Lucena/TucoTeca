@@ -550,7 +550,7 @@ def _salvar_filtro(servico, params) -> dict:
 
 
 def _aviso_pos_sessao(servico, ident) -> str:
-    """Backup pós-sessão opt-in (default ligado), espelhando o Qt; falha vira aviso."""
+    """Backup pós-sessão opt-in (default ligado); falha vira aviso."""
     try:
         aparencia = servico.aparencia()
     except Exception:

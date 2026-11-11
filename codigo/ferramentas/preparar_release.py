@@ -49,6 +49,11 @@ def ler_versao(repo: Path = REPO) -> str:
     declarada = m.group(1) if m else None
     if declarada != versao:
         raise ValueError(f"pyproject.toml declara {declarada!r}, VERSION diz {versao!r}")
+    pacote = repo / "codigo/frontends/electron/package.json"
+    if pacote.is_file():
+        npm = json.loads(pacote.read_text(encoding="utf-8")).get("version")
+        if npm != versao:
+            raise ValueError(f"package.json do Electron declara {npm!r}, VERSION diz {versao!r}")
     if not secao_changelog(repo, versao):
         raise ValueError(f"CHANGELOG.md sem seção [{versao}]")
     return versao

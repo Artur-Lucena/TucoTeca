@@ -4,8 +4,8 @@
 
 ```mermaid
 flowchart TD
-  Qt[app_qt / QML por seção] --> Bridge[qt_bridge / superfície Qt + mixins]
-  Bridge --> Services[servicos_ui / casos de uso]
+  Electron[electron / main + preload + renderer Preact] --> Ponte[ponte.py / NDJSON em stdin/stdout]
+  Ponte --> Services[servicos_ui / casos de uso]
   Services --> Compat[bib_core / APIs públicas]
   TUI[app_tui.py / curses] --> Compat
   Compat --> DB[banco / SQLite]
@@ -16,16 +16,16 @@ flowchart TD
   Compat --> Network[rede / adaptadores remotos explícitos]
   Services --> Personal[saves / perfis / estatísticas / arquivos]
   DB --> Dados[dados / estado do usuário]
-  Builders[montar_* / build_utils / copiar_app] --> Dist[dist / artefatos]
+  Builder[electron-builder + preparar_runtime_python] --> Dist[instalador NSIS]
 ```
 
-Os frontends usam a mesma persistência. As regras ficam no núcleo; a GUI
-constrói widgets/ações e a TUI conduz menus. A fachada `bib_core` reexporta
+Os frontends usam a mesma persistência. As regras ficam no núcleo; o desktop
+Electron só apresenta (fala com o núcleo pela ponte) e a TUI conduz menus. A fachada `bib_core` reexporta
 APIs para preservar consumidores antigos. Os módulos possuem alguns imports
 locais deliberados para desfazer ciclos entre banco, scanners e providers.
-O desktop Qt Quick segue como padrão no Windows; a fatia F0 do desktop
-Electron (ponte NDJSON + shell Preact) está em
-[DESKTOP_ELECTRON.md](DESKTOP_ELECTRON.md).
+O desktop é o app Electron (Windows; detalhes em
+[DESKTOP_ELECTRON.md](DESKTOP_ELECTRON.md)); a TUI curses atende Linux/macOS
+pelos fontes. O Qt Quick e o modo clássico Tk foram removidos.
 
 ## Árvore comentada
 
@@ -34,22 +34,22 @@ Tucoteca/
 ├── README.md                         entrada funcional e técnica
 ├── LICENSE                           licença do código do Hub
 ├── TucoTeca.bat                       entrada Windows; BibliotecaHub.bat é alias
-├── BibliotecaHub.sh/Mac.command       entradas Linux/macOS legadas
+├── BibliotecaHub.sh/Mac.command       TUI no Linux/macOS (pelos fontes)
 ├── .github/workflows/                matriz de testes
 ├── docs/
 │   ├── ARQUITETURA.md                 este mapa
 │   ├── CONTRIBUTING.md                ambiente, testes e colaboração
 │   ├── SECURITY.md                    canal de contato de segurança
-│   └── REVISAO_TECNICA.md             achados e evidência da revisão
+│   ├── RELEASES.md                    instalador, anexos e publicação
+│   └── HISTORICO.md                   auditorias e revisões antigas
 ├── codigo/
 │   ├── bib_core.py                   fachada de compatibilidade
 │   ├── bib_nucleo/                   núcleo e domínios pessoais
 │   │   └── rede/                     adaptadores com BIBLIOTECA_REDE
-│   ├── frontends/                    Qt e TUI
-│   │   └── qml/secoes/               telas carregadas por Loader
+│   ├── frontends/                    ponte, casos de uso, Electron e TUI
+│   │   └── electron/                 app desktop (main/preload/renderer)
 │   ├── ferramentas/                  diagnóstico, entrega e builders
-│   │   ├── Montar-Universal.bat       entrada de empacotamento
-│   │   ├── requirements-*.txt         dependências de interface
+│   │   ├── preparar_release.py        anexos da release (instalador + fontes)
 │   │   └── testes/                   casos e runner em sandbox
 │   └── historico/                    arquivo local, ignorado
 ├── midia/fontes-capas/                opcional: placeholders gerados localmente
@@ -68,8 +68,8 @@ na raiz (ambos ignorados pelo Git), `resolve_home()` em `base.py` prefere a
 própria árvore à instalação canônica — bundles e clone dev compartilham a
 mesma regra. Links do Wine (`dosdevices/*`, junctions de pastas do usuário)
 não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
-A reconciliação do histórico remoto com as revisões locais está documentada
-em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
+A reconciliação do histórico remoto com as revisões locais está registrada
+em [HISTORICO.md](HISTORICO.md).
 
 ## Responsabilidade por módulo
 
@@ -111,27 +111,22 @@ em [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md).
 
 | Arquivo | Função |
 |---|---|
-| `frontends/desktop.py` | Dispatcher Qt: abre o Qt Quick quando PySide6 está presente (padrão) e, sem PySide6, exibe instruções para instalar `codigo/ferramentas/requirements-ui.txt` (ou usar o pacote pronto) |
-| `frontends/app_qt.py` | Shell Qt Quick, lock, selftest e screenshot |
-| `frontends/qt_bridge/` (pacote) | Superfície Qt no `HubBridge` (sinais + properties), lógica por domínio nos mixins, modelos e workers |
-| `frontends/navegacao_controle.py` | Estado XInput → ações (direcional repete ao ser segurado); o Qt traduz para teclas e seções |
-| `frontends/qt_emulacao.py` | Mods, texturas, cheats e presets do Azahar para o jogo selecionado; cada ação recarrega o estado |
-| `frontends/servicos_ui/` (pacote) | Casos de uso desktop, `resumo_sistema`, `busca_global`, registro |
-| `frontends/qml/` | shell `Main.qml`, `secoes/`, componentes, diálogos, navegador/player opcionais |
-| `frontends/ponte.py` | Ponte NDJSON (stdin/stdout, sem TCP) entre o desktop Electron e os casos de uso; lock com evento `bloqueio` e paridade de selftest |
-| `frontends/electron/` | Desktop Electron em construção (F0): processo principal, preload isolado e renderer Preact sobre IPC; telas por módulo |
-| `frontends/app_tui.py` + `tui_*.py` | Tui em mixins por domínio (entry point e `tui.curses` patchável preservados) |
-| `ferramentas/build_utils.py` | comum aos builders: SHA-256 de arquivo, escritor único de `.tar.xz` (Win/Linux/Mac, com diretórios) e download verificado (cache + `.part` atômico) |
+| `frontends/desktop.py` | Abre o app Electron pelo checkout (exige `npm install` + `npm run build`); o usuário final usa o instalador |
+| `frontends/ponte.py` | Ponte NDJSON (stdin/stdout, sem TCP) entre o Electron e os casos de uso; lock com evento `bloqueio`, jobs com progresso |
+| `frontends/servicos_ui/` (pacote) | Casos de uso do desktop em mixins por domínio, `resumo_sistema`, `busca_global`, registro de módulos |
+| `frontends/electron/` | Desktop: processo principal (protocolos `tucoteca-img`/`tucoteca-media`, menu, ponte), preload isolado e renderer Preact; `electron-builder.config.cjs` gera o instalador |
+| `frontends/app_tui.py` + `tui_*.py` | TUI em mixins por domínio (entry point e `tui.curses` patchável preservados) |
+| `frontends/atalho_jogo.py` | Abre um jogo direto por atalho, com os mesmos serviços do Hub |
+| `ferramentas/abrir_hub.py` | Prepara ambiente/runtime do checkout ou do app instalado (usado pela ponte) |
+| `ferramentas/build_utils.py` | SHA-256 de arquivo, escritor de `.tar.xz` e download verificado (cache + `.part` atômico) |
 | `ferramentas/diagnosticar.py` | sintaxe/exports/dependências/pastas/SQLite somente-leitura |
-| `ferramentas/empacotar_fontes.py` | entrega da árvore atual + SHA-256 sem coleção |
-| `ferramentas/montar_portatil.py` | Windows, Python embutido, ZIP/tar.xz/Inno e `copiar_app` |
-| `ferramentas/montar_linux.py` | payload Linux + stub `.run`, desktop e desinstalação |
-| `ferramentas/montar_mac.py` | payload + oficiais macOS, completo/leve |
-| `ferramentas/montar_universal.py` | agrega artefatos dos 3 SOs |
-| `ferramentas/montar_superhub.py` | variantes Windows x64; poda, revisão exata dos fontes, manifesto e provas pós-extração |
-| `ferramentas/provar_qbit_runtime.py` | prova nativa do perfil/API com torrent local artificial |
-| `ferramentas/provar_qt_runtime.py` | capturas, áudio/LRC em caminho longo, Chromium local e vídeo/retomada |
-| `ferramentas/provar_integracoes_locais.py` | API HTTP real, snapshots, hardlinks, screenshots e vigia em casa descartável |
+| `ferramentas/empacotar_fontes.py` | entrega da árvore atual (Python + Electron) + SHA-256, sem coleção |
+| `ferramentas/preparar_runtime_python.py` | Python embeddable oficial, SHA-256 fixado, para `programa/windows-x64/python` |
+| `ferramentas/gerar_icone.py` | ícone do app (`resources/icon.ico`), reproduzível, só stdlib |
+| `ferramentas/preparar_release.py` | confere git/versões/instalador/runtime e gera fontes, notas, `release.json` e `SHA256SUMS` |
+| `ferramentas/semear_prova_electron.py` | coleção sintética para selftest do app (nunca a coleção real) |
+| `ferramentas/provar_qbit_runtime.py` / `provar_rede_runtime.py` | provas nativas opcionais (qBittorrent e rede), fora da suíte hermética |
+| `ferramentas/validar.py` | gates locais: Ruff, mypy, suíte, cobertura, Electron e Git |
 
 ## Estado e modelo de dados
 
@@ -211,13 +206,13 @@ anterior e produz erro claro; abertura/controle do dispositivo continuam na UI.
 `importar_fila_pronta` retorna `novas/ignoradas/erros/avisos/capas`.
 São contratos distintos: consumidores devem usar suas chaves exatas.
 
-### Concorrência da GUI
+### Concorrência
 
 - SQLite tem conexão própria no worker.
 - Rede, hashing e conversão são trabalhos de fundo.
-- Trabalhos de fundo devolvem resultado à thread da UI por sinais do bridge (conexão enfileirada); nenhum worker toca em widgets.
-- O player tem preparação separada de abertura/controle MCI. Aliases são
-  locais à thread: todos os comandos nativos ficam na thread da UI.
+- A ponte atende pedidos NDJSON; trabalhos longos viram jobs (`trabalhos.listar`/`cancelar`) com progresso, sem bloquear o renderer.
+- O player MCI (TUI) separa preparação de abertura/controle; aliases são
+  locais à thread. O desktop toca mídia no renderer (`tucoteca-media://`).
 - Tokens invalidam preparações antigas; Stop/fechar não deixam resultado
   atrasado iniciar ou interromper outra faixa.
 - Erro de status é desconhecido, não fim. Auto-avançar exige fim confirmado.
@@ -246,7 +241,6 @@ duplicatas e escapes, com limites de tamanho/arquivos e backup pré-sobrescrita.
 | `BIBLIOTECA_JOGOS_DIR` (alias legado `BIBLIOTECA_PIRATAS`) | pasta dos downloads de jogos (padrão `Meus Jogos Locais`; se a antiga `Piratas` já existir e a nova não, continua usando a antiga) |
 | `BIBLIOTECA_7Z` | caminho explícito do 7-Zip |
 | `BIBLIOTECA_REDE` | `0` bloqueia ações remotas do Hub; não é firewall dos apps externos nem bloqueio da API loopback |
-| `BIBLIOTECA_WEBENGINE` | `0` força a alternativa sem Chromium |
 | `BIBLIOTECA_WATCH` | pasta de pacotes vigiada; extração automática só com opt-in |
 | `BIBLIOTECA_EVERYTHING` | caminho BYOB do CLI `es.exe` |
 | `BIBLIOTECA_MUSICA_DIR` | origem de áudio local/Harmoni |
@@ -259,11 +253,12 @@ duplicatas e escapes, com limites de tamanho/arquivos e backup pré-sobrescrita.
 | `BIBLIOTECA_QBIT_API` | URL explícita da API em loopback |
 | `BIBLIOTECA_QUICKJS/DENO` | runtime JavaScript explícito para yt-dlp |
 | `HYDRA_DB_PATH` | origem Hydra explícita |
-| `ISCC_EXE` | compilador Inno do builder Windows |
+| `TUCOTECA_RAIZ` / `TUCOTECA_PYTHON` / `TUCOTECA_USERDATA` | app Electron: fontes Python, intérprete e userData (ver DESKTOP_ELECTRON.md) |
 
 Defaults de caminhos refletem a máquina original. Ao desenvolver, use
-overrides de ambiente. Bundles novos usam casa raiz; launchers reconhecem
-também a coleção legada `dados/dados/biblioteca.db` sem movê-la.
+overrides de ambiente. O app instalado usa `Documentos\TucoTeca` como casa;
+o checkout usa a própria raiz e reconhece a coleção legada
+`dados/dados/biblioteca.db` sem movê-la.
 A leitura dessas chaves é centralizada em `bib_nucleo/config.py` (somente
 stdlib): `cfg` tipado, defaults documentados, parsing de listas (`;` para
 raízes, `,` para hosts) e bools (`0/false/no/off` desligam). Código novo
@@ -272,7 +267,8 @@ consome `cfg`; o helper `_env` atende chamadas legadas.
 ## Testes e evolução
 
 Casos cobrem persistência, identidade, scanners, overlays, rollback,
-downloads simulados, GUI/TUI, áudio e volume. `executar.py` cria sandbox,
+downloads simulados, ponte, TUI, áudio e volume;
+o renderer/main do Electron têm testes vitest próprios. `executar.py` cria sandbox,
 descobre `teste_*` e informa os pulos e falhas por ambiente.
 `conftest.py` coleta por AST e executa os mesmos casos em processos separados;
 `pytest --cobertura` agrega cobertura dos subprocessos. Provas nativas e
@@ -286,6 +282,5 @@ preservados). A decomposição futura deve seguir domínios
 (catálogo, áudio, diálogos, sessões), mantendo contratos e fixtures antes
 de mover métodos. Desejos, Hydra, sessões manuais e adaptadores remotos já
 foram extraídos; isso não significa decomposição integral dos módulos grandes.
-`copiar_app` é uma fronteira já extraída; `build_utils.py`
-concentra o que os três builders compartilham (SHA-256, escritor único de
-`.tar.xz` e download verificado), sem duplicar lógica de empacotamento.
+`build_utils.py` concentra SHA-256 e download verificado, usados por
+`preparar_runtime_python.py` e `preparar_release.py`.

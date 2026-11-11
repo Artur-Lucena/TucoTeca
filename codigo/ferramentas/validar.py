@@ -5,9 +5,10 @@
 Ordem (mesma da antiga matriz, na medida do possível no SO local):
   1. Ruff (se disponível; senão, substituto: py_compile + espaço em branco)
   2. mypy nos builders (`ferramentas/`; se disponível; senão, pula)
-  3. Suíte completa (`testes/executar.py`) — stdlib + Qt offscreen
+  3. Suíte completa (`testes/executar.py`)
   4. Cobertura dos subprocessos (`pytest --cobertura`) — opcional
-  5. `git diff --check` + árvore suja (informativo)
+  5. Electron: typecheck + vitest (se o npm e as dependências existirem)
+  6. `git diff --check` + árvore suja (informativo)
 
 Diferenças honestas em relação à matriz hospedada: sem gitleaks (a menos que
 o binário exista no PATH), sem Ubuntu/Python 3.10 (roda no SO/Python atuais)
@@ -15,7 +16,7 @@ e sem macOS (continuaria pulado). Uso:
 
     python -B codigo/ferramentas/validar.py                 # tudo
     python -B codigo/ferramentas/validar.py --sem-pytest    # rápido (~2 min)
-    python -B codigo/ferramentas/validar.py --modulo test_qt --sem-pytest
+    python -B codigo/ferramentas/validar.py --modulo test_ponte --sem-pytest
 
 Saída: resumo no console e JSON em .provas/gates-local-<timestamp>.json.
 Código de saída 0 somente se todos os passos executados passarem.
@@ -43,9 +44,6 @@ def _agora():
 def _rodar(nome, cmd, cwd=REPO, env_extra=None):
     """Roda um passo, ecoa a saída e devolve (ok, tail, segundos)."""
     env = dict(os.environ)
-    env.setdefault("QT_QPA_PLATFORM", "offscreen")
-    env.setdefault("QT_QUICK_BACKEND", "software")
-    env.setdefault("QML_DISABLE_DISK_CACHE", "1")
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("PYTHONDONTWRITEBYTECODE", "1")
     if env_extra:
@@ -62,7 +60,7 @@ def _rodar(nome, cmd, cwd=REPO, env_extra=None):
 
 def passo_ruff():
     """Ruff completo se existir (venv/PATH/python -m); senão substituto."""
-    venv = Path(__file__).resolve().parent.parent / ".provas" / "venv-rel" / "Scripts" / "ruff.exe"
+    venv = REPO / ".provas" / "venv-ruff" / "Scripts" / "ruff.exe"  # convenção do AGENTS.md
     ruff_exe = shutil.which("ruff")
     if venv.is_file():
         ruff = [str(venv)]
@@ -114,6 +112,20 @@ def passo_pytest():
     return ok, {"cmd": c, "segundos": seg, "resumo": resumo}
 
 
+def passo_electron():
+    """typecheck + vitest do app Electron; pula sem npm ou sem node_modules."""
+    app = REPO / "codigo" / "frontends" / "electron"
+    npm = shutil.which("npm")
+    if not npm or not (app / "node_modules").is_dir():
+        print("  [pulo] npm ou node_modules ausentes (npm --prefix codigo/frontends/electron ci)")
+        return True, {"modo": "pulado"}
+    ok_t, _, seg_t, _ = _rodar("typecheck", [npm, "run", "typecheck"], cwd=app)
+    ok_v, tail, seg_v, _ = _rodar("vitest", [npm, "test"], cwd=app)
+    resumo = next((ln.strip() for ln in tail if ln.strip().startswith("Tests")), "")
+    return ok_t and ok_v, {"typecheck": ok_t, "vitest": ok_v, "resumo": resumo,
+                           "segundos": round(seg_t + seg_v, 1)}
+
+
 def passo_git():
     r = subprocess.run(["git", "status", "--porcelain"], cwd=REPO,
                        capture_output=True, text=True)
@@ -130,7 +142,8 @@ def main(argv=None):
     ap.add_argument("--sem-tipos", action="store_true", help="pula o mypy dos builders")
     ap.add_argument("--sem-pytest", action="store_true", help="pula a cobertura (leva ~8 min)")
     ap.add_argument("--modulo", action="append", default=[],
-                    help="restringe a suíte a módulos (ex.: test_qt)")
+                    help="restringe a suíte a módulos (ex.: test_ponte)")
+    ap.add_argument("--sem-electron", action="store_true", help="pula typecheck/vitest do Electron")
     a = ap.parse_args(argv)
 
     print("== validação local (%s) ==" % _agora())
@@ -139,13 +152,13 @@ def main(argv=None):
     t0 = time.monotonic()
     try:
         if not a.sem_ruff:
-            print("[1/5] ruff")
+            print("[1/6] ruff")
             ok, info = passo_ruff()
             rel["passos"]["ruff"] = info
             print("  ->", "ok" if ok else "FALHOU")
             rel["ok"] &= ok
         if not a.sem_tipos:
-            print("[2/5] mypy (ferramentas/)")
+            print("[2/6] mypy (ferramentas/)")
             ok, info = passo_tipos()
             rel["passos"]["tipos"] = info
             if info.get("modo") == "pulado":
@@ -155,18 +168,25 @@ def main(argv=None):
             else:
                 print("  ->", "ok" if ok else "FALHOU")
             rel["ok"] &= ok
-        print("[3/5] suíte completa" + (" (módulos: %s)" % ",".join(a.modulo) if a.modulo else ""))
+        print("[3/6] suíte completa" + (" (módulos: %s)" % ",".join(a.modulo) if a.modulo else ""))
         ok, info = passo_suite(a.modulo)
         rel["passos"]["suite"] = info
         print("  ->", info["resumo"] or ("ok" if ok else "FALHOU"))
         rel["ok"] &= ok
         if not a.sem_pytest:
-            print("[4/5] pytest --cobertura")
+            print("[4/6] pytest --cobertura")
             ok, info = passo_pytest()
             rel["passos"]["pytest"] = info
             print("  ->", info["resumo"] or ("ok" if ok else "FALHOU"))
             rel["ok"] &= ok
-        print("[5/5] git")
+        if not a.sem_electron:
+            print("[5/6] electron (typecheck + vitest)")
+            ok, info = passo_electron()
+            rel["passos"]["electron"] = info
+            print("  ->", "pulado" if info.get("modo") == "pulado" else
+                  (info.get("resumo") or ("ok" if ok else "FALHOU")))
+            rel["ok"] &= ok
+        print("[6/6] git")
         ok, info = passo_git()
         rel["passos"]["git"] = info
         print("  ->", "limpo" if ok and not info["sujo"] else

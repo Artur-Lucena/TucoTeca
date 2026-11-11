@@ -1,3 +1,0 @@
-# Variante COMPLTA do Hub: motor web + multimedia + gamepad.
-# Traz PySide6-Essentials como dependência. +~250 MB no bundle.
-PySide6-Addons==6.10.2

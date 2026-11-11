@@ -13,7 +13,7 @@ from pathlib import Path
 from bib_nucleo import base
 from bib_nucleo.arquivos import gravar_atomico, gravar_json, ler_json
 
-USER_AGENT = "TucoTeca/1.5 (https://github.com/Artur-Lucena/Projeto-Launcher)"
+USER_AGENT = "TucoTeca/1.5 (https://github.com/Artur-Lucena/TucoTeca)"
 _lock = threading.RLock()
 _ENVS = {"steam_key": "BIBLIOTECA_STEAM_API_KEY",
          "steamgriddb_key": "BIBLIOTECA_STEAMGRIDDB_KEY",

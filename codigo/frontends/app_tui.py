@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 TucoTeca — aplicativo de terminal (curses, stdlib), voltado ao Linux.
-Compartilha o núcleo e a coleção com o desktop Qt e as ferramentas clássicas.
+Compartilha o núcleo e a coleção com o desktop Electron.
 
 Uso:
     python3 codigo/frontends/app_tui.py [--db ~/.../biblioteca.db]
@@ -54,8 +54,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="monta o TUI sem terminal e sai (verificação)")
     args = ap.parse_args(argv)
     if curses is None and not args.selftest:
-        print("curses indisponível neste Python (no Windows, abra a interface Qt "
-              "(TucoTeca.bat / desktop.py)).", file=sys.stderr)
+        print("curses indisponível neste Python (no Windows, use o app desktop: "
+              "instalador TucoTeca-Setup ou TucoTeca.bat).", file=sys.stderr)
         return 2
     core.garantir_dirs()
     lk = core.adquirir_lock(ignorar=args.ignorar_lock)

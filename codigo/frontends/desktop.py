@@ -2,8 +2,7 @@
 
 Usuário final usa o instalador (TucoTeca-Setup-*.exe); este módulo serve o
 checkout de desenvolvimento (TucoTeca.bat / abrir_hub.py). A TUI curses
-(app_tui.py) continua disponível para Linux/macOS. O modo clássico (Tk) e o
-desktop Qt (PySide6) foram removidos na F5.
+(app_tui.py) continua disponível para Linux/macOS.
 """
 from __future__ import annotations
 

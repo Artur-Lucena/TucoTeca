@@ -1,45 +1,28 @@
 # Índice da documentação
 
 Mapa por tema dos documentos em `docs/`. Comece por `ARQUITETURA.md` para
-se localizar; o fluxo de colaboração está em `docs/CONTRIBUTING.md`.
+se localizar; o fluxo de colaboração está em `CONTRIBUTING.md`.
 
 ## Mapa e interface
 
 - [ARQUITETURA.md](ARQUITETURA.md) — mapa de pastas, responsabilidade por
   módulo, modelo de dados, fluxos, concorrência e variáveis de ambiente.
-- [DESKTOP_QT.md](DESKTOP_QT.md) — decisão Qt Quick, cobertura por fluxo,
-  contratos de integração, concorrência e limites da etapa (A1).
-- [DESKTOP_ELECTRON.md](DESKTOP_ELECTRON.md) — desktop Electron em construção
-  (fatia F0): ponte NDJSON, contrato de módulos, segurança e provas.
+- [DESKTOP_ELECTRON.md](DESKTOP_ELECTRON.md) — desktop Electron: ponte NDJSON,
+  módulos, segurança, provas e app instalado.
 - [INTEGRACOES.md](INTEGRACOES.md) — como adicionar uma integração ao hub
   (contrato, template e testes).
-- [VISAO_OS.md](VISAO_OS.md) — visão TucoOS: o Hub como shell pessoal,
-  sem reescrita do domínio.
+- [ROADMAP.md](ROADMAP.md) — o que falta até a próxima release.
 
-## Releases e legal
+## Colaboração, releases e legal
 
-- [RELEASES.md](RELEASES.md) — como congelar, gerar bundles, preparar
-  anexos e publicar uma release privada (coordenador).
+- [CONTRIBUTING.md](CONTRIBUTING.md) — ambiente, testes e convenções.
+- [RELEASES.md](RELEASES.md) — instalador, anexos e publicação de uma release.
+- [SECURITY.md](SECURITY.md) — canal de contato de segurança.
 - [LEGAL.md](LEGAL.md) — aviso legal e responsabilidades de uso.
-- [RECONCILIACAO_GITHUB.md](RECONCILIACAO_GITHUB.md) — proveniência do
-  histórico reconciliado com o remoto e o que nunca vai ao GitHub.
 
-## Revisões técnicas (registro histórico)
+## Histórico
 
-- [REVISAO_TECNICA.md](REVISAO_TECNICA.md) — auditoria de código de
-  06–07/10/2026: 20 erros comprovados e corrigidos.
-- [REVISAO_LINUX_W11.md](REVISAO_LINUX_W11.md) — revisão Linux feita no
-  Windows 11: correções verificadas e matriz de compatibilidade por SO.
-- [PARTE1_VISUAL_E_AUDITORIA.md](PARTE1_VISUAL_E_AUDITORIA.md) — acabamento
-  visual Tk e auditoria de 09/10/2026.
-- [PARTE2_RUNTIME_E_INTEGRACOES.md](PARTE2_RUNTIME_E_INTEGRACOES.md) — runtime
-  independente, otimização e tamanhos medidos dos artefatos.
-- [QOL_1_5.md](QOL_1_5.md) — qualidade de vida 1.5 do desktop Qt (10/10/2026).
-- [INTEGRACAO_FINAL_QOL_MIDIAS.md](INTEGRACAO_FINAL_QOL_MIDIAS.md) —
-  consolidação de 11/10/2026 das frentes QoL 1.5 e mídias 2.0 no Qt.
-
-## Dados
-
-- [organizacao-local.json](organizacao-local.json) — registro histórico de
-  09/10/2026 dos movimentos de artefatos em `dist/`; não é substituto de
-  `organizacao_local.py`.
+- [HISTORICO.md](HISTORICO.md) — auditorias, revisões técnicas e reconciliação
+  do Git consolidadas (registro, não instrução vigente).
+- [arquivo/](arquivo/) — material de sessões de trabalho antigas (QoL 1.5,
+  planos das fatias Electron e organização local de `dist/`).

@@ -30,25 +30,6 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(CODIGO))
 sys.path.insert(0, str(FRONTENDS))
 
-# A suíte nunca abre janela na tela: Qt em offscreen/software e sem cache
-# de disco QML. Vale para este processo e é herdado pelos subprocessos de
-# cada caso (o dict de env do filho deriva de os.environ).
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("QT_QUICK_BACKEND", "software")
-os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
-
-
-def fundo_segundo_plano():
-    """Garante o modo sem janela antes de importar/criar o Qt.
-
-    Chamar no início de qualquer helper que crie QGuiApplication/QApplication:
-    o Qt lê QT_QPA_PLATFORM ao instanciar o aplicativo, então o default
-    precisa existir antes do primeiro import que o consulte.
-    """
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    os.environ.setdefault("QT_QUICK_BACKEND", "software")
-    os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
-
 
 def afirmar(cond, msg=""):
     if not cond:

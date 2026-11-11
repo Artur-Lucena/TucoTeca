@@ -21,12 +21,15 @@ entram no Git.
 
 ## Código e validação
 
-- Núcleo Python stdlib; Qt/PySide6 é o único desktop (Qt Quick). A TUI curses
-  atende Linux/macOS. Não reintroduzir tkinter nem um "modo clássico".
+- Núcleo Python stdlib; o desktop é o app Electron (`codigo/frontends/electron`,
+  ponte NDJSON em `ponte.py`). A TUI curses atende Linux/macOS. Não
+  reintroduzir tkinter, Qt/PySide6 nem um "modo clássico".
 - Preserve aliases legados (`BibliotecaHub.*`) e a integração S0–S8/R4/R5.
 - Não reescrever o domínio para implementar a paridade visual.
 - Testes: `py -3.14 -B codigo/ferramentas/testes/executar.py [--modulo <modulo>]`.
   Suíte completa: sem argumentos. Pytest/cobertura quando disponíveis.
+  Electron: `npm --prefix codigo/frontends/electron run typecheck` e `npm test`.
+  Gates juntos: `py -3.14 -B codigo/ferramentas/validar.py`.
 - Lint: `ruff check codigo conftest.py` (venv própria em `.provas/venv-ruff` se
   o Python global não tiver) e `git diff --check`.
 - Provas e caches ficam em `.provas/`.
@@ -40,4 +43,5 @@ entram no Git.
 - Push, merge, tags e releases só com pedido explícito do usuário.
 - Nunca resetar, sobrescrever ou apagar alterações que você não criou.
 - `VERSION`, `README.md`, `CHANGELOG.md`, lock de release e publicação: por
-  pedido explícito.
+  pedido explícito. A versão vive em `VERSION`, `pyproject.toml` e
+  `codigo/frontends/electron/package.json` — sempre as três juntas.

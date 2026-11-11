@@ -1,12 +1,12 @@
-# Desktop Electron (em construção — fatia F1)
+# Desktop Electron
 
 ## Decisão de arquitetura
 
-O desktop TucoTeca ganha uma segunda geração de interface: um app **Electron**
-com renderer **Preact + TypeScript**, mantendo o motor em Python. O domínio
-(banco SQLite, emulação, áudio, integrações) continua em `bib_nucleo` /
-`servicos_ui`; o Electron substitui apenas a camada de apresentação, em fatias.
-O Qt Quick (`docs/DESKTOP_QT.md`) segue como desktop atual no Windows até a F5.
+O desktop do TucoTeca é um app **Electron** com renderer **Preact +
+TypeScript**, mantendo o motor em Python. O domínio (banco SQLite, emulação,
+áudio, integrações) continua em `bib_nucleo` / `servicos_ui`; o Electron é só
+a camada de apresentação. Ele substituiu o Qt Quick (removido na F5) e é
+entregue como instalador Windows (ver "App instalado (F4)" abaixo).
 
 ```text
 ┌────────────────────────── Electron (Node) ────────────────────────────┐
@@ -68,7 +68,7 @@ fixo: é a preparação para módulos de terceiros (F3).
 - **Gamepad**: `LeitorControle` no renderer usa a Gamepad API do Chromium (pads
   XInput); D-pad e analógico esquerdo navegam, botões A/B selecionam/voltam;
   a leitura reinicia em `gamepadconnected` e no retorno de foco. Sem controle
-  físico na bancada, a prova é unitária (mesmo limite do desktop Qt).
+  físico na bancada, a prova é unitária.
 - **Queda e reconexão da ponte**: se o Python morre, o main emite
   `ponte-estado` (`caiu` / `reabrindo` / `ok`), as chamadas passam a falhar com
   "a ponte encerrou — clique em Reconectar" e o banner do renderer traz
@@ -110,7 +110,7 @@ npm run build      # electron-vite build → out/
 npm run start      # roda o build (electron .)
 ```
 
-Selftest (paridade com o Qt): `electron . --selftest [--screenshot x.png]
+Selftest: `electron . --selftest [--screenshot x.png]
 [--db X] [--ignorar-lock]`. Erros → `[erro] …` no stderr e saída 1; lock
 ocupado → saída 2; sucesso imprime `[ok] selftest Electron: N jogos; ponte,
 módulos e Início carregados`. Com `--screenshot`, a captura acontece após o
@@ -154,16 +154,11 @@ persistidos, gamepad por Gamepad API, hardening da queda da ponte (banner +
 **Reconectar**, lock órfão assumido) e menu do app — 55 testes vitest e suíte
 Python 526/526 na rodada completa, provas E2E de queda e do checklist do shell.
 
-Ainda não (fatias seguintes): F2 telas Jogos/Músicas/Desejos/Downloads/
-Integrações/Vídeos com a tabela de paridade do `docs/DESKTOP_QT.md`; F3 módulos
-de terceiros; F4 empacotamento e assinatura (instalador único); F5 retirada do
-Qt e do `BIBLIOTECA_WEBENGINE`; F6 release 1.2.0.
-
 Limites honestos: a TUI curses continua para Linux/macOS e a plataforma macOS
 segue fora do escopo; gamepad provado só por unidade (sem controle físico na
 máquina); a paleta busca em memória (12 itens/limite — coleções grandes podem
 querer FTS depois); o selftest não substitui prova física de áudio nem serviços
-remotos; a F1 não empacota, não assina e não substitui o Qt como desktop padrão.
+remotos.
 
 
 ## O que a F2 entrega (telas restantes)
@@ -186,18 +181,26 @@ Protocolo de midia: `tucoteca-media://arquivo/<caminho>` servido pelo main com
 (valida que o caminho esta sob a home).
 
 Divergencias documentadas: o player de musica e do renderer (HTMLAudio sobre o protocolo
-de midia), nao o MCI do Qt/TUI (`player.py` segue TUI-only); o volume global do Windows
+de midia), nao o MCI da TUI (`player.py` segue TUI-only); o volume global do Windows
 ainda nao foi portado (pendencia). Musicas nao entram na lixeira (remover apaga o
-arquivo, sem desfazer). TUI curses e Qt permanecem (F5 retira o Qt).
+arquivo, sem desfazer).
 
-Ainda nao (fatias seguintes): F3 modulos de terceiros; F4 empacotamento e assinatura;
-F5 retirada do Qt e do `BIBLIOTECA_WEBENGINE`; F6 release 1.2.0. Pendencias nomeadas
-da F2 (F2b/F3): importacao/scan/drag&drop de jogos, capas, conquistas, mods/emulacao,
-saves/ferramentas, Spotify/musicas online/fila/letras, YouTube embutido/busca/download,
-catalogo pacotes/UAC, configuracoes/tema, export/import da colecao, sincronizar
-Steam/wishlist/precos offline, "Iniciar cliente"/"Pacotes locais", volume global Windows,
-gamepad dentro de listas.
+O que ainda falta em relação ao antigo desktop Qt está listado em
+"Pendências de paridade" abaixo.
 
+
+## Pendências de paridade (antes da 1.3.0 final)
+
+Sem método na ponte (o domínio existe em `bib_nucleo`/`servicos_ui`): mods,
+cheats, texturas HD e presets do Azahar; controles/pads (fotografar, aplicar,
+gerar mapa); saneamento e reparo com UAC.
+
+Na ponte, mas sem tela: `emulacao.status`/`consultar`/`atualizar`,
+`musicas.letras`, `musicas.eq`, `desejos.importar_wishlist`,
+`desejos.buscar_fontes`, `capas.libretro`, `capas.importar_selecionados`,
+`jogo.disco`, `ferramentas.abrir`, `torrents.fora_destino`.
+
+Também pendentes: arrastar e soltar jogos e volume global do Windows.
 
 ## App instalado (F4)
 

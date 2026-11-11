@@ -47,7 +47,7 @@ function etiquetasDe(jogo: JogoDaLista): string {
 
 /**
  * Aplica filtro e busca. A busca exige todas as palavras (sem acento) em
- * título/etiquetas/plataforma — como o `_filtrar` do qt_bridge.
+ * título/etiquetas/plataforma (mesma regra do antigo filtro do desktop Qt).
  */
 export function filtrarJogos(
   jogos: JogoDaLista[] | undefined,

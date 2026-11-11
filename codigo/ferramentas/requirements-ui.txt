@@ -1,2 +1,0 @@
-# Qt Quick, QML, controles e renderização acelerada. Núcleo continua stdlib.
-PySide6-Essentials==6.10.2

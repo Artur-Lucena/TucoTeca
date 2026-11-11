@@ -28,6 +28,8 @@ def _repo_falso(versao="1.2.0", pyproject="1.2.0", changelog=True) -> Path:
         "CHANGELOG.md": (f"# Changelog\n\n## [{versao}] - 2026-11-11\n\n### Adicionado\n\n- Instalador.\n\n"
                          "## [1.0.0] - 2026-01-01\n\n- antigo\n") if changelog else "# Changelog\n",
         "README.md": "TucoTeca", "LICENSE": "MIT",
+        # está na lista explícita E sai na varredura de docs/ (regressão de duplicata)
+        "docs/CONTRIBUTING.md": "# Colaboração",
         "codigo/bib_core.py": "# núcleo",
     }
     for nome, conteudo in arquivos.items():
@@ -88,6 +90,9 @@ def teste_release_gera_anexos_coerentes():
     afirmar("SmartScreen" in notas and "Atenção" not in notas, notas)
     with zipfile.ZipFile(saida / "tucoteca-1.2.0-fontes.zip") as z:
         afirmar(json.loads(z.read("MANIFESTO-FONTES.json"))["revisao_git"] == SHA)
+        nomes = z.namelist()
+        afirmar(len(nomes) == len(set(nomes)), "entradas duplicadas no ZIP de fontes")
+        afirmar("docs/CONTRIBUTING.md" in nomes, nomes)
     # sem staging esquecido ao lado da saída
     afirmar([p.name for p in saida.parent.iterdir()] == ["v1.2.0"], list(saida.parent.iterdir()))
 
@@ -98,6 +103,13 @@ def teste_release_recusa_versoes_divergentes():
     afirmar("pyproject.toml" in _erro(REL.ler_versao, repo))
     repo = _repo_falso(changelog=False)
     afirmar("CHANGELOG" in _erro(REL.ler_versao, repo))
+    repo = _repo_falso()
+    pacote = repo / "codigo/frontends/electron/package.json"
+    pacote.parent.mkdir(parents=True)
+    pacote.write_text('{"name": "tucoteca-electron", "version": "0.1.0"}', encoding="utf-8")
+    afirmar("package.json" in _erro(REL.ler_versao, repo))
+    pacote.write_text('{"name": "tucoteca-electron", "version": "1.2.0"}', encoding="utf-8")
+    afirmar(REL.ler_versao(repo) == "1.2.0")
     repo = _repo_falso()
     dist = _dist_falso(repo, versao="1.1.0")
     msg = _erro(REL.preparar, SHA, repo / "saida", repo=repo, dist=dist, conferir_git=False)
@@ -158,6 +170,12 @@ def teste_runtime_python_confere_hash_e_troca_pasta():
     afirmar("inseguro" in _erro(RUNTIME.instalar, inseguro, inseguro.parent / "py",
                                 sha256=hashlib.sha256(inseguro.read_bytes()).hexdigest()))
     afirmar(not (inseguro.parent / "fora.txt").exists())
+
+
+def teste_versoes_do_repositorio_coerentes():
+    """O próprio checkout precisa passar no gate de versão do preparador."""
+    versao = REL.ler_versao(REL.REPO)
+    afirmar(versao == (REL.REPO / "VERSION").read_text(encoding="utf-8").strip(), versao)
 
 
 def teste_icone_ico_valido_e_reproduzivel():

@@ -17,7 +17,7 @@ import urllib.request
 from bib_nucleo.rede import exigir_rede, online
 
 ENDPOINT = "https://lrclib.net/api/get"
-USER_AGENT = "TucoTeca/1.0 (uso pessoal; https://github.com/Artur-Lucena/Projeto-Launcher)"
+USER_AGENT = "TucoTeca/1.0 (uso pessoal; https://github.com/Artur-Lucena/TucoTeca)"
 _TEMPO_LRC = re.compile(r"\[(\d{1,3}):(\d{2}(?:\.\d{1,3})?)\]")
 _PEDIDOS = threading.Lock()
 

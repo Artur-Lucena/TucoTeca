@@ -1,20 +1,22 @@
 # Roadmap — TucoTeca
 
-Estado: **1.0.3 publicada** (Mac: bundle .app + instalador simplificado). Desenvolvimento da
-**1.1.0** em curso.
+Estado: **1.3.0 em preparação** — primeira entrega do desktop Electron como
+instalador Windows. Publicadas antes: 1.0.1, 1.0.2 e 1.0.3 (Mac); a tag
+`v1.2.0` marca as fatias Electron F0–F6.
 
-## 1.1.0 — frente atual
-- Prova macOS nativa no Ventura 13.7.8.
-- Prova física do controle (Xbox 360 XInput/SDL).
-- Credenciais vivas (Spotify, Steam, SteamGridDB) + wishlist viva.
-- Everything portátil ativo.
-- Testar links_ntfs.py e ZIP de dados.
+## Até a 1.3.0
 
-## Fases finais
-1. Validação Mac real.
-2. Fechar 1.1.0 (controle, credenciais, Everything).
-3. Qualidade (testes + lint).
-4. Release 1.1.0 (build Windows/Mac, hashes, publicar).
+1. ~~Empacotamento: instalador NSIS com Python embutido e preparador de release.~~
+2. ~~Coerência: versões unificadas, docs/CI/lançadores sem Qt.~~
+3. Paridade com o antigo Qt: decidir, item a item, entre implementar ou cortar
+   (lista em `DESKTOP_ELECTRON.md`, "Pendências de paridade").
+4. Acabamento: revisão de textos/acentos e layout, prova do instalador numa
+   máquina limpa, congelar, gerar anexos e publicar.
 
-## Histórico
-v1.0.0 preparação, v1.0.2 release, v1.0.3 Mac port.
+## Depois da 1.3.0
+
+- Assinatura de código do instalador (hoje decisão: sem assinatura).
+- Prova física do controle (Xbox 360 XInput) e credenciais vivas (Spotify,
+  Steam, SteamGridDB).
+- Desktop Electron para macOS/Linux (hoje só TUI).
+- Atualização automática (hoje desligada: `publish: null`).

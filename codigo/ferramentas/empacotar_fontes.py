@@ -19,10 +19,9 @@ IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git", ".provas",
              # artefatos do app Electron (dependências e builds), não fontes
              "node_modules", "out", "dist"}
 RAIZ_ARQUIVOS = {"README.md", "docs/CONTRIBUTING.md", "LICENSE", ".gitignore", ".gitattributes",
-                 "BibliotecaHub.bat", "BibliotecaHub.sh", "BibliotecaHubMac.command",
-                  "codigo/ferramentas/requirements-ui.txt"}
+                 "BibliotecaHub.bat", "BibliotecaHub.sh", "BibliotecaHubMac.command"}
 RAIZ_ARQUIVOS.update({"TucoTeca.bat", "VERSION", "CHANGELOG.md", "docs/SECURITY.md",
-                      "pyproject.toml", "conftest.py", "codigo/ferramentas/requirements-extras.txt"})
+                      "pyproject.toml", "conftest.py", "AGENTS.md"})
 EXTENSOES = {"codigo": {".py", ".bat",
                         # interface Electron (main/preload/renderer, config e ícone)
                         ".ts", ".tsx", ".css", ".html", ".json", ".cjs", ".ico"},
@@ -53,7 +52,10 @@ def listar_fontes(repo: Path = REPO) -> list[Path]:
                 path = Path(pasta, fn)
                 if (path.suffix.lower() in extensoes or fn in NOMES_EXTRAS) and not _link(path):
                     arquivos.append(path)
-    return sorted(arquivos, key=lambda p: p.relative_to(repo).as_posix())
+    # arquivos da lista explícita (ex.: docs/CONTRIBUTING.md) também saem na
+    # varredura de docs/: sem dedup o ZIP ganharia entradas duplicadas
+    unicos = {p.relative_to(repo).as_posix(): p for p in arquivos}
+    return [unicos[rel] for rel in sorted(unicos)]
 
 
 def empacotar_fontes(destino: Path, repo: Path = REPO, revisao: str | None = None) -> dict:

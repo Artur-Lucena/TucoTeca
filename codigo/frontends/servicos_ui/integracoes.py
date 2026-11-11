@@ -18,7 +18,7 @@ declara, num vocabulario fixo (`CAPACIDADES`), o que a integracao faz:
     "config"   -> expoe presets/opcoes de configuracao
 
 `apresentar()` devolve um DTO serializavel com todas as chaves, inclusive
-`capacidades` como lista ordenada (o QML itera chaves genericas). Nomes,
+`capacidades` como lista ordenada (a interface itera chaves genericas). Nomes,
 exports e formatos atuais continuam validos: `capacidades` tem default `()`.
 
 Para adicionar uma integracao em 3 passos (modulo de rede -> registro aqui ->
