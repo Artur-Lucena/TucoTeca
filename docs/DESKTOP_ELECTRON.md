@@ -136,7 +136,8 @@ Variáveis do app Electron:
 
 | Variável | Uso |
 |---|---|
-| `TUCOTECA_RAIZ` | raiz do repositório/bundle (padrão: derivada do `appPath`) |
+| `TUCOTECA_RAIZ` | raiz dos fontes Python (padrão: checkout = 3 níveis acima do `appPath`; instalado = `resources/tucoteca`) |
+| `BIBLIOTECA_HOME` | pasta da coleção (padrão: checkout = a raiz; instalado = `Documentos\TucoTeca`, preservada ao atualizar/desinstalar) |
 | `TUCOTECA_PYTHON` | intérprete explícito; ordem: env → runtime embutido `programa/windows-x64/python/python.exe` → `py -3.14` / `python3` |
 | `TUCOTECA_USERDATA` | userData do Electron fora do padrão (provas) |
 
@@ -196,3 +197,13 @@ saves/ferramentas, Spotify/musicas online/fila/letras, YouTube embutido/busca/do
 catalogo pacotes/UAC, configuracoes/tema, export/import da colecao, sincronizar
 Steam/wishlist/precos offline, "Iniciar cliente"/"Pacotes locais", volume global Windows,
 gamepad dentro de listas.
+
+
+## App instalado (F4)
+
+`npm run dist` gera `dist/TucoTeca-Setup-<versão>-x64.exe` (NSIS por usuário,
+sem admin) com `electron-builder.config.cjs`. O núcleo Python, a ponte e o
+Python embutido vão em `resources/tucoteca/`; a coleção padrão fica em
+`Documentos\TucoTeca`. A ponte roda com `windowsHide` (sem console). Fluxo
+completo de build, prova e anexos em `docs/RELEASES.md`. Assinatura de
+código continua fora (decisão do usuário).

@@ -1,7 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'electron'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { registrarProtocoloMedia, registrarProtocoloMidia } from './arquivos'
+import { resolverRaizHome } from './caminhos'
 import { lockOrfao } from './lock'
 import { montarMenu } from './menu'
 import { ClientePonte } from './ponte'
@@ -38,8 +39,20 @@ function lerFlags(): Flags {
 }
 
 const flags = lerFlags()
-const RAIZ = resolve(process.env.TUCOTECA_RAIZ || join(app.getAppPath(), '..', '..', '..'))
-const HOME = process.env.BIBLIOTECA_HOME || RAIZ
+const { raiz: RAIZ, home: HOME } = resolverRaizHome({
+  empacotado: app.isPackaged,
+  appPath: app.getAppPath(),
+  resourcesPath: process.resourcesPath,
+  documentos: app.getPath('documents'),
+  env: process.env,
+})
+// A ponte herda o ambiente: assim o núcleo usa a mesma coleção que o main valida.
+process.env.BIBLIOTECA_HOME = HOME
+try {
+  mkdirSync(HOME, { recursive: true })
+} catch {
+  // falha aqui vira erro claro da ponte (coleção inacessível), não crash do main
+}
 const CAMINHO_LOCK = join(HOME, '.biblioteca.lock')
 
 let ponte: ClientePonte | null = null

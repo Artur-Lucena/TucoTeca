@@ -141,6 +141,8 @@ export class ClientePonte {
     const processo = criar(comando, args, {
       env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONIOENCODING: 'utf-8' },
       stdio: ['pipe', 'pipe', 'pipe'],
+      // App GUI no Windows: sem isso o python.exe abre uma janela de console.
+      windowsHide: true,
     })
     this.processo = processo
 

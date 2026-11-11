@@ -15,14 +15,22 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[2]
 IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git", ".provas",
-             ".pytest_cache", ".ruff_cache", ".venv"}
+             ".pytest_cache", ".ruff_cache", ".venv",
+             # artefatos do app Electron (dependências e builds), não fontes
+             "node_modules", "out", "dist"}
 RAIZ_ARQUIVOS = {"README.md", "docs/CONTRIBUTING.md", "LICENSE", ".gitignore", ".gitattributes",
                  "BibliotecaHub.bat", "BibliotecaHub.sh", "BibliotecaHubMac.command",
-                  "codigo/ferramentas/Montar-Universal.bat", "codigo/ferramentas/requirements-ui.txt"}
+                  "codigo/ferramentas/requirements-ui.txt"}
 RAIZ_ARQUIVOS.update({"TucoTeca.bat", "VERSION", "CHANGELOG.md", "docs/SECURITY.md",
                       "pyproject.toml", "conftest.py", "codigo/ferramentas/requirements-extras.txt"})
-EXTENSOES = {"codigo": {".py", ".iss", ".qml"}, "docs": {".md"},
+EXTENSOES = {"codigo": {".py", ".bat",
+                        # interface Electron (main/preload/renderer, config e ícone)
+                        ".ts", ".tsx", ".css", ".html", ".json", ".cjs", ".ico"},
+             "docs": {".md"},
               ".github": {".yml", ".yaml", ".md"}, "midia": {".png", ".jpg", ".jpeg"}}
+
+# arquivos sem extensão útil que também são fonte
+NOMES_EXTRAS = {".gitignore"}
 
 
 def _link(path: Path) -> bool:
@@ -43,7 +51,7 @@ def listar_fontes(repo: Path = REPO) -> list[Path]:
             dirs[:] = sorted(d for d in dirs if d not in IGNORADAS and not _link(Path(pasta, d)))
             for fn in sorted(nomes):
                 path = Path(pasta, fn)
-                if (path.suffix.lower() in extensoes or fn == "qmldir") and not _link(path):
+                if (path.suffix.lower() in extensoes or fn in NOMES_EXTRAS) and not _link(path):
                     arquivos.append(path)
     return sorted(arquivos, key=lambda p: p.relative_to(repo).as_posix())
 
