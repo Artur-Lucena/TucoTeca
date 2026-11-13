@@ -150,3 +150,58 @@ def teste_atualizar_emulador_vira_trabalho_e_exige_consulta():
         r = _ok(ponte, "emulacao.atualizar", {"chave": "azahar", "info": {"tag": "2125.0"}})
         item = _esperar_fim(ponte, r["trabalho"]["id"])
     afirmar(item["estado"] == "erro" and "sem espaço" in item["erro"], item)
+
+
+def _prov_falso(chamadas, tag_remota="v2"):
+    def release_info():
+        chamadas.append("release_info")
+        return {"tag": tag_remota, "size": 40 * 1048576, "url": "https://exemplo.invalid/emu.zip"}
+    return {"chave": "azahar", "nome": "Azahar Falso", "origens": (), "sistemas": (),
+            "rom_exts": (), "release_info": release_info, "versao_local": lambda: "v1",
+            "instalar": lambda info, progresso=None: {"ok": True, "tag": tag_remota}}
+
+
+def teste_emuladores_status_sem_rede_e_consulta_explicita():
+    import bib_core as core
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-emus-"))
+    ponte = Ponte(ServicoBiblioteca(tmp / "b.db"))
+    chamadas = []
+    falsos = {"azahar": _prov_falso(chamadas), "desmume": _prov_falso(chamadas)}
+    with patch.object(core, "provedores", lambda: falsos):
+        status = _ok(ponte, "emulacao.status")
+        afirmar(len(status["itens"]) == 2 and "release_info" not in chamadas, (status, chamadas))
+        consulta = _ok(ponte, "emulacao.consultar", {"chave": "azahar"})
+    afirmar(consulta["tag"] == "v2" and consulta["atualizado"] is False, consulta)
+    afirmar(consulta["tamanho_mb"] == 40 and consulta["info"]["tag"] == "v2", consulta)
+
+
+def teste_controles_listar_fotografar_aplicar_gerar_estado():
+    import bib_core as core
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-pads-"))
+    ponte = Ponte(ServicoBiblioteca(tmp / "b.db"))
+    salvos = ["Padrão"]
+    with patch.object(core, "listar_controles", lambda: [{"nome": "Xbox", "familia": "xbox360"}]), \
+            patch.object(core, "listar_presets_controle", lambda: list(salvos)), \
+            patch.object(core, "fotografar_perfil",
+                         lambda n: salvos.append(n) or {"ok": True, "preset": n}), \
+            patch.object(core, "aplicar_preset_controle", lambda n: {"ok": True, "chaves": 12}), \
+            patch.object(core, "detectar_sdl", lambda: []), \
+            patch.object(core, "nomes_sdl", lambda: {}), \
+            patch.object(core, "salvar_mapa_gerado",
+                         lambda tipo, **kw: salvos.append(kw["nome"]) or {"ok": True}), \
+            patch.object(core, "ler_estado_xinput", lambda slot: {"slot": slot}), \
+            patch.object(core, "resumir_estado", lambda est: f"A slot={est['slot']}"):
+        lista = _ok(ponte, "controles.listar")
+        afirmar(lista["pads"][0]["nome"] == "Xbox" and lista["presets"] == ["Padrão"], lista)
+        afirmar(any(t["tipo"] == "xbox360" for t in lista["tipos"]), lista)
+        foto = _ok(ponte, "controles.fotografar", {"nome": "Meu Pad"})
+        afirmar("Meu Pad" in foto["presets"], foto)
+        afirmar(_ok(ponte, "controles.aplicar", {"nome": "Meu Pad"})["ok"] is True)
+        gerado = _ok(ponte, "controles.gerar", {"tipo": "xbox360"})
+        afirmar("xbox360-hub" in gerado["presets"], gerado)
+        afirmar(_ok(ponte, "controles.estado")["resumo"] == "A slot=0")
+        afirmar("tipo" in _erro(ponte, "controles.gerar", {"tipo": "patinete"}).lower())
+        afirmar("nome" in _erro(ponte, "controles.fotografar", {"nome": "  "}))
+        with patch.object(ponte.trabalhos, "listar",
+                          return_value=[{"id": 1, "escopo": "jogo", "estado": "rodando"}]):
+            afirmar("Feche o jogo" in _erro(ponte, "controles.aplicar", {"nome": "Meu Pad"}))

@@ -100,6 +100,26 @@ def metodos_paridade(trabalhos) -> dict:
         return {"trabalho": trabalhos.iniciar(f"Atualizar emulador {chave}", tarefa,
                                               escopo="emulador")}
 
+    # -- controles/pads (perfis [Controls] do Azahar) -----------------------
+    def controles_listar(servico, params):
+        """Pads detectados, presets salvos e tipos para gerar mapa. Só leitura."""
+        return {**servico.controles_pads(), **servico.controles_presets(),
+                **servico.controles_tipos()}
+
+    def controles_fotografar(servico, params):
+        r = servico.controle_fotografar(_texto(params, "nome"))
+        return {**dict(r), **servico.controles_presets()}
+
+    def controles_aplicar(servico, params):
+        return dict(servico.controle_aplicar(_texto(params, "nome")))
+
+    def controles_gerar(servico, params):
+        r = servico.controle_gerar(_texto(params, "tipo"))
+        return {**dict(r), **servico.controles_presets()}
+
+    def controles_estado(servico, params):
+        return servico.controle_estado()
+
     novos = {
         "emulacao.jogo": emulacao_jogo,
         "emulacao.mod": sem_jogo_aberto(emulacao_mod),
@@ -108,6 +128,12 @@ def metodos_paridade(trabalhos) -> dict:
         "emulacao.preset": sem_jogo_aberto(emulacao_preset),
         # substitui a versão síncrona de ponte.py (estourava o limite de 30 s)
         "emulacao.atualizar": sem_jogo_aberto(emulacao_atualizar),
+        "controles.listar": controles_listar,
+        "controles.fotografar": controles_fotografar,
+        # aplicar sobrescreve o perfil ativo do Azahar: nunca com jogo aberto
+        "controles.aplicar": sem_jogo_aberto(controles_aplicar),
+        "controles.gerar": controles_gerar,
+        "controles.estado": controles_estado,
     }
     return novos
 

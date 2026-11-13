@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
+import { PainelControles } from '../componentes/PainelControles'
 import { PainelEmuladores } from '../componentes/PainelEmuladores'
 import { textoDeFalha } from '../estado/notificacoes'
 
@@ -162,6 +163,8 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
       </div>
 
       <PainelEmuladores aoAvisar={aoAvisar} />
+
+      <PainelControles aoAvisar={aoAvisar} />
 
       <div class="form-config">
         <h2>Manutenção</h2>
