@@ -217,6 +217,29 @@ async function principal(): Promise<void> {
     return resultado.filePaths[0] ?? null
   })
 
+  // Arquivo único; filtros vêm do renderer mas só extensões alfanuméricas passam.
+  ipcMain.handle('dialogo:escolher-arquivo', async (_evento, filtros?: unknown) => {
+    const lista = Array.isArray(filtros)
+      ? filtros
+          .filter((f): f is { nome: string; extensoes: string[] } =>
+            typeof f === 'object' && f !== null &&
+            typeof (f as { nome?: unknown }).nome === 'string' &&
+            Array.isArray((f as { extensoes?: unknown }).extensoes))
+          .map((f) => ({
+            name: f.nome.slice(0, 60),
+            extensions: f.extensoes.filter((e) => typeof e === 'string' && /^[a-z0-9]{1,8}$/i.test(e)),
+          }))
+          .filter((f) => f.extensions.length > 0)
+      : []
+    const opcoes = { properties: ['openFile' as const], filters: lista }
+    const [janela] = BrowserWindow.getAllWindows()
+    const resultado = janela
+      ? await dialog.showOpenDialog(janela, opcoes)
+      : await dialog.showOpenDialog(opcoes)
+    if (resultado.canceled) return null
+    return resultado.filePaths[0] ?? null
+  })
+
   // Só https; com BIBLIOTECA_REDE=0 a ação é recusada (espelha o exigir_rede).
   ipcMain.handle('app:abrir-url', async (_evento, url: string) => {
     const texto = String(url ?? '').trim()

@@ -423,16 +423,6 @@ def _emulacao_consultar(servico, params) -> dict:
     return servico.emu_consultar(chave.strip())
 
 
-def _emulacao_atualizar(servico, params) -> dict:
-    chave = params.get("chave")
-    if not isinstance(chave, str) or not chave.strip():
-        raise ValueError("chave deve ser um texto")
-    info = params.get("info", {})
-    if not isinstance(info, dict):
-        raise ValueError("info deve ser um objeto")
-    return servico.emu_atualizar(chave.strip(), info)
-
-
 def _ferramentas_jogo(servico, params) -> dict:
     ident = _inteiro(params, "id")
     return servico.ferramentas_jogo(ident)
@@ -610,7 +600,6 @@ METODOS = {
     "capas.libretro": _capas_libretro,
     "emulacao.status": _emulacao_status,
     "emulacao.consultar": _emulacao_consultar,
-    "emulacao.atualizar": _emulacao_atualizar,
     "ferramentas.jogo": _ferramentas_jogo,
     "jogo.diagnosticar": _diagnosticar_jogo,
     "jogo.disco": _disco_jogo,
@@ -748,6 +737,10 @@ class Ponte:
             "videos.baixar_mp3": self._videos_baixar_mp3,
             "jogos.importar": self._importar_jogos,
         })
+        # paridade com o antigo desktop Qt (emulação, controles, manutenção…);
+        # import tardio: no app instalado o sys.path só fica pronto em preparar_ambiente()
+        from ponte_paridade import metodos_paridade
+        base.update(metodos_paridade(self.trabalhos))
         self.metodos = base
 
     def _publicar_evento(self, evento: dict) -> None:

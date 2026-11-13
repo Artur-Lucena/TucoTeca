@@ -1828,3 +1828,67 @@ body {
 .checkbox-wrap { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; font-size: var(--text-md); }
 .loading { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--texto2); font-size: var(--text-md); }
 .loading-spinner { width: 16px; height: 16px; border: 2px solid var(--borda); border-top-color: var(--realce); border-radius: 50%; animation: spin 0.6s linear infinite; }
+/* ---- Fase 3: paridade (emulação, controles, manutenção…) ---- */
+.sub {
+  margin: 0 0 var(--espaco-sm);
+  font-size: 13px;
+  color: var(--texto2);
+}
+
+p.aviso-inline,
+.painel-emulacao p.aviso {
+  margin: 0 0 var(--espaco-sm);
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: 1px solid var(--perigo);
+  border-radius: var(--raio-sm);
+  font-size: 13px;
+  color: var(--texto);
+}
+
+.painel-emulacao h4,
+.painel-paridade h4 {
+  margin: var(--espaco-md) 0 var(--espaco-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.lista-simples {
+  display: grid;
+  gap: var(--espaco-xs);
+  margin: 0 0 var(--espaco-sm);
+  padding: 0;
+  list-style: none;
+}
+
+.lista-simples li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-sm);
+  padding: var(--espaco-xs) var(--espaco-sm);
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+  font-size: 13px;
+}
+
+/* checkbox com rótulo ao lado (o .detalhe label padrão é em grade) */
+.lista-simples label,
+.detalhe-linha > label,
+label.marcar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-sm);
+  color: var(--texto);
+}
+
+.detalhe input[type='checkbox'],
+.painel-paridade input[type='checkbox'] {
+  width: auto;
+  accent-color: var(--realce);
+}
+
+.detalhe-linha {
+  align-items: center;
+  flex-wrap: wrap;
+}

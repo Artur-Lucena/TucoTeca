@@ -16,6 +16,7 @@ const api: ApiTucoteca = {
   imagemUrl: (url) => converterUrlMidia(url),
   mediaUrl: (caminho) => mediaUrl(caminho),
   escolherPasta: () => ipcRenderer.invoke('dialogo:escolher-pasta'),
+  escolherArquivo: (filtros) => ipcRenderer.invoke('dialogo:escolher-arquivo', filtros),
   abrirUrl: (url) => ipcRenderer.invoke('app:abrir-url', url),
   abrirPasta: (caminho) => ipcRenderer.invoke('app:abrir-pasta', caminho),
   reabrir: () => ipcRenderer.invoke('ponte:reabrir'),

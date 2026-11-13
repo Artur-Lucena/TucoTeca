@@ -103,7 +103,8 @@ def conferir_app(dist: Path, exigir_runtime: bool = True) -> dict:
     recursos = dist / "win-unpacked" / "resources" / "tucoteca"
     if not recursos.is_dir():
         raise ValueError(f"{recursos} ausente: o instalador não veio do build atual")
-    for obrigatorio in ("codigo/frontends/ponte.py", "codigo/bib_core.py",
+    for obrigatorio in ("codigo/frontends/ponte.py", "codigo/frontends/ponte_paridade.py",
+                        "codigo/bib_core.py",
                         "codigo/ferramentas/abrir_hub.py", "VERSION", "LICENSE"):
         if not (recursos / obrigatorio).is_file():
             raise ValueError(f"app empacotado sem {obrigatorio}")

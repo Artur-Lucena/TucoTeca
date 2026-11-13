@@ -8,6 +8,7 @@ import {
 } from '../estado/jogos'
 import { textoDeFalha } from '../estado/notificacoes'
 import { jogoEmAndamento, listaTrabalhos } from '../estado/trabalhos'
+import { PainelEmulacao } from './PainelEmulacao'
 import { iniciais } from './PosterCard'
 
 interface Props {
@@ -501,6 +502,13 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                 )}
               </div>
             </section>
+
+            {String(jogo.launch_options ?? '').trim() !== '' && (
+              <section>
+                <h3>Emulação (3DS)</h3>
+                <PainelEmulacao id={id} bloqueado={jogando !== null} aoAvisar={aoAvisar} />
+              </section>
+            )}
 
             <section>
               <h3>Saves</h3>
