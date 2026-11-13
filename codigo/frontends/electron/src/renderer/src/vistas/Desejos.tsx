@@ -27,6 +27,13 @@ interface DesejoItem {
 }
 
 /** Tela Desejos: lista, preços (cache Steam), adicionar/remover e nota das pendências. */
+interface FontesDesejo {
+  titulo: string
+  steamrip: Array<{ titulo: string; url: string }>
+  fitgirl: Array<{ titulo: string; url: string }>
+  erros: string[]
+}
+
 export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props) {
   const desejos = (snapshot.value?.desejos ?? []) as DesejoItem[]
   const [busca, setBusca] = useState('')
@@ -119,6 +126,53 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
     }
   }
 
+  const [fontes, setFontes] = useState<FontesDesejo | null>(null)
+  const [buscandoFontes, setBuscandoFontes] = useState(false)
+
+  const sincronizarSteam = async () => {
+    try {
+      const r = await window.tucoteca.chamar<{ avisos?: string[] }>('desejos.sincronizar_steam')
+      aoAvisar(r?.avisos?.[0] ?? 'Wishlist sincronizada.')
+      aoMudou()
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
+  const importarWishlist = async () => {
+    const caminho = await window.tucoteca.escolherArquivo([{ nome: 'Wishlist da Steam (JSON)', extensoes: ['json'] }])
+    if (!caminho) return
+    try {
+      const r = await window.tucoteca.chamar<{ avisos?: string[] }>('desejos.importar_wishlist', { caminho })
+      aoAvisar(r?.avisos?.[0] ?? 'Wishlist importada.')
+      aoMudou()
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
+  const buscarFontes = async () => {
+    const titulo = String(escolhido?.titulo ?? '').trim()
+    if (titulo === '') return
+    setBuscandoFontes(true)
+    try {
+      const r = await window.tucoteca.chamar<FontesDesejo>('desejos.buscar_fontes', { titulo })
+      setFontes({ titulo, steamrip: r?.steamrip ?? [], fitgirl: r?.fitgirl ?? [], erros: r?.erros ?? [] })
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    } finally {
+      setBuscandoFontes(false)
+    }
+  }
+
+  const abrirFonte = async (url: string) => {
+    try {
+      await window.tucoteca.abrirUrl(url)
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
   const remover = async () => {
     if (escolhido?.id === undefined) return
     const titulo = String(escolhido.titulo ?? 'o desejo')
@@ -164,8 +218,23 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
           >
             {consultando ? 'Ver preços…' : 'Ver preços'}
           </button>
+          <button
+            type="button"
+            class="acao"
+            onClick={() => void buscarFontes()}
+            disabled={escolhido === undefined || buscandoFontes}
+            title="Procura o título selecionado nas fontes (abre a página no navegador)"
+          >
+            {buscandoFontes ? 'Buscando…' : 'Buscar fontes'}
+          </button>
           <button type="button" class="acao" onClick={() => setFormAberto((atual) => !atual)}>
             + Adicionar
+          </button>
+          <button type="button" class="acao" onClick={() => void sincronizarSteam()} title="Lê a wishlist da conta Steam deste PC">
+            Sincronizar Steam
+          </button>
+          <button type="button" class="acao" onClick={() => void importarWishlist()} title="Importa o JSON da wishlist salvo do site da Steam">
+            Importar JSON
           </button>
           <button
             type="button"
@@ -212,13 +281,37 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
         </div>
       )}
 
-      <p class="aviso">
-        Sincronizar Steam, importar wishlist e buscar fontes de download ainda não nesta fatia da
-        interface nova.
-      </p>
+      {fontes !== null && (
+        <div class="form-config painel-paridade fontes-desejo">
+          <h2>Fontes para “{fontes.titulo}”</h2>
+          {(['steamrip', 'fitgirl'] as const).map((chave) => (
+            <div key={chave}>
+              <h4>{chave === 'steamrip' ? 'SteamRip' : 'FitGirl'}</h4>
+              {fontes[chave].length === 0 ? (
+                <p class="sub">Nada encontrado.</p>
+              ) : (
+                <ul class="lista-simples">
+                  {fontes[chave].map((item, i) => (
+                    <li key={`${chave}-${i}`}>
+                      <span>{item.titulo}</span>
+                      <button type="button" class="acao" onClick={() => void abrirFonte(item.url)}>
+                        Abrir página ↗
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+          {fontes.erros.length > 0 && <p class="sub">Avisos: {fontes.erros.join(' · ')}</p>}
+          <button type="button" class="acao" onClick={() => setFontes(null)}>
+            Fechar
+          </button>
+        </div>
+      )}
 
       {lista.length === 0 ? (
-        <EmptyState icone="★" titulo="Nada por aqui." descricao="Adicione um appid ou sincronize a wishlist mais tarde." />
+        <EmptyState icone="★" titulo="Nada por aqui." descricao="Adicione um appid, sincronize com a Steam ou importe o JSON da wishlist." />
       ) : (
         <ul class="lista-desejos">
           {lista.map((desejo, posicao) => {

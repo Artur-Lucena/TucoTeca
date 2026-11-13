@@ -234,6 +234,18 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
     }
   }
 
+  const capaLibretro = async () => {
+    try {
+      await window.tucoteca.chamar('capas.libretro', { id })
+      aoAvisar('Capa do acervo libretro aplicada.')
+      const atualizado = await window.tucoteca.chamar<JogoDaLista>('jogo.ler', { id })
+      setJogo(atualizado)
+      aoMudou()
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
   const configurarSaves = async () => {
     const caminhos = savesInput.split(',').map((c) => c.trim()).filter(Boolean)
     try {
@@ -425,6 +437,11 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                 <button type="button" class="acao" onClick={() => void buscarCapas()}>
                   Buscar capas
                 </button>
+                {String(jogo.launch_options ?? '').trim() !== '' && (
+                  <button type="button" class="acao" onClick={() => void capaLibretro()} title="Capa de ROM pelo acervo libretro-thumbnails">
+                    Capa libretro
+                  </button>
+                )}
                 <button type="button" class="acao" onClick={() => void ferramentasJogo()}>
                   Ferramentas
                 </button>

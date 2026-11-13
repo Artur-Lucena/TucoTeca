@@ -249,3 +249,28 @@ def teste_volume_do_pc_le_define_e_indisponivel_nao_quebra():
             patch.object(core, "definir_volume_pc", lambda n, mudo=None: {"ok": False, "erro": "sem Core Audio"}):
         afirmar(_ok(ponte, "sistema.volume")["ok"] is False)
         afirmar("Core Audio" in _erro(ponte, "sistema.volume_definir", {"nivel": 10}))
+
+
+def teste_desejos_importar_json_e_buscar_fontes_pela_ponte():
+    from bib_nucleo.rede import fontes
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-desejos-"))
+    servico = ServicoBiblioteca(tmp / "b.db")
+    ponte = Ponte(servico)
+    arquivo = tmp / "wishlist.json"
+    arquivo.write_text(json.dumps([{"appid": "10", "titulo": "Alpha"},
+                                   {"appid": "20", "titulo": "Beta"}]), encoding="utf-8")
+    r = _ok(ponte, "desejos.importar_wishlist", {"caminho": str(arquivo)})
+    afirmar("2 novos" in r["avisos"][0], r)
+    titulos = sorted(d["titulo"] for d in servico.snapshot()["desejos"])
+    afirmar(titulos == ["Alpha", "Beta"], titulos)
+    vazio = tmp / "vazio.json"
+    vazio.write_text("[]", encoding="utf-8")
+    _erro(ponte, "desejos.importar_wishlist", {"caminho": str(vazio)})
+
+    with patch.object(fontes, "buscar_steamrip",
+                      lambda t: {"itens": [{"titulo": f"{t} Repack", "url": "https://steamrip.com/x"}]}), \
+            patch.object(fontes, "buscar_fitgirl", side_effect=OSError("tempo esgotado")):
+        achados = _ok(ponte, "desejos.buscar_fontes", {"titulo": "Alpha"})
+    afirmar(achados["steamrip"] == [{"titulo": "Alpha Repack", "url": "https://steamrip.com/x"}], achados)
+    afirmar(achados["fitgirl"] == [] and "tempo esgotado" in achados["erros"][0], achados)
+    afirmar("titulo" in _erro(ponte, "desejos.buscar_fontes", {"titulo": " "}))
