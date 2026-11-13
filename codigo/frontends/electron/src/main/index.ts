@@ -158,6 +158,12 @@ function criarJanela(): BrowserWindow {
     if (!flags.selftest || flags.screenshot) janela.show()
   })
 
+  // Soltar um arquivo fora da área de importação não pode trocar o app por
+  // file://… (nem um link interno levar a janela para fora do app).
+  janela.webContents.on('will-navigate', (evento, url) => {
+    if (url !== janela.webContents.getURL()) evento.preventDefault()
+  })
+
   janela.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://') || url.startsWith('https://')) shell.openExternal(url)
     return { action: 'deny' }

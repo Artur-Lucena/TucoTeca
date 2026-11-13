@@ -1944,3 +1944,27 @@ select.eq-preset {
   font: inherit;
   font-size: 13px;
 }
+
+.jogos {
+  position: relative;
+}
+
+.jogos.soltando {
+  outline: 2px dashed var(--realce);
+  outline-offset: -6px;
+  border-radius: var(--raio);
+}
+
+.soltar-dica {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  border-radius: var(--raio);
+  background: rgba(10, 10, 16, 0.72);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--texto);
+  pointer-events: none;
+}

@@ -9,6 +9,7 @@ import {
 import { textoDeFalha } from '../estado/notificacoes'
 import { jogoEmAndamento, listaTrabalhos } from '../estado/trabalhos'
 import { PainelEmulacao } from './PainelEmulacao'
+import { PainelManutencaoJogo } from './PainelManutencaoJogo'
 import { iniciais } from './PosterCard'
 
 interface Props {
@@ -270,16 +271,6 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
     }
   }
 
-  const diagnosticar = async () => {
-    try {
-      const r = await window.tucoteca.chamar<{ exe?: { estado?: string } }>('jogo.diagnosticar', { id })
-      const estado = r?.exe?.estado ?? 'ok'
-      aoAvisar(`Diagnóstico: executável ${estado}.`)
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
   const remover = async () => {
     if (jogo === null) return
     const titulo = String(jogo.titulo ?? 'o jogo')
@@ -445,9 +436,6 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                 <button type="button" class="acao" onClick={() => void ferramentasJogo()}>
                   Ferramentas
                 </button>
-                <button type="button" class="acao" onClick={() => void diagnosticar()}>
-                  Diagnosticar
-                </button>
               </div>
               {capasCandidatas.length > 0 && (
                 <div class="capas-candidatas">
@@ -518,6 +506,11 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                   </>
                 )}
               </div>
+            </section>
+
+            <section>
+              <h3>Manutenção</h3>
+              <PainelManutencaoJogo id={id} bloqueado={jogando !== null} aoMudou={aoMudou} aoAvisar={aoAvisar} />
             </section>
 
             {String(jogo.launch_options ?? '').trim() !== '' && (

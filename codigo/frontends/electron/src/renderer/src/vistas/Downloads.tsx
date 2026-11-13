@@ -20,6 +20,8 @@ interface TorrentItem {
   velocidade: number
   eta: number | null
   save_path: string
+  /** Concluído fora da pasta de jogos: candidato a Organizar. */
+  fora_destino?: boolean
 }
 
 interface RespostaListar {
@@ -178,8 +180,9 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
                       class="acao"
                       onClick={() => void organizar(item)}
                       disabled={ocupados[item.hash] === true}
+                      title={item.fora_destino === true ? 'Move para a pasta de jogos' : 'Organiza na pasta de jogos'}
                     >
-                      Organizar
+                      {item.fora_destino === true ? 'Organizar (fora da pasta de jogos)' : 'Organizar'}
                     </button>
                   )}
                 </div>

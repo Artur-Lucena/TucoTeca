@@ -10,6 +10,8 @@ destrutivas ficam na interface, antes da chamada.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 _MSG_JOGO_ABERTO = ("Feche o jogo aberto antes de mudar mods, texturas, cheats, "
                     "presets, controles ou arquivos da coleção.")
 
@@ -166,6 +168,58 @@ def metodos_paridade(trabalhos) -> dict:
             raise ValueError(r.get("erro") or "Volume do PC indisponível.")
         return r
 
+    # -- manutenção de jogos (saneamento, religar, UAC, disco) ---------------
+    def manutencao_plano(servico, params):
+        """O que o saneamento faria na pasta. Só leitura."""
+        return servico.sanear_plano(_texto(params, "caminho"))
+
+    def manutencao_sanear(servico, params):
+        """Aplica o saneamento (instaladores vão para .hub-lixo, reversível)."""
+        return dict(servico.sanear_pasta(_texto(params, "caminho")))
+
+    def jogo_religar(servico, params):
+        campo = _opcao(params, "campo", ("launch_options", "executable_path", "exe_win", "exe_linux"))
+        servico.religar_jogo(_id(params), campo, _texto(params, "caminho"))
+        return servico.diagnosticar_jogo(_id(params))
+
+    def jogo_jogar_elevado(servico, params):
+        """Abre como administrador (UAC do Windows). Sem rastreio automático de
+        horas: o núcleo abre uma sessão manual para registrar ao terminar."""
+        return dict(servico.iniciar_jogo_elevado(_id(params)))
+
+    # -- ferramentas de mídia externas (editores, equalizadores, players) ----
+    def ferramentas_listar(servico, params):
+        import bib_core as core
+
+        def lista(status):
+            return [{"chave": chave, **{k: v for k, v in dict(info).items() if k != "exe"}}
+                    for chave, info in status().items()]
+        return {"imagens": lista(core.status_editores),
+                "equalizadores": lista(core.status_equalizadores),
+                "videos": lista(core.status_reprodutores)}
+
+    # -- importar por arrastar e soltar: prévia → seleção → importação -------
+    def jogos_prever(servico, params):
+        """Prévia só-leitura: pasta varre PC+ROMs; arquivo é classificado."""
+        caminho = _texto(params, "caminho")
+        if Path(caminho).is_dir():
+            r = servico.prever_pasta(caminho)
+            return {"ok": bool(r.get("ok")), "itens": list(r.get("itens") or []),
+                    "erro": r.get("erro", ""), "avisos": []}
+        r = servico.analisar_arquivo(caminho)
+        item = r.get("item")
+        avisos = [r["aviso"]] if r.get("aviso") else []
+        if not r.get("ok") or not isinstance(item, dict):
+            return {"ok": False, "itens": [], "avisos": avisos,
+                    "erro": r.get("detalhe") or "Não reconheci este arquivo como jogo ou ROM."}
+        return {"ok": True, "itens": [dict(item)], "erro": "", "avisos": avisos}
+
+    def jogos_importar_selecionados(servico, params):
+        itens = params.get("itens")
+        if not isinstance(itens, list) or not all(isinstance(i, dict) for i in itens):
+            raise ValueError("itens deve ser uma lista de objetos")
+        return servico.importar_selecionados(itens)
+
     novos = {
         "emulacao.jogo": emulacao_jogo,
         "emulacao.mod": sem_jogo_aberto(emulacao_mod),
@@ -186,6 +240,13 @@ def metodos_paridade(trabalhos) -> dict:
         "sistema.volume": volume_ler,
         "sistema.volume_definir": volume_definir,
         "sistema.volume_mudo": volume_mudo,
+        "manutencao.plano": manutencao_plano,
+        "manutencao.sanear": sem_jogo_aberto(manutencao_sanear),
+        "jogo.religar": sem_jogo_aberto(jogo_religar),
+        "jogo.jogar_elevado": sem_jogo_aberto(jogo_jogar_elevado),
+        "ferramentas.listar": ferramentas_listar,
+        "jogos.prever": jogos_prever,
+        "jogos.importar_selecionados": jogos_importar_selecionados,
     }
     return novos
 

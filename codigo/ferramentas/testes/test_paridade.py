@@ -274,3 +274,91 @@ def teste_desejos_importar_json_e_buscar_fontes_pela_ponte():
     afirmar(achados["steamrip"] == [{"titulo": "Alpha Repack", "url": "https://steamrip.com/x"}], achados)
     afirmar(achados["fitgirl"] == [] and "tempo esgotado" in achados["erros"][0], achados)
     afirmar("titulo" in _erro(ponte, "desejos.buscar_fontes", {"titulo": " "}))
+
+
+def teste_manutencao_plano_so_le_e_sanear_religar_respeitam_trava():
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-manut-"))
+    servico = ServicoBiblioteca(tmp / "b.db")
+    ponte = Ponte(servico)
+    pasta = tmp / "Jogo"
+    pasta.mkdir()
+    (pasta / "setup.exe").write_bytes(b"MZ" + b"0" * 64)
+    antes = sorted(p.name for p in pasta.iterdir())
+    plano = _ok(ponte, "manutencao.plano", {"caminho": str(pasta)})
+    afirmar(isinstance(plano, dict) and "pasta" in plano, plano)
+    afirmar(sorted(p.name for p in pasta.iterdir()) == antes, "plano alterou a pasta")
+    afirmar(_ok(ponte, "manutencao.plano", {"caminho": str(tmp / "nao-existe")})["ok"] is False)
+
+    gid = servico.salvar_jogo(0, {"titulo": "Jogo", "executable_path": str(pasta / "velho.exe")})["id"]
+    novo = pasta / "jogo.exe"
+    novo.write_bytes(b"MZ")
+    diag = _ok(ponte, "jogo.religar", {"id": gid, "campo": "executable_path", "caminho": str(novo)})
+    afirmar(diag["jogo"]["executable_path"] == str(novo), diag)
+    afirmar("campo" in _erro(ponte, "jogo.religar", {"id": gid, "campo": "titulo", "caminho": "x"}))
+    with patch.object(ponte.trabalhos, "listar",
+                      return_value=[{"id": 1, "escopo": "jogo", "estado": "rodando"}]):
+        for metodo, params in (("manutencao.sanear", {"caminho": str(pasta)}),
+                               ("jogo.religar", {"id": gid, "campo": "executable_path",
+                                                 "caminho": str(novo)}),
+                               ("jogo.jogar_elevado", {"id": gid})):
+            afirmar("Feche o jogo" in _erro(ponte, metodo, params), metodo)
+
+
+def teste_jogar_elevado_pede_uac_simulado():
+    import bib_core as core
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-uac-"))
+    servico = ServicoBiblioteca(tmp / "b.db")
+    ponte = Ponte(servico)
+    gid = servico.salvar_jogo(0, {"titulo": "Jogo", "executable_path": "C:/x/jogo.exe"})["id"]
+    pedidos = []
+    with patch.object(core, "preparar_lancamento", lambda jogo: {"aviso": ""}), \
+            patch.object(core, "executar_jogo_dict",
+                         lambda jogo, elevar=False: pedidos.append(elevar) or {"ok": True, "modo": "runas-uac"}), \
+            patch.object(core, "iniciar_sessao_manual", lambda gid, titulo: None):
+        r = _ok(ponte, "jogo.jogar_elevado", {"id": gid})
+    afirmar(r["ok"] is True and r["modo"] == "runas-uac" and pedidos == [True], (r, pedidos))
+
+
+def teste_ferramentas_listar_sem_exe_e_prever_importar_selecionados():
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-drop-"))
+    servico = ServicoBiblioteca(tmp / "b.db")
+    ponte = Ponte(servico)
+    lista = _ok(ponte, "ferramentas.listar")
+    afirmar(set(lista) == {"imagens", "equalizadores", "videos"}, lista)
+    afirmar(all("exe" not in f and "instalado" in f for grupo in lista.values() for f in grupo), lista)
+
+    pasta = tmp / "Jogos"
+    with patch.object(servico, "prever_pasta",
+                      lambda c: {"ok": True, "itens": [{"titulo": "Celeste", "executable_path": "C:/j/c.exe"}],
+                                 "raizes": [c], "info": {}, "erro": ""}):
+        pasta.mkdir()
+        previa = _ok(ponte, "jogos.prever", {"caminho": str(pasta)})
+    afirmar(previa["ok"] and previa["itens"][0]["titulo"] == "Celeste", previa)
+    with patch.object(servico, "analisar_arquivo",
+                      lambda c: {"ok": True, "tipo": "rom", "item": {"titulo": "Zelda"}, "aviso": "sem capa"}):
+        arquivo = _ok(ponte, "jogos.prever", {"caminho": str(tmp / "zelda.3ds")})
+    afirmar(arquivo["itens"] == [{"titulo": "Zelda"}] and arquivo["avisos"] == ["sem capa"], arquivo)
+    with patch.object(servico, "analisar_arquivo",
+                      lambda c: {"ok": True, "tipo": "desconhecido", "item": None, "detalhe": "não é jogo"}):
+        nada = _ok(ponte, "jogos.prever", {"caminho": str(tmp / "leia.txt")})
+    afirmar(nada["ok"] is False and "não é jogo" in nada["erro"], nada)
+
+    r = _ok(ponte, "jogos.importar_selecionados",
+            {"itens": [{"titulo": "Celeste", "executable_path": "C:/j/c.exe"}]})
+    afirmar(r, r)
+    afirmar([j["titulo"] for j in servico.snapshot()["jogos"]] == ["Celeste"], servico.snapshot()["jogos"])
+    afirmar("Nada selecionado" in _erro(ponte, "jogos.importar_selecionados", {"itens": []}))
+    afirmar("itens" in _erro(ponte, "jogos.importar_selecionados", {"itens": ["x"]}))
+
+
+def teste_torrents_listar_marca_fora_do_destino():
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-torr-"))
+    servico = ServicoBiblioteca(tmp / "b.db")
+    ponte = Ponte(servico)
+    leitura = {"torrents": [{"hash": "a", "nome": "A", "pct": 100, "completo": True, "save_path": "D:/Downloads/A"},
+                            {"hash": "b", "nome": "B", "pct": 100, "completo": True, "save_path": "D:/Jogos/B"},
+                            {"hash": "c", "nome": "C", "pct": 10, "save_path": ""}], "erros": []}
+    with patch.object(servico, "listar_torrents", lambda: leitura), \
+            patch.object(servico, "fora_do_destino", lambda c: "Downloads" in c):
+        itens = _ok(ponte, "torrents.listar")["itens"]
+    afirmar([i["fora_destino"] for i in itens] == [True, False, False], itens)

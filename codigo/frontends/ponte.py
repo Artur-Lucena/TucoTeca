@@ -227,8 +227,19 @@ def _torrents_listar(servico, params) -> dict:
             "velocidade": t.get("velocidade", 0),
             "eta": t.get("eta", None),
             "save_path": t.get("save_path", ""),
+            "fora_destino": _fora_destino(servico, t.get("save_path", "")),
         })
     return {"itens": itens, "erros": erros}
+
+
+def _fora_destino(servico, caminho) -> bool:
+    """Download fora da pasta de jogos (candidato a "Organizar"); erro = False."""
+    if not caminho:
+        return False
+    try:
+        return bool(servico.fora_do_destino(caminho))
+    except Exception:
+        return False
 
 
 def _torrents_controlar(servico, params) -> dict:

@@ -13,6 +13,8 @@ export interface ApiTucoteca {
   mediaUrl(caminho: string): string
   escolherPasta(): Promise<string | null>
   escolherArquivo(filtros?: FiltroArquivo[]): Promise<string | null>
+  /** Caminho no disco de um arquivo/pasta solto na janela ('' se não houver). */
+  caminhoDoArquivo(arquivo: File): string
   abrirUrl(url: string): Promise<void>
   abrirPasta(caminho: string): Promise<void>
   reabrir(): Promise<void>
