@@ -1892,3 +1892,55 @@ label.marcar {
   align-items: center;
   flex-wrap: wrap;
 }
+
+.volume-pc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-xs);
+}
+
+.player-modo.ativo {
+  border-color: var(--realce);
+  background: var(--realce-suave);
+}
+
+.letra {
+  max-height: 180px;
+  margin-top: var(--espaco-sm);
+  padding: var(--espaco-sm) var(--espaco-md);
+  overflow-y: auto;
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+}
+
+.letra-linhas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--texto2);
+}
+
+.letra-linhas li.atual {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.letra-texto {
+  margin: 0;
+  font: inherit;
+  font-size: 14px;
+  white-space: pre-wrap;
+  color: var(--texto);
+}
+
+select.eq-preset {
+  padding: 6px 8px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+}

@@ -7,6 +7,16 @@ import { faixaAtual, player, playerInicial, tocarFila } from '../estado/player'
 import { listaTrabalhos } from '../estado/trabalhos'
 import type { JogoResumo } from '../derivacoes'
 
+/** Rótulos dos presets de `PRESETS_EQ` (equalizadores.py). */
+const ROTULO_EQ: Record<string, string> = {
+  flat: 'Normalizar volume',
+  bass: 'Mais grave',
+  treble: 'Mais agudo',
+  vocal: 'Voz em destaque',
+  rock: 'Rock',
+  night: 'Modo noturno',
+}
+
 interface Props {
   /** Incrementa a cada Ctrl+F: foca o campo de busca. */
   focoBusca?: number
@@ -105,6 +115,36 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
     }
   }
 
+  const [eqPresets, setEqPresets] = useState<string[]>([])
+  const [eqPreset, setEqPreset] = useState('bass')
+  const [eqFfmpeg, setEqFfmpeg] = useState(false)
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const r = await window.tucoteca.chamar<{ presets?: string[]; ffmpeg?: boolean }>('musicas.eq_presets')
+        const presets = Array.isArray(r?.presets) ? r.presets : []
+        setEqPresets(presets)
+        setEqFfmpeg(r?.ffmpeg === true)
+        if (presets.length > 0 && !presets.includes('bass')) setEqPreset(presets[0])
+      } catch {
+        // sem presets o controle some; não é erro para o usuário
+      }
+    })()
+  }, [])
+
+  const equalizar = async () => {
+    if (escolhida === undefined) return
+    const caminho = String(escolhida.musica_path ?? '')
+    if (caminho === '') return aoAvisar('Esta faixa não tem arquivo local.', 'atencao')
+    try {
+      await window.tucoteca.chamar('musicas.eq', { caminho, preset: eqPreset })
+      aoAvisar(`Equalizando "${String(escolhida.titulo ?? '')}" (${ROTULO_EQ[eqPreset] ?? eqPreset})… a cópia aparece na lista ao terminar; o original fica intacto.`)
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
   const importar = async () => {
     try {
       const pasta = await window.tucoteca.escolherPasta()
@@ -196,6 +236,32 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
           >
             Remover
           </button>
+          {eqPresets.length > 0 && (
+            <>
+              <select
+                class="eq-preset"
+                value={eqPreset}
+                aria-label="Preset de equalização"
+                title={eqFfmpeg ? 'Preset de equalização' : 'Instale o FFmpeg para equalizar'}
+                onChange={(e) => setEqPreset((e.target as HTMLSelectElement).value)}
+              >
+                {eqPresets.map((p) => (
+                  <option key={p} value={p}>
+                    {ROTULO_EQ[p] ?? p}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                class="acao"
+                onClick={() => void equalizar()}
+                disabled={escolhida === undefined || !eqFfmpeg}
+                title={eqFfmpeg ? 'Gera uma cópia equalizada da faixa selecionada' : 'Instale o FFmpeg para equalizar'}
+              >
+                Equalizar
+              </button>
+            </>
+          )}
           <button type="button" class="acao" onClick={() => void importar()}>
             + Importar pasta
           </button>

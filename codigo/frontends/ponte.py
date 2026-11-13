@@ -308,16 +308,6 @@ def _musicas_letras(servico, params) -> dict:
     return servico.buscar_letras(artista, titulo, album, duracao)
 
 
-def _musicas_eq(servico, params) -> dict:
-    caminho = params.get("caminho")
-    if not isinstance(caminho, str) or not caminho.strip():
-        raise ValueError("caminho deve ser um texto")
-    preset = params.get("preset", "bass")
-    if not isinstance(preset, str):
-        raise ValueError("preset deve ser um texto")
-    return servico.aplicar_eq_musica(caminho.strip(), preset)
-
-
 def _capas_importar_selecionados(servico, params) -> dict:
     itens = params.get("itens")
     if not isinstance(itens, list):
@@ -618,7 +608,6 @@ METODOS = {
     "musicas.buscar_online": _musicas_buscar_online,
     "musicas.enfileirar": _musicas_enfileirar,
     "musicas.letras": _musicas_letras,
-    "musicas.eq": _musicas_eq,
     "capas.importar_selecionados": _capas_importar_selecionados,
     "pacotes.importar": _pacotes_importar,
     "pacotes.abrir_instalador": _pacotes_abrir_instalador,

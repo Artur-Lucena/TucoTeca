@@ -120,6 +120,52 @@ def metodos_paridade(trabalhos) -> dict:
     def controles_estado(servico, params):
         return servico.controle_estado()
 
+    # -- música: equalização (FFmpeg gera faixa nova) e volume do PC --------
+    def musicas_eq_presets(servico, params):
+        import bib_core as core
+        return {"presets": sorted(core.PRESETS_EQ), "ffmpeg": bool(core.ffmpeg_pronto())}
+
+    def musicas_eq(servico, params):
+        """Renderiza a faixa com o preset numa cópia nova (trabalho: pode passar de 30 s)."""
+        import bib_core as core
+        caminho = _texto(params, "caminho")
+        preset = _texto(params, "preset")
+        if preset not in core.PRESETS_EQ:
+            raise ValueError(f"preset deve ser um de: {', '.join(sorted(core.PRESETS_EQ))}")
+
+        def tarefa(progresso, cancelado):
+            progresso(5)
+            r = servico.aplicar_eq_musica(caminho, preset)
+            detalhe = dict(r) if isinstance(r, dict) else {}
+            detalhe.setdefault("aviso", f"Cópia equalizada ({preset}) adicionada às músicas.")
+            return detalhe
+
+        nome = caminho.replace("\\", "/").rsplit("/", 1)[-1]
+        return {"trabalho": trabalhos.iniciar(f"Equalizar {nome} ({preset})", tarefa,
+                                              escopo="equalizacao")}
+
+    def volume_ler(servico, params):
+        import bib_core as core
+        # indisponível (ex.: fora do Windows) volta ok=false: a interface esconde o controle
+        return dict(core.ler_volume_pc())
+
+    def volume_definir(servico, params):
+        import bib_core as core
+        nivel = params.get("nivel")
+        if isinstance(nivel, bool) or not isinstance(nivel, (int, float)):
+            raise ValueError("nivel deve ser um número de 0 a 100")
+        r = dict(core.definir_volume_pc(nivel))
+        if not r.get("ok"):
+            raise ValueError(r.get("erro") or "Volume do PC indisponível.")
+        return r
+
+    def volume_mudo(servico, params):
+        import bib_core as core
+        r = dict(core.alternar_mudo_pc())
+        if not r.get("ok"):
+            raise ValueError(r.get("erro") or "Volume do PC indisponível.")
+        return r
+
     novos = {
         "emulacao.jogo": emulacao_jogo,
         "emulacao.mod": sem_jogo_aberto(emulacao_mod),
@@ -134,6 +180,12 @@ def metodos_paridade(trabalhos) -> dict:
         "controles.aplicar": sem_jogo_aberto(controles_aplicar),
         "controles.gerar": controles_gerar,
         "controles.estado": controles_estado,
+        "musicas.eq_presets": musicas_eq_presets,
+        # substitui a versão síncrona de ponte.py (FFmpeg em faixa longa > 30 s)
+        "musicas.eq": musicas_eq,
+        "sistema.volume": volume_ler,
+        "sistema.volume_definir": volume_definir,
+        "sistema.volume_mudo": volume_mudo,
     }
     return novos
 

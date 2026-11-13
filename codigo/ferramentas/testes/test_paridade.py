@@ -205,3 +205,47 @@ def teste_controles_listar_fotografar_aplicar_gerar_estado():
         with patch.object(ponte.trabalhos, "listar",
                           return_value=[{"id": 1, "escopo": "jogo", "estado": "rodando"}]):
             afirmar("Feche o jogo" in _erro(ponte, "controles.aplicar", {"nome": "Meu Pad"}))
+
+
+def teste_equalizacao_vira_trabalho_e_valida_preset():
+    import bib_core as core
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-eq-"))
+    servico = ServicoBiblioteca(tmp / "b.db")
+    ponte = Ponte(servico)
+    with patch.object(core, "ffmpeg_pronto", lambda: False):
+        lista = _ok(ponte, "musicas.eq_presets")
+    afirmar("bass" in lista["presets"] and lista["ffmpeg"] is False, lista)
+    afirmar("preset" in _erro(ponte, "musicas.eq", {"caminho": "C:/m/a.mp3", "preset": "turbo"}))
+    with patch.object(servico, "aplicar_eq_musica",
+                      lambda c, p: {"ok": True, "path": c + f".{p}.mp3"}):
+        r = _ok(ponte, "musicas.eq", {"caminho": "C:/m/faixa.mp3", "preset": "bass"})
+        item = _esperar_fim(ponte, r["trabalho"]["id"])
+    afirmar(item["estado"] == "ok" and "faixa.mp3" in item["rotulo"], item)
+    afirmar(item["detalhe"]["path"].endswith(".bass.mp3"), item)
+
+
+def teste_volume_do_pc_le_define_e_indisponivel_nao_quebra():
+    import bib_core as core
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-vol-"))
+    ponte = Ponte(ServicoBiblioteca(tmp / "b.db"))
+    estado = {"nivel": 40, "mudo": False}
+
+    def definir(nivel, mudo=None):
+        estado["nivel"] = nivel
+        return {"ok": True, **estado}
+
+    def mudo():
+        estado["mudo"] = not estado["mudo"]
+        return {"ok": True, **estado}
+
+    with patch.object(core, "ler_volume_pc", lambda: {"ok": True, **estado}), \
+            patch.object(core, "definir_volume_pc", definir), \
+            patch.object(core, "alternar_mudo_pc", mudo):
+        afirmar(_ok(ponte, "sistema.volume")["nivel"] == 40)
+        afirmar(_ok(ponte, "sistema.volume_definir", {"nivel": 75})["nivel"] == 75)
+        afirmar(_ok(ponte, "sistema.volume_mudo")["mudo"] is True)
+        afirmar("nivel" in _erro(ponte, "sistema.volume_definir", {"nivel": "alto"}))
+    with patch.object(core, "ler_volume_pc", lambda: {"ok": False, "erro": "sem Core Audio"}), \
+            patch.object(core, "definir_volume_pc", lambda n, mudo=None: {"ok": False, "erro": "sem Core Audio"}):
+        afirmar(_ok(ponte, "sistema.volume")["ok"] is False)
+        afirmar("Core Audio" in _erro(ponte, "sistema.volume_definir", {"nivel": 10}))

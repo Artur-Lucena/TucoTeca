@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
+import { LetraFaixa } from './LetraFaixa'
+import { VolumePC } from './VolumePC'
 import {
   alternar,
   anterior,
@@ -35,6 +37,7 @@ export function PlayerRodape() {
   const [posicao, setPosicao] = useState(0)
   const [duracao, setDuracao] = useState(0)
   const [volume, setVolume] = useState(1)
+  const [mostrarLetra, setMostrarLetra] = useState(false)
 
   useEffect(() => {
     const el = audio.current
@@ -150,10 +153,22 @@ export function PlayerRodape() {
             max={1}
             step={0.01}
             value={volume}
-            aria-label="Volume"
+            aria-label="Volume do player"
+            title="Volume do player"
             onInput={(evento) => setVolume(Number((evento.target as HTMLInputElement).value))}
           />
+          <VolumePC />
+          <button
+            type="button"
+            class={`player-modo${mostrarLetra ? ' ativo' : ''}`}
+            aria-pressed={mostrarLetra}
+            title="Mostrar a letra (busca online no LRCLIB, com cache)"
+            onClick={() => setMostrarLetra((v) => !v)}
+          >
+            Letra
+          </button>
         </div>
+        {mostrarLetra && <LetraFaixa faixa={atual} posicao={posicao} duracao={duracao} />}
       </div>
       <ul class="player-fila">
         {estado.fila.map((faixa, indice) => (
