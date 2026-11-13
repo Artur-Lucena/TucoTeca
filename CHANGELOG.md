@@ -19,6 +19,14 @@ isso a entrega instalável segue como 1.3.0.
 - `validar.py` roda typecheck + vitest do Electron.
 - CI (manual): job `electron` com typecheck, vitest, build e, opcionalmente,
   instalador + selftest do app empacotado.
+- Paridade com o antigo desktop Qt (`ponte_paridade.py`): mods, cheats,
+  texturas HD e presets do Azahar no detalhe do jogo; emuladores (verificar e
+  atualizar) e controles/pads em Configurações; letra sincronizada e volume
+  do PC no player; equalização de faixas; wishlist por JSON, sincronizar
+  Steam e buscar fontes em Desejos; capa libretro; manutenção do jogo
+  (verificar/religar exe e ROM, disco, abrir como administrador); sanear
+  pasta; ferramentas de mídia; downloads fora da pasta de jogos; arrastar e
+  soltar para importar com prévia. Mapa completo em `DESKTOP_ELECTRON.md`.
 
 ### Alterado
 
@@ -28,6 +36,8 @@ isso a entrega instalável segue como 1.3.0.
   (`VERSION`, `pyproject.toml`, `package.json`), runtime e ausência de dados
   pessoais no app; gera fontes, notas, `release.json` e `SHA256SUMS.txt`.
 - Pacote de fontes inclui a interface Electron (sem `node_modules`/`out`/`dist`).
+- `emulacao.atualizar` e `musicas.eq` viram trabalhos em segundo plano (a
+  versão síncrona estourava o limite de 30 s da ponte).
 - macOS: `BibliotecaHubMac.command` abre a TUI (como o Linux).
 - Versões unificadas em 1.3.0; User-Agent aponta para o repositório TucoTeca.
 - Documentação (README, ARQUITETURA, CONTRIBUTING, INDICE, AGENTS, templates)
@@ -37,6 +47,8 @@ isso a entrega instalável segue como 1.3.0.
 
 - `TucoTeca-Electron.bat` não apaga mais o lock da coleção sem conferir o dono.
 - `desktop.py` acha o Electron em qualquer SO e avisa quando falta o build.
+- Soltar um arquivo na janela navegava o app para `file://`; agora é bloqueado.
+- Pacote de fontes saía com `docs/CONTRIBUTING.md` e `SECURITY.md` duplicados.
 
 ### Removido
 
@@ -48,8 +60,10 @@ isso a entrega instalável segue como 1.3.0.
 ### Limitações conhecidas
 
 - Instalador sem assinatura de código (SmartScreen na primeira execução).
-- Pendências de paridade com o antigo Qt (mods/cheats/texturas, controles,
-  saneamento, letras/EQ e outras) listadas em `docs/DESKTOP_ELECTRON.md`.
+- Download automático de repacks a partir das fontes não está na interface
+  nova (a busca abre a página no navegador).
+- Controles, UAC, volume e emuladores foram provados com simulação; falta a
+  conferência com controle físico, emulador real e o UAC do Windows.
 - macOS e Linux só pela TUI, a partir dos fontes.
 
 ## [1.2.0] - 2026-10-18

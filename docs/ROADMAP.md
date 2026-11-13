@@ -8,8 +8,7 @@ instalador Windows. Publicadas antes: 1.0.1, 1.0.2 e 1.0.3 (Mac); a tag
 
 1. ~~Empacotamento: instalador NSIS com Python embutido e preparador de release.~~
 2. ~~Coerência: versões unificadas, docs/CI/lançadores sem Qt.~~
-3. Paridade com o antigo Qt: decidir, item a item, entre implementar ou cortar
-   (lista em `DESKTOP_ELECTRON.md`, "Pendências de paridade").
+3. ~~Paridade com o antigo Qt (mapa em `DESKTOP_ELECTRON.md`).~~
 4. Acabamento: revisão de textos/acentos e layout, prova do instalador numa
    máquina limpa, congelar, gerar anexos e publicar.
 

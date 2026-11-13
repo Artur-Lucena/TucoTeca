@@ -189,18 +189,35 @@ O que ainda falta em relação ao antigo desktop Qt está listado em
 "Pendências de paridade" abaixo.
 
 
-## Pendências de paridade (antes da 1.3.0 final)
+## Paridade com o antigo Qt (fase 3, 1.3.0)
 
-Sem método na ponte (o domínio existe em `bib_nucleo`/`servicos_ui`): mods,
-cheats, texturas HD e presets do Azahar; controles/pads (fotografar, aplicar,
-gerar mapa); saneamento e reparo com UAC.
+Métodos novos ficam em `codigo/frontends/ponte_paridade.py` (registrados pela
+`Ponte`); a lógica continua em `servicos_ui`/`bib_nucleo`. Ações que mexem em
+arquivos do emulador ou da coleção recusam com um jogo aberto ("Feche o jogo
+aberto antes…"), como no Qt. Operações longas viram trabalhos (rodapé).
 
-Na ponte, mas sem tela: `emulacao.status`/`consultar`/`atualizar`,
-`musicas.letras`, `musicas.eq`, `desejos.importar_wishlist`,
-`desejos.buscar_fontes`, `capas.libretro`, `capas.importar_selecionados`,
-`jogo.disco`, `ferramentas.abrir`, `torrents.fora_destino`.
+| Onde | O quê | Métodos |
+|---|---|---|
+| Detalhe do jogo › Emulação (3DS) | mods (importar .zip/pasta, ligar, jogar sem mods, remover), cheats, texturas HD, presets do Azahar | `emulacao.jogo/mod/cheat/textura/preset` |
+| Detalhe do jogo › Manutenção | verificar exe/ROM e religar, usar o emulador atual, ROM candidata, espaço em disco, abrir como administrador (UAC) | `jogo.diagnosticar`, `jogo.religar`, `jogo.disco`, `jogo.jogar_elevado` |
+| Detalhe do jogo | capa libretro (jogos com ROM) | `capas.libretro` |
+| Configurações › Emuladores | versão local, verificar release, atualizar (trabalho) | `emulacao.status/consultar/atualizar` |
+| Configurações › Controles | pads, presets (salvar perfil atual, aplicar), mapa padrão por tipo, leitura ao vivo | `controles.listar/fotografar/aplicar/gerar/estado` |
+| Configurações › Sanear pasta | plano só-leitura e aplicar (instaladores → `.hub-lixo`) | `manutencao.plano/sanear` |
+| Configurações › Ferramentas de mídia | editores, equalizadores e players externos | `ferramentas.listar`, `ferramentas.abrir` |
+| Músicas | equalizar a faixa (cópia nova; trabalho) | `musicas.eq_presets`, `musicas.eq` |
+| Player do rodapé | letra sincronizada (LRCLIB, só com o painel aberto) e volume do PC | `musicas.letras`, `sistema.volume*` |
+| Desejos | sincronizar Steam, importar JSON, buscar fontes (abre a página) | `desejos.sincronizar_steam/importar_wishlist/buscar_fontes` |
+| Downloads | marca concluídos fora da pasta de jogos | `torrents.listar` (`fora_destino`) |
+| Jogos | arrastar pastas/exe/ROMs → prévia com seleção → importar | `jogos.prever`, `jogos.importar_selecionados` |
 
-Também pendentes: arrastar e soltar jogos e volume global do Windows.
+Fora da interface nova, de propósito: o download/instalação automático de
+repacks a partir das fontes (`baixar_fonte_steamrip`); a busca só abre a página.
+
+Arquivos soltos na janela fora da área de Jogos não fazem nada: o main bloqueia
+`will-navigate` e o renderer cancela o drop padrão (antes, soltar um arquivo
+trocava o app por `file://`). O caminho do arquivo solto vem de
+`webUtils.getPathForFile` no preload (`caminhoDoArquivo`).
 
 ## App instalado (F4)
 
