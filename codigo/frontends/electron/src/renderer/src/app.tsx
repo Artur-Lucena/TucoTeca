@@ -4,6 +4,7 @@ import { combinacao, decidirAtalho } from './atalhos'
 import { AvisoPonte } from './componentes/AvisoPonte'
 import { Atividade } from './componentes/Atividade'
 import { BarraLateral } from './componentes/BarraLateral'
+import { ConfirmacaoHost } from './componentes/Confirmacao'
 import { DetalheJogo } from './componentes/DetalheJogo'
 import { Paleta } from './componentes/Paleta'
 import { PlayerRodape } from './componentes/PlayerRodape'
@@ -330,7 +331,7 @@ export function App() {
           />
           <section class="conteudo">
             {ativo === undefined || ativo.chave === 'inicio' ? (
-              <Inicio snapshot={colecao ?? {}} />
+              <Inicio snapshot={colecao ?? {}} aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
             ) : ativo.chave === 'jogos' ? (
               <Lazy key="Jogos" fabrica={() => import('./vistas/Jogos').then((m) => m.Jogos)} props={{ focoBusca, perfil, aoAbrirJogo: (id: number) => setDetalheId(id), aoJogarJogo: (id: number) => void jogar(id), aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'musicas' ? (
@@ -356,6 +357,7 @@ export function App() {
         </main>
         {filaPlayer.length > 0 && <PlayerRodape />}
         <Atividade aoAvisar={avisar} />
+        <ConfirmacaoHost />
         {(jogando !== null || lixeira?.disponivel === true) && (
           <footer class="status">
             {jogando !== null && (

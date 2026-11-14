@@ -1,8 +1,15 @@
 import { Cartao } from '../componentes/Cartao'
 import { EmptyState, Metric } from '../componentes/ui'
+import { PainelSessoes } from '../componentes/PainelSessoes'
 import { continuarJogando, type Snapshot } from '../derivacoes'
 
-export function Inicio({ snapshot }: { snapshot: Snapshot }) {
+interface Props {
+  snapshot: Snapshot
+  aoAvisar?: (texto: string, tom?: 'info' | 'atencao') => void
+  aoMudou?: () => void
+}
+
+export function Inicio({ snapshot, aoAvisar = () => undefined, aoMudou = () => undefined }: Props) {
   const continuar = continuarJogando(snapshot.jogos)
   const sistema = snapshot.sistema ?? {}
   return (
@@ -16,6 +23,7 @@ export function Inicio({ snapshot }: { snapshot: Snapshot }) {
         <Metric valor={sistema.musicas ?? snapshot.musicas?.length ?? 0} label="Músicas" icone="♪" />
         <Metric valor={sistema.desejos ?? snapshot.desejos?.length ?? 0} label="Desejos" icone="★" />
       </div>
+      <PainelSessoes revisao={Number(sistema.pendentes ?? 0)} aoMudou={aoMudou} aoAvisar={aoAvisar} />
       <section class="secao">
         <h2>Continuar jogando</h2>
         {continuar.length === 0 ? (

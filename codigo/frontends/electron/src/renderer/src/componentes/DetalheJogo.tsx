@@ -9,6 +9,7 @@ import {
 import { textoDeFalha } from '../estado/notificacoes'
 import { jogoEmAndamento, listaTrabalhos } from '../estado/trabalhos'
 import { PainelEmulacao } from './PainelEmulacao'
+import { PainelFerramentasJogo } from './PainelFerramentasJogo'
 import { PainelManutencaoJogo } from './PainelManutencaoJogo'
 import { iniciais } from './PosterCard'
 
@@ -260,17 +261,6 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
     }
   }
 
-  const ferramentasJogo = async () => {
-    try {
-      const r = await window.tucoteca.chamar<{ saves?: unknown[]; snapshots?: unknown[] }>('ferramentas.jogo', { id })
-      const saves = Array.isArray(r?.saves) ? r.saves.length : 0
-      const snaps = Array.isArray(r?.snapshots) ? r.snapshots.length : 0
-      aoAvisar(`Ferramentas: ${saves} save(s), ${snaps} snapshot(s).`)
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
   const remover = async () => {
     if (jogo === null) return
     const titulo = String(jogo.titulo ?? 'o jogo')
@@ -433,9 +423,6 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                     Capa libretro
                   </button>
                 )}
-                <button type="button" class="acao" onClick={() => void ferramentasJogo()}>
-                  Ferramentas
-                </button>
               </div>
               {capasCandidatas.length > 0 && (
                 <div class="capas-candidatas">
@@ -530,6 +517,11 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                 <PainelEmulacao id={id} bloqueado={jogando !== null} aoAvisar={aoAvisar} />
               </section>
             )}
+
+            <section>
+              <h3>Saves e screenshots</h3>
+              <PainelFerramentasJogo id={id} bloqueado={jogando !== null} aoAvisar={aoAvisar} />
+            </section>
 
             <section>
               <h3>Saves</h3>

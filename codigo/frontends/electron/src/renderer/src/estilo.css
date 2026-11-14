@@ -2054,3 +2054,95 @@ select.eq-preset {
   font: inherit;
   font-size: 13px;
 }
+
+/* ---- 1.3.1: coleção, sessões, ferramentas do jogo, confirmação ---- */
+.grafico-meses {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--espaco-xs);
+  height: 110px;
+  margin: var(--espaco-sm) 0 var(--espaco-md);
+}
+
+.grafico-mes {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  align-items: end;
+  gap: 2px;
+  height: 100%;
+}
+
+.grafico-barra {
+  display: block;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--realce);
+}
+
+.grafico-rotulo {
+  font-size: 10px;
+  color: var(--texto2);
+  text-align: center;
+}
+
+.log-erros {
+  max-height: 260px;
+  margin: var(--espaco-sm) 0 0;
+  padding: var(--espaco-sm) var(--espaco-md);
+  overflow: auto;
+  border-radius: var(--raio-sm);
+  background: var(--fundo);
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: var(--texto2);
+}
+
+.sessoes-abertas {
+  margin-bottom: var(--espaco-xl);
+  padding: var(--espaco-md) var(--espaco-lg);
+  border: 1px solid var(--aviso);
+  border-radius: var(--raio);
+  background: var(--painel);
+}
+
+.campo-horas {
+  width: 140px;
+  padding: 6px 10px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+}
+
+.galeria {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: var(--espaco-sm);
+  margin-bottom: var(--espaco-sm);
+}
+
+.galeria img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--raio-sm);
+  object-fit: cover;
+}
+
+.confirmacao-texto {
+  margin: 0 0 var(--espaco-lg);
+  line-height: 1.5;
+  color: var(--texto);
+}
+
+.confirmacao-botoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--espaco-sm);
+}
+
+.acao.perigo {
+  border-color: var(--perigo);
+  color: var(--perigo);
+}

@@ -19,8 +19,8 @@ export function avisosDoResumo(sistema: SistemaResumo): Aviso[] {
       tom: 'atencao',
       texto:
         pendentes === 1
-          ? '1 sessão pendente para registrar e fechar.'
-          : `${pendentes} sessões pendentes para registrar e fechar.`,
+          ? '1 sessão aberta sem horas registradas — feche em Início.'
+          : `${pendentes} sessões abertas sem horas registradas — feche em Início.`,
     })
   }
 
@@ -30,7 +30,7 @@ export function avisosDoResumo(sistema: SistemaResumo): Aviso[] {
       avisos.push({
         id: 'backup-ausente',
         tom: 'atencao',
-        texto: 'Sem backup local da coleção — faça um backup na tela Sistema.',
+        texto: 'Sem backup local da coleção — use “Fazer backup agora” em Configurações.',
       })
     } else {
       const idade = Number(sistema.backup_idade_dias)

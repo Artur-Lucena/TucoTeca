@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
+import { PainelColecao } from '../componentes/PainelColecao'
 import { PainelControles } from '../componentes/PainelControles'
 import { PainelEmuladores } from '../componentes/PainelEmuladores'
 import { PainelFerramentasMidia } from '../componentes/PainelFerramentasMidia'
@@ -10,7 +11,7 @@ interface Props {
   aoMudou: () => void
 }
 
-/** Tela Configurações: aparência, provedores, estatísticas, backups e coleção. */
+/** Tela Configurações: aparência, provedores, emuladores, controles, manutenção e coleção. */
 export function Configuracoes({ aoAvisar, aoMudou }: Props) {
   const [tema, setTema] = useState('')
   const [densidade, setDensidade] = useState('')
@@ -19,8 +20,6 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
   const [steamgrid, setSteamgrid] = useState('')
   const [spotifyId, setSpotifyId] = useState('')
   const [spotifySecret, setSpotifySecret] = useState('')
-  const [estatisticas, setEstatisticas] = useState<Record<string, unknown> | null>(null)
-  const [backups, setBackups] = useState<unknown[]>([])
 
   useEffect(() => {
     void (async () => {
@@ -53,56 +52,6 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
         spotify_secret: spotifySecret,
       })
       aoAvisar('Provedores salvos.')
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const verEstatisticas = async () => {
-    try {
-      setEstatisticas(await window.tucoteca.chamar<Record<string, unknown>>('estatisticas.ler'))
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const listarBackups = async () => {
-    try {
-      const r = await window.tucoteca.chamar<{ itens?: unknown[] }>('backups.listar', { manter: 10 })
-      setBackups(r?.itens ?? [])
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const sincronizarSteam = async () => {
-    try {
-      const r = await window.tucoteca.chamar<Record<string, unknown>>('desejos.sincronizar_steam')
-      aoAvisar(`Wishlist sincronizada: ${JSON.stringify(r)}`)
-      aoMudou()
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const exportar = async () => {
-    try {
-      const pasta = await window.tucoteca.escolherPasta()
-      if (pasta === null || pasta === '') return
-      await window.tucoteca.chamar('colecao.exportar', { pasta })
-      aoAvisar('Coleção exportada.')
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const importar = async () => {
-    try {
-      const pasta = await window.tucoteca.escolherPasta()
-      if (pasta === null || pasta === '') return
-      await window.tucoteca.chamar('colecao.importar', { caminho: pasta, restaurar_saves: false })
-      aoAvisar('Coleção importada.')
-      aoMudou()
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }
@@ -172,26 +121,7 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
 
       <PainelFerramentasMidia aoAvisar={aoAvisar} />
 
-      <div class="form-config">
-        <h2>Manutenção</h2>
-        <button type="button" class="acao" onClick={() => void verEstatisticas()}>
-          Estatísticas
-        </button>
-        <button type="button" class="acao" onClick={() => void listarBackups()}>
-          Backups
-        </button>
-        <button type="button" class="acao" onClick={() => void sincronizarSteam()}>
-          Sincronizar Steam (wishlist)
-        </button>
-        <button type="button" class="acao" onClick={() => void exportar()}>
-          Exportar coleção
-        </button>
-        <button type="button" class="acao" onClick={() => void importar()}>
-          Importar coleção
-        </button>
-        {estatisticas !== null && <pre class="stats">{JSON.stringify(estatisticas, null, 2)}</pre>}
-        {backups.length > 0 && <pre class="stats">{JSON.stringify(backups, null, 2)}</pre>}
-      </div>
+      <PainelColecao aoAvisar={aoAvisar} aoMudou={aoMudou} />
     </section>
   )
 }

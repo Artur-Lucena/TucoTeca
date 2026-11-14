@@ -136,6 +136,12 @@ class MixNucleo:
         return [{"nome": p.name, "bytes": p.stat().st_size if p.is_file() else 0}
                 for p in arqs]
 
+    def fazer_backup_agora(self):
+        """Backup manual da coleção (SQLite + JSON), com a mesma poda do automático."""
+        with self._escrita:
+            r = core.fazer_backup(self.db_path)
+        return {"ok": True, "db": Path(r["db"]).name, "jogos": r.get("jogos", 0)}
+
     def sessoes(self):
         try:
             return core.listar_sessoes_pendentes()

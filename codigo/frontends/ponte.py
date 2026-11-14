@@ -499,7 +499,11 @@ def _exportar_colecao(servico, params) -> dict:
     pasta = params.get("pasta")
     if not isinstance(pasta, str) or not pasta.strip():
         raise ValueError("pasta deve ser um texto")
-    return servico.exportar_colecao_para(pasta.strip())
+    r = servico.exportar_colecao_para(pasta.strip())
+    # o domínio devolve ok=false em vez de levantar: a interface diria "exportada"
+    if isinstance(r, dict) and r.get("ok") is False:
+        raise ValueError(r.get("erro") or "Não foi possível exportar a coleção.")
+    return r
 
 
 def _importar_colecao(servico, params) -> dict:
@@ -507,7 +511,10 @@ def _importar_colecao(servico, params) -> dict:
     if not isinstance(caminho, str) or not caminho.strip():
         raise ValueError("caminho deve ser um texto")
     restaurar_saves = bool(params.get("restaurar_saves", False))
-    return servico.importar_colecao(caminho.strip(), restaurar_saves)
+    r = servico.importar_colecao(caminho.strip(), restaurar_saves)
+    if isinstance(r, dict) and r.get("ok") is False:
+        raise ValueError(r.get("erro") or "Não foi possível importar a coleção.")
+    return r
 
 
 def _sincronizar_steam(servico, params) -> dict:
@@ -781,8 +788,8 @@ class Ponte:
                 if pos:
                     detalhe["aviso"] = pos
             else:
-                detalhe["aviso"] = ("Sessão sem rastreio: registre as horas nas "
-                                    "ferramentas clássicas.")
+                detalhe["aviso"] = ("Sessão sem rastreio automático: registre as horas "
+                                    "no detalhe do jogo (Registrar horas).")
             return detalhe
 
         return {"trabalho": self.trabalhos.iniciar(f"Jogar {titulo}", tarefa, escopo="jogo")}

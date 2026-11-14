@@ -220,6 +220,35 @@ def metodos_paridade(trabalhos) -> dict:
             raise ValueError("itens deve ser uma lista de objetos")
         return servico.importar_selecionados(itens)
 
+    # -- coleção: backup manual, sessões abertas e erros recentes -----------
+    def colecao_backup(servico, params):
+        return servico.fazer_backup_agora()
+
+    def sessoes_listar(servico, params):
+        """Sessões manuais abertas (ex.: jogo aberto como administrador)."""
+        return [{"arquivo": str(s.get("_arquivo", "")), "gid": s.get("gid"),
+                 "titulo": str(s.get("titulo") or ""), "inicio": str(s.get("inicio") or "")}
+                for s in servico.sessoes() if s.get("_arquivo")]
+
+    def sessoes_encerrar(servico, params):
+        horas = params.get("horas")
+        if isinstance(horas, bool) or not isinstance(horas, (int, float)):
+            raise ValueError("horas deve ser um número")
+        return dict(servico.encerrar_sessao(_texto(params, "arquivo"), float(horas)))
+
+    def sistema_erros(servico, params):
+        linhas = params.get("linhas", 40)
+        if isinstance(linhas, bool) or not isinstance(linhas, int) or not 1 <= linhas <= 500:
+            raise ValueError("linhas deve ser um inteiro de 1 a 500")
+        return {"texto": servico.log_cauda(linhas)}
+
+    # -- saves do jogo: snapshot agora e restaurar --------------------------
+    def saves_snapshot(servico, params):
+        return dict(servico.backup_pos_sessao(_id(params)))
+
+    def saves_restaurar(servico, params):
+        return dict(servico.restaurar_saves(_id(params), _texto(params, "caminho")))
+
     novos = {
         "emulacao.jogo": emulacao_jogo,
         "emulacao.mod": sem_jogo_aberto(emulacao_mod),
@@ -247,6 +276,13 @@ def metodos_paridade(trabalhos) -> dict:
         "ferramentas.listar": ferramentas_listar,
         "jogos.prever": jogos_prever,
         "jogos.importar_selecionados": jogos_importar_selecionados,
+        "colecao.backup": colecao_backup,
+        "sessoes.listar": sessoes_listar,
+        "sessoes.encerrar": sessoes_encerrar,
+        "sistema.erros": sistema_erros,
+        # snapshot e restauração mexem nos saves: nunca com o jogo aberto
+        "saves.snapshot": sem_jogo_aberto(saves_snapshot),
+        "saves.restaurar": sem_jogo_aberto(saves_restaurar),
     }
     return novos
 
