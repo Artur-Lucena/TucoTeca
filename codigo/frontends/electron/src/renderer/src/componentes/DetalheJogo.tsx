@@ -6,6 +6,7 @@ import {
   validarNota,
   type JogoDaLista,
 } from '../estado/jogos'
+import { candidatosDeCapa, errosDeCapa, type CandidatoCapa } from '../estado/capas'
 import { textoDeFalha } from '../estado/notificacoes'
 import { jogoEmAndamento, listaTrabalhos } from '../estado/trabalhos'
 import { PainelEmulacao } from './PainelEmulacao'
@@ -65,8 +66,7 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
   const [appidConquistas, setAppidConquistas] = useState('')
   const [regrasConquistas, setRegrasConquistas] = useState('')
   const [mostrarRegras, setMostrarRegras] = useState(false)
-  const [capasCandidatas, setCapasCandidatas] = useState<Array<Record<string, unknown>>>([])
-  const [savesInput, setSavesInput] = useState('')
+  const [capasCandidatas, setCapasCandidatas] = useState<CandidatoCapa[]>([])
 
   useEffect(() => {
     let vivo = true
@@ -211,15 +211,12 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
 
   const buscarCapas = async () => {
     try {
-      const r = await window.tucoteca.chamar<{ candidatos?: Array<Record<string, unknown>> }>('capas.buscar', {
-        categoria: 'jogos',
-        id,
-        provedor: '',
-        atualizar: false,
-      })
-      const lista = Array.isArray(r?.candidatos) ? r.candidatos : []
+      const r = await window.tucoteca.chamar('capas.buscar', { categoria: 'jogos', id, provedor: '', atualizar: false })
+      const lista = candidatosDeCapa(r)
+      const erros = errosDeCapa(r)
       setCapasCandidatas(lista)
-      aoAvisar(lista.length > 0 ? `${lista.length} capa(s) encontrada(s).` : 'Nenhuma capa encontrada.')
+      if (lista.length > 0) aoAvisar(`${lista.length} capa(s) encontrada(s). Clique em uma para aplicar.`)
+      else aoAvisar(erros[0] ? `Nenhuma capa encontrada (${erros[0]}).` : 'Nenhuma capa encontrada.', 'atencao')
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }
@@ -244,19 +241,6 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
       const atualizado = await window.tucoteca.chamar<JogoDaLista>('jogo.ler', { id })
       setJogo(atualizado)
       aoMudou()
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const configurarSaves = async () => {
-    const caminhos = savesInput.split(',').map((c) => c.trim()).filter(Boolean)
-    try {
-      await window.tucoteca.chamar('saves.configurar', { id, caminhos })
-      setSavesInput('')
-      aoAvisar('Saves configurados.')
-      const atualizado = await window.tucoteca.chamar<JogoDaLista>('jogo.ler', { id })
-      setJogo(atualizado)
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }
@@ -411,11 +395,8 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
             </section>
 
             <section>
-              <h3>Conquistas e capas</h3>
+              <h3>Capa</h3>
               <div class="detalhe-linha">
-                <button type="button" class="acao" onClick={() => void avaliarConquistas()}>
-                  Avaliar conquistas
-                </button>
                 <button type="button" class="acao" onClick={() => void buscarCapas()}>
                   Buscar capas
                 </button>
@@ -427,9 +408,9 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
               </div>
               {capasCandidatas.length > 0 && (
                 <div class="capas-candidatas">
-                  {capasCandidatas.map((c: Record<string, unknown>, i: number) => {
-                    const fonte = String(c.fonte ?? c.provedor ?? '')
-                    const url = typeof c.url === 'string' && c.url.startsWith('https://') ? c.url : ''
+                  {capasCandidatas.map((c, i) => {
+                    const fonte = c.fonte
+                    const url = window.tucoteca.imagemUrl(c.preview)
                     return (
                       <button
                         key={i}
@@ -437,7 +418,7 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                         class="capa-candidata"
                         title={`Aplicar capa${fonte ? ` de ${fonte}` : ''}`}
                         aria-label={`Aplicar capa ${i + 1}${fonte ? ` de ${fonte}` : ''}`}
-                        onClick={() => void aplicarCapa(c)}
+                        onClick={() => void aplicarCapa(c.original)}
                       >
                         {url !== '' ? (
                           <img src={url} alt="" loading="lazy" onError={(e) => ((e.target as HTMLImageElement).style.visibility = 'hidden')} />
@@ -450,7 +431,10 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                   })}
                 </div>
               )}
+            </section>
 
+            <section>
+              <h3>Conquistas</h3>
               <div class="conquistas-painel">
                 <div class="detalhe-linha">
                   <input
@@ -473,8 +457,12 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                     <textarea
                       value={regrasConquistas}
                       onInput={(e) => setRegrasConquistas((e.target as HTMLTextAreaElement).value)}
-                      placeholder='{"CODIGO": {"campo": "valor"}}'
+                      placeholder={'{"ID_DA_CONQUISTA": {"path": ["chave", "subchave"], "op": "eq", "value": true}}'}
                     />
+                    <p class="sub">
+                      Uma regra por conquista: <code>path</code> é o caminho dentro do save (JSON) e <code>op</code> é
+                      eq, gte, contains ou exists (exists dispensa <code>value</code>).
+                    </p>
                     <button type="button" class="acao" onClick={() => void salvarRegras()}>
                       Salvar regras
                     </button>
@@ -522,20 +510,6 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
             <section>
               <h3>Saves e screenshots</h3>
               <PainelFerramentasJogo id={id} bloqueado={jogando !== null} aoAvisar={aoAvisar} />
-            </section>
-
-            <section>
-              <h3>Saves</h3>
-              <div class="detalhe-linha">
-                <input
-                  value={savesInput}
-                  onInput={(e) => setSavesInput((e.target as HTMLInputElement).value)}
-                  placeholder="caminhos separados por vírgula"
-                />
-                <button type="button" class="acao" onClick={() => void configurarSaves()}>
-                  Configurar saves
-                </button>
-              </div>
             </section>
 
             <section>
