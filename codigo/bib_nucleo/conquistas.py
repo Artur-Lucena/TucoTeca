@@ -316,28 +316,66 @@ def _strings_blob(raw, offset=4):
     return out
 
 
+def _ler_save_mewgenics(arq):
+    """Save SQLite do Mewgenics: propriedades + blobs de desbloqueio."""
+    with closing(sqlite3.connect(arq.resolve().as_uri() + "?mode=ro", uri=True)) as con:
+        props = {k: v for k, v in con.execute("SELECT key,data FROM properties")
+                 if isinstance(v, (str, int, float))}
+        classes = []
+        casas = []
+        blobs = dict(con.execute("SELECT key,data FROM files WHERE key IN ('unlocks','house_unlocks')"))
+        raw = blobs.get("unlocks")
+        if isinstance(raw, bytes) and raw[:4] == struct.pack("<I", 3):
+            classes = _strings_blob(raw)
+        else:
+            raise ValueError("Versão não reconhecida do save Mewgenics.")
+        raw = blobs.get("house_unlocks")
+        if isinstance(raw, bytes) and raw[:4] == struct.pack("<I", 1) and len(raw) >= 12:
+            tamanho = struct.unpack_from("<Q", raw, 4)[0]
+            if tamanho <= 1000 and 12 + tamanho <= len(raw):
+                casas = _strings_blob(raw, 12 + tamanho)
+    return {"properties": props, "classes": classes, "house_unlocks": casas}
+
+
+def _regras_howmanydudes(catalogo):
+    return {i["id"]: {"path": ["achievement_progress", i["id"], "complete"], "op": "eq", "value": True}
+            for i in catalogo["itens"]}
+
+
+def _regras_mewgenics(catalogo):
+    return {"class_unlock_medic": {"path": ["classes"], "op": "contains", "value": "Medic"},
+            "map_unlock_sewers": {"path": ["properties", "mapflag_SewersUnlocked"], "op": "eq", "value": 1},
+            "house_upgrade_attic": {"path": ["house_unlocks"], "op": "contains", "value": "SmallHouse_Attic"}}
+
+
+# Jogos com leitor de save conhecido, por appid Steam (referência). Para
+# suportar outro jogo, acrescente uma entrada:
+#   raiz: (variável de ambiente, subpasta) onde o save costuma ficar;
+#   padroes: globs dentro da raiz; leitor: (sufixo, função) para saves que não
+#   são JSON; regras: função(catalogo) -> regras padrão de desbloqueio.
+LEITORES_SAVE = {
+    "3934270": {  # How Many Dudes
+        "raiz": ("LOCALAPPDATA", "HowManyDudes"),
+        "padroes": ("global.json", "Game/global.json", "*/Game/global.json"),
+        "regras": _regras_howmanydudes,
+    },
+    "686060": {  # Mewgenics
+        "raiz": ("APPDATA", "Glaiel Games/Mewgenics"),
+        "padroes": ("steamcampaign*.sav", "saves/steamcampaign*.sav", "*/saves/steamcampaign*.sav"),
+        "leitor": (".sav", _ler_save_mewgenics),
+        "regras": _regras_mewgenics,
+    },
+}
+PADROES_SAVE_GENERICOS = ("save.json", "global.json", "progression.json")
+
+
 def ler_save_nativo(arq, appid):
     arq = Path(arq)
     if arq.stat().st_size > 32_000_000:
         raise ValueError("Save maior que o limite do leitor.")
-    if appid == "686060" and arq.suffix.lower() == ".sav":
-        with closing(sqlite3.connect(arq.resolve().as_uri() + "?mode=ro", uri=True)) as con:
-            props = {k: v for k, v in con.execute("SELECT key,data FROM properties")
-                     if isinstance(v, (str, int, float))}
-            classes = []
-            casas = []
-            blobs = dict(con.execute("SELECT key,data FROM files WHERE key IN ('unlocks','house_unlocks')"))
-            raw = blobs.get("unlocks")
-            if isinstance(raw, bytes) and raw[:4] == struct.pack("<I", 3):
-                classes = _strings_blob(raw)
-            else:
-                raise ValueError("Versão não reconhecida do save Mewgenics.")
-            raw = blobs.get("house_unlocks")
-            if isinstance(raw, bytes) and raw[:4] == struct.pack("<I", 1) and len(raw) >= 12:
-                tamanho = struct.unpack_from("<Q", raw, 4)[0]
-                if tamanho <= 1000 and 12 + tamanho <= len(raw):
-                    casas = _strings_blob(raw, 12 + tamanho)
-        return {"properties": props, "classes": classes, "house_unlocks": casas}
+    leitor = LEITORES_SAVE.get(appid, {}).get("leitor")
+    if leitor and arq.suffix.lower() == leitor[0]:
+        return leitor[1](arq)
     dados = online.ler_json(arq)
     if not isinstance(dados, dict):
         raise ValueError("Este save não é JSON compatível; precisa de um leitor próprio.")
@@ -347,19 +385,16 @@ def ler_save_nativo(arq, appid):
 def localizar_save(jogo, appid, config):
     informado = str(config.get("save") or jogo.get("save_path") or "").strip()
     raizes = [Path(base.traduzir_para_atual(informado))] if informado else []
-    if not raizes:
-        if appid == "3934270":
-            raizes.append(Path(os.environ.get("LOCALAPPDATA", "")) / "HowManyDudes")
-        elif appid == "686060":
-            raizes.append(Path(os.environ.get("APPDATA", "")) / "Glaiel Games/Mewgenics")
+    conhecido = LEITORES_SAVE.get(appid, {})
+    if not raizes and conhecido.get("raiz"):
+        variavel, sub = conhecido["raiz"]
+        raizes.append(Path(os.environ.get(variavel, "")) / sub)
+    padroes = conhecido.get("padroes", PADROES_SAVE_GENERICOS)
     encontrados = []
     for raiz in raizes:
         if raiz.is_file():
             encontrados.append(raiz)
         elif raiz.is_dir():
-            padroes = ("global.json", "Game/global.json", "*/Game/global.json") if appid == "3934270" else (
-                "steamcampaign*.sav", "saves/steamcampaign*.sav", "*/saves/steamcampaign*.sav") if appid == "686060" else (
-                "save.json", "global.json", "progression.json")
             for padrao in padroes:
                 encontrados.extend(raiz.glob(padrao))
     encontrados = list(dict.fromkeys(p.resolve() for p in encontrados if p.is_file()))
@@ -370,14 +405,8 @@ def localizar_save(jogo, appid, config):
 
 
 def _regras_padrao(appid, catalogo):
-    if appid == "3934270":
-        return {i["id"]: {"path": ["achievement_progress", i["id"], "complete"], "op": "eq", "value": True}
-                for i in catalogo["itens"]}
-    if appid == "686060":
-        return {"class_unlock_medic": {"path": ["classes"], "op": "contains", "value": "Medic"},
-                "map_unlock_sewers": {"path": ["properties", "mapflag_SewersUnlocked"], "op": "eq", "value": 1},
-                "house_upgrade_attic": {"path": ["house_unlocks"], "op": "contains", "value": "SmallHouse_Attic"}}
-    return {}
+    regras = LEITORES_SAVE.get(appid, {}).get("regras")
+    return regras(catalogo) if regras else {}
 
 
 def validar_regras(regras):
