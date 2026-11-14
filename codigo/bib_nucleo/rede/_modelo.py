@@ -29,11 +29,13 @@ from __future__ import annotations
 
 import re
 
+from bib_nucleo.versao import user_agent
+
 # --- Constantes de identidade do provedor ---------------------------------
 FONTE = "exemplo"                 # chave curta e estavel (slug)
 NOME = "Exemplo"                  # rotulo humano exibido no Hub
 BASE_URL = "https://api.exemplo.test/v1"  # sem barra final
-USER_AGENT = "TucoTeca/1.5 (integracao exemplo)"
+USER_AGENT = user_agent("integracao exemplo")
 TIMEOUT = 8                       # curto: a UI nao deve travar a espera
 LIMITE = 10                       # maximo de itens por pagina
 MAX_TERMO = 120                   # corta entradas absurdas antes da rede

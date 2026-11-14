@@ -80,7 +80,8 @@ class MixMidia:
             for n, d in enumerate(fila):
                 if cancelar.is_set():
                     break
-                def pct(did, valor):
+                # n/d fixados na definição: o callback pertence a ESTA faixa
+                def pct(did, valor, n=n, d=d):
                     if progresso:
                         progresso({"id": did, "rotulo": f'{n + 1}/{len(fila)} · {d["artista"]} — {d["titulo"]}', "pct": valor})
                 pct(d["id"], 0)

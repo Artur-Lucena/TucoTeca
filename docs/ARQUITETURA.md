@@ -77,10 +77,10 @@ em [HISTORICO.md](HISTORICO.md).
 |---|---|
 | `config.py` | leitura única das `BIBLIOTECA_*` (paths, listas `;`/`,`, bools 0/1), defaults e singleton `cfg` — consumida por `base.py`, builders e testes |
 | `base.py` | casa, raízes Win/Linux/Mac, tradução de caminhos, lock, texto, logs |
-| `banco/` (pacote) | schema, migrações por colunas, CRUD jogos/músicas/fila, capas — `banco.py` fatiado em `_infra`/`jogos`/`catalogo` com fachada de compatibilidade (`__all__` idêntico) |
+| `banco/` (pacote) | schema, migrações por colunas, CRUD jogos/músicas/fila, capas — fatiado em `_infra`/`jogos`/`catalogo` com fachada de compatibilidade (`__all__` idêntico) |
 | `banco_desejos.py` | wishlist local, sincronização preservadora e histórico obtido |
 | `scans/` (pacote) / `scans_hydra.py` | lojas/disco/ROMs e adaptador Hydra, preview, dedup e restore — `scans.py` fatiado na F2 do O2 sem mudar contratos |
-| `emuladores/` (pacote) | Azahar/DeSmuME, processos/sessões, presets e overlay de mods — `emuladores.py` fatiado na F1 do O2 sem mudar contratos |
+| `emuladores/` (pacote) | Azahar/DeSmuME, processos/sessões, presets e overlay de mods — fatiado na F1 do O2 sem mudar contratos |
 | `atualizacao.py` | download e atualização transacional, manifesto, rollback |
 | `pacotes.py` | JSON, ZIP de coleção e backups versionados |
 | `lixeira.py` | snapshot e desfazer de remoções (jogos com capa, desejos, vídeos); música fora por design |
@@ -106,6 +106,7 @@ em [HISTORICO.md](HISTORICO.md).
 | `organizacao_local.py` / `patches_rom.py` | cópia/hardlinks explícitos e IPS/BPS em uma nova ROM |
 | `everything.py` | `es.exe` BYOB, limitado às raízes escolhidas; scanner como fallback |
 | `api_local.py` | leitura HTTP opt-in, loopback, token, Host/Origin, sem rotas de execução |
+| `versao.py` | versão (`VERSION`) e User-Agent das requisições, num lugar só |
 
 ### Frontends e ferramentas
 
@@ -117,7 +118,6 @@ em [HISTORICO.md](HISTORICO.md).
 | `frontends/servicos_ui/` (pacote) | Casos de uso do desktop em mixins por domínio, `resumo_sistema`, `busca_global`, registro de módulos |
 | `frontends/electron/` | Desktop: processo principal (protocolos `tucoteca-img`/`tucoteca-media`, menu, ponte), preload isolado e renderer Preact; `electron-builder.config.cjs` gera o instalador |
 | `frontends/app_tui.py` + `tui_*.py` | TUI em mixins por domínio (entry point e `tui.curses` patchável preservados) |
-| `frontends/atalho_jogo.py` | Abre um jogo direto por atalho, com os mesmos serviços do Hub |
 | `ferramentas/abrir_hub.py` | Prepara ambiente/runtime do checkout ou do app instalado (usado pela ponte) |
 | `ferramentas/build_utils.py` | SHA-256 de arquivo, escritor de `.tar.xz` e download verificado (cache + `.part` atômico) |
 | `ferramentas/diagnosticar.py` | sintaxe/exports/dependências/pastas/SQLite somente-leitura |
@@ -276,7 +276,7 @@ descobre `teste_*` e informa os pulos e falhas por ambiente.
 smokes remotos são separados dos casos herméticos e não usam jogos reais.
 
 Os maiores pontos de acoplamento continuam `app_tui.py`
-e `scans.py` (`emuladores.py` foi fatiado na F1 do O2 em
+e `scans/` (`emuladores` foi fatiado na F1 do O2 em
 `emuladores/{azahar,desmume,provedores,presets,mods,lancamento,_comum}` e
 `banco.py` em `banco/{_infra,jogos,catalogo}`; contratos e `__all__`
 preservados). A decomposição futura deve seguir domínios

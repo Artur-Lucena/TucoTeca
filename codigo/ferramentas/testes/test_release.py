@@ -208,3 +208,11 @@ def teste_fontes_incluem_electron_sem_artefatos():
         afirmar(base + nome in nomes, (nome, sorted(nomes)))
     afirmar(not any(n.startswith((base + "node_modules", base + "out/", base + "dist/"))
                     for n in nomes), sorted(nomes))
+
+
+def teste_user_agent_segue_version():
+    from bib_nucleo import versao
+    esperado = (REL.REPO / "VERSION").read_text(encoding="utf-8").strip()
+    afirmar(versao.versao_app() == esperado, versao.versao_app())
+    afirmar(versao.user_agent().startswith(f"TucoTeca/{esperado} (+https://github.com/"), versao.user_agent())
+    afirmar(versao.user_agent("x").endswith("; x)"), versao.user_agent("x"))

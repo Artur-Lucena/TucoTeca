@@ -7,6 +7,7 @@ import urllib.parse
 import urllib.request
 
 from bib_nucleo.rede import abrir_rede, rede_ativa
+from bib_nucleo.versao import user_agent
 
 
 def _capa_steam(appid: str, timeout: int = 15):
@@ -14,7 +15,7 @@ def _capa_steam(appid: str, timeout: int = 15):
     if not str(appid).isdigit():
         return None
     req = urllib.request.Request(f"https://store.steampowered.com/api/appdetails?appids={appid}",
-                                 headers={"User-Agent": "TucoTeca/1.0"})
+                                 headers={"User-Agent": user_agent()})
     with abrir_rede(req, timeout=timeout) as r:
         data = json.loads(r.read(2_000_001).decode("utf-8"))
     info = data.get(str(appid)) or {}
@@ -23,7 +24,7 @@ def _capa_steam(appid: str, timeout: int = 15):
     url = ((info.get("data") or {}).get("header_image") or "").split("?")[0]
     if not url_https(url):
         return None
-    req = urllib.request.Request(url, headers={"User-Agent": "TucoTeca/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": user_agent()})
     with abrir_rede(req, timeout=timeout) as r:
         raw = r.read(2_500_001)
     return raw if 1024 <= len(raw) <= 2_500_000 else None
@@ -43,7 +44,7 @@ def canonizar_steam(*candidatos: str, timeout: int = 15):
         try:
             q = urllib.parse.urlencode({"term": alvo, "l": "english", "cc": "US"})
             req = urllib.request.Request(f"https://store.steampowered.com/api/storesearch/?{q}",
-                                         headers={"User-Agent": "TucoTeca/1.0"})
+                                         headers={"User-Agent": user_agent()})
             with abrir_rede(req, timeout=timeout) as r:
                 dados = json.loads(r.read(2_000_001).decode("utf-8"))
             for item in dados.get("items") or []:
@@ -71,7 +72,7 @@ def capa_album_url(artista: str, album: str, titulo: str, timeout: int = 15):
         for q in consultas:
             qs = urllib.parse.urlencode({"term": q, "media": "music", "entity": "album", "limit": 5})
             req = urllib.request.Request(f"https://itunes.apple.com/search?{qs}",
-                                         headers={"User-Agent": "TucoTeca/1.0"})
+                                         headers={"User-Agent": user_agent()})
             with abrir_rede(req, timeout=timeout) as r:
                 dados = json.loads(r.read(500_001).decode("utf-8"))
             for item in dados.get("results") or []:
@@ -100,7 +101,7 @@ def _precos_lote(appids: list[str], regiao: str, timeout: int = 15) -> dict:
         q = urllib.parse.urlencode({"appids": ",".join(appids), "cc": regiao,
                                     "l": "portuguese", "filters": "price_overview"})
         req = urllib.request.Request(f"https://store.steampowered.com/api/appdetails?{q}",
-                                     headers={"User-Agent": "TucoTeca/1.0"})
+                                     headers={"User-Agent": user_agent()})
         with abrir_rede(req, timeout=timeout) as r:
             dados = json.loads(r.read(1_500_001).decode("utf-8"))
     except (ValueError, OSError, AttributeError, TypeError):

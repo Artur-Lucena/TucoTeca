@@ -35,7 +35,7 @@ Para a TUI interativa no Linux/macOS, execute `./BibliotecaHub.sh` (ou
 
 ## Pontos de entrada para mudanças
 
-- Banco/CRUD/migrações: `codigo/bib_nucleo/banco.py`.
+- Banco/CRUD/migrações: `codigo/bib_nucleo/banco/` (pacote).
 - Importação/dedup/ROMs: `codigo/bib_nucleo/scans/` (pacote fatiado por
   contrato; `scans_hydra.py` é o adaptador Hydra).
 - Lançamento/presets/mods: `codigo/bib_nucleo/emuladores/` (pacote).
