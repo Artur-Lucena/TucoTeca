@@ -49,6 +49,16 @@ isso a entrega instalável segue como 1.3.0.
 - `desktop.py` acha o Electron em qualquer SO e avisa quando falta o build.
 - Soltar um arquivo na janela navegava o app para `file://`; agora é bloqueado.
 - Pacote de fontes saía com `docs/CONTRIBUTING.md` e `SECURITY.md` duplicados.
+- Depois de crash, encerramento forçado ou queda de energia o app recusava a
+  coleção por 24 h (lock de processo morto); agora assume só o lock órfão do
+  mesmo PC ao abrir. Lock de processo vivo continua recusado.
+- Tela Vídeos em branco (o carregador pegava a exportação errada do módulo) e
+  troca de seção que desenhava a tela anterior com as props da nova (erro em
+  Notificações → Configurações).
+- 20 tokens de CSS da biblioteca de componentes nunca definidos: métricas,
+  modais e abas perdiam espaçamento, fonte e camada; teste impede a volta.
+- Textos sem acento e botões "ainda não nesta fatia" nas Integrações (agora
+  levam às telas existentes); downloads 100% mostrados como "baixando".
 
 ### Removido
 
