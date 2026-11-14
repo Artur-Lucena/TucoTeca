@@ -1,0 +1,274 @@
+.lista-musicas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.musica-capa {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--cartao);
+}
+
+.musica-capa img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.musica-textos {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.musica-textos strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.musica-textos span {
+  overflow: hidden;
+  color: var(--texto2);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fila-musicas {
+  padding-top: var(--espaco-md);
+  border-top: 1px solid var(--borda);
+}
+
+.fila-musicas h2 {
+  margin: 0 0 var(--espaco-sm);
+  font-size: 14px;
+}
+
+.fila-musicas ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xs);
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.fila-musicas li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--texto2);
+  font-size: 13px;
+}
+
+.player {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(320px, 2fr) minmax(160px, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 10px var(--espaco-lg);
+  border-top: 1px solid var(--borda);
+  background: var(--painel);
+}
+
+.player audio {
+  display: none;
+}
+
+.player-faixa {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.player-capa {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--cartao);
+}
+
+.player-capa img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.player-textos {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.player-textos strong,
+.player-textos span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-textos span {
+  color: var(--texto2);
+  font-size: 12px;
+}
+
+.player-controles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.player-linha {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-sm);
+}
+
+.player-botao {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--borda);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  cursor: pointer;
+}
+
+.player-botao:hover {
+  border-color: var(--realce);
+  background: var(--realce-suave);
+}
+
+.player-botao.primario {
+  border-color: var(--realce);
+  background: var(--realce-suave);
+}
+
+.player-tempo {
+  min-width: 84px;
+  color: var(--texto2);
+  font-size: 12px;
+  text-align: center;
+}
+
+.player-barra {
+  flex: 1;
+  accent-color: var(--realce);
+}
+
+.player-modo {
+  padding: 6px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--texto2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.player-modo:hover {
+  border-color: var(--realce);
+  color: var(--texto);
+}
+
+.player-volume {
+  width: 90px;
+  accent-color: var(--realce);
+}
+
+.player-fila {
+  display: flex;
+  max-height: 66px;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.player-fila button {
+  width: 100%;
+  padding: var(--espaco-xs) var(--espaco-sm);
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--texto2);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.player-fila li.atual button {
+  background: var(--realce-suave);
+  color: var(--texto);
+}
+
+.player-fila button:hover {
+  color: var(--texto);
+}
+
+.volume-pc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-xs);
+}
+
+.player-modo.ativo {
+  border-color: var(--realce);
+  background: var(--realce-suave);
+}
+
+.letra {
+  max-height: 180px;
+  margin-top: var(--espaco-sm);
+  padding: var(--espaco-sm) var(--espaco-md);
+  overflow-y: auto;
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+}
+
+.letra-linhas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--texto2);
+}
+
+.letra-linhas li.atual {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.letra-texto {
+  margin: 0;
+  font: inherit;
+  font-size: 14px;
+  white-space: pre-wrap;
+  color: var(--texto);
+}

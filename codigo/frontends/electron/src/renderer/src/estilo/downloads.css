@@ -1,0 +1,73 @@
+.job {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-md);
+  padding: 10px var(--espaco-md);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--cartao);
+  font-size: 13px;
+}
+
+.job-barra {
+  flex: 1;
+  height: 8px;
+  accent-color: var(--realce);
+}
+
+.linha-download {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: var(--espaco-sm) 10px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--cartao);
+}
+
+.download-icone {
+  color: var(--realce);
+  font-size: 18px;
+}
+
+.download-textos {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.download-barra {
+  width: 120px;
+  height: 8px;
+  accent-color: var(--realce);
+}
+
+.download-acoes {
+  display: flex;
+  gap: 6px;
+}
+
+.modal-downloads {
+  padding: 14px;
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  background: var(--painel);
+}
+
+.lista-importar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.lista-importar li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}

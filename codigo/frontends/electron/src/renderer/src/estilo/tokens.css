@@ -1,0 +1,79 @@
+:root {
+  color-scheme: dark;
+  --fundo: #0a0a10;
+  --painel: #12121a;
+  --cartao: #1a1a26;
+  --borda: #2a2a3c;
+  --texto: #ececf1;
+  --texto2: #8b93a7;
+  --realce: #7c5cff;
+  --realce-suave: rgba(124, 92, 255, 0.14);
+  --perigo: #ff5c7a;
+  --sucesso: #3dd68c;
+  --raio: 12px;
+  --raio-sm: 8px;
+  --sombra: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --sombra-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --transicao: 150ms ease;
+  --espaco-xs: 4px;
+  --espaco-sm: 8px;
+  --espaco-md: 12px;
+  --espaco-lg: 16px;
+  --espaco-xl: 24px;
+  --aviso: #ffb84d;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-10: 40px;
+  --radius-sm: var(--raio-sm);
+  --radius-lg: var(--raio);
+  --shadow-sm: var(--sombra-sm);
+  --shadow-lg: var(--sombra);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+  --z-dropdown: 20;
+  --z-modal: 50;
+  --sobreposicao: rgba(255, 255, 255, 0.04);
+  --sobreposicao-forte: rgba(255, 255, 255, 0.06);
+  --fundo-capa: #12141a;
+  --capa-vazia: linear-gradient(160deg, #1b2030, #151823);
+  --borda-forte: #3a3a52;
+  --texto-atencao: #ffd7a1;
+  --texto-erro: #ff8f8f;
+  --borda-erro: #6b2b2b;
+}
+
+/* Tema claro: mesmos tokens, outra paleta (contraste AA nos textos). */
+
+:root[data-tema='claro'] {
+  color-scheme: light;
+  --fundo: #f4f5f8;
+  --painel: #ffffff;
+  --cartao: #eef0f5;
+  --borda: #d9dce6;
+  --texto: #1b1d26;
+  --texto2: #586072;
+  --realce: #6a4cf0;
+  --realce-suave: rgba(106, 76, 240, 0.12);
+  --perigo: #d02c4b;
+  --sucesso: #1b8f5a;
+  --aviso: #a85f00;
+  --sombra: 0 8px 24px rgba(20, 24, 40, 0.12);
+  --sombra-sm: 0 2px 8px rgba(20, 24, 40, 0.08);
+  --shadow-xl: 0 16px 48px rgba(20, 24, 40, 0.18);
+  --sobreposicao: rgba(0, 0, 0, 0.04);
+  --sobreposicao-forte: rgba(0, 0, 0, 0.06);
+  --fundo-capa: #e4e7ee;
+  --capa-vazia: linear-gradient(160deg, #e9ebf2, #dde1ea);
+  --borda-forte: #b6bccc;
+  --texto-atencao: #7d4a00;
+  --texto-erro: #b3263a;
+  --borda-erro: #e6a3ae;
+}

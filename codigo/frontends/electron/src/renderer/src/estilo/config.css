@@ -1,0 +1,168 @@
+.form-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-md);
+  padding: var(--espaco-lg);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--cartao);
+  box-shadow: var(--sombra-sm);
+  max-width: 640px;
+  margin-bottom: var(--espaco-lg);
+}
+
+.form-config h2 {
+  margin: 0 0 var(--espaco-sm);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.form-config label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xs);
+  font-size: 13px;
+  color: var(--texto2);
+}
+
+.form-config input,
+.form-config select {
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transicao);
+}
+
+.form-config input:focus,
+.form-config select:focus {
+  border-color: var(--realce);
+}
+
+.form-config .stats {
+  padding: var(--espaco-sm);
+  background: var(--painel);
+  border-radius: var(--raio-sm);
+  font-size: 12px;
+  overflow-x: auto;
+}
+
+.integracao {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--espaco-md);
+  padding: var(--espaco-md);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  background: var(--cartao);
+}
+
+.integracao-inicial {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  color: #0d0f14;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.integracao-corpo h3 {
+  margin: 0 0 var(--espaco-xs);
+  font-size: 15px;
+}
+
+.integracao-corpo p {
+  margin: 0 0 var(--espaco-sm);
+  color: var(--texto2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.integracao-selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.integracao-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-sm);
+  grid-column: 1 / -1;
+}
+
+.integracao-resultados {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xs);
+}
+
+/* ---- 1.3.1: coleção, sessões, ferramentas do jogo, confirmação ---- */
+
+.grafico-meses {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--espaco-xs);
+  height: 110px;
+  margin: var(--espaco-sm) 0 var(--espaco-md);
+}
+
+.grafico-mes {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  align-items: end;
+  gap: 2px;
+  height: 100%;
+}
+
+.grafico-barra {
+  display: block;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--realce);
+}
+
+.grafico-rotulo {
+  font-size: 10px;
+  color: var(--texto2);
+  text-align: center;
+}
+
+.log-erros {
+  max-height: 260px;
+  margin: var(--espaco-sm) 0 0;
+  padding: var(--espaco-sm) var(--espaco-md);
+  overflow: auto;
+  border-radius: var(--raio-sm);
+  background: var(--fundo);
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: var(--texto2);
+}
+
+/* checkbox e range em formulários: sem a largura total dos inputs de texto */
+
+.form-config input[type='checkbox'] {
+  width: auto;
+  accent-color: var(--realce);
+}
+
+.form-config label.marcar {
+  display: inline-flex;
+  flex-direction: row;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--espaco-sm);
+  color: var(--texto);
+}
