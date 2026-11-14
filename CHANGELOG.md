@@ -3,7 +3,7 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
-## [1.3.1] - não publicada
+## [1.3.1] - 2026-11-14
 
 Revisão completa da 1.3.0: segurança, recursos que não funcionavam e limpeza.
 
