@@ -2155,9 +2155,13 @@ select.eq-preset {
 }
 
 .form-config label.marcar {
+  /* o .form-config label base é coluna; aqui o rótulo fica ao lado da caixa */
   display: inline-flex;
+  flex-direction: row;
+  align-self: flex-start;
   align-items: center;
   gap: var(--espaco-sm);
+  color: var(--texto);
 }
 
 input[type='range'] {
