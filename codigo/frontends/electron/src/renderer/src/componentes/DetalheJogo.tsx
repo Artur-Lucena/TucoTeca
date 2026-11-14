@@ -190,7 +190,7 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
   const sincronizarConquistas = async () => {
     try {
       await window.tucoteca.chamar('conquistas.sincronizar', { id, appid: appidConquistas.trim(), save: '' })
-      aoAvisar('Catalogo de conquistas sincronizado.')
+      aoAvisar('Catálogo de conquistas sincronizado.')
       await avaliarConquistas()
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
@@ -439,16 +439,27 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
               </div>
               {capasCandidatas.length > 0 && (
                 <div class="capas-candidatas">
-                  {capasCandidatas.map((c: Record<string, unknown>, i: number) => (
-                    <button
-                      key={i}
-                      type="button"
-                      class="acao"
-                      onClick={() => void aplicarCapa(c)}
-                    >
-                      Aplicar capa {i + 1}
-                    </button>
-                  ))}
+                  {capasCandidatas.map((c: Record<string, unknown>, i: number) => {
+                    const fonte = String(c.fonte ?? c.provedor ?? '')
+                    const url = typeof c.url === 'string' && c.url.startsWith('https://') ? c.url : ''
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        class="capa-candidata"
+                        title={`Aplicar capa${fonte ? ` de ${fonte}` : ''}`}
+                        aria-label={`Aplicar capa ${i + 1}${fonte ? ` de ${fonte}` : ''}`}
+                        onClick={() => void aplicarCapa(c)}
+                      >
+                        {url !== '' ? (
+                          <img src={url} alt="" loading="lazy" onError={(e) => ((e.target as HTMLImageElement).style.visibility = 'hidden')} />
+                        ) : (
+                          <span class="capa-vazia">{i + 1}</span>
+                        )}
+                        <span>{fonte || `Capa ${i + 1}`}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
 

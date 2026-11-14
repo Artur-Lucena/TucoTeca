@@ -317,7 +317,7 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
       )}
 
       <section class="musicas-online">
-        <h2>Musicas online</h2>
+        <h2>Músicas online</h2>
         <div class="vista-acoes">
           <input
             class="busca"

@@ -150,7 +150,7 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
                 <div class="download-textos">
                   <strong>{item.nome}</strong>
                   <span>
-                    {item.pct.toFixed(0)}% · {item.estado}
+                    {item.pct >= 100 || item.estado === 'completo' ? 'Concluído' : `${item.pct.toFixed(0)}% · baixando`}
                     {item.total > 0 ? ` · ${formatarBytes(item.feito)}/${formatarBytes(item.total)}` : ''}
                     {item.fonte_progresso === 'estimativa' ? ' · estimativa em disco' : ''}
                     {item.velocidade ? ` · ${formatarBytes(item.velocidade)}/s` : ''}
@@ -192,7 +192,9 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
         </ul>
       )}
 
-      {livres !== undefined && <p class="aviso">· {livres.toFixed(1)} GB livres</p>}
+      {livres !== undefined && (
+        <p class="sub">{livres.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} GB livres no disco</p>
+      )}
 
       {trabalhoAtivo !== undefined && trabalhoAtivo !== null && (
         <p class="aviso">Importando… {trabalhoAtivo.rotulo}</p>
@@ -211,7 +213,7 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
           <input
             class="busca"
             type="text"
-            placeholder="Executavel (opcional)"
+            placeholder="Executável (opcional)"
             value={pacoteExe}
             onInput={(e) => setPacoteExe((e.target as HTMLInputElement).value)}
           />

@@ -9,11 +9,11 @@ export function Inicio({ snapshot }: { snapshot: Snapshot }) {
     <div class="inicio">
       <header class="cabecalho">
         <h1>Boas-vindas ao seu hub.</h1>
-        <p>Continuar, buscar e cuidar da colecao - sem sair do lugar.</p>
+        <p>Continuar, buscar e cuidar da coleção — sem sair do lugar.</p>
       </header>
       <div class="kpi-row">
         <Metric valor={sistema.jogos ?? snapshot.jogos?.length ?? 0} label="Jogos" icone="🎮" />
-        <Metric valor={sistema.musicas ?? snapshot.musicas?.length ?? 0} label="Musicas" icone="♪" />
+        <Metric valor={sistema.musicas ?? snapshot.musicas?.length ?? 0} label="Músicas" icone="♪" />
         <Metric valor={sistema.desejos ?? snapshot.desejos?.length ?? 0} label="Desejos" icone="★" />
       </div>
       <section class="secao">

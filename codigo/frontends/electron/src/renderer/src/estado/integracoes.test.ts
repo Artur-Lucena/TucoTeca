@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { acaoDaIntegracao, type IntegracaoDTO } from './integracoes'
+import { acaoDaIntegracao, selosDaIntegracao, type IntegracaoDTO } from './integracoes'
 
 const base: IntegracaoDTO = { chave: 'x', nome: 'X', tipo: 'link' }
 
@@ -22,19 +22,30 @@ describe('acaoDaIntegracao', () => {
 
   it('download leva para a fila de downloads', () => {
     expect(acaoDaIntegracao({ ...base, tipo: 'download', capacidades: ['download'] }))
-      .toEqual({ tipo: 'download', rotulo: 'Ir para Downloads' })
+      .toEqual({ tipo: 'navegar', rotulo: 'Ir para Downloads', secao: 'downloads' })
   })
 
-  it('emulador fica para a próxima fatia', () => {
-    const r = acaoDaIntegracao({ ...base, tipo: 'emulador', capacidades: ['emulador', 'config'] })
-    expect(r.tipo).toBe('indisponivel')
-    if (r.tipo === 'indisponivel') expect(r.motivo).toContain('Emulação')
+  it('emulador, músicas online e provedores levam à tela que faz isso', () => {
+    expect(acaoDaIntegracao({ ...base, tipo: 'emulador', capacidades: ['emulador', 'config'] }))
+      .toEqual({ tipo: 'navegar', rotulo: 'Emuladores e controles', secao: 'configuracoes' })
+    expect(acaoDaIntegracao({ ...base, tipo: 'musicas_online', capacidades: ['midia'] }))
+      .toMatchObject({ tipo: 'navegar', secao: 'musicas' })
+    expect(acaoDaIntegracao({ ...base, tipo: 'provedores', capacidades: ['midia'] }))
+      .toMatchObject({ tipo: 'navegar', secao: 'configuracoes' })
   })
 
-  it('músicas online e provedores ficam para a próxima fatia', () => {
-    expect(acaoDaIntegracao({ ...base, tipo: 'musicas_online', capacidades: ['midia'] }).tipo)
-      .toBe('indisponivel')
-    expect(acaoDaIntegracao({ ...base, tipo: 'provedores', capacidades: ['midia'] }).tipo)
-      .toBe('indisponivel')
+  it('sem URL e sem tipo conhecido fica indisponível com motivo', () => {
+    expect(acaoDaIntegracao(base).tipo).toBe('indisponivel')
+  })
+})
+
+describe('selosDaIntegracao', () => {
+  it('rótulos legíveis e sem repetir o tipo nas capacidades', () => {
+    expect(selosDaIntegracao({ ...base, tipo: 'emulador', capacidades: ['emulador', 'config'] }))
+      .toEqual(['emulador', 'configuração'])
+    expect(selosDaIntegracao({ ...base, tipo: 'musicas_online', capacidades: ['midia'] }))
+      .toEqual(['músicas online', 'mídia'])
+    expect(selosDaIntegracao({ ...base, tipo: 'catalogo', capacidades: ['busca'], personalizada: true }))
+      .toEqual(['catálogo', 'busca', 'personalizada'])
   })
 })
