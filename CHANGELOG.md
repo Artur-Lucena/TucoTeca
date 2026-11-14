@@ -3,7 +3,7 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
-## [1.3.0] - não publicada
+## [1.3.0] - 2026-11-14
 
 Primeira release com o desktop Electron entregue como instalador Windows.
 A tag `v1.2.0` já existe (na revisão das fatias F0–F6) e não é movida; por
