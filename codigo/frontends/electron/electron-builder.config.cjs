@@ -36,6 +36,7 @@ const extraResources = [
       'frontends/__init__.py',
       'frontends/ponte.py',
       'frontends/ponte_paridade.py',
+      'frontends/ponte_params.py',
       'frontends/servicos_ui/**/*.py',
       'ferramentas/__init__.py',
       'ferramentas/abrir_hub.py',

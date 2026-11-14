@@ -12,32 +12,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ponte_params import inteiro, opcao, texto
+
 _MSG_JOGO_ABERTO = ("Feche o jogo aberto antes de mudar mods, texturas, cheats, "
                     "presets, controles ou arquivos da coleção.")
 
 
 def _texto(params, chave, obrigatorio=True) -> str:
-    valor = params.get(chave, "")
-    if not isinstance(valor, str):
-        raise ValueError(f"{chave} deve ser um texto")
-    valor = valor.strip()
-    if obrigatorio and not valor:
-        raise ValueError(f"{chave} deve ser um texto")
-    return valor
+    return texto(params, chave, obrigatorio=obrigatorio)
 
 
 def _id(params) -> int:
-    valor = params.get("id")
-    if isinstance(valor, bool) or not isinstance(valor, int) or valor <= 0:
-        raise ValueError("id deve ser um inteiro positivo")
-    return valor
+    return inteiro(params, "id", positivo=True)
 
 
 def _opcao(params, chave, opcoes) -> str:
-    valor = params.get(chave)
-    if valor not in opcoes:
-        raise ValueError(f"{chave} deve ser um de: {', '.join(opcoes)}")
-    return valor
+    return opcao(params, chave, opcoes)
 
 
 def metodos_paridade(trabalhos) -> dict:

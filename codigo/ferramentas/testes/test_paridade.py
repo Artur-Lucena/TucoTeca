@@ -427,3 +427,26 @@ def teste_aparencia_salva_tema_densidade_e_escala():
     afirmar(_ok(ponte, "aparencia.ler")["escala_texto"] == 1.2)
     afirmar(_ok(ponte, "aparencia.salvar", {"escala_texto": 9})["escala_texto"] == 1.5)
     afirmar("escala_texto" in _erro(ponte, "aparencia.salvar", {"escala_texto": "grande"}))
+
+
+def teste_ponte_params_mensagens_e_valores():
+    from ponte_params import inteiro, lista, objeto, opcao, texto
+
+    def falha(f, *a, **k):
+        try:
+            f(*a, **k)
+        except ValueError as e:
+            return str(e)
+        raise AssertionError("esperava ValueError")
+
+    afirmar(texto({"c": "  x  "}, "c") == "x")
+    afirmar(falha(texto, {"c": "  "}, "c") == "c deve ser um texto")
+    afirmar(falha(texto, {}, "c") == "c deve ser um texto")
+    afirmar(texto({}, "c", obrigatorio=False, padrao="p") == "p")
+    afirmar("passa de 3" in falha(texto, {"c": "abcd"}, "c", maximo=3))
+    afirmar(inteiro({"id": 3}, "id") == 3)
+    afirmar(falha(inteiro, {"id": True}, "id") == "id deve ser um inteiro")
+    afirmar(falha(inteiro, {"id": 0}, "id", positivo=True) == "id deve ser um inteiro positivo")
+    afirmar(falha(opcao, {"a": "z"}, "a", ("x", "y")) == "a deve ser um de: x, y")
+    afirmar(falha(objeto, {"o": []}, "o") == "o deve ser um objeto")
+    afirmar(falha(lista, {"l": {}}, "l") == "l deve ser uma lista")

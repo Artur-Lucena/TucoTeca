@@ -28,6 +28,14 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
+# No app instalado o Python embutido (._pth) NÃO põe a pasta do script no
+# sys.path; os módulos irmãos (ponte_params, ponte_paridade) precisam dela já
+# no import, antes de preparar_ambiente().
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from ponte_params import inteiro, lista, objeto, texto  # noqa: E402
+
 RAIZ = Path(__file__).resolve().parents[2]
 
 
@@ -84,10 +92,7 @@ def _trocar_perfil(servico, params) -> dict:
 
 
 def _inteiro(params, chave) -> int:
-    valor = params.get(chave)
-    if isinstance(valor, bool) or not isinstance(valor, int):
-        raise ValueError(f"{chave} deve ser um inteiro")
-    return valor
+    return inteiro(params, chave)
 
 
 def _com_perfil(jogo):
@@ -175,17 +180,13 @@ def _integracoes_adicionar(servico, params) -> dict:
 
 
 def _integracoes_remover(servico, params) -> dict:
-    chave = params.get("chave")
-    if not isinstance(chave, str) or not chave.strip():
-        raise ValueError("chave deve ser um texto")
+    chave = texto(params, "chave")
     servico.remover_integracao(chave.strip())
     return {"ok": True, "chave": chave.strip()}
 
 
 def _integracoes_url(servico, params) -> dict:
-    chave = params.get("chave")
-    if not isinstance(chave, str) or not chave.strip():
-        raise ValueError("chave deve ser um texto")
+    chave = texto(params, "chave")
     termo = params.get("termo", "")
     if not isinstance(termo, str):
         raise ValueError("termo deve ser um texto")
@@ -193,9 +194,7 @@ def _integracoes_url(servico, params) -> dict:
 
 
 def _integracoes_buscar(servico, params) -> dict:
-    chave = params.get("chave")
-    if not isinstance(chave, str) or not chave.strip():
-        raise ValueError("chave deve ser um texto")
+    chave = texto(params, "chave")
     termo = params.get("termo", "")
     if not isinstance(termo, str):
         raise ValueError("termo deve ser um texto")
@@ -253,9 +252,7 @@ def _torrents_controlar(servico, params) -> dict:
 
 
 def _torrents_organizar(servico, params) -> dict:
-    caminho = params.get("caminho")
-    if not isinstance(caminho, str) or not caminho.strip():
-        raise ValueError("caminho deve ser um texto")
+    caminho = texto(params, "caminho")
     return servico.organizar_download(caminho.strip())
 
 
@@ -292,9 +289,7 @@ def _musicas_buscar_online(servico, params) -> list:
 
 
 def _musicas_enfileirar(servico, params) -> dict:
-    itens = params.get("itens")
-    if not isinstance(itens, list):
-        raise ValueError("itens deve ser uma lista")
+    itens = lista(params, "itens")
     return servico.enfileirar_musicas(itens)
 
 
@@ -313,9 +308,7 @@ def _musicas_letras(servico, params) -> dict:
 
 
 def _pacotes_importar(servico, params) -> dict:
-    pasta = params.get("pasta")
-    if not isinstance(pasta, str) or not pasta.strip():
-        raise ValueError("pasta deve ser um texto")
+    pasta = texto(params, "pasta")
     exe = params.get("exe", "")
     if not isinstance(exe, str):
         raise ValueError("exe deve ser um texto")
@@ -323,9 +316,7 @@ def _pacotes_importar(servico, params) -> dict:
 
 
 def _pacotes_abrir_instalador(servico, params) -> dict:
-    exe = params.get("exe")
-    if not isinstance(exe, str) or not exe.strip():
-        raise ValueError("exe deve ser um texto")
+    exe = texto(params, "exe")
     return servico.abrir_instalador_pacote(exe.strip())
 
 
@@ -388,9 +379,7 @@ def _capas_aplicar(servico, params) -> dict:
     if categoria not in ("jogos", "musicas", "desejos"):
         raise ValueError("categoria deve ser jogos, musicas ou desejos")
     ident = _inteiro(params, "id")
-    candidato = params.get("candidato")
-    if not isinstance(candidato, dict):
-        raise ValueError("candidato deve ser um objeto")
+    candidato = objeto(params, "candidato")
     return servico.aplicar_capa(categoria, ident, candidato)
 
 
@@ -404,9 +393,7 @@ def _emulacao_status(servico, params) -> dict:
 
 
 def _emulacao_consultar(servico, params) -> dict:
-    chave = params.get("chave")
-    if not isinstance(chave, str) or not chave.strip():
-        raise ValueError("chave deve ser um texto")
+    chave = texto(params, "chave")
     return servico.emu_consultar(chave.strip())
 
 
@@ -427,9 +414,7 @@ def _disco_jogo(servico, params) -> dict:
 
 def _configurar_saves(servico, params) -> dict:
     ident = _inteiro(params, "id")
-    caminhos = params.get("caminhos")
-    if not isinstance(caminhos, list):
-        raise ValueError("caminhos deve ser uma lista")
+    caminhos = lista(params, "caminhos")
     return servico.configurar_saves(ident, caminhos)
 
 
@@ -437,9 +422,7 @@ def _abrir_ferramenta(servico, params) -> dict:
     tipo = params.get("tipo")
     if tipo not in ("imagens", "equalizadores", "videos"):
         raise ValueError("tipo deve ser imagens, equalizadores ou videos")
-    nome = params.get("nome")
-    if not isinstance(nome, str) or not nome.strip():
-        raise ValueError("nome deve ser um texto")
+    nome = texto(params, "nome")
     caminho = params.get("caminho", "")
     if not isinstance(caminho, str):
         raise ValueError("caminho deve ser um texto")
@@ -485,9 +468,7 @@ def _backups(servico, params) -> dict:
 
 
 def _exportar_colecao(servico, params) -> dict:
-    pasta = params.get("pasta")
-    if not isinstance(pasta, str) or not pasta.strip():
-        raise ValueError("pasta deve ser um texto")
+    pasta = texto(params, "pasta")
     r = servico.exportar_colecao_para(pasta.strip())
     # o domínio devolve ok=false em vez de levantar: a interface diria "exportada"
     if isinstance(r, dict) and r.get("ok") is False:
@@ -496,9 +477,7 @@ def _exportar_colecao(servico, params) -> dict:
 
 
 def _importar_colecao(servico, params) -> dict:
-    caminho = params.get("caminho")
-    if not isinstance(caminho, str) or not caminho.strip():
-        raise ValueError("caminho deve ser um texto")
+    caminho = texto(params, "caminho")
     restaurar_saves = bool(params.get("restaurar_saves", False))
     r = servico.importar_colecao(caminho.strip(), restaurar_saves)
     if isinstance(r, dict) and r.get("ok") is False:
@@ -511,16 +490,12 @@ def _sincronizar_steam(servico, params) -> dict:
 
 
 def _importar_wishlist(servico, params) -> dict:
-    caminho = params.get("caminho")
-    if not isinstance(caminho, str) or not caminho.strip():
-        raise ValueError("caminho deve ser um texto")
+    caminho = texto(params, "caminho")
     return servico.importar_wishlist(caminho.strip())
 
 
 def _buscar_fontes_desejo(servico, params) -> dict:
-    titulo = params.get("titulo")
-    if not isinstance(titulo, str) or not titulo.strip():
-        raise ValueError("titulo deve ser um texto")
+    titulo = texto(params, "titulo")
     return servico.buscar_fontes_desejo(titulo.strip())
 
 
@@ -823,9 +798,7 @@ class Ponte:
                                                     cancelavel=True, escopo="musicas")}
 
     def _torrents_importar(self, servico, params) -> dict:
-        caminho = params.get("caminho")
-        if not isinstance(caminho, str) or not caminho.strip():
-            raise ValueError("caminho deve ser um texto")
+        caminho = texto(params, "caminho")
         caminho = caminho.strip()
 
         def tarefa(progresso, cancelado):
@@ -863,9 +836,7 @@ class Ponte:
                                                   escopo="videos")}
 
     def _importar_jogos(self, servico, params) -> dict:
-        pasta = params.get("pasta")
-        if not isinstance(pasta, str) or not pasta.strip():
-            raise ValueError("pasta deve ser um texto")
+        pasta = texto(params, "pasta")
         pasta = pasta.strip()
 
         def tarefa(progresso, cancelado):
@@ -883,9 +854,7 @@ class Ponte:
                                                   escopo="jogos")}
 
     def _videos_baixar(self, servico, params) -> dict:
-        video_id = params.get("video_id")
-        if not isinstance(video_id, str) or not video_id.strip():
-            raise ValueError("video_id deve ser um texto")
+        video_id = texto(params, "video_id")
         video_id = video_id.strip()
 
         def tarefa(progresso, cancelado):
@@ -902,9 +871,7 @@ class Ponte:
                                                   escopo="videos")}
 
     def _videos_baixar_mp3(self, servico, params) -> dict:
-        video = params.get("video")
-        if not isinstance(video, dict):
-            raise ValueError("video deve ser um objeto")
+        video = objeto(params, "video")
 
         def tarefa(progresso, cancelado):
             if cancelado.is_set():
