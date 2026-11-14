@@ -9,6 +9,7 @@ import {
 } from '../estado/desejos'
 import { EmptyState } from '../componentes/ui'
 import { textoDeFalha } from '../estado/notificacoes'
+import { confirmar } from '../componentes/Confirmacao'
 
 interface Props {
   /** Incrementa a cada Ctrl+F: foca o campo de busca. */
@@ -176,7 +177,7 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
   const remover = async () => {
     if (escolhido?.id === undefined) return
     const titulo = String(escolhido.titulo ?? 'o desejo')
-    if (!window.confirm(`Remover "${titulo}" da lista de desejos?`)) return
+    if (!(await confirmar({ titulo: 'Remover desejo', texto: `Remover "${titulo}" da lista de desejos? Dá para desfazer pela barra de status.`, confirmar: 'Remover', perigo: true }))) return
     try {
       await window.tucoteca.chamar('item.excluir', {
         categoria: 'desejos',

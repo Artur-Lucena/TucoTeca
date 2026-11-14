@@ -24,7 +24,7 @@ import {
 } from './estado/trabalhos'
 import { Inicio } from './vistas/Inicio'
 import { Lazy } from './componentes/Lazy'
-import { Placeholder } from './vistas/Placeholder'
+import { EmptyState } from './componentes/ui'
 
 const DESTINO_DO_ITEM: Record<string, string> = {
   jogo: 'jogos',
@@ -359,7 +359,7 @@ export function App() {
             ) : ativo.chave === 'notificacoes' ? (
               <Lazy key="Notificacoes" fabrica={() => import('./vistas/Notificacoes').then((m) => m.Notificacoes)} props={{ avisos, aoDispensar: (id: string) => setAvisos((atual) => dispensarAviso(atual, id)), aoLimpar: () => setAvisos([]) }} />
             ) : (
-              <Placeholder modulo={ativo} />
+              <EmptyState icone="?" titulo="Seção não encontrada." descricao="Escolha outra seção na barra lateral." />
             )}
           </section>
         </main>

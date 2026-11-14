@@ -36,12 +36,6 @@ class MixNucleo:
                 "fila_musicas": fila_musicas,
                 "sistema": resumo_sistema(jogos, musicas, desejos)}
 
-    def panorama(self, termo=""):
-        snap = self.snapshot()
-        return {"sistema": snap["sistema"],
-                "global": busca_global(snap["jogos"], snap["musicas"],
-                                       snap["desejos"], [], termo) if termo.strip() else []}
-
     def jogo(self, gid):
         with closing(core.get_db(self.db_path)) as con:
             row = con.execute("SELECT * FROM jogos WHERE id=?", (int(gid),)).fetchone()

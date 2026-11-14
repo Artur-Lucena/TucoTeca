@@ -1,8 +1,6 @@
 """Scans e pacotes via ServicoBiblioteca: preview, importacao e pacotes."""
 from __future__ import annotations
 
-from contextlib import closing
-
 import bib_core as core
 
 
@@ -53,10 +51,6 @@ class MixScans:
     def importar_colecao(self, caminho, restaurar_saves=False):
         with self._escrita:
             return core.importar_pacote(caminho, self.db_path, restaurar_saves)
-
-    def pacotes_piratas(self):
-        with closing(core.get_db(self.db_path)) as con:
-            return core.listar_pacotes_piratas(con)
 
     def preparar_pacote(self, arquivo):
         core.fazer_backup(self.db_path)

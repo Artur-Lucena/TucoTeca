@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks'
 import { textoDeFalha } from '../estado/notificacoes'
 import { jogoEmAndamento, listaTrabalhos } from '../estado/trabalhos'
+import { confirmar } from './Confirmacao'
 
 interface Props {
   aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
@@ -43,7 +44,7 @@ export function PainelSaneamento({ aoAvisar, aoMudou }: Props) {
     const texto =
       `Sanear "${plano.pasta}"?` +
       (plano.quarentenaveis ? ` ${plano.quarentenaveis} instalador(es) vão para .hub-lixo (dá para recuperar).` : '')
-    if (!window.confirm(texto)) return
+    if (!(await confirmar({ titulo: 'Sanear pasta', texto, confirmar: 'Sanear' }))) return
     setOcupado(true)
     try {
       await window.tucoteca.chamar('manutencao.sanear', { caminho: plano.pasta })

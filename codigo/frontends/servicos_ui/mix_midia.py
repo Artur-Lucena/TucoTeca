@@ -218,10 +218,4 @@ class MixMidia:
             posicoes[sha] = max(0, int(posicao))
             online.gravar_json(alvo, posicoes)
 
-    def atualizar_audio(self):
-        resultados = [core.instalar_ytdlp(), core.instalar_ffmpeg()]
-        erros = [r.get("erro", "Falha na atualização") for r in resultados if not r.get("ok")]
-        return {"ok": not erros, "erros": erros, "erro": "; ".join(erros)}
-
-
 __all__ = ["MixMidia"]

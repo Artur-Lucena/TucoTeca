@@ -252,13 +252,6 @@ def _torrents_controlar(servico, params) -> dict:
     return servico.torrent_controlar(ident.strip(), acao)
 
 
-def _torrents_fora_destino(servico, params) -> dict:
-    caminho = params.get("caminho")
-    if not isinstance(caminho, str) or not caminho.strip():
-        raise ValueError("caminho deve ser um texto")
-    return {"fora": servico.fora_do_destino(caminho.strip())}
-
-
 def _torrents_organizar(servico, params) -> dict:
     caminho = params.get("caminho")
     if not isinstance(caminho, str) or not caminho.strip():
@@ -317,13 +310,6 @@ def _musicas_letras(servico, params) -> dict:
     if isinstance(duracao, bool) or not isinstance(duracao, (int, float)):
         raise ValueError("duracao_s deve ser numero")
     return servico.buscar_letras(artista, titulo, album, duracao)
-
-
-def _capas_importar_selecionados(servico, params) -> dict:
-    itens = params.get("itens")
-    if not isinstance(itens, list):
-        raise ValueError("itens deve ser uma lista")
-    return servico.importar_selecionados(itens)
 
 
 def _pacotes_importar(servico, params) -> dict:
@@ -597,7 +583,6 @@ METODOS = {
     "integracoes.buscar": _integracoes_buscar,
     "torrents.listar": _torrents_listar,
     "torrents.controlar": _torrents_controlar,
-    "torrents.fora_destino": _torrents_fora_destino,
     "torrents.organizar": _torrents_organizar,
     "videos.local": _videos_local,
     "videos.salvar_posicao": _videos_salvar_posicao,
@@ -629,7 +614,6 @@ METODOS = {
     "musicas.buscar_online": _musicas_buscar_online,
     "musicas.enfileirar": _musicas_enfileirar,
     "musicas.letras": _musicas_letras,
-    "capas.importar_selecionados": _capas_importar_selecionados,
     "pacotes.importar": _pacotes_importar,
     "pacotes.abrir_instalador": _pacotes_abrir_instalador,
 }

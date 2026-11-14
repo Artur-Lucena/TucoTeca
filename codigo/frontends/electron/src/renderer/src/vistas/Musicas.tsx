@@ -6,6 +6,7 @@ import { textoDeFalha } from '../estado/notificacoes'
 import { faixaAtual, player, playerInicial, tocarFila } from '../estado/player'
 import { listaTrabalhos } from '../estado/trabalhos'
 import type { JogoResumo } from '../derivacoes'
+import { confirmar } from '../componentes/Confirmacao'
 
 /** Rótulos dos presets de `PRESETS_EQ` (equalizadores.py). */
 const ROTULO_EQ: Record<string, string> = {
@@ -104,7 +105,7 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
     if (escolhida?.id === undefined) return
     const titulo = String(escolhida.titulo ?? 'a música')
     const aviso = `Remover "${titulo}"? O arquivo de áudio também será apagado e não dá para desfazer.`
-    if (!window.confirm(aviso)) return
+    if (!(await confirmar({ titulo: 'Remover música', texto: aviso, confirmar: 'Remover', perigo: true }))) return
     try {
       await window.tucoteca.chamar('item.excluir', { categoria: 'musicas', id: Number(escolhida.id) })
       if (faixaAtual(player.value)?.id === escolhida.id) player.value = playerInicial

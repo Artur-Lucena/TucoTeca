@@ -12,6 +12,7 @@ import { PainelEmulacao } from './PainelEmulacao'
 import { PainelFerramentasJogo } from './PainelFerramentasJogo'
 import { PainelManutencaoJogo } from './PainelManutencaoJogo'
 import { iniciais } from './PosterCard'
+import { confirmar } from './Confirmacao'
 
 interface Props {
   id: number
@@ -264,7 +265,7 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
   const remover = async () => {
     if (jogo === null) return
     const titulo = String(jogo.titulo ?? 'o jogo')
-    if (!window.confirm(`Remover "${titulo}" da biblioteca? Dá para desfazer.`)) return
+    if (!(await confirmar({ titulo: 'Remover jogo', texto: `Remover "${titulo}" da biblioteca? Dá para desfazer pela barra de status.`, confirmar: 'Remover', perigo: true }))) return
     try {
       await window.tucoteca.chamar('item.excluir', { categoria: 'jogos', id })
       aoAvisar(`${titulo} foi removido. Use Desfazer na barra de status.`)

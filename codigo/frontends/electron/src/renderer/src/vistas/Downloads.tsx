@@ -3,6 +3,7 @@ import { snapshot } from '../estado/dados'
 import { EmptyState } from '../componentes/ui'
 import { textoDeFalha } from '../estado/notificacoes'
 import { listaTrabalhos } from '../estado/trabalhos'
+import { confirmar } from '../componentes/Confirmacao'
 
 interface Props {
   aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
@@ -93,7 +94,7 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
   }
 
   const organizar = async (item: TorrentItem) => {
-    if (!window.confirm(`Organizar "${item.nome}" para a pasta de jogos?`)) return
+    if (!(await confirmar({ titulo: 'Organizar download', texto: `Mover "${item.nome}" para a pasta de jogos?`, confirmar: 'Organizar' }))) return
     setOcupados((atual) => ({ ...atual, [item.hash]: true }))
     try {
       const r = await window.tucoteca.chamar<{ ok?: boolean }>('torrents.organizar', { caminho: item.save_path })

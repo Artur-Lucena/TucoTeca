@@ -7,6 +7,7 @@ import {
   type EstadoEmulacao,
 } from '../estado/emulacao'
 import { textoDeFalha } from '../estado/notificacoes'
+import { confirmar } from './Confirmacao'
 
 interface Props {
   id: number
@@ -75,7 +76,7 @@ export function PainelEmulacao({ id, bloqueado, aoAvisar }: Props) {
   }
 
   const removerMod = async (nome: string) => {
-    if (!window.confirm(`O mod "${nome}" será apagado da biblioteca. Não há desfazer. Continuar?`)) return
+    if (!(await confirmar({ titulo: 'Remover mod', texto: `O mod "${nome}" será apagado da biblioteca. Não há desfazer.`, confirmar: 'Remover', perigo: true }))) return
     await agir('emulacao.mod', { id, acao: 'remover', nome }, `Mod "${nome}" removido.`)
   }
 
@@ -94,7 +95,7 @@ export function PainelEmulacao({ id, bloqueado, aoAvisar }: Props) {
   }
 
   const removerCheat = async (nome: string) => {
-    if (!window.confirm(`O cheat "${nome}" será removido deste jogo. Não há desfazer. Continuar?`)) return
+    if (!(await confirmar({ titulo: 'Remover cheat', texto: `O cheat "${nome}" será removido deste jogo. Não há desfazer.`, confirmar: 'Remover', perigo: true }))) return
     await agir('emulacao.cheat', { id, acao: 'remover', nome }, `Cheat "${nome}" removido.`)
   }
 
@@ -105,8 +106,8 @@ export function PainelEmulacao({ id, bloqueado, aoAvisar }: Props) {
 
   const aplicarPreset = async () => {
     if (preset === '') return
-    const texto = `O preset "${preset}" sobrescreve a configuração atual do Azahar. Feche o emulador antes. Continuar?`
-    if (!window.confirm(texto)) return
+    const texto = `O preset "${preset}" sobrescreve a configuração atual do Azahar. Feche o emulador antes.`
+    if (!(await confirmar({ titulo: 'Aplicar preset', texto, confirmar: 'Aplicar' }))) return
     await agir('emulacao.preset', { acao: 'aplicar', nome: preset }, `Preset "${preset}" aplicado.`)
   }
 
