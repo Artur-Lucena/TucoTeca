@@ -227,8 +227,19 @@ def _torrents_listar(servico, params) -> dict:
             "velocidade": t.get("velocidade", 0),
             "eta": t.get("eta", None),
             "save_path": t.get("save_path", ""),
+            "fora_destino": _fora_destino(servico, t.get("save_path", "")),
         })
     return {"itens": itens, "erros": erros}
+
+
+def _fora_destino(servico, caminho) -> bool:
+    """Download fora da pasta de jogos (candidato a "Organizar"); erro = False."""
+    if not caminho:
+        return False
+    try:
+        return bool(servico.fora_do_destino(caminho))
+    except Exception:
+        return False
 
 
 def _torrents_controlar(servico, params) -> dict:
@@ -306,16 +317,6 @@ def _musicas_letras(servico, params) -> dict:
     if isinstance(duracao, bool) or not isinstance(duracao, (int, float)):
         raise ValueError("duracao_s deve ser numero")
     return servico.buscar_letras(artista, titulo, album, duracao)
-
-
-def _musicas_eq(servico, params) -> dict:
-    caminho = params.get("caminho")
-    if not isinstance(caminho, str) or not caminho.strip():
-        raise ValueError("caminho deve ser um texto")
-    preset = params.get("preset", "bass")
-    if not isinstance(preset, str):
-        raise ValueError("preset deve ser um texto")
-    return servico.aplicar_eq_musica(caminho.strip(), preset)
 
 
 def _capas_importar_selecionados(servico, params) -> dict:
@@ -421,16 +422,6 @@ def _emulacao_consultar(servico, params) -> dict:
     if not isinstance(chave, str) or not chave.strip():
         raise ValueError("chave deve ser um texto")
     return servico.emu_consultar(chave.strip())
-
-
-def _emulacao_atualizar(servico, params) -> dict:
-    chave = params.get("chave")
-    if not isinstance(chave, str) or not chave.strip():
-        raise ValueError("chave deve ser um texto")
-    info = params.get("info", {})
-    if not isinstance(info, dict):
-        raise ValueError("info deve ser um objeto")
-    return servico.emu_atualizar(chave.strip(), info)
 
 
 def _ferramentas_jogo(servico, params) -> dict:
@@ -550,7 +541,7 @@ def _salvar_filtro(servico, params) -> dict:
 
 
 def _aviso_pos_sessao(servico, ident) -> str:
-    """Backup pós-sessão opt-in (default ligado), espelhando o Qt; falha vira aviso."""
+    """Backup pós-sessão opt-in (default ligado); falha vira aviso."""
     try:
         aparencia = servico.aparencia()
     except Exception:
@@ -610,7 +601,6 @@ METODOS = {
     "capas.libretro": _capas_libretro,
     "emulacao.status": _emulacao_status,
     "emulacao.consultar": _emulacao_consultar,
-    "emulacao.atualizar": _emulacao_atualizar,
     "ferramentas.jogo": _ferramentas_jogo,
     "jogo.diagnosticar": _diagnosticar_jogo,
     "jogo.disco": _disco_jogo,
@@ -629,7 +619,6 @@ METODOS = {
     "musicas.buscar_online": _musicas_buscar_online,
     "musicas.enfileirar": _musicas_enfileirar,
     "musicas.letras": _musicas_letras,
-    "musicas.eq": _musicas_eq,
     "capas.importar_selecionados": _capas_importar_selecionados,
     "pacotes.importar": _pacotes_importar,
     "pacotes.abrir_instalador": _pacotes_abrir_instalador,
@@ -748,6 +737,10 @@ class Ponte:
             "videos.baixar_mp3": self._videos_baixar_mp3,
             "jogos.importar": self._importar_jogos,
         })
+        # paridade com o antigo desktop Qt (emulação, controles, manutenção…);
+        # import tardio: no app instalado o sys.path só fica pronto em preparar_ambiente()
+        from ponte_paridade import metodos_paridade
+        base.update(metodos_paridade(self.trabalhos))
         self.metodos = base
 
     def _publicar_evento(self, evento: dict) -> None:

@@ -23,8 +23,8 @@ Uma integração é um item de `Integracao`
 Integrações são **registradas explicitamente** em `integracoes_padrao()`.
 Instalar um serviço nunca executa plugin arbitrário. O consumo na interface é
 genérico: `RegistroIntegracoes.listar()` devolve DTOs serializáveis (via
-`apresentar()`), e o QML apenas itera as chaves — por isso adicionar uma
-capacidade nova não exige mexer no QML.
+`apresentar()`), e a interface apenas itera as chaves — por isso adicionar uma
+capacidade nova não exige mexer na interface.
 
 ## Os 3 passos
 
@@ -65,7 +65,7 @@ Integracao("minha-fonte", "Minha Fonte", "Catálogo conectado.",
            capacidades=("busca",)),
 ```
 
-Nada mais em QML/bridge é necessário: `listar()`, `buscar()` e `url_integracao()`
+Nada mais na ponte/interface é necessário: `listar()`, `buscar()` e `url_integracao()`
 já operam sobre qualquer item registrado.
 
 ### Passo 3 — teste hermético

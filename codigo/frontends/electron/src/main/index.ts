@@ -1,7 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'electron'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { registrarProtocoloMedia, registrarProtocoloMidia } from './arquivos'
+import { resolverRaizHome } from './caminhos'
 import { lockOrfao } from './lock'
 import { montarMenu } from './menu'
 import { ClientePonte } from './ponte'
@@ -38,8 +39,20 @@ function lerFlags(): Flags {
 }
 
 const flags = lerFlags()
-const RAIZ = resolve(process.env.TUCOTECA_RAIZ || join(app.getAppPath(), '..', '..', '..'))
-const HOME = process.env.BIBLIOTECA_HOME || RAIZ
+const { raiz: RAIZ, home: HOME } = resolverRaizHome({
+  empacotado: app.isPackaged,
+  appPath: app.getAppPath(),
+  resourcesPath: process.resourcesPath,
+  documentos: app.getPath('documents'),
+  env: process.env,
+})
+// A ponte herda o ambiente: assim o núcleo usa a mesma coleção que o main valida.
+process.env.BIBLIOTECA_HOME = HOME
+try {
+  mkdirSync(HOME, { recursive: true })
+} catch {
+  // falha aqui vira erro claro da ponte (coleção inacessível), não crash do main
+}
 const CAMINHO_LOCK = join(HOME, '.biblioteca.lock')
 
 let ponte: ClientePonte | null = null
@@ -145,6 +158,12 @@ function criarJanela(): BrowserWindow {
     if (!flags.selftest || flags.screenshot) janela.show()
   })
 
+  // Soltar um arquivo fora da área de importação não pode trocar o app por
+  // file://… (nem um link interno levar a janela para fora do app).
+  janela.webContents.on('will-navigate', (evento, url) => {
+    if (url !== janela.webContents.getURL()) evento.preventDefault()
+  })
+
   janela.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://') || url.startsWith('https://')) shell.openExternal(url)
     return { action: 'deny' }
@@ -174,7 +193,11 @@ async function principal(): Promise<void> {
   }
 
   try {
-    await conectar()
+    // Depois de crash/encerramento forçado/queda de energia sobra um lock de pid
+    // morto; o núcleo o recusaria por 24 h e o usuário do instalador não tem
+    // como passar --ignorar-lock. Mesma regra do Reconectar: só assume lock
+    // órfão do mesmo host/SO; lock de processo vivo continua recusado.
+    await conectar(lockOrfao(CAMINHO_LOCK))
   } catch (erro) {
     if (bloqueioAtual) {
       falhar(bloqueioAtual, 2)
@@ -200,6 +223,29 @@ async function principal(): Promise<void> {
     const resultado = janela
       ? await dialog.showOpenDialog(janela, { properties: ['openDirectory'] })
       : await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    if (resultado.canceled) return null
+    return resultado.filePaths[0] ?? null
+  })
+
+  // Arquivo único; filtros vêm do renderer mas só extensões alfanuméricas passam.
+  ipcMain.handle('dialogo:escolher-arquivo', async (_evento, filtros?: unknown) => {
+    const lista = Array.isArray(filtros)
+      ? filtros
+          .filter((f): f is { nome: string; extensoes: string[] } =>
+            typeof f === 'object' && f !== null &&
+            typeof (f as { nome?: unknown }).nome === 'string' &&
+            Array.isArray((f as { extensoes?: unknown }).extensoes))
+          .map((f) => ({
+            name: f.nome.slice(0, 60),
+            extensions: f.extensoes.filter((e) => typeof e === 'string' && /^[a-z0-9]{1,8}$/i.test(e)),
+          }))
+          .filter((f) => f.extensions.length > 0)
+      : []
+    const opcoes = { properties: ['openFile' as const], filters: lista }
+    const [janela] = BrowserWindow.getAllWindows()
+    const resultado = janela
+      ? await dialog.showOpenDialog(janela, opcoes)
+      : await dialog.showOpenDialog(opcoes)
     if (resultado.canceled) return null
     return resultado.filePaths[0] ?? null
   })

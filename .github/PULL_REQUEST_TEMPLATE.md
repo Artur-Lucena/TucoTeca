@@ -8,13 +8,13 @@
 **Como testar**
 ```powershell
 py -3.14 codigo/ferramentas/testes/executar.py
-py -3.14 codigo/ferramentas/testes/executar.py --modulo test_qt
-py -3.14 codigo/frontends/desktop.py --selftest
+npm --prefix codigo/frontends/electron test
+npm --prefix codigo/frontends/electron run typecheck
 ```
 
 **Checklist**
-- [ ] Suíte verde (stdlib + Qt) e selftest
+- [ ] Suíte Python e vitest verdes
 - [ ] `git diff --check` limpo (sem espaços no fim / conflitos)
-- [ ] Docs atualizadas (`ARQUITETURA.md`, `DESKTOP_QT.md`, `CHANGELOG.md`)
+- [ ] Docs atualizadas (`ARQUITETURA.md`, `DESKTOP_ELECTRON.md`, `CHANGELOG.md`)
 - [ ] Nenhum dado pessoal/coleção incluído no diff
 - [ ] Sem segredos (tokens, credenciais)

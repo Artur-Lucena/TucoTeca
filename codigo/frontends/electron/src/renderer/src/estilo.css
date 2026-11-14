@@ -20,6 +20,31 @@
   --espaco-md: 12px;
   --espaco-lg: 16px;
   --espaco-xl: 24px;
+
+  /* Tokens da biblioteca de componentes (componentes/ui: Metric, Modal,
+     Drawer, Tabs, EmptyState…). Estavam em uso sem definição — os
+     componentes perdiam espaçamento, tamanhos de fonte e o z-index do modal.
+     Mesma escala dos tokens acima. */
+  --aviso: #ffb84d;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-10: 40px;
+  --radius-sm: var(--raio-sm);
+  --radius-lg: var(--raio);
+  --shadow-sm: var(--sombra-sm);
+  --shadow-lg: var(--sombra);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+  --z-dropdown: 20;
+  --z-modal: 50;
 }
 
 * {
@@ -1828,3 +1853,204 @@ body {
 .checkbox-wrap { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; font-size: var(--text-md); }
 .loading { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--texto2); font-size: var(--text-md); }
 .loading-spinner { width: 16px; height: 16px; border: 2px solid var(--borda); border-top-color: var(--realce); border-radius: 50%; animation: spin 0.6s linear infinite; }
+/* ---- Fase 3: paridade (emulação, controles, manutenção…) ---- */
+.sub {
+  margin: 0 0 var(--espaco-sm);
+  font-size: 13px;
+  color: var(--texto2);
+}
+
+p.aviso-inline,
+.painel-emulacao p.aviso {
+  margin: 0 0 var(--espaco-sm);
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: 1px solid var(--perigo);
+  border-radius: var(--raio-sm);
+  font-size: 13px;
+  color: var(--texto);
+}
+
+.painel-emulacao h4,
+.painel-paridade h4 {
+  margin: var(--espaco-md) 0 var(--espaco-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.lista-simples {
+  display: grid;
+  gap: var(--espaco-xs);
+  margin: 0 0 var(--espaco-sm);
+  padding: 0;
+  list-style: none;
+}
+
+.lista-simples li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-sm);
+  padding: var(--espaco-xs) var(--espaco-sm);
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+  font-size: 13px;
+}
+
+/* checkbox com rótulo ao lado (o .detalhe label padrão é em grade) */
+.lista-simples label,
+.detalhe-linha > label,
+label.marcar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-sm);
+  color: var(--texto);
+}
+
+.detalhe input[type='checkbox'],
+.painel-paridade input[type='checkbox'] {
+  width: auto;
+  accent-color: var(--realce);
+}
+
+.detalhe-linha {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.volume-pc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-xs);
+}
+
+.player-modo.ativo {
+  border-color: var(--realce);
+  background: var(--realce-suave);
+}
+
+.letra {
+  max-height: 180px;
+  margin-top: var(--espaco-sm);
+  padding: var(--espaco-sm) var(--espaco-md);
+  overflow-y: auto;
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+}
+
+.letra-linhas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--texto2);
+}
+
+.letra-linhas li.atual {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.letra-texto {
+  margin: 0;
+  font: inherit;
+  font-size: 14px;
+  white-space: pre-wrap;
+  color: var(--texto);
+}
+
+select.eq-preset {
+  padding: 6px 8px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+}
+
+.jogos {
+  position: relative;
+}
+
+.jogos.soltando {
+  outline: 2px dashed var(--realce);
+  outline-offset: -6px;
+  border-radius: var(--raio);
+}
+
+.soltar-dica {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  border-radius: var(--raio);
+  background: rgba(10, 10, 16, 0.72);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--texto);
+  pointer-events: none;
+}
+
+/* ---- Fase 4: acabamento ---- */
+.download-acoes .acao {
+  white-space: nowrap;
+}
+
+.capas-candidatas {
+  margin: var(--espaco-sm) 0;
+}
+
+.capa-candidata {
+  display: grid;
+  gap: var(--espaco-xs);
+  width: 96px;
+  padding: var(--espaco-xs);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+  color: var(--texto2);
+  font: inherit;
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transicao);
+}
+
+.capa-candidata:hover,
+.capa-candidata:focus-visible {
+  border-color: var(--realce);
+  color: var(--texto);
+}
+
+.capa-candidata img,
+.capa-candidata .capa-vazia {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-md);
+  margin: var(--espaco-lg) 0 var(--espaco-xl);
+}
+
+.kpi-row .metric {
+  min-width: 140px;
+}
+
+.vista-acoes select,
+.filtros select {
+  padding: 6px 8px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+}

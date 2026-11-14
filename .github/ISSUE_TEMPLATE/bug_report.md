@@ -19,8 +19,7 @@ py -3.14 codigo/ferramentas/diagnosticar.py --json
 ```
 - Versão (veja `VERSION`):
 - SO:
-- Interface: Qt / clássica (tkinter) / TUI:
-- PySide6 instalado? (sim/não):
+- Interface: app instalado / checkout (Electron) / TUI:
 
 **Prints/Logs**
 `dados/erros.log` ajuda muito.

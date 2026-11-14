@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { PosterCard } from '../componentes/PosterCard'
+import { PreviaImportacao } from '../componentes/PreviaImportacao'
 import { EmptyState } from '../componentes/ui'
 import { textoDeFalha } from '../estado/notificacoes'
 import { saude, snapshot } from '../estado/dados'
+import { juntarPrevias, type ItemPrevia } from '../estado/importacao'
 import {
   FILTROS_JOGOS,
   ORDENS_JOGOS,
@@ -51,6 +53,39 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
   const [selecionado, setSelecionado] = useState(0)
   const campo = useRef<HTMLInputElement>(null)
   const grade = useRef<HTMLDivElement>(null)
+  const [arrastando, setArrastando] = useState(false)
+  const [previa, setPrevia] = useState<{ itens: ItemPrevia[]; avisos: string[] } | null>(null)
+
+  /** Pastas/exe/ROMs soltos → prévia só-leitura na ponte → modal de seleção. */
+  const aoSoltar = async (evento: DragEvent) => {
+    evento.preventDefault()
+    setArrastando(false)
+    const arquivos = Array.from(evento.dataTransfer?.files ?? [])
+    const caminhos = arquivos.map((a) => window.tucoteca.caminhoDoArquivo(a)).filter((c) => c !== '')
+    if (caminhos.length === 0) return
+    aoAvisar?.(`Analisando ${caminhos.length} item(ns)…`)
+    const listas: ItemPrevia[][] = []
+    const avisos: string[] = []
+    for (const caminho of caminhos) {
+      try {
+        const r = await window.tucoteca.chamar<{ ok?: boolean; itens?: ItemPrevia[]; avisos?: string[]; erro?: string }>(
+          'jogos.prever',
+          { caminho },
+        )
+        listas.push(Array.isArray(r?.itens) ? r.itens : [])
+        avisos.push(...(r?.avisos ?? []))
+        if (r?.ok !== true && r?.erro) avisos.push(`${caminho.split(/[\\/]/).pop()}: ${r.erro}`)
+      } catch (falha) {
+        avisos.push(textoDeFalha(falha))
+      }
+    }
+    const itens = juntarPrevias(listas)
+    if (itens.length === 0) {
+      aoAvisar?.(avisos[0] ?? 'Nada para importar no que foi solto.', 'atencao')
+      return
+    }
+    setPrevia({ itens, avisos })
+  }
 
   useEffect(() => {
     void (async () => {
@@ -130,7 +165,29 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
   }, [lista, indice, aoAbrirJogo, aoJogarJogo])
 
   return (
-    <div class="jogos">
+    <div
+      class={`jogos${arrastando ? ' soltando' : ''}`}
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types.includes('Files')) {
+          e.preventDefault()
+          setArrastando(true)
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setArrastando(false)
+      }}
+      onDrop={(e) => void aoSoltar(e)}
+    >
+      {arrastando && <div class="soltar-dica">Solte pastas, executáveis ou ROMs para importar</div>}
+      {previa !== null && (
+        <PreviaImportacao
+          itens={previa.itens}
+          avisos={previa.avisos}
+          aoFechar={() => setPrevia(null)}
+          aoImportou={() => aoMudou?.()}
+          aoAvisar={(texto, tom) => aoAvisar?.(texto, tom)}
+        />
+      )}
       <header class="cabecalho">
         <h1>Jogos</h1>
         <button
@@ -187,7 +244,11 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
         />
       </div>
       {lista.length === 0 ? (
-        <EmptyState icone="🎮" titulo="Nenhum jogo com esse filtro." descricao="Limpe a busca ou troque o filtro." />
+        <EmptyState
+          icone="🎮"
+          titulo="Nenhum jogo com esse filtro."
+          descricao="Limpe a busca, troque o filtro ou arraste pastas, executáveis e ROMs para cá."
+        />
       ) : (
         <div class="grade" ref={grade}>
           {lista.map((jogo, posicao) => {

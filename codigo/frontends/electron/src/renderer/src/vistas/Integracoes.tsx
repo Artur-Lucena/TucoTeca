@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
-import { acaoDaIntegracao, type IntegracaoDTO } from '../estado/integracoes'
+import { acaoDaIntegracao, rotuloTipo, selosDaIntegracao, type IntegracaoDTO } from '../estado/integracoes'
 import { textoDeFalha } from '../estado/notificacoes'
 
 interface Props {
@@ -55,8 +55,8 @@ export function Integracoes({ aoAvisar, aoNavegar }: Props) {
 
   const agir = async (item: IntegracaoDTO) => {
     const acao = acaoDaIntegracao(item)
-    if (acao.tipo === 'download') {
-      aoNavegar('downloads')
+    if (acao.tipo === 'navegar') {
+      aoNavegar(acao.secao)
       return
     }
     if (acao.tipo === 'indisponivel') {
@@ -197,7 +197,7 @@ export function Integracoes({ aoAvisar, aoNavegar }: Props) {
             >
               {TIPOS.map((tipo) => (
                 <option key={tipo} value={tipo}>
-                  {tipo}
+                  {rotuloTipo(tipo)}
                 </option>
               ))}
             </select>
@@ -236,13 +236,11 @@ export function Integracoes({ aoAvisar, aoNavegar }: Props) {
                 <h3>{item.nome}</h3>
                 <p>{item.descricao ?? ''}</p>
                 <div class="integracao-selos">
-                  <span class="selo">{item.tipo}</span>
-                  {(item.capacidades ?? []).map((capacidade) => (
-                    <span class="selo" key={capacidade}>
-                      {capacidade}
+                  {selosDaIntegracao(item).map((selo) => (
+                    <span class="selo" key={selo}>
+                      {selo}
                     </span>
                   ))}
-                  {item.personalizada === true && <span class="selo">personalizada</span>}
                 </div>
               </div>
               <div class="integracao-acoes">

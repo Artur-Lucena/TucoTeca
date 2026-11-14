@@ -8,6 +8,8 @@ import {
 } from '../estado/jogos'
 import { textoDeFalha } from '../estado/notificacoes'
 import { jogoEmAndamento, listaTrabalhos } from '../estado/trabalhos'
+import { PainelEmulacao } from './PainelEmulacao'
+import { PainelManutencaoJogo } from './PainelManutencaoJogo'
 import { iniciais } from './PosterCard'
 
 interface Props {
@@ -188,7 +190,7 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
   const sincronizarConquistas = async () => {
     try {
       await window.tucoteca.chamar('conquistas.sincronizar', { id, appid: appidConquistas.trim(), save: '' })
-      aoAvisar('Catalogo de conquistas sincronizado.')
+      aoAvisar('Catálogo de conquistas sincronizado.')
       await avaliarConquistas()
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
@@ -233,6 +235,18 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
     }
   }
 
+  const capaLibretro = async () => {
+    try {
+      await window.tucoteca.chamar('capas.libretro', { id })
+      aoAvisar('Capa do acervo libretro aplicada.')
+      const atualizado = await window.tucoteca.chamar<JogoDaLista>('jogo.ler', { id })
+      setJogo(atualizado)
+      aoMudou()
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
   const configurarSaves = async () => {
     const caminhos = savesInput.split(',').map((c) => c.trim()).filter(Boolean)
     try {
@@ -252,16 +266,6 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
       const saves = Array.isArray(r?.saves) ? r.saves.length : 0
       const snaps = Array.isArray(r?.snapshots) ? r.snapshots.length : 0
       aoAvisar(`Ferramentas: ${saves} save(s), ${snaps} snapshot(s).`)
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const diagnosticar = async () => {
-    try {
-      const r = await window.tucoteca.chamar<{ exe?: { estado?: string } }>('jogo.diagnosticar', { id })
-      const estado = r?.exe?.estado ?? 'ok'
-      aoAvisar(`Diagnóstico: executável ${estado}.`)
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }
@@ -424,25 +428,38 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                 <button type="button" class="acao" onClick={() => void buscarCapas()}>
                   Buscar capas
                 </button>
+                {String(jogo.launch_options ?? '').trim() !== '' && (
+                  <button type="button" class="acao" onClick={() => void capaLibretro()} title="Capa de ROM pelo acervo libretro-thumbnails">
+                    Capa libretro
+                  </button>
+                )}
                 <button type="button" class="acao" onClick={() => void ferramentasJogo()}>
                   Ferramentas
-                </button>
-                <button type="button" class="acao" onClick={() => void diagnosticar()}>
-                  Diagnosticar
                 </button>
               </div>
               {capasCandidatas.length > 0 && (
                 <div class="capas-candidatas">
-                  {capasCandidatas.map((c: Record<string, unknown>, i: number) => (
-                    <button
-                      key={i}
-                      type="button"
-                      class="acao"
-                      onClick={() => void aplicarCapa(c)}
-                    >
-                      Aplicar capa {i + 1}
-                    </button>
-                  ))}
+                  {capasCandidatas.map((c: Record<string, unknown>, i: number) => {
+                    const fonte = String(c.fonte ?? c.provedor ?? '')
+                    const url = typeof c.url === 'string' && c.url.startsWith('https://') ? c.url : ''
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        class="capa-candidata"
+                        title={`Aplicar capa${fonte ? ` de ${fonte}` : ''}`}
+                        aria-label={`Aplicar capa ${i + 1}${fonte ? ` de ${fonte}` : ''}`}
+                        onClick={() => void aplicarCapa(c)}
+                      >
+                        {url !== '' ? (
+                          <img src={url} alt="" loading="lazy" onError={(e) => ((e.target as HTMLImageElement).style.visibility = 'hidden')} />
+                        ) : (
+                          <span class="capa-vazia">{i + 1}</span>
+                        )}
+                        <span>{fonte || `Capa ${i + 1}`}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
 
@@ -501,6 +518,18 @@ export function DetalheJogo({ id, revisao, aoFechar, aoMudou, aoAvisar }: Props)
                 )}
               </div>
             </section>
+
+            <section>
+              <h3>Manutenção</h3>
+              <PainelManutencaoJogo id={id} bloqueado={jogando !== null} aoMudou={aoMudou} aoAvisar={aoAvisar} />
+            </section>
+
+            {String(jogo.launch_options ?? '').trim() !== '' && (
+              <section>
+                <h3>Emulação (3DS)</h3>
+                <PainelEmulacao id={id} bloqueado={jogando !== null} aoAvisar={aoAvisar} />
+              </section>
+            )}
 
             <section>
               <h3>Saves</h3>

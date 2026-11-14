@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { ApiTucoteca } from '../shared/api'
 import { converterUrlMidia, mediaUrl } from '../shared/midia'
 
@@ -16,6 +16,9 @@ const api: ApiTucoteca = {
   imagemUrl: (url) => converterUrlMidia(url),
   mediaUrl: (caminho) => mediaUrl(caminho),
   escolherPasta: () => ipcRenderer.invoke('dialogo:escolher-pasta'),
+  escolherArquivo: (filtros) => ipcRenderer.invoke('dialogo:escolher-arquivo', filtros),
+  // sandbox sem File.path: o caminho real do arquivo solto vem do webUtils
+  caminhoDoArquivo: (arquivo) => webUtils.getPathForFile(arquivo),
   abrirUrl: (url) => ipcRenderer.invoke('app:abrir-url', url),
   abrirPasta: (caminho) => ipcRenderer.invoke('app:abrir-pasta', caminho),
   reabrir: () => ipcRenderer.invoke('ponte:reabrir'),

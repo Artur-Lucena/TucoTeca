@@ -6,7 +6,7 @@ export function Placeholder({ modulo }: { modulo?: ModuloDTO }) {
       <h1>{modulo?.nome ?? 'Seção'}</h1>
       <p>{modulo?.descricao ?? ''}</p>
       <p class="aviso">
-        Esta tela chega na próxima fatia (F2) — o módulo já está registrado e navegável.
+        Esta seção ainda não tem tela no app.
       </p>
     </section>
   )

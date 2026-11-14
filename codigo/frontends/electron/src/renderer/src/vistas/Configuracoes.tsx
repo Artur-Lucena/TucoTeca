@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'preact/hooks'
+import { PainelControles } from '../componentes/PainelControles'
+import { PainelEmuladores } from '../componentes/PainelEmuladores'
+import { PainelFerramentasMidia } from '../componentes/PainelFerramentasMidia'
+import { PainelSaneamento } from '../componentes/PainelSaneamento'
 import { textoDeFalha } from '../estado/notificacoes'
 
 interface Props {
@@ -159,6 +163,14 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
           Salvar provedores
         </button>
       </div>
+
+      <PainelEmuladores aoAvisar={aoAvisar} />
+
+      <PainelControles aoAvisar={aoAvisar} />
+
+      <PainelSaneamento aoAvisar={aoAvisar} aoMudou={aoMudou} />
+
+      <PainelFerramentasMidia aoAvisar={aoAvisar} />
 
       <div class="form-config">
         <h2>Manutenção</h2>

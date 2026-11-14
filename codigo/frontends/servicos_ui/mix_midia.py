@@ -110,8 +110,8 @@ class MixMidia:
                         pass
         return {"novas": novas, "erros": erros, "cancelado": cancelar.is_set()}
 
-    # 2.0 — mídias open source (backend pronto p/ a UI/QML ligar; outro chat
-    # organiza as abas; aqui só o contrato, sem tocar no QML existente).
+    # 2.0 — mídias open source (backend pronto p/ a interface ligar; outra frente
+    # organiza as abas; aqui só o contrato).
     def midias_status(self):
         return {"imagens": core.status_editores(),
                 "equalizadores": core.status_equalizadores(),

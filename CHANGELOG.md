@@ -3,7 +3,84 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.3.0] - 2026-11-14
+
+Primeira release com o desktop Electron entregue como instalador Windows.
+A tag `v1.2.0` já existe (na revisão das fatias F0–F6) e não é movida; por
+isso a entrega instalável segue como 1.3.0.
+
+### Adicionado
+
+- Instalador Windows NSIS (`npm run dist`, `electron-builder.config.cjs`): por
+  usuário, sem admin, atalhos no Menu Iniciar/Área de Trabalho e ícone próprio.
+  Leva o núcleo Python, a ponte e o Python 3.14 embutido em `resources/tucoteca`.
+- `preparar_runtime_python.py`: Python embeddable oficial com SHA-256 fixado.
+- `gerar_icone.py`: ícone do app reproduzível, só com a stdlib.
+- `validar.py` roda typecheck + vitest do Electron.
+- CI (manual): job `electron` com typecheck, vitest, build e, opcionalmente,
+  instalador + selftest do app empacotado.
+- Paridade com o antigo desktop Qt (`ponte_paridade.py`): mods, cheats,
+  texturas HD e presets do Azahar no detalhe do jogo; emuladores (verificar e
+  atualizar) e controles/pads em Configurações; letra sincronizada e volume
+  do PC no player; equalização de faixas; wishlist por JSON, sincronizar
+  Steam e buscar fontes em Desejos; capa libretro; manutenção do jogo
+  (verificar/religar exe e ROM, disco, abrir como administrador); sanear
+  pasta; ferramentas de mídia; downloads fora da pasta de jogos; arrastar e
+  soltar para importar com prévia. Mapa completo em `DESKTOP_ELECTRON.md`.
+
+### Alterado
+
+- App instalado usa a coleção em `Documentos\TucoTeca` (ou `BIBLIOTECA_HOME`),
+  preservada ao atualizar/desinstalar; a ponte roda sem janela de console.
+- `preparar_release.py` reescrito para o instalador: confere Git, versões
+  (`VERSION`, `pyproject.toml`, `package.json`), runtime e ausência de dados
+  pessoais no app; gera fontes, notas, `release.json` e `SHA256SUMS.txt`.
+- Pacote de fontes inclui a interface Electron (sem `node_modules`/`out`/`dist`).
+- `emulacao.atualizar` e `musicas.eq` viram trabalhos em segundo plano (a
+  versão síncrona estourava o limite de 30 s da ponte).
+- macOS: `BibliotecaHubMac.command` abre a TUI (como o Linux).
+- Versões unificadas em 1.3.0; User-Agent aponta para o repositório TucoTeca.
+- Documentação (README, ARQUITETURA, CONTRIBUTING, INDICE, AGENTS, templates)
+  sem Qt; material de sessões antigas em `docs/arquivo/`.
+
+### Corrigido
+
+- `TucoTeca-Electron.bat` não apaga mais o lock da coleção sem conferir o dono.
+- `desktop.py` acha o Electron em qualquer SO e avisa quando falta o build.
+- Soltar um arquivo na janela navegava o app para `file://`; agora é bloqueado.
+- Pacote de fontes saía com `docs/CONTRIBUTING.md` e `SECURITY.md` duplicados.
+- Depois de crash, encerramento forçado ou queda de energia o app recusava a
+  coleção por 24 h (lock de processo morto); agora assume só o lock órfão do
+  mesmo PC ao abrir. Lock de processo vivo continua recusado.
+- Tela Vídeos em branco (o carregador pegava a exportação errada do módulo) e
+  troca de seção que desenhava a tela anterior com as props da nova (erro em
+  Notificações → Configurações).
+- 20 tokens de CSS da biblioteca de componentes nunca definidos: métricas,
+  modais e abas perdiam espaçamento, fonte e camada; teste impede a volta.
+- Textos sem acento e botões "ainda não nesta fatia" nas Integrações (agora
+  levam às telas existentes); downloads 100% mostrados como "baixando".
+
+### Removido
+
+- `instalador.iss` (Inno), `montar_mac.py`, `montar_linux.py`,
+  `provar_linux_shell.py` (dependiam do `montar_portatil` já removido) e
+  `requirements-ui.txt`/`requirements-extras.txt` (PySide6).
+- Extras `ui`/`extras` (PySide6) do `pyproject.toml` e variáveis Qt da suíte.
+
+### Limitações conhecidas
+
+- Instalador sem assinatura de código (SmartScreen na primeira execução).
+- Download automático de repacks a partir das fontes não está na interface
+  nova (a busca abre a página no navegador).
+- Controles, UAC, volume e emuladores foram provados com simulação; falta a
+  conferência com controle físico, emulador real e o UAC do Windows.
+- macOS e Linux só pela TUI, a partir dos fontes.
+
 ## [1.2.0] - 2026-10-18
+
+> Nota (registrada na 1.3.0): o texto abaixo descreve o Qt Quick como desktop
+> único, mas a tag `v1.2.0` foi criada já com o desktop Electron (F0–F6) e o
+> Qt removido. Mantido como estava, por ser registro histórico.
 
 Planejamento da 1.1.0 segue no roadmap (`docs/ROADMAP.md`). Esta rodada remove o
 modo clássico tkinter e passa a tratar o desktop Qt Quick como interface única

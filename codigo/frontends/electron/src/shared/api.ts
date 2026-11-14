@@ -1,3 +1,9 @@
+/** Filtro do seletor de arquivo: rótulo e extensões sem ponto (ex.: zip). */
+export interface FiltroArquivo {
+  nome: string
+  extensoes: string[]
+}
+
 /** Superfície que o preload expõe ao renderer (`window.tucoteca`). */
 export interface ApiTucoteca {
   chamar<T = unknown>(metodo: string, params?: Record<string, unknown>): Promise<T>
@@ -6,6 +12,9 @@ export interface ApiTucoteca {
   imagemUrl(url: string): string
   mediaUrl(caminho: string): string
   escolherPasta(): Promise<string | null>
+  escolherArquivo(filtros?: FiltroArquivo[]): Promise<string | null>
+  /** Caminho no disco de um arquivo/pasta solto na janela ('' se não houver). */
+  caminhoDoArquivo(arquivo: File): string
   abrirUrl(url: string): Promise<void>
   abrirPasta(caminho: string): Promise<void>
   reabrir(): Promise<void>

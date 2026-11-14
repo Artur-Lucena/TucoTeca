@@ -28,7 +28,7 @@ class Modulo:
 
 
 def modulos_padrao() -> list[Modulo]:
-    """Módulos embutidos na ordem do HUD atual (Main.qml, linhas 33-55)."""
+    """Módulos embutidos, na ordem da barra lateral do desktop Electron."""
     return [
         Modulo("inicio", "Início",
                "Continuar, buscar e cuidar da coleção — sem sair do lugar.",

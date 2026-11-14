@@ -1,11 +1,127 @@
-"""Emulacao e controles via ServicoBiblioteca: status, update e pads."""
+"""Emulacao e controles via ServicoBiblioteca: status, update, pads e, por
+jogo 3DS, mods/cheats/texturas/presets do Azahar (antes `qt_emulacao.py`)."""
 from __future__ import annotations
 
 import bib_core as core
+from bib_nucleo import cheats as CHEATS
+from bib_nucleo import emuladores as EMU
+from bib_nucleo import texturas as TEXTURAS
+from bib_nucleo.base import traduzir_para_atual
+
+
+def _exigir_ok(r, padrao):
+    """Domínio devolve {"ok": False, "erro": ...}; a ponte espera exceção."""
+    if isinstance(r, dict) and r.get("ok") is False:
+        raise ValueError(r.get("erro") or padrao)
+    return r
 
 
 class MixEmulacao:
     _EMU_CHAVES = ("azahar", "desmume")
+
+    # -- por jogo (3DS/Azahar) ------------------------------------------------
+    def _tid_jogo(self, jogo):
+        launch = (jogo.get("launch_options") or "").strip()
+        return EMU.title_id_da_rom(traduzir_para_atual(launch)) if launch else ""
+
+    def emulacao_jogo(self, gid):
+        """Estado de mods, cheats, texturas e presets de um jogo 3DS. Só leitura.
+
+        Sem ROM 3DS legível volta `erro` explicando, com listas vazias — a
+        interface mostra o aviso em vez de botões que não teriam efeito.
+        """
+        jogo = self.jogo(gid)
+        base = {"id": gid, "titulo": jogo.get("titulo") or "", "tid": "", "erro": "",
+                "mods": [], "mods_off": False, "cheats": [],
+                "textura": {"instalado": False, "ativo": False, "arquivos": 0},
+                "presets": []}
+        tid = self._tid_jogo(jogo)
+        if not tid:
+            base["erro"] = ("Escolha um jogo 3DS com ROM válida para gerenciar mods, "
+                            "texturas, cheats e presets.")
+            return base
+        ativos = set(EMU.mods_ativos(jogo))
+        base.update(
+            tid=tid,
+            mods=[{"nome": n, "ativo": n in ativos} for n in EMU.listar_mods(tid)],
+            mods_off=bool(jogo.get("azahar_mods_off")),
+            cheats=[dict(c) for c in CHEATS.listar_cheats(tid)],
+            textura=dict(TEXTURAS.estado_textura(tid)),
+            presets=list(EMU.listar_presets("azahar")),
+        )
+        return base
+
+    def _tid_exigido(self, gid):
+        jogo = self.jogo(gid)
+        tid = self._tid_jogo(jogo)
+        if not tid:
+            raise ValueError("Escolha um jogo 3DS com ROM válida.")
+        return jogo, tid
+
+    def emulacao_mod(self, gid, acao, nome="", arquivo=""):
+        """alternar | desligar_todos | remover | importar. Devolve o estado novo."""
+        jogo, tid = self._tid_exigido(gid)
+        atuais = list(EMU.mods_ativos(jogo))
+        off = bool(jogo.get("azahar_mods_off"))
+        if acao == "alternar":
+            if nome not in EMU.listar_mods(tid):
+                raise ValueError("Mod não encontrado na biblioteca.")
+            ativos = [m for m in atuais if m != nome] if nome in atuais else atuais + [nome]
+            self.salvar_mods_jogo(gid, ativos, off)
+        elif acao == "desligar_todos":
+            self.salvar_mods_jogo(gid, atuais, not off)
+        elif acao == "remover":
+            _exigir_ok(EMU.remover_mod(tid, nome), "Não foi possível remover o mod.")
+            self.salvar_mods_jogo(gid, [m for m in atuais if m != nome], off)
+        elif acao == "importar":
+            if not str(arquivo or "").strip():
+                raise ValueError("Escolha o arquivo ou a pasta do mod.")
+            _exigir_ok(EMU.importar_mod(arquivo, tid), "Não foi possível importar o mod.")
+        else:
+            raise ValueError("Ação de mod inválida.")
+        return self.emulacao_jogo(gid)
+
+    def emulacao_cheat(self, gid, acao, nome="", codigo=""):
+        """alternar | adicionar | remover. Devolve o estado novo."""
+        _jogo, tid = self._tid_exigido(gid)
+        if acao == "alternar":
+            _exigir_ok(CHEATS.alternar_cheat(tid, nome), "Não foi possível alterar o cheat.")
+        elif acao == "adicionar":
+            _exigir_ok(CHEATS.adicionar_cheat(tid, nome, codigo), "Não foi possível salvar o cheat.")
+        elif acao == "remover":
+            _exigir_ok(CHEATS.remover_cheat(tid, nome), "Não foi possível remover o cheat.")
+        else:
+            raise ValueError("Ação de cheat inválida.")
+        return self.emulacao_jogo(gid)
+
+    def emulacao_textura(self, gid, acao, arquivo=""):
+        """alternar | instalar. Devolve o estado novo."""
+        _jogo, tid = self._tid_exigido(gid)
+        if acao == "alternar":
+            _exigir_ok(TEXTURAS.alternar_textura(tid), "Não foi possível alterar as texturas.")
+        elif acao == "instalar":
+            if not str(arquivo or "").strip():
+                raise ValueError("Escolha o pacote de texturas.")
+            _exigir_ok(TEXTURAS.instalar_textura(tid, arquivo),
+                       "Não foi possível instalar as texturas.")
+        else:
+            raise ValueError("Ação de textura inválida.")
+        return self.emulacao_jogo(gid)
+
+    def emulacao_preset(self, acao, nome):
+        """aplicar | salvar presets globais do Azahar (qt-config.ini)."""
+        nome = str(nome or "").strip()
+        if not nome:
+            raise ValueError("Informe o nome do preset.")
+        if acao == "aplicar":
+            r = _exigir_ok(EMU.aplicar_preset(nome, "azahar"), "Não foi possível aplicar o preset.")
+        elif acao == "salvar":
+            r = _exigir_ok(EMU.salvar_preset_de_atual(nome, "azahar"),
+                           "Não foi possível salvar o preset.")
+        else:
+            raise ValueError("Ação de preset inválida.")
+        return {"ok": True, "presets": list(EMU.listar_presets("azahar")),
+                "avisos": list((r or {}).get("avisos") or [])}
 
     def emus_status(self):
         """Status local dos emuladores. Só leitura, sem rede.

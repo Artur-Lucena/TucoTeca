@@ -12,11 +12,6 @@ from pathlib import Path
 
 import pytest
 
-# A suíte nunca abre janela na tela (ver executar.fundo_segundo_plano).
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("QT_QUICK_BACKEND", "software")
-os.environ.setdefault("QML_DISABLE_DISK_CACHE", "1")
-
 RAIZ = Path(__file__).resolve().parent
 RUNNER = RAIZ / "codigo/ferramentas/testes/executar.py"
 
@@ -47,7 +42,7 @@ class CasoIsolado(pytest.Item):
 
 class ModuloIsolado(pytest.Module):
     def collect(self):
-        # Não importa módulos no processo compartilhado: constantes HOME e Qt
+        # Não importa módulos no processo compartilhado: constantes HOME
         # de um caso não podem contaminar o seguinte nem acessar a coleção real.
         tree = ast.parse(self.path.read_text(encoding="utf-8"))
         for no in tree.body:

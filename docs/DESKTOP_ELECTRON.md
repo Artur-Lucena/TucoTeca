@@ -1,12 +1,12 @@
-# Desktop Electron (em construção — fatia F1)
+# Desktop Electron
 
 ## Decisão de arquitetura
 
-O desktop TucoTeca ganha uma segunda geração de interface: um app **Electron**
-com renderer **Preact + TypeScript**, mantendo o motor em Python. O domínio
-(banco SQLite, emulação, áudio, integrações) continua em `bib_nucleo` /
-`servicos_ui`; o Electron substitui apenas a camada de apresentação, em fatias.
-O Qt Quick (`docs/DESKTOP_QT.md`) segue como desktop atual no Windows até a F5.
+O desktop do TucoTeca é um app **Electron** com renderer **Preact +
+TypeScript**, mantendo o motor em Python. O domínio (banco SQLite, emulação,
+áudio, integrações) continua em `bib_nucleo` / `servicos_ui`; o Electron é só
+a camada de apresentação. Ele substituiu o Qt Quick (removido na F5) e é
+entregue como instalador Windows (ver "App instalado (F4)" abaixo).
 
 ```text
 ┌────────────────────────── Electron (Node) ────────────────────────────┐
@@ -68,7 +68,7 @@ fixo: é a preparação para módulos de terceiros (F3).
 - **Gamepad**: `LeitorControle` no renderer usa a Gamepad API do Chromium (pads
   XInput); D-pad e analógico esquerdo navegam, botões A/B selecionam/voltam;
   a leitura reinicia em `gamepadconnected` e no retorno de foco. Sem controle
-  físico na bancada, a prova é unitária (mesmo limite do desktop Qt).
+  físico na bancada, a prova é unitária.
 - **Queda e reconexão da ponte**: se o Python morre, o main emite
   `ponte-estado` (`caiu` / `reabrindo` / `ok`), as chamadas passam a falhar com
   "a ponte encerrou — clique em Reconectar" e o banner do renderer traz
@@ -110,7 +110,7 @@ npm run build      # electron-vite build → out/
 npm run start      # roda o build (electron .)
 ```
 
-Selftest (paridade com o Qt): `electron . --selftest [--screenshot x.png]
+Selftest: `electron . --selftest [--screenshot x.png]
 [--db X] [--ignorar-lock]`. Erros → `[erro] …` no stderr e saída 1; lock
 ocupado → saída 2; sucesso imprime `[ok] selftest Electron: N jogos; ponte,
 módulos e Início carregados`. Com `--screenshot`, a captura acontece após o
@@ -136,7 +136,8 @@ Variáveis do app Electron:
 
 | Variável | Uso |
 |---|---|
-| `TUCOTECA_RAIZ` | raiz do repositório/bundle (padrão: derivada do `appPath`) |
+| `TUCOTECA_RAIZ` | raiz dos fontes Python (padrão: checkout = 3 níveis acima do `appPath`; instalado = `resources/tucoteca`) |
+| `BIBLIOTECA_HOME` | pasta da coleção (padrão: checkout = a raiz; instalado = `Documentos\TucoTeca`, preservada ao atualizar/desinstalar) |
 | `TUCOTECA_PYTHON` | intérprete explícito; ordem: env → runtime embutido `programa/windows-x64/python/python.exe` → `py -3.14` / `python3` |
 | `TUCOTECA_USERDATA` | userData do Electron fora do padrão (provas) |
 
@@ -153,16 +154,11 @@ persistidos, gamepad por Gamepad API, hardening da queda da ponte (banner +
 **Reconectar**, lock órfão assumido) e menu do app — 55 testes vitest e suíte
 Python 526/526 na rodada completa, provas E2E de queda e do checklist do shell.
 
-Ainda não (fatias seguintes): F2 telas Jogos/Músicas/Desejos/Downloads/
-Integrações/Vídeos com a tabela de paridade do `docs/DESKTOP_QT.md`; F3 módulos
-de terceiros; F4 empacotamento e assinatura (instalador único); F5 retirada do
-Qt e do `BIBLIOTECA_WEBENGINE`; F6 release 1.2.0.
-
 Limites honestos: a TUI curses continua para Linux/macOS e a plataforma macOS
 segue fora do escopo; gamepad provado só por unidade (sem controle físico na
 máquina); a paleta busca em memória (12 itens/limite — coleções grandes podem
 querer FTS depois); o selftest não substitui prova física de áudio nem serviços
-remotos; a F1 não empacota, não assina e não substitui o Qt como desktop padrão.
+remotos.
 
 
 ## O que a F2 entrega (telas restantes)
@@ -185,14 +181,49 @@ Protocolo de midia: `tucoteca-media://arquivo/<caminho>` servido pelo main com
 (valida que o caminho esta sob a home).
 
 Divergencias documentadas: o player de musica e do renderer (HTMLAudio sobre o protocolo
-de midia), nao o MCI do Qt/TUI (`player.py` segue TUI-only); o volume global do Windows
+de midia), nao o MCI da TUI (`player.py` segue TUI-only); o volume global do Windows
 ainda nao foi portado (pendencia). Musicas nao entram na lixeira (remover apaga o
-arquivo, sem desfazer). TUI curses e Qt permanecem (F5 retira o Qt).
+arquivo, sem desfazer).
 
-Ainda nao (fatias seguintes): F3 modulos de terceiros; F4 empacotamento e assinatura;
-F5 retirada do Qt e do `BIBLIOTECA_WEBENGINE`; F6 release 1.2.0. Pendencias nomeadas
-da F2 (F2b/F3): importacao/scan/drag&drop de jogos, capas, conquistas, mods/emulacao,
-saves/ferramentas, Spotify/musicas online/fila/letras, YouTube embutido/busca/download,
-catalogo pacotes/UAC, configuracoes/tema, export/import da colecao, sincronizar
-Steam/wishlist/precos offline, "Iniciar cliente"/"Pacotes locais", volume global Windows,
-gamepad dentro de listas.
+O que ainda falta em relação ao antigo desktop Qt está listado em
+"Pendências de paridade" abaixo.
+
+
+## Paridade com o antigo Qt (fase 3, 1.3.0)
+
+Métodos novos ficam em `codigo/frontends/ponte_paridade.py` (registrados pela
+`Ponte`); a lógica continua em `servicos_ui`/`bib_nucleo`. Ações que mexem em
+arquivos do emulador ou da coleção recusam com um jogo aberto ("Feche o jogo
+aberto antes…"), como no Qt. Operações longas viram trabalhos (rodapé).
+
+| Onde | O quê | Métodos |
+|---|---|---|
+| Detalhe do jogo › Emulação (3DS) | mods (importar .zip/pasta, ligar, jogar sem mods, remover), cheats, texturas HD, presets do Azahar | `emulacao.jogo/mod/cheat/textura/preset` |
+| Detalhe do jogo › Manutenção | verificar exe/ROM e religar, usar o emulador atual, ROM candidata, espaço em disco, abrir como administrador (UAC) | `jogo.diagnosticar`, `jogo.religar`, `jogo.disco`, `jogo.jogar_elevado` |
+| Detalhe do jogo | capa libretro (jogos com ROM) | `capas.libretro` |
+| Configurações › Emuladores | versão local, verificar release, atualizar (trabalho) | `emulacao.status/consultar/atualizar` |
+| Configurações › Controles | pads, presets (salvar perfil atual, aplicar), mapa padrão por tipo, leitura ao vivo | `controles.listar/fotografar/aplicar/gerar/estado` |
+| Configurações › Sanear pasta | plano só-leitura e aplicar (instaladores → `.hub-lixo`) | `manutencao.plano/sanear` |
+| Configurações › Ferramentas de mídia | editores, equalizadores e players externos | `ferramentas.listar`, `ferramentas.abrir` |
+| Músicas | equalizar a faixa (cópia nova; trabalho) | `musicas.eq_presets`, `musicas.eq` |
+| Player do rodapé | letra sincronizada (LRCLIB, só com o painel aberto) e volume do PC | `musicas.letras`, `sistema.volume*` |
+| Desejos | sincronizar Steam, importar JSON, buscar fontes (abre a página) | `desejos.sincronizar_steam/importar_wishlist/buscar_fontes` |
+| Downloads | marca concluídos fora da pasta de jogos | `torrents.listar` (`fora_destino`) |
+| Jogos | arrastar pastas/exe/ROMs → prévia com seleção → importar | `jogos.prever`, `jogos.importar_selecionados` |
+
+Fora da interface nova, de propósito: o download/instalação automático de
+repacks a partir das fontes (`baixar_fonte_steamrip`); a busca só abre a página.
+
+Arquivos soltos na janela fora da área de Jogos não fazem nada: o main bloqueia
+`will-navigate` e o renderer cancela o drop padrão (antes, soltar um arquivo
+trocava o app por `file://`). O caminho do arquivo solto vem de
+`webUtils.getPathForFile` no preload (`caminhoDoArquivo`).
+
+## App instalado (F4)
+
+`npm run dist` gera `dist/TucoTeca-Setup-<versão>-x64.exe` (NSIS por usuário,
+sem admin) com `electron-builder.config.cjs`. O núcleo Python, a ponte e o
+Python embutido vão em `resources/tucoteca/`; a coleção padrão fica em
+`Documentos\TucoTeca`. A ponte roda com `windowsHide` (sem console). Fluxo
+completo de build, prova e anexos em `docs/RELEASES.md`. Assinatura de
+código continua fora (decisão do usuário).
