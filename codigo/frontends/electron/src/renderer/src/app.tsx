@@ -332,23 +332,23 @@ export function App() {
             {ativo === undefined || ativo.chave === 'inicio' ? (
               <Inicio snapshot={colecao ?? {}} />
             ) : ativo.chave === 'jogos' ? (
-              <Lazy fabrica={() => import('./vistas/Jogos')} props={{ focoBusca, perfil, aoAbrirJogo: (id: number) => setDetalheId(id), aoJogarJogo: (id: number) => void jogar(id), aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
+              <Lazy key="Jogos" fabrica={() => import('./vistas/Jogos').then((m) => m.Jogos)} props={{ focoBusca, perfil, aoAbrirJogo: (id: number) => setDetalheId(id), aoJogarJogo: (id: number) => void jogar(id), aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'musicas' ? (
-              <Lazy fabrica={() => import('./vistas/Musicas')} props={{ focoBusca, perfil, aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
+              <Lazy key="Musicas" fabrica={() => import('./vistas/Musicas').then((m) => m.Musicas)} props={{ focoBusca, perfil, aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'desejos' ? (
-              <Lazy fabrica={() => import('./vistas/Desejos')} props={{ focoBusca, perfil, aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
+              <Lazy key="Desejos" fabrica={() => import('./vistas/Desejos').then((m) => m.Desejos)} props={{ focoBusca, perfil, aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'integracoes' ? (
-              <Lazy fabrica={() => import('./vistas/Integracoes')} props={{ aoAvisar: avisar, aoNavegar: setSecao }} />
+              <Lazy key="Integracoes" fabrica={() => import('./vistas/Integracoes').then((m) => m.Integracoes)} props={{ aoAvisar: avisar, aoNavegar: setSecao }} />
             ) : ativo.chave === 'downloads' ? (
-              <Lazy fabrica={() => import('./vistas/Downloads')} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
+              <Lazy key="Downloads" fabrica={() => import('./vistas/Downloads').then((m) => m.Downloads)} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'videos' ? (
-              <Lazy fabrica={() => import('./vistas/Videos')} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
+              <Lazy key="Videos" fabrica={() => import('./vistas/Videos').then((m) => m.Videos)} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'youtube' ? (
-              <Lazy fabrica={() => import('./vistas/YouTube')} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
+              <Lazy key="YouTube" fabrica={() => import('./vistas/YouTube').then((m) => m.YouTube)} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'configuracoes' ? (
-              <Lazy fabrica={() => import('./vistas/Configuracoes')} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
+              <Lazy key="Configuracoes" fabrica={() => import('./vistas/Configuracoes').then((m) => m.Configuracoes)} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
             ) : ativo.chave === 'notificacoes' ? (
-              <Lazy fabrica={() => import('./vistas/Notificacoes')} props={{ avisos, aoDispensar: (id: string) => setAvisos((atual) => dispensarAviso(atual, id)), aoLimpar: () => setAvisos([]) }} />
+              <Lazy key="Notificacoes" fabrica={() => import('./vistas/Notificacoes').then((m) => m.Notificacoes)} props={{ avisos, aoDispensar: (id: string) => setAvisos((atual) => dispensarAviso(atual, id)), aoLimpar: () => setAvisos([]) }} />
             ) : (
               <Placeholder modulo={ativo} />
             )}

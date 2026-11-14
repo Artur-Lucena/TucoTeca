@@ -193,7 +193,11 @@ async function principal(): Promise<void> {
   }
 
   try {
-    await conectar()
+    // Depois de crash/encerramento forçado/queda de energia sobra um lock de pid
+    // morto; o núcleo o recusaria por 24 h e o usuário do instalador não tem
+    // como passar --ignorar-lock. Mesma regra do Reconectar: só assume lock
+    // órfão do mesmo host/SO; lock de processo vivo continua recusado.
+    await conectar(lockOrfao(CAMINHO_LOCK))
   } catch (erro) {
     if (bloqueioAtual) {
       falhar(bloqueioAtual, 2)
