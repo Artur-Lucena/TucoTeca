@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { resumoEmulador, type EmuladorStatus } from '../estado/emulacao'
 import { textoDeFalha } from '../estado/notificacoes'
 import { jogoEmAndamento, listaTrabalhos } from '../estado/trabalhos'
+import { confirmar } from './Confirmacao'
 
 interface Props {
   aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
@@ -47,7 +48,7 @@ export function PainelEmuladores({ aoAvisar }: Props) {
       `Baixar e instalar ${e.nome} ${e.tag}` +
       (e.tamanho_mb ? ` (${e.tamanho_mb} MB)` : '') +
       '? Feche o emulador antes. A pasta user/ (saves e configurações) não é tocada e a versão anterior fica guardada para recuperação.'
-    if (!window.confirm(texto)) return
+    if (!(await confirmar({ titulo: `Atualizar ${e.nome}`, texto, confirmar: 'Baixar e instalar' }))) return
     try {
       await window.tucoteca.chamar('emulacao.atualizar', { chave: e.chave, info: e.info ?? {} })
       aoAvisar(`Atualizando ${e.nome}… acompanhe no rodapé.`)

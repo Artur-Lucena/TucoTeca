@@ -4,10 +4,11 @@ from __future__ import annotations
 import urllib.request
 
 from bib_nucleo.rede import abrir_rede
+from bib_nucleo.versao import user_agent
 
 
 def _baixar_bin(url: str, minimo: int, progresso=None, timeout: int = 60) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": "TucoTeca/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": user_agent()})
     with abrir_rede(req, timeout=timeout) as r:
         total = int(r.headers.get("Content-Length") or 0)
         if total > 500_000_000:

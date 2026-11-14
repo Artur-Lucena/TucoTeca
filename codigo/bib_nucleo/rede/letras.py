@@ -15,9 +15,10 @@ import urllib.parse
 import urllib.request
 
 from bib_nucleo.rede import exigir_rede, online
+from bib_nucleo.versao import user_agent
 
 ENDPOINT = "https://lrclib.net/api/get"
-USER_AGENT = "TucoTeca/1.0 (uso pessoal; https://github.com/Artur-Lucena/TucoTeca)"
+USER_AGENT = user_agent("uso pessoal")
 _TEMPO_LRC = re.compile(r"\[(\d{1,3}):(\d{2}(?:\.\d{1,3})?)\]")
 _PEDIDOS = threading.Lock()
 

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 import type { ApiTucoteca } from '../shared/api'
 import { converterUrlMidia, mediaUrl } from '../shared/midia'
 
@@ -22,6 +22,8 @@ const api: ApiTucoteca = {
   abrirUrl: (url) => ipcRenderer.invoke('app:abrir-url', url),
   abrirPasta: (caminho) => ipcRenderer.invoke('app:abrir-pasta', caminho),
   reabrir: () => ipcRenderer.invoke('ponte:reabrir'),
+  // densidade × escala de texto (Aparência); limites para nunca sumir com a interface
+  definirZoom: (fator) => webFrame.setZoomFactor(Math.min(2, Math.max(0.5, Number(fator) || 1))),
 }
 
 contextBridge.exposeInMainWorld('tucoteca', api)

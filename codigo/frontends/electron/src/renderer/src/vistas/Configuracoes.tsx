@@ -1,8 +1,18 @@
 import { useEffect, useState } from 'preact/hooks'
+import { PainelColecao } from '../componentes/PainelColecao'
 import { PainelControles } from '../componentes/PainelControles'
 import { PainelEmuladores } from '../componentes/PainelEmuladores'
 import { PainelFerramentasMidia } from '../componentes/PainelFerramentasMidia'
 import { PainelSaneamento } from '../componentes/PainelSaneamento'
+import {
+  aplicarAparencia,
+  DENSIDADES,
+  ESCALA_MAX,
+  ESCALA_MIN,
+  normalizarAparencia,
+  TEMAS,
+  type Aparencia,
+} from '../estado/aparencia'
 import { textoDeFalha } from '../estado/notificacoes'
 
 interface Props {
@@ -10,25 +20,18 @@ interface Props {
   aoMudou: () => void
 }
 
-/** Tela Configurações: aparência, provedores, estatísticas, backups e coleção. */
+/** Tela Configurações: aparência, provedores, emuladores, controles, manutenção e coleção. */
 export function Configuracoes({ aoAvisar, aoMudou }: Props) {
-  const [tema, setTema] = useState('')
-  const [densidade, setDensidade] = useState('')
-  const [autoBackup, setAutoBackup] = useState(true)
+  const [aparencia, setAparencia] = useState<Aparencia>(normalizarAparencia({}))
   const [steam, setSteam] = useState('')
   const [steamgrid, setSteamgrid] = useState('')
   const [spotifyId, setSpotifyId] = useState('')
   const [spotifySecret, setSpotifySecret] = useState('')
-  const [estatisticas, setEstatisticas] = useState<Record<string, unknown> | null>(null)
-  const [backups, setBackups] = useState<unknown[]>([])
 
   useEffect(() => {
     void (async () => {
       try {
-        const a = await window.tucoteca.chamar<{ tema?: string; densidade?: string; auto_backup?: boolean }>('aparencia.ler')
-        if (typeof a.tema === 'string') setTema(a.tema)
-        if (typeof a.densidade === 'string') setDensidade(a.densidade)
-        if (typeof a.auto_backup === 'boolean') setAutoBackup(a.auto_backup)
+        setAparencia(normalizarAparencia(await window.tucoteca.chamar('aparencia.ler')))
       } catch (falha) {
         aoAvisar(textoDeFalha(falha), 'atencao')
       }
@@ -37,7 +40,16 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
 
   const salvarAparencia = async () => {
     try {
-      await window.tucoteca.chamar('aparencia.salvar', { tema, densidade, auto_backup: autoBackup })
+      const salva = normalizarAparencia(
+        await window.tucoteca.chamar('aparencia.salvar', {
+          tema: aparencia.tema,
+          densidade: aparencia.densidade,
+          escala_texto: aparencia.escala_texto,
+          auto_backup: aparencia.auto_backup,
+        }),
+      )
+      setAparencia(salva)
+      aplicarAparencia(salva)
       aoAvisar('Aparência salva.')
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
@@ -58,56 +70,6 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
     }
   }
 
-  const verEstatisticas = async () => {
-    try {
-      setEstatisticas(await window.tucoteca.chamar<Record<string, unknown>>('estatisticas.ler'))
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const listarBackups = async () => {
-    try {
-      const r = await window.tucoteca.chamar<{ itens?: unknown[] }>('backups.listar', { manter: 10 })
-      setBackups(r?.itens ?? [])
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const sincronizarSteam = async () => {
-    try {
-      const r = await window.tucoteca.chamar<Record<string, unknown>>('desejos.sincronizar_steam')
-      aoAvisar(`Wishlist sincronizada: ${JSON.stringify(r)}`)
-      aoMudou()
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const exportar = async () => {
-    try {
-      const pasta = await window.tucoteca.escolherPasta()
-      if (pasta === null || pasta === '') return
-      await window.tucoteca.chamar('colecao.exportar', { pasta })
-      aoAvisar('Coleção exportada.')
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const importar = async () => {
-    try {
-      const pasta = await window.tucoteca.escolherPasta()
-      if (pasta === null || pasta === '') return
-      await window.tucoteca.chamar('colecao.importar', { caminho: pasta, restaurar_saves: false })
-      aoAvisar('Coleção importada.')
-      aoMudou()
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
   return (
     <section class="vista configuracoes">
       <header class="vista-topo">
@@ -118,17 +80,48 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
         <h2>Aparência</h2>
         <label>
           Tema
-          <input value={tema} onInput={(e) => setTema((e.target as HTMLInputElement).value)} />
+          <select
+            value={aparencia.tema}
+            onChange={(e) => setAparencia({ ...aparencia, tema: (e.target as HTMLSelectElement).value as Aparencia['tema'] })}
+          >
+            {TEMAS.map((t) => (
+              <option key={t.valor} value={t.valor}>
+                {t.rotulo}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           Densidade
-          <input value={densidade} onInput={(e) => setDensidade((e.target as HTMLInputElement).value)} />
+          <select
+            value={aparencia.densidade}
+            onChange={(e) =>
+              setAparencia({ ...aparencia, densidade: (e.target as HTMLSelectElement).value as Aparencia['densidade'] })
+            }
+          >
+            {DENSIDADES.map((d) => (
+              <option key={d.valor} value={d.valor}>
+                {d.rotulo}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
+          Tamanho do texto: {Math.round(aparencia.escala_texto * 100)}%
+          <input
+            type="range"
+            min={ESCALA_MIN}
+            max={ESCALA_MAX}
+            step={0.05}
+            value={aparencia.escala_texto}
+            onInput={(e) => setAparencia({ ...aparencia, escala_texto: Number((e.target as HTMLInputElement).value) })}
+          />
+        </label>
+        <label class="marcar">
           <input
             type="checkbox"
-            checked={autoBackup}
-            onChange={(e) => setAutoBackup((e.target as HTMLInputElement).checked)}
+            checked={aparencia.auto_backup}
+            onChange={(e) => setAparencia({ ...aparencia, auto_backup: (e.target as HTMLInputElement).checked })}
           />
           Backup automático pós-sessão
         </label>
@@ -172,26 +165,7 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
 
       <PainelFerramentasMidia aoAvisar={aoAvisar} />
 
-      <div class="form-config">
-        <h2>Manutenção</h2>
-        <button type="button" class="acao" onClick={() => void verEstatisticas()}>
-          Estatísticas
-        </button>
-        <button type="button" class="acao" onClick={() => void listarBackups()}>
-          Backups
-        </button>
-        <button type="button" class="acao" onClick={() => void sincronizarSteam()}>
-          Sincronizar Steam (wishlist)
-        </button>
-        <button type="button" class="acao" onClick={() => void exportar()}>
-          Exportar coleção
-        </button>
-        <button type="button" class="acao" onClick={() => void importar()}>
-          Importar coleção
-        </button>
-        {estatisticas !== null && <pre class="stats">{JSON.stringify(estatisticas, null, 2)}</pre>}
-        {backups.length > 0 && <pre class="stats">{JSON.stringify(backups, null, 2)}</pre>}
-      </div>
+      <PainelColecao aoAvisar={aoAvisar} aoMudou={aoMudou} />
     </section>
   )
 }

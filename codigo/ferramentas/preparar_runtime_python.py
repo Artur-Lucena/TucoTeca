@@ -26,8 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_utils import baixar_verificado, sha_arquivo  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
-VERSAO = "3.14.7"
-SHA256 = "d297e5ff019966817ad8502465176139f2d3d840fa4ed84b13bed399a6ab1f15"
+VERSAO = "3.14.10"
+SHA256 = "90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159"
 URL = f"https://www.python.org/ftp/python/{VERSAO}/python-{VERSAO}-embed-amd64.zip"
 NOME = f"python-{VERSAO}-embed-amd64.zip"
 CACHE = REPO / "codigo/ferramentas/.cache"

@@ -1,229 +1,141 @@
 # Desktop Electron
 
-## Decisão de arquitetura
-
 O desktop do TucoTeca é um app **Electron** com renderer **Preact +
-TypeScript**, mantendo o motor em Python. O domínio (banco SQLite, emulação,
-áudio, integrações) continua em `bib_nucleo` / `servicos_ui`; o Electron é só
-a camada de apresentação. Ele substituiu o Qt Quick (removido na F5) e é
-entregue como instalador Windows (ver "App instalado (F4)" abaixo).
+TypeScript**; o motor continua em Python. Domínio (SQLite, emulação, áudio,
+integrações) fica em `bib_nucleo` / `servicos_ui`; o Electron só apresenta.
+Entrega: instalador Windows (NSIS). Linux/macOS usam a TUI pelos fontes.
 
 ```text
 ┌────────────────────────── Electron (Node) ────────────────────────────┐
-│ main: BrowserWindow, instância única, IPC, protocolo tucoteca-img://  │
+│ main: janela, instância única, IPC, protocolos tucoteca-img/-media,   │
+│       menu, diálogos, ciclo de vida da ponte                          │
 │   └ preload (contextBridge) → window.tucoteca                         │
 │       └ renderer: Preact + TypeScript (só IPC, sem Node)              │
 └───────────────────────────────┬───────────────────────────────────────┘
                      spawn + NDJSON em stdin/stdout (sem TCP)
 ┌───────────────────────────────▼───────────────────────────────────────┐
-│ ponte.py: abrir_hub.preparar() → ServicoBiblioteca → bib_core/SQLite  │
+│ ponte.py (+ ponte_paridade.py) → ServicoBiblioteca → bib_core/SQLite  │
 └───────────────────────────────────────────────────────────────────────┘
 ```
-
-Não existe porta TCP: o renderer fala só por IPC com o main, e o main fala
-com o Python por NDJSON (uma linha JSON por mensagem) em stdin/stdout do
-processo filho.
 
 ## Protocolo (NDJSON)
 
 - Pedido: `{"id": 1, "metodo": "nucleo.ping", "params": {…}}` (`params` opcional).
-- Resposta: `{"id": 1, "ok": true, "resultado": {…}}` ou
-  `{"id": 1, "ok": false, "erro": "…"}`.
-- Evento (sem `id`): `{"evento": "bloqueio", "dados": {"erro": "…"}}` — a
-  coleção ocupada por outro programa vira evento e a ponte sai com código 2.
+- Resposta: `{"id": 1, "ok": true, "resultado": …}` ou `{"id": 1, "ok": false, "erro": "…"}`.
+- Eventos (sem `id`): `bloqueio` (coleção ocupada; a ponte sai com código 2) e
+  `trabalho` (início/progresso/cancelamento/fim de operações longas).
+- A ponte nunca morre por erro de chamada: JSON inválido, método desconhecido e
+  exceção viram `ok: false`. O main corta cada pedido em **30 s**; o que pode
+  demorar mais roda como **trabalho** (`trabalhos.listar/cancelar`) e aparece no
+  rodapé (`Atividade`).
 
-Métodos da ponte (F0/F1):
+## Métodos da ponte (98)
 
-| Método | Resultado |
+Contrato provado por `test_ponte.py` e `test_paridade.py`. Ações que mexem em
+arquivos do emulador, saves ou coleção recusam com um jogo aberto ("Feche o
+jogo aberto antes…"); confirmações de ações destrutivas ficam na interface.
+
+| Domínio | Métodos |
 |---|---|
-| `nucleo.ping` | `{pong: true, versao, home, db}` |
-| `nucleo.snapshot` | jogos/músicas/desejos/vídeos/fila + `sistema` (contadores, backup, disco) |
-| `nucleo.buscar` | busca global `{termo, limite?}` (1–50, padrão 12) em jogos/músicas/desejos, sem acento |
-| `modulos.listar` | lista ordenada dos módulos do hub |
-| `preferencias.ler` | `{ativo, perfis, atalhos}` (padrões quando ainda não há arquivo) |
-| `preferencias.trocar_perfil` | grava `{nome}` (Tuco/Isa) e devolve o perfil ativo; nome inválido → `ok:false` |
+| núcleo e preferências | `nucleo.ping/snapshot/buscar/saude`, `modulos.listar`, `preferencias.ler/trocar_perfil/filtro/salvar_filtro`, `aparencia.ler/salvar` |
+| jogos | `jogo.ler/salvar/favoritar/observacoes/jogar`*, `jogo.registrar_horas`, `jogo.diagnosticar/religar/disco/jogar_elevado`, `jogos.importar`*, `jogos.prever`, `jogos.importar_selecionados` |
+| emulação | `emulacao.jogo/mod/cheat/textura/preset`, `emulacao.status/consultar/atualizar`*, `controles.listar/fotografar/aplicar/gerar/estado` |
+| saves e capas | `saves.configurar/snapshot/restaurar`, `ferramentas.jogo`, `capas.buscar/aplicar/libretro`, `conquistas.avaliar/sincronizar/regras` |
+| músicas | `musicas.importar`*, `musicas.baixar_fila`*, `musicas.buscar_online/enfileirar/letras`, `musicas.eq_presets`, `musicas.eq`* |
+| vídeos | `videos.local/salvar_posicao/reproduzir/buscar_online`, `videos.importar/baixar/baixar_mp3`* |
+| desejos | `desejos.adicionar/precos/sincronizar_steam/importar_wishlist/buscar_fontes` |
+| downloads | `torrents.listar` (com `fora_destino`), `torrents.controlar/organizar`, `torrents.importar`*, `pacotes.importar/abrir_instalador` |
+| integrações | `integracoes.listar/adicionar/remover/url/buscar` |
+| coleção e sistema | `colecao.backup/exportar/importar`, `backups.listar`, `estatisticas.ler`, `item.excluir/desfazer`, `lixeira.estado`, `sessoes.listar/encerrar`, `sistema.erros/volume/volume_definir/volume_mudo`, `manutencao.plano/sanear`, `ferramentas.listar/abrir`, `provedores.configurar` |
+| trabalhos | `trabalhos.listar/cancelar` |
 
-## Contrato de módulos
+\* roda como trabalho (devolve `{trabalho}`; resultado chega pelo evento).
 
-`servicos_ui/modulos.py` define `Modulo` (chave, nome, descrição, ícone,
-ordem) e `modulos_padrao()` — hoje 8 módulos (Início a YouTube), na ordem da
-navegação. A barra lateral do renderer é gerada dessa lista, não de código JS
-fixo: é a preparação para módulos de terceiros (F3).
+## Telas
 
-## Shell da F1
+| Seção | O que faz |
+|---|---|
+| Início | KPIs, continuar jogando e **Sessões abertas** (jogos abertos sem contagem de horas: informar e fechar) |
+| Jogos | grade com filtros/ordem/busca, importar pasta e **arrastar e soltar** (prévia só-leitura com seleção) |
+| Detalhe do jogo | editar, jogar, horas, conquistas, capas (inclusive libretro), **Manutenção** (verificar/religar exe e ROM, disco, abrir como administrador), **Emulação 3DS** (mods, cheats, texturas HD, presets), **Saves e screenshots** (snapshot, restaurar, galeria) |
+| Músicas | lista, player no rodapé (letra sincronizada, volume do PC), equalizar, busca online e fila |
+| Desejos | preços, sincronizar Steam, importar JSON, buscar fontes (abre a página) |
+| Downloads | torrents com progresso, organizar (marca o que está fora da pasta de jogos), importar concluídos, pacotes locais |
+| Integrações | cartões com busca de catálogo ou atalho para a tela que faz aquilo |
+| Vídeos / YouTube | videoteca local com player interno e navegador do YouTube embutido |
+| Notificações | avisos do sistema (backup, sessões abertas, disco) e das tarefas |
+| Configurações | aparência, provedores, emuladores, controles, sanear pasta, ferramentas de mídia e **Coleção** (backup agora, backups, horas do ano, exportar/importar `.zip`, erros recentes) |
 
-- **Paleta (`Ctrl+K` / `Ctrl+F`)**: busca global pela ponte (`nucleo.buscar`);
-  Enter navega para o item, `Esc` fecha; com a paleta aberta os atalhos de seção
-  ficam suspensos e `Ctrl+K` fecha. Respostas atrasadas de um termo antigo são
-  descartadas (guarda de termo).
-- **Atalhos pessoais** (`preferencias.ler`): `Ctrl+1..8` (Início…YouTube),
-  `Ctrl+K`/`Ctrl+F` paleta, `F11` tela cheia. O renderer normaliza a combinação
-  (`combinacao`) e resolve contra o mapa pessoal; sem combinação o evento segue
-  para o menu — é assim que `F11` chega ao `togglefullscreen` nativo.
-- **Notificações**: sino na base da barra lateral com contador; avisos vêm do
-  `sistema` do snapshot (e de eventos `aviso` da ponte, quando houver);
-  dispensar remove só na sessão.
-- **Perfis**: chip Tuco/Isa; a troca grava `dados/preferencias-pessoais.json`
-  via `preferencias.trocar_perfil` e reflete no chip.
-- **Gamepad**: `LeitorControle` no renderer usa a Gamepad API do Chromium (pads
-  XInput); D-pad e analógico esquerdo navegam, botões A/B selecionam/voltam;
-  a leitura reinicia em `gamepadconnected` e no retorno de foco. Sem controle
-  físico na bancada, a prova é unitária.
-- **Queda e reconexão da ponte**: se o Python morre, o main emite
-  `ponte-estado` (`caiu` / `reabrindo` / `ok`), as chamadas passam a falhar com
-  "a ponte encerrou — clique em Reconectar" e o banner do renderer traz
-  **Reconectar**. A reabertura é single-flight, refaz o snapshot sem recarregar
-  a página e, quando o lock no disco é órfão (mesmo host/SO e pid morto — sobra
-  típica de crash/`taskkill /F`), assume a coleção; lock vivo de outra
-  instância continua recusado com a mensagem do núcleo.
-- **Menu do app**: barra com **TucoTeca** (Sobre… — versão, home da coleção e
-  versão do Electron —, Sair), **Exibir** (Recarregar `CmdOrCtrl+R`, DevTools
-  `F12`, zoom, Tela cheia `F11`) e **Ajuda** (Documentação e Aviso legal, que
-  abrem os arquivos locais de `docs/`). `autoHideMenuBar` continua: `Alt` mostra
-  a barra e os aceleradores valem sempre.
+## Comportamentos transversais
+
+- **Paleta** `Ctrl+K`/`Ctrl+F` (busca global), atalhos pessoais `Ctrl+1..8`,
+  `F11` tela cheia, gamepad pela Gamepad API (D-pad/analógico navegam, A/B).
+- **Aparência**: tema escuro/claro (`:root[data-tema]`, mesmos tokens de cor),
+  densidade compacta/confortável/Big Picture e tamanho do texto (80–150%) viram
+  o zoom da janela (`webFrame.setZoomFactor`). Aplicada ao abrir e ao salvar.
+- **Confirmações**: `confirmar()` (diálogo do app, `componentes/Confirmacao.tsx`)
+  — nunca `window.confirm`. Esc/Enter são tratados na captura para não fechar a
+  gaveta do detalhe junto.
+- **Carregamento por seção**: `Lazy` com `key` por seção e componente nomeado
+  (`import(...).then((m) => m.Videos)`).
+- **Queda da ponte**: banner com **Reconectar** (single-flight, refaz o snapshot).
+- **Lock da coleção**: instância única; lock de processo vivo é recusado. Lock
+  órfão (pid morto no mesmo host/SO — crash, queda de energia, encerramento
+  forçado) é assumido **ao abrir** e no Reconectar.
+- **Arquivos soltos** fora da área de Jogos não fazem nada (`will-navigate`
+  bloqueado e drop padrão cancelado); o caminho real vem de
+  `webUtils.getPathForFile` (`caminhoDoArquivo`).
 
 ## Segurança
 
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`; o
-  renderer só enxerga `window.tucoteca` (`chamar`, `assinar`, `pronto`,
-  `imagemUrl`, `reabrir`) exposto por `contextBridge`.
-- Capas locais são servidas por `tucoteca-img://` (protocolo próprio); o main
-  valida cada caminho contra a pasta da coleção (fora dela, inclusive `..`,
-  responde 403) — o renderer nunca carrega `file://` direto.
-- Navegação para http/https abre no navegador do sistema; a janela não navega
-  para fora do app.
-- Instância única (`requestSingleInstanceLock`); o lock da coleção continua
-  sendo o do núcleo (arquivo `.lock`), com mensagem clara e saída 2 quando
-  ocupado. A reabertura só assume lock com pid morto no mesmo host/SO.
-- Provas usam `BIBLIOTECA_HOME` temporário e `TUCOTECA_USERDATA` (userData do
-  Electron redirecionado) — nunca a coleção real nem o `%APPDATA%` padrão.
+  renderer só enxerga `window.tucoteca` (`shared/api.ts`).
+- Imagens e mídia locais por `tucoteca-img://` e `tucoteca-media://` (com
+  Range); o main valida cada caminho contra a pasta da coleção (fora dela → 403).
+- Links http/https abrem no navegador do sistema; `app:abrir-url` só aceita
+  https e respeita `BIBLIOTECA_REDE=0`; `app:abrir-pasta` só dentro da coleção.
+- Seletores de arquivo/pasta são do sistema; filtros vindos do renderer são
+  validados (extensões alfanuméricas).
+- Provas usam `BIBLIOTECA_HOME` e `TUCOTECA_USERDATA` temporários — nunca a
+  coleção real nem o `%APPDATA%` padrão.
 
 ## Desenvolvimento e verificação
 
 ```powershell
-cd codigo/frontends/electron
-npm install
-npm run dev        # janela com hot reload (usa a coleção padrão do checkout)
-npm run test       # vitest (ponte, shell, estado, menu, derivações)
-npm run typecheck  # tsc --noEmit nos dois tsconfigs
-npm run build      # electron-vite build → out/
-npm run start      # roda o build (electron .)
+npm --prefix codigo/frontends/electron ci
+npm --prefix codigo/frontends/electron run dev        # hot reload
+npm --prefix codigo/frontends/electron test           # vitest
+npm --prefix codigo/frontends/electron run typecheck
+py -3.14 -B codigo/ferramentas/validar.py             # todos os gates
 ```
 
-Selftest: `electron . --selftest [--screenshot x.png]
-[--db X] [--ignorar-lock]`. Erros → `[erro] …` no stderr e saída 1; lock
-ocupado → saída 2; sucesso imprime `[ok] selftest Electron: N jogos; ponte,
-módulos e Início carregados`. Com `--screenshot`, a captura acontece após o
-primeiro render estável.
-
-Prova com dados sintéticos (nunca a coleção real):
-
-```powershell
-py -3.14 -B codigo/ferramentas/semear_prova_electron.py --destino .provas/electron/home-f0 --limpar
-$env:BIBLIOTECA_HOME = "…\.provas\electron\home-f0"
-$env:TUCOTECA_USERDATA = "…\.provas\electron\userdata-f0"
-npx electron . --selftest --screenshot "…\.provas\electron\f0-inicio.png"
-```
-
-Provas E2E do shell (locais, em `.provas/electron/`): o app roda de verdade com
-`--remote-debugging-port` e o CDP dirige paleta/atalhos/reload; `keybd_event`
-com a janela em primeiro plano envia `F11`/`Alt` (atalhos de menu são nativos e
-não chegam por CDP); `taskkill /T /F` no Python prova a queda e a reconexão;
-`PrintWindow` captura a moldura (barra de menu) — tudo com home e userData de
-prova.
-
-Variáveis do app Electron:
+Selftest: `electron . --selftest [--screenshot x.png] [--db X] [--ignorar-lock]`
+— erro → saída 1, lock ocupado → 2, sucesso imprime
+`[ok] selftest Electron: N jogos; ponte, módulos e Início carregados`.
+Coleção sintética para provas: `semear_prova_electron.py --destino … --limpar`.
+Provas de tela usam `--remote-debugging-port` e CDP sobre o app empacotado.
 
 | Variável | Uso |
 |---|---|
-| `TUCOTECA_RAIZ` | raiz dos fontes Python (padrão: checkout = 3 níveis acima do `appPath`; instalado = `resources/tucoteca`) |
-| `BIBLIOTECA_HOME` | pasta da coleção (padrão: checkout = a raiz; instalado = `Documentos\TucoTeca`, preservada ao atualizar/desinstalar) |
-| `TUCOTECA_PYTHON` | intérprete explícito; ordem: env → runtime embutido `programa/windows-x64/python/python.exe` → `py -3.14` / `python3` |
+| `TUCOTECA_RAIZ` | raiz dos fontes Python (checkout: 3 níveis acima do `appPath`; instalado: `resources/tucoteca`) |
+| `BIBLIOTECA_HOME` | pasta da coleção (checkout: a raiz; instalado: `Documentos\TucoTeca`, preservada ao atualizar/desinstalar) |
+| `TUCOTECA_PYTHON` | intérprete explícito; ordem: env → `programa/windows-x64/python/python.exe` → `py -3.14` / `python3` |
 | `TUCOTECA_USERDATA` | userData do Electron fora do padrão (provas) |
 
-## O que a F0/F1 entregam (e o que ainda não)
-
-Entregue na F0: ponte NDJSON com `nucleo.ping`/`nucleo.snapshot`/
-`modulos.listar` (15 casos de teste hoje), registro de módulos, shell Electron
-com barra lateral + boas-vindas, tela Início (contadores e "Continuar jogando"
-com capas), selftest com screenshot e provas visuais revisadas.
-
-Entregue na F1: paleta de busca global `Ctrl+K`/`Ctrl+F` (`nucleo.buscar`),
-atalhos pessoais `Ctrl+1..8`, notificações com sino/contador, perfis Tuco/Isa
-persistidos, gamepad por Gamepad API, hardening da queda da ponte (banner +
-**Reconectar**, lock órfão assumido) e menu do app — 55 testes vitest e suíte
-Python 526/526 na rodada completa, provas E2E de queda e do checklist do shell.
-
-Limites honestos: a TUI curses continua para Linux/macOS e a plataforma macOS
-segue fora do escopo; gamepad provado só por unidade (sem controle físico na
-máquina); a paleta busca em memória (12 itens/limite — coleções grandes podem
-querer FTS depois); o selftest não substitui prova física de áudio nem serviços
-remotos.
-
-
-## O que a F2 entrega (telas restantes)
-
-Entregue na F2 (Tasks 1-9, commits `3e13f3f`..`00439bd`): telas Jogos (grade com
-filtro por perfil, favoritos, pendencias, detalhe com horas/nota/etiquetas/observacoes,
-jogar e desfazer), Musicas (lista, player do rodape com protocolo de midia e Range,
-importar pasta, fila de downloads), Desejos (lista, precos via cache Steam, adicionar/
-remover com desfazer, abrir na loja), Downloads (torrents com progresso, pausar/retomar
-via API, organizar, importar concluidos), Integracoes (cartoes, busca por catalogo,
-personalizadas persistidas) e Videos (lista, player interno sobre `tucoteca-media://`,
-reprodutor externo). Trabalhos (jobs) com progresso/cancelamento na ponte e o
-componente `Atividade` no rodape; detalhe do jogo abre pela paleta (`Enter`).
-
-Protocolo de midia: `tucoteca-media://arquivo/<caminho>` servido pelo main com
-`200`/`206` (Range)/`403`/`416`; `mediaUrl()` no shared; autoplay liberado via
-`app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')`; CSP com
-`media-src 'self' tucoteca-media:`. IPCs novos: `dialogo:escolher-pasta`,
-`app:abrir-url` (so https, respeita `BIBLIOTECA_REDE=0`) e `app:abrir-pasta`
-(valida que o caminho esta sob a home).
-
-Divergencias documentadas: o player de musica e do renderer (HTMLAudio sobre o protocolo
-de midia), nao o MCI da TUI (`player.py` segue TUI-only); o volume global do Windows
-ainda nao foi portado (pendencia). Musicas nao entram na lixeira (remover apaga o
-arquivo, sem desfazer).
-
-O que ainda falta em relação ao antigo desktop Qt está listado em
-"Pendências de paridade" abaixo.
-
-
-## Paridade com o antigo Qt (fase 3, 1.3.0)
-
-Métodos novos ficam em `codigo/frontends/ponte_paridade.py` (registrados pela
-`Ponte`); a lógica continua em `servicos_ui`/`bib_nucleo`. Ações que mexem em
-arquivos do emulador ou da coleção recusam com um jogo aberto ("Feche o jogo
-aberto antes…"), como no Qt. Operações longas viram trabalhos (rodapé).
-
-| Onde | O quê | Métodos |
-|---|---|---|
-| Detalhe do jogo › Emulação (3DS) | mods (importar .zip/pasta, ligar, jogar sem mods, remover), cheats, texturas HD, presets do Azahar | `emulacao.jogo/mod/cheat/textura/preset` |
-| Detalhe do jogo › Manutenção | verificar exe/ROM e religar, usar o emulador atual, ROM candidata, espaço em disco, abrir como administrador (UAC) | `jogo.diagnosticar`, `jogo.religar`, `jogo.disco`, `jogo.jogar_elevado` |
-| Detalhe do jogo | capa libretro (jogos com ROM) | `capas.libretro` |
-| Configurações › Emuladores | versão local, verificar release, atualizar (trabalho) | `emulacao.status/consultar/atualizar` |
-| Configurações › Controles | pads, presets (salvar perfil atual, aplicar), mapa padrão por tipo, leitura ao vivo | `controles.listar/fotografar/aplicar/gerar/estado` |
-| Configurações › Sanear pasta | plano só-leitura e aplicar (instaladores → `.hub-lixo`) | `manutencao.plano/sanear` |
-| Configurações › Ferramentas de mídia | editores, equalizadores e players externos | `ferramentas.listar`, `ferramentas.abrir` |
-| Músicas | equalizar a faixa (cópia nova; trabalho) | `musicas.eq_presets`, `musicas.eq` |
-| Player do rodapé | letra sincronizada (LRCLIB, só com o painel aberto) e volume do PC | `musicas.letras`, `sistema.volume*` |
-| Desejos | sincronizar Steam, importar JSON, buscar fontes (abre a página) | `desejos.sincronizar_steam/importar_wishlist/buscar_fontes` |
-| Downloads | marca concluídos fora da pasta de jogos | `torrents.listar` (`fora_destino`) |
-| Jogos | arrastar pastas/exe/ROMs → prévia com seleção → importar | `jogos.prever`, `jogos.importar_selecionados` |
-
-Fora da interface nova, de propósito: o download/instalação automático de
-repacks a partir das fontes (`baixar_fonte_steamrip`); a busca só abre a página.
-
-Arquivos soltos na janela fora da área de Jogos não fazem nada: o main bloqueia
-`will-navigate` e o renderer cancela o drop padrão (antes, soltar um arquivo
-trocava o app por `file://`). O caminho do arquivo solto vem de
-`webUtils.getPathForFile` no preload (`caminhoDoArquivo`).
-
-## App instalado (F4)
+## App instalado
 
 `npm run dist` gera `dist/TucoTeca-Setup-<versão>-x64.exe` (NSIS por usuário,
-sem admin) com `electron-builder.config.cjs`. O núcleo Python, a ponte e o
-Python embutido vão em `resources/tucoteca/`; a coleção padrão fica em
-`Documentos\TucoTeca`. A ponte roda com `windowsHide` (sem console). Fluxo
-completo de build, prova e anexos em `docs/RELEASES.md`. Assinatura de
-código continua fora (decisão do usuário).
+sem admin) com `electron-builder.config.cjs`: núcleo Python, ponte e Python
+embutido em `resources/tucoteca/`. A ponte roda com `windowsHide` (sem
+console). Build, prova e anexos: `docs/RELEASES.md`. Sem assinatura de código
+(decisão do usuário).
+
+## Limites conhecidos
+
+- Download automático de repacks a partir das fontes não está na interface (a
+  busca abre a página no navegador).
+- Controle físico, UAC real, FFmpeg instalado e atualização real de emulador
+  foram provados por simulação; a validação no hardware do usuário segue
+  pendente (ver `ROADMAP.md`).
+- O volume do player é do renderer (HTMLAudio); o volume do PC usa Core Audio
+  e só aparece no Windows.

@@ -7,43 +7,6 @@ import bib_core as core
 
 
 class MixTorrents:
-    def baixar_torrent_hub(self, url):
-        from bib_nucleo.rede import exigir_rede
-        exigir_rede("Adicionar torrent")
-        r = core.qbit_adicionar(url)
-        if not r.get("ok"):
-            raise ValueError(r.get("erro", "Não foi possível adicionar o torrent."))
-        return r
-
-    def torrents_prontos(self):
-        """Torrents 100% com caminho conhecido. Só leitura.
-
-        Download incompleto não entra na lista: nada de importar pela metade.
-        Devolve {"itens": [...], "erros": [...]} com o estado de cada alvo.
-        """
-        from bib_nucleo.rede.repacks import ARQUIVO_EXTS
-        leitura = core.listar_torrents()
-        erro = leitura.get("erro") if isinstance(leitura, dict) else None
-        torrents = leitura.get("torrents") if isinstance(leitura, dict) else []
-        prontos: list[dict] = []
-        for t in torrents or []:
-            if not isinstance(t, dict) or not (t.get("completo") and t.get("save_path")):
-                continue
-            alvo = Path(str(t["save_path"]))
-            if alvo.is_file():
-                if alvo.suffix.lower() in ARQUIVO_EXTS:
-                    estado = "arquivo"
-                else:
-                    estado = "nao-suportado"
-            elif alvo.is_dir():
-                estado = "pasta"
-            else:
-                estado = "sumiu"
-            prontos.append({"hash": t.get("hash", ""), "nome": t.get("nome") or alvo.name,
-                            "save_path": str(alvo), "estado": estado,
-                            "progresso": t.get("progresso", 1.0)})
-        return {"itens": prontos, "erros": [erro] if erro else list(leitura.get("erros") or [])}
-
     def importar_torrent(self, save_path):
         """Importa UM torrent concluído, com backup. Preserva a origem."""
         caminho = (save_path or "").strip()
@@ -87,14 +50,5 @@ class MixTorrents:
         if not r.get("ok"):
             raise ValueError(r.get("erro", "Não foi possível controlar o torrent."))
         return {"ok": True}
-
-    def fora_do_destino(self, caminho):
-        from bib_nucleo.rede import repacks
-        return not repacks.dentro_do_destino(caminho)
-
-    def organizar_download(self, caminho):
-        from bib_nucleo.rede import repacks
-        return repacks.organizar_no_destino(caminho)
-
 
 __all__ = ["MixTorrents"]

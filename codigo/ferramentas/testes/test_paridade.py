@@ -362,3 +362,68 @@ def teste_torrents_listar_marca_fora_do_destino():
             patch.object(servico, "fora_do_destino", lambda c: "Downloads" in c):
         itens = _ok(ponte, "torrents.listar")["itens"]
     afirmar([i["fora_destino"] for i in itens] == [True, False, False], itens)
+
+
+def teste_backup_manual_e_sessoes_abertas_pela_ponte():
+    import bib_core as core
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-sessoes-"))
+    servico = ServicoBiblioteca(tmp / "b.db")
+    ponte = Ponte(servico)
+    gid = servico.salvar_jogo(0, {"titulo": "Jogo UAC", "executable_path": "C:/x/j.exe"})["id"]
+    antes = len(servico.backups())
+    r = _ok(ponte, "colecao.backup")
+    afirmar(r["ok"] and r["db"].startswith("biblioteca-") and len(servico.backups()) == antes + 1, r)
+
+    marcador = core.iniciar_sessao_manual(gid, "Jogo UAC")
+    afirmar(marcador["ok"], marcador)
+    abertas = _ok(ponte, "sessoes.listar")
+    afirmar([s["titulo"] for s in abertas] == ["Jogo UAC"] and abertas[0]["gid"] == gid, abertas)
+    afirmar("horas" in _erro(ponte, "sessoes.encerrar", {"arquivo": abertas[0]["arquivo"], "horas": "2"}))
+    _ok(ponte, "sessoes.encerrar", {"arquivo": abertas[0]["arquivo"], "horas": 1.5})
+    afirmar(_ok(ponte, "sessoes.listar") == [], "sessão continuou aberta")
+    afirmar(abs(float(servico.jogo(gid).get("horas") or 0) - 1.5) < 1e-6, servico.jogo(gid))
+    # marcador forjado fora da pasta de sessões não fecha nada
+    _erro(ponte, "sessoes.encerrar", {"arquivo": str(tmp / "sessao-1-x.json"), "horas": 1})
+
+
+def teste_erros_recentes_e_saves_com_trava():
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-erros-"))
+    servico = ServicoBiblioteca(tmp / "b.db")
+    ponte = Ponte(servico)
+    afirmar(isinstance(_ok(ponte, "sistema.erros", {"linhas": 10})["texto"], str))
+    afirmar("linhas" in _erro(ponte, "sistema.erros", {"linhas": 0}))
+    gid = servico.salvar_jogo(0, {"titulo": "Jogo", "executable_path": "C:/x/j.exe"})["id"]
+    with patch.object(servico, "backup_pos_sessao", lambda g: {"ok": True, "saves": {"arquivos": 0}}), \
+            patch.object(servico, "restaurar_saves", lambda g, c: {"ok": True, "restaurado": c}):
+        afirmar(_ok(ponte, "saves.snapshot", {"id": gid})["ok"] is True)
+        afirmar(_ok(ponte, "saves.restaurar", {"id": gid, "caminho": "x.zip"})["restaurado"] == "x.zip")
+        with patch.object(ponte.trabalhos, "listar",
+                          return_value=[{"id": 1, "escopo": "jogo", "estado": "rodando"}]):
+            afirmar("Feche o jogo" in _erro(ponte, "saves.restaurar", {"id": gid, "caminho": "x.zip"}))
+            afirmar("Feche o jogo" in _erro(ponte, "saves.snapshot", {"id": gid}))
+
+
+def teste_colecao_exportar_importar_falha_vira_erro_e_zip_funciona():
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-colecao-"))
+    servico = ServicoBiblioteca(tmp / "b.db")
+    ponte = Ponte(servico)
+    servico.salvar_jogo(0, {"titulo": "Celeste", "executable_path": "C:/j/c.exe"})
+    exportado = _ok(ponte, "colecao.exportar", {"pasta": str(tmp)})
+    zips = sorted(tmp.glob("tucoteca-*.zip"))
+    afirmar(len(zips) == 1, (exportado, list(tmp.iterdir())))
+    # pasta no lugar do .zip (o que a tela fazia antes) é erro claro, não "importada"
+    afirmar("pacote" in _erro(ponte, "colecao.importar", {"caminho": str(tmp)}).lower())
+    outro = ServicoBiblioteca(tmp / "outro.db")
+    r = _ok(Ponte(outro), "colecao.importar", {"caminho": str(zips[0])})
+    afirmar(r.get("ok") is not False, r)
+    afirmar([j["titulo"] for j in outro.snapshot()["jogos"]] == ["Celeste"], outro.snapshot()["jogos"])
+
+
+def teste_aparencia_salva_tema_densidade_e_escala():
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-aparencia-"))
+    ponte = Ponte(ServicoBiblioteca(tmp / "b.db"))
+    r = _ok(ponte, "aparencia.salvar", {"tema": "claro", "densidade": "bigpicture", "escala_texto": 1.2})
+    afirmar(r["tema"] == "claro" and r["densidade"] == "bigpicture" and r["escala_texto"] == 1.2, r)
+    afirmar(_ok(ponte, "aparencia.ler")["escala_texto"] == 1.2)
+    afirmar(_ok(ponte, "aparencia.salvar", {"escala_texto": 9})["escala_texto"] == 1.5)
+    afirmar("escala_texto" in _erro(ponte, "aparencia.salvar", {"escala_texto": "grande"}))

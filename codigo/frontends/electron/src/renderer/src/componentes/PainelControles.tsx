@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { textoDeFalha } from '../estado/notificacoes'
 import { jogoEmAndamento, listaTrabalhos } from '../estado/trabalhos'
+import { confirmar } from './Confirmacao'
 
 interface Props {
   aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
@@ -81,7 +82,7 @@ export function PainelControles({ aoAvisar }: Props) {
 
   const aplicar = async () => {
     if (preset === '') return
-    if (!window.confirm(`O preset "${preset}" sobrescreve o perfil de controles atual do Azahar. Continuar?`)) return
+    if (!(await confirmar({ titulo: 'Aplicar perfil de controles', texto: `O preset "${preset}" sobrescreve o perfil de controles atual do Azahar.`, confirmar: 'Aplicar' }))) return
     await agir('controles.aplicar', { nome: preset }, `Preset "${preset}" aplicado.`)
   }
 

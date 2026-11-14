@@ -3,6 +3,57 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.3.1] - 2026-11-14
+
+Revisão completa da 1.3.0: segurança, recursos que não funcionavam e limpeza.
+
+### Segurança
+
+- Electron 44.9.0 → 44.11.3: a versão da 1.3.0 tinha alerta **alto**
+  (mitigação de certificados intermediários eMudhra comprometidos).
+- Python embutido 3.14.7 → 3.14.10 (SHA-256 fixado da página oficial).
+
+### Corrigido
+
+- Aviso "Sem backup local" apontava para uma tela que não existe e não havia
+  como fazer backup: **Fazer backup agora** em Configurações › Coleção.
+- **Importar coleção** abria seletor de pasta, mas o pacote é `.zip` — nunca
+  funcionou; exportar/importar com falha diziam sucesso.
+- A lista de backups nunca aparecia (formato de resposta lido errado).
+- Sessões manuais (abrir como administrador) não tinham onde ser fechadas:
+  **Sessões abertas** no Início registra as horas.
+- **Tema** e **Densidade** eram gravados e nunca aplicados.
+- Mensagens que citavam "ferramentas clássicas" e a "tela Sistema".
+
+### Adicionado
+
+- Tema claro; densidades compacta/confortável/Big Picture e tamanho do texto
+  (80–150%) aplicados como zoom da janela.
+- Configurações › Coleção: backups legíveis, horas do ano por mês, top jogos,
+  exportar/importar `.zip` e erros recentes do log.
+- Detalhe do jogo: saves (snapshot agora, restaurar com confirmação) e
+  galeria de screenshots.
+- Confirmações com o diálogo do app no lugar de `window.confirm`.
+
+### Removido
+
+- 12 componentes de interface nunca usados e 54 regras de CSS só deles;
+  `DialogoVideo`, `Placeholder`, `atalho_jogo.py`.
+- Métodos da ponte substituídos (`capas.importar_selecionados`,
+  `torrents.fora_destino`) e 7 métodos de serviço sem chamador.
+
+### Alterado
+
+- Versão e User-Agent num lugar só (`bib_nucleo/versao.py`, lê `VERSION`).
+- `DESKTOP_ELECTRON.md` reescrito como estado atual; CI com `setup-node` v7.
+
+### Limitações conhecidas
+
+- O alerta moderado do `minimatch` segue dentro do electron-builder (já na
+  última versão); afeta só o build de binários universais do macOS.
+- Validação no hardware do usuário (instalação limpa, controle, UAC, FFmpeg,
+  atualização de emulador) segue pendente.
+
 ## [1.3.0] - 2026-11-14
 
 Primeira release com o desktop Electron entregue como instalador Windows.

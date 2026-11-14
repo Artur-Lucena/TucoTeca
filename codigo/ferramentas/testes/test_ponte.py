@@ -923,20 +923,6 @@ def teste_ponte_torrents_controlar_valida_acao():
     afirmar(sem_acao["ok"] is False and "acao" in sem_acao["erro"], sem_acao)
 
 
-def teste_ponte_torrents_fora_destino():
-    from servicos_ui import ServicoBiblioteca
-
-    tmp = Path(tempfile.mkdtemp(prefix="suite-torrents-3-"))
-    db = tmp / "hub.db"
-    _semear_banco(db)
-    ponte = Ponte(ServicoBiblioteca(db))
-    r = _chamar(ponte, {"id": 204, "metodo": "torrents.fora_destino",
-                        "params": {"caminho": str(tmp / "fora")}})
-    afirmar(r["ok"] is True and r["resultado"]["fora"] is True, r)
-    r2 = _chamar(ponte, {"id": 205, "metodo": "torrents.fora_destino", "params": {"caminho": ""}})
-    afirmar(r2["ok"] is False and "caminho" in r2["erro"], r2)
-
-
 def teste_ponte_torrents_importar_cria_job():
     from servicos_ui import ServicoBiblioteca
 

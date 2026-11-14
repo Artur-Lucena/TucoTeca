@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks'
 import { lerDiagnostico, tamanhoLegivel, type Diagnostico, type LeituraDiagnostico } from '../estado/manutencao'
 import { textoDeFalha } from '../estado/notificacoes'
+import { confirmar } from './Confirmacao'
 
 interface Props {
   id: number
@@ -65,9 +66,9 @@ export function PainelManutencaoJogo({ id, bloqueado, aoMudou, aoAvisar }: Props
 
   const elevado = async () => {
     const texto =
-      'Abrir este jogo como administrador? O Windows vai pedir confirmação (UAC). ' +
-      'As horas não são contadas automaticamente: registre a sessão ao terminar.'
-    if (!window.confirm(texto)) return
+      'O Windows vai pedir confirmação (UAC). ' +
+      'As horas não são contadas automaticamente: a sessão fica aberta no Início até você registrar.'
+    if (!(await confirmar({ titulo: 'Abrir como administrador', texto, confirmar: 'Abrir' }))) return
     try {
       const r = await window.tucoteca.chamar<{ aviso?: string }>('jogo.jogar_elevado', { id })
       aoAvisar(r?.aviso || 'Jogo aberto como administrador. Registre as horas ao terminar.')

@@ -36,12 +36,6 @@ class MixNucleo:
                 "fila_musicas": fila_musicas,
                 "sistema": resumo_sistema(jogos, musicas, desejos)}
 
-    def panorama(self, termo=""):
-        snap = self.snapshot()
-        return {"sistema": snap["sistema"],
-                "global": busca_global(snap["jogos"], snap["musicas"],
-                                       snap["desejos"], [], termo) if termo.strip() else []}
-
     def jogo(self, gid):
         with closing(core.get_db(self.db_path)) as con:
             row = con.execute("SELECT * FROM jogos WHERE id=?", (int(gid),)).fetchone()
@@ -135,6 +129,12 @@ class MixNucleo:
                       key=lambda p: p.name, reverse=True)[:manter]
         return [{"nome": p.name, "bytes": p.stat().st_size if p.is_file() else 0}
                 for p in arqs]
+
+    def fazer_backup_agora(self):
+        """Backup manual da coleção (SQLite + JSON), com a mesma poda do automático."""
+        with self._escrita:
+            r = core.fazer_backup(self.db_path)
+        return {"ok": True, "db": Path(r["db"]).name, "jogos": r.get("jogos", 0)}
 
     def sessoes(self):
         try:

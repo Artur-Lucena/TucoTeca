@@ -17,6 +17,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from bib_nucleo.versao import user_agent
+
 CAPA_MUSICA_ENV = "BIBLIOTECA_CAPA_MUSICA_AUTO"
 
 _TXT_FRAME = {"TIT2": "titulo", "TPE1": "artista", "TALB": "album"}
@@ -346,7 +348,7 @@ def baixar_capa_album(con: sqlite3.Connection, mid: int,
             import urllib.request
 
             from bib_nucleo.rede import abrir_rede
-            req = urllib.request.Request(url, headers={"User-Agent": "TucoTeca/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": user_agent()})
             with abrir_rede(req, timeout=timeout) as r:
                 raw = r.read(2_500_000)
         if len(raw) < 1024:

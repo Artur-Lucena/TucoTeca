@@ -5,7 +5,7 @@ describe('avisosDoResumo', () => {
   it('avisa sessões pendentes com plural correto', () => {
     expect(avisosDoResumo({ pendentes: 1 }).map((a) => a.id)).toEqual(['sessoes-pendentes'])
     const dois = avisosDoResumo({ pendentes: 2 })
-    expect(dois[0].texto).toContain('2 sessões pendentes')
+    expect(dois[0].texto).toContain('2 sessões abertas')
     expect(dois[0].tom).toBe('atencao')
   })
 

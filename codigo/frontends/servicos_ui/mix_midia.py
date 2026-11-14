@@ -80,7 +80,8 @@ class MixMidia:
             for n, d in enumerate(fila):
                 if cancelar.is_set():
                     break
-                def pct(did, valor):
+                # n/d fixados na definição: o callback pertence a ESTA faixa
+                def pct(did, valor, n=n, d=d):
                     if progresso:
                         progresso({"id": did, "rotulo": f'{n + 1}/{len(fila)} · {d["artista"]} — {d["titulo"]}', "pct": valor})
                 pct(d["id"], 0)
@@ -217,11 +218,5 @@ class MixMidia:
             posicoes = posicoes if isinstance(posicoes, dict) else {}
             posicoes[sha] = max(0, int(posicao))
             online.gravar_json(alvo, posicoes)
-
-    def atualizar_audio(self):
-        resultados = [core.instalar_ytdlp(), core.instalar_ffmpeg()]
-        erros = [r.get("erro", "Falha na atualização") for r in resultados if not r.get("ok")]
-        return {"ok": not erros, "erros": erros, "erro": "; ".join(erros)}
-
 
 __all__ = ["MixMidia"]
