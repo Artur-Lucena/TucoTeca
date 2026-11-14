@@ -9,6 +9,7 @@ import { DetalheJogo } from './componentes/DetalheJogo'
 import { Paleta } from './componentes/Paleta'
 import { PlayerRodape } from './componentes/PlayerRodape'
 import { LeitorControle, type EstadoPad } from './controle'
+import { aplicarAparencia, normalizarAparencia } from './estado/aparencia'
 import { reduzirConexao, type EstadoConexao } from './estado/conexao'
 import { erroCarga, recarregar, snapshot } from './estado/dados'
 import { avisosDoResumo, dispensarAviso, juntarAvisos, textoDeFalha, type Aviso } from './estado/notificacoes'
@@ -56,6 +57,13 @@ export function App() {
       setLixeira(null)
     }
   }
+
+  useEffect(() => {
+    void window.tucoteca
+      .chamar('aparencia.ler')
+      .then((a) => aplicarAparencia(normalizarAparencia(a)))
+      .catch(() => undefined) // sem preferências legíveis fica o padrão (escuro/confortável)
+  }, [])
 
   useEffect(() => {
     void (async () => {

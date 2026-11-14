@@ -470,7 +470,10 @@ def _definir_aparencia(servico, params) -> dict:
     auto_backup = params.get("auto_backup", None)
     if not isinstance(tema, str) or not isinstance(densidade, str):
         raise ValueError("tema e densidade devem ser texto")
-    return servico.definir_aparencia(tema, densidade, auto_backup)
+    escala = params.get("escala_texto", None)
+    if escala is not None and (isinstance(escala, bool) or not isinstance(escala, (int, float))):
+        raise ValueError("escala_texto deve ser um número")
+    return servico.definir_aparencia(tema, densidade, auto_backup, escala_texto=escala)
 
 
 def _configurar_provedores(servico, params) -> dict:

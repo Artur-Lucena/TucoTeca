@@ -18,4 +18,6 @@ export interface ApiTucoteca {
   abrirUrl(url: string): Promise<void>
   abrirPasta(caminho: string): Promise<void>
   reabrir(): Promise<void>
+  /** Zoom da janela (0,5–2), usado pela densidade e escala de texto. */
+  definirZoom(fator: number): void
 }

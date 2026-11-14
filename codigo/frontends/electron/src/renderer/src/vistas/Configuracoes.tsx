@@ -4,6 +4,15 @@ import { PainelControles } from '../componentes/PainelControles'
 import { PainelEmuladores } from '../componentes/PainelEmuladores'
 import { PainelFerramentasMidia } from '../componentes/PainelFerramentasMidia'
 import { PainelSaneamento } from '../componentes/PainelSaneamento'
+import {
+  aplicarAparencia,
+  DENSIDADES,
+  ESCALA_MAX,
+  ESCALA_MIN,
+  normalizarAparencia,
+  TEMAS,
+  type Aparencia,
+} from '../estado/aparencia'
 import { textoDeFalha } from '../estado/notificacoes'
 
 interface Props {
@@ -13,9 +22,7 @@ interface Props {
 
 /** Tela Configurações: aparência, provedores, emuladores, controles, manutenção e coleção. */
 export function Configuracoes({ aoAvisar, aoMudou }: Props) {
-  const [tema, setTema] = useState('')
-  const [densidade, setDensidade] = useState('')
-  const [autoBackup, setAutoBackup] = useState(true)
+  const [aparencia, setAparencia] = useState<Aparencia>(normalizarAparencia({}))
   const [steam, setSteam] = useState('')
   const [steamgrid, setSteamgrid] = useState('')
   const [spotifyId, setSpotifyId] = useState('')
@@ -24,10 +31,7 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
   useEffect(() => {
     void (async () => {
       try {
-        const a = await window.tucoteca.chamar<{ tema?: string; densidade?: string; auto_backup?: boolean }>('aparencia.ler')
-        if (typeof a.tema === 'string') setTema(a.tema)
-        if (typeof a.densidade === 'string') setDensidade(a.densidade)
-        if (typeof a.auto_backup === 'boolean') setAutoBackup(a.auto_backup)
+        setAparencia(normalizarAparencia(await window.tucoteca.chamar('aparencia.ler')))
       } catch (falha) {
         aoAvisar(textoDeFalha(falha), 'atencao')
       }
@@ -36,7 +40,16 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
 
   const salvarAparencia = async () => {
     try {
-      await window.tucoteca.chamar('aparencia.salvar', { tema, densidade, auto_backup: autoBackup })
+      const salva = normalizarAparencia(
+        await window.tucoteca.chamar('aparencia.salvar', {
+          tema: aparencia.tema,
+          densidade: aparencia.densidade,
+          escala_texto: aparencia.escala_texto,
+          auto_backup: aparencia.auto_backup,
+        }),
+      )
+      setAparencia(salva)
+      aplicarAparencia(salva)
       aoAvisar('Aparência salva.')
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
@@ -67,17 +80,48 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
         <h2>Aparência</h2>
         <label>
           Tema
-          <input value={tema} onInput={(e) => setTema((e.target as HTMLInputElement).value)} />
+          <select
+            value={aparencia.tema}
+            onChange={(e) => setAparencia({ ...aparencia, tema: (e.target as HTMLSelectElement).value as Aparencia['tema'] })}
+          >
+            {TEMAS.map((t) => (
+              <option key={t.valor} value={t.valor}>
+                {t.rotulo}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           Densidade
-          <input value={densidade} onInput={(e) => setDensidade((e.target as HTMLInputElement).value)} />
+          <select
+            value={aparencia.densidade}
+            onChange={(e) =>
+              setAparencia({ ...aparencia, densidade: (e.target as HTMLSelectElement).value as Aparencia['densidade'] })
+            }
+          >
+            {DENSIDADES.map((d) => (
+              <option key={d.valor} value={d.valor}>
+                {d.rotulo}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
+          Tamanho do texto: {Math.round(aparencia.escala_texto * 100)}%
+          <input
+            type="range"
+            min={ESCALA_MIN}
+            max={ESCALA_MAX}
+            step={0.05}
+            value={aparencia.escala_texto}
+            onInput={(e) => setAparencia({ ...aparencia, escala_texto: Number((e.target as HTMLInputElement).value) })}
+          />
+        </label>
+        <label class="marcar">
           <input
             type="checkbox"
-            checked={autoBackup}
-            onChange={(e) => setAutoBackup((e.target as HTMLInputElement).checked)}
+            checked={aparencia.auto_backup}
+            onChange={(e) => setAparencia({ ...aparencia, auto_backup: (e.target as HTMLInputElement).checked })}
           />
           Backup automático pós-sessão
         </label>

@@ -417,3 +417,13 @@ def teste_colecao_exportar_importar_falha_vira_erro_e_zip_funciona():
     r = _ok(Ponte(outro), "colecao.importar", {"caminho": str(zips[0])})
     afirmar(r.get("ok") is not False, r)
     afirmar([j["titulo"] for j in outro.snapshot()["jogos"]] == ["Celeste"], outro.snapshot()["jogos"])
+
+
+def teste_aparencia_salva_tema_densidade_e_escala():
+    tmp = Path(tempfile.mkdtemp(prefix="paridade-aparencia-"))
+    ponte = Ponte(ServicoBiblioteca(tmp / "b.db"))
+    r = _ok(ponte, "aparencia.salvar", {"tema": "claro", "densidade": "bigpicture", "escala_texto": 1.2})
+    afirmar(r["tema"] == "claro" and r["densidade"] == "bigpicture" and r["escala_texto"] == 1.2, r)
+    afirmar(_ok(ponte, "aparencia.ler")["escala_texto"] == 1.2)
+    afirmar(_ok(ponte, "aparencia.salvar", {"escala_texto": 9})["escala_texto"] == 1.5)
+    afirmar("escala_texto" in _erro(ponte, "aparencia.salvar", {"escala_texto": "grande"}))
