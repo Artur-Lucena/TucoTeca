@@ -1,3 +1,4 @@
+import { dataHora } from '../estado/formato'
 import { useEffect, useState } from 'preact/hooks'
 import { validarHoras } from '../estado/jogos'
 import { textoDeFalha } from '../estado/notificacoes'
@@ -16,12 +17,7 @@ interface Props {
   aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
 }
 
-function quando(iso: string): string {
-  const data = new Date(iso)
-  return Number.isNaN(data.getTime())
-    ? ''
-    : data.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
+const quando = dataHora
 
 /**
  * Sessões manuais abertas (ex.: jogo aberto como administrador, sem rastreio

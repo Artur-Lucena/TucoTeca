@@ -1,3 +1,4 @@
+import { moeda } from './formato'
 import { semAcento } from './jogos'
 
 /** Item de desejo vindo do snapshot (`listar_desejos`); campos extras passam. */
@@ -19,23 +20,13 @@ export interface PrecoSteam {
   [campo: string]: unknown
 }
 
-const SIMBOLOS: Record<string, string> = {
-  BRL: 'R$',
-  USD: 'US$',
-  EUR: '€',
-  GBP: '£',
-  JPY: '¥',
-}
-
 /** Centavos → "R$ 19,99 (-50%)"; código desconhecido sai prefixado; vazio sem dado. */
 export function formatarPreco(preco: PrecoSteam | null | undefined): string {
   if (!preco || typeof preco !== 'object') return ''
   if (preco.gratis === true) return 'Grátis'
   const centavos = Number(preco.final)
   if (!Number.isFinite(centavos)) return ''
-  const moeda = String(preco.moeda ?? '').toUpperCase()
-  const prefixo = moeda === '' ? '' : `${SIMBOLOS[moeda] ?? moeda} `
-  const valor = `${prefixo}${(centavos / 100).toFixed(2).replace('.', ',')}`
+  const valor = moeda(centavos, String(preco.moeda ?? ''))
   const pct = Number(preco.desconto_pct ?? 0)
   return Number.isFinite(pct) && pct > 0 ? `${valor} (-${pct}%)` : valor
 }
