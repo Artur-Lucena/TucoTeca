@@ -3,6 +3,39 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.4.0] - 2026-11-14
+
+Primeira etapa da 1.4 (hub de Jogos, Filmes e Séries e Músicas): correções e
+limpeza antes das telas novas. Visual igual ao da 1.3.1 (conferido por
+captura de tela do app instalado).
+
+### Corrigido
+
+- **Buscar capa** no detalhe do jogo nunca mostrava resultados (lia o campo
+  errado da resposta).
+- O exemplo de regras de conquista estava num formato que o app recusava;
+  agora mostra o formato aceito e os operadores.
+- Detalhe do jogo: botões "Avaliar" repetidos e duas seções de saves viraram
+  uma só de cada.
+
+### Alterado
+
+- Tamanhos em Downloads seguem o formato do resto do app ("512 B", "1,5 KB").
+- Vídeos com mais de uma hora mostram a duração como 1:02:03.
+
+### Interno
+
+- CSS dividido por área (`estilo/*.css`), seletores repetidos fundidos e
+  espaçamentos com tokens; o teste falha se um seletor se repetir.
+- Formatação pt-BR (horas, tamanhos, duração, datas, tempo relativo, preço)
+  num módulo só, com testes.
+- Validação de parâmetros da ponte num módulo comum (`ponte_params`), com as
+  mesmas mensagens de erro.
+- Colunas da tabela de jogos numa lista só; leitores de save das conquistas
+  numa tabela.
+- Removido `baixar_fonte_steamrip` do serviço de desejos (sem uso; a TUI
+  segue com o próprio fluxo).
+
 ## [1.3.1] - 2026-11-14
 
 Revisão completa da 1.3.0: segurança, recursos que não funcionavam e limpeza.
