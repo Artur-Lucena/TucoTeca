@@ -161,51 +161,17 @@ def teste_desejo_busca_fontes_isola_erro_de_uma_fonte():
     afirmar(r["fitgirl"] == [] and any("fitgirl" in e for e in r["erros"]), r)
 
 
-def teste_desejo_baixar_importa_e_tira_da_lista():
-    from bib_nucleo.rede import fontes, repacks
-    from servicos_ui import ServicoBiblioteca
+def teste_desejo_obtido_sai_da_lista_e_nao_volta():
     B, con, tmp = _banco()
     try:
         B.adicionar_desejo(con, "367520", "Hollow Knight")
         did = B.listar_desejos(con)[0]["id"]
+        B.marcar_desejo_obtido(con, did)
         con.commit()
-        afirmar(len(B.listar_desejos(con)) == 1)
-    finally:
-        con.close()
-    arquivo = tmp / "hollow-knight.rar"
-    arquivo.write_bytes(b"Rar!\x1a\x07\x00")
-    svc = ServicoBiblioteca(tmp / "biblioteca.db")
-    with patch.object(fontes, "baixar_steamrip", return_value={"ok": True, "path": str(arquivo)}), \
-         patch.object(repacks, "importar_repack", return_value={"ok": True, "titulo": "Hollow Knight"}):
-        r = svc.baixar_fonte_steamrip("https://steamrip.com/hk/", did)
-    afirmar(r.get("ok") is True, r)
-    con = B.get_db(tmp / "biblioteca.db")
-    try:
         afirmar(B.listar_desejos(con) == [], "o desejo obtido deve sair da lista ativa")
         afirmar(B.listar_desejos(con, incluir_obtidos=True)[0]["obtido_em"], "histórico perdido")
         B.sincronizar_desejos(con, [{"appid": "367520", "titulo": "Hollow Knight"}])
         afirmar(not B.listar_desejos(con), "sincronização ressuscitou desejo obtido")
-    finally:
-        con.close()
-
-
-def teste_desejo_importacao_falha_preserva_arquivo_e_desejo():
-    from bib_nucleo.rede import fontes, repacks
-    from servicos_ui import ServicoBiblioteca
-    B, con, tmp = _banco()
-    B.adicionar_desejo(con, "2", "Jogo")
-    did = B.listar_desejos(con)[0]["id"]
-    con.close()
-    arq = tmp / "jogo.zip"
-    arq.write_bytes(b"arquivo preservado")
-    svc = ServicoBiblioteca(tmp / "biblioteca.db")
-    with patch.object(fontes, "baixar_steamrip", return_value={"ok": True, "path": str(arq)}), \
-         patch.object(repacks, "importar_repack", return_value={"ok": False, "erro": "sem executável"}):
-        r = svc.baixar_fonte_steamrip("https://steamrip.com/x/", did)
-    afirmar(not r["ok"] and arq.is_file())
-    con = B.get_db(tmp / "biblioteca.db")
-    try:
-        afirmar(len(B.listar_desejos(con)) == 1)
     finally:
         con.close()
 
@@ -217,24 +183,3 @@ def teste_letras_malformadas_nao_entram_no_cache():
     afirmar(not r["ok"] and "inválida" in r["erro"], r)
     linhas = letras.linhas_lrc("[00:01.125][00:03.250] refrão\n[00:99] lixo")
     afirmar([item["t"] for item in linhas] == [1.125, 3.25], linhas)
-
-
-def teste_desejo_download_falho_nao_mexe_na_lista():
-    from bib_nucleo.rede import fontes
-    from servicos_ui import ServicoBiblioteca
-    B, con, tmp = _banco()
-    try:
-        B.adicionar_desejo(con, "1", "Jogo")
-        did = B.listar_desejos(con)[0]["id"]
-        con.commit()
-    finally:
-        con.close()
-    svc = ServicoBiblioteca(tmp / "biblioteca.db")
-    with patch.object(fontes, "baixar_steamrip", return_value={"ok": False, "erro": "host caiu"}):
-        r = svc.baixar_fonte_steamrip("https://steamrip.com/x/", did)
-    afirmar(r["ok"] is False and r["erro"] == "host caiu", r)
-    con = B.get_db(tmp / "biblioteca.db")
-    try:
-        afirmar(len(B.listar_desejos(con)) == 1, "download falho não pode apagar o desejo")
-    finally:
-        con.close()

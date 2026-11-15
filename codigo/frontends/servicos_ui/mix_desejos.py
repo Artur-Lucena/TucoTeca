@@ -1,7 +1,6 @@
 """Desejos e fontes de download via ServicoBiblioteca."""
 from __future__ import annotations
 
-import urllib.parse
 from contextlib import closing
 
 import bib_core as core
@@ -54,30 +53,6 @@ class MixDesejos:
                             for i in (r.get("itens") or [])]
             saida["erros"].extend(str(e) for e in (r.get("erros") or []))
         return saida
-
-    def baixar_fonte_steamrip(self, url, did):
-        """Baixa/importa e marca obtido somente depois da importação bem-sucedida."""
-        from bib_nucleo import banco as B
-        from bib_nucleo.rede import exigir_rede, fontes, repacks
-        exigir_rede("Baixar de fontes")
-        parsed = urllib.parse.urlsplit(url)
-        if (parsed.scheme != "https" or parsed.hostname not in ("steamrip.com", "www.steamrip.com")
-                or parsed.username or parsed.password or parsed.port not in (None, 443)):
-            raise ValueError("Informe a página HTTPS do jogo no SteamRip.")
-        with closing(core.get_db(self.db_path)) as con:
-            if not con.execute("SELECT id FROM desejos WHERE id=? AND obtido_em IS NULL",
-                               (int(did),)).fetchone():
-                raise ValueError("Este desejo já foi obtido ou removido.")
-        res = fontes.baixar_steamrip(url)
-        if not res.get("ok"):
-            return {"ok": False, "erro": res.get("erro") or "download falhou"}
-
-        def importar(con):
-            r = repacks.importar_repack(con, res["path"])
-            if r.get("ok"):
-                B.marcar_desejo_obtido(con, did)
-            return r
-        return self.alterar(importar)
 
 
 __all__ = ["MixDesejos"]
