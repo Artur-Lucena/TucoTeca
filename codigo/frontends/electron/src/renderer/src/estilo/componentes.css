@@ -107,14 +107,6 @@
   border-color: var(--borda-erro);
 }
 
-.rodape-lateral {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-top: var(--espaco-md);
-  border-top: 1px solid var(--borda);
-}
-
 .busca::placeholder {
   color: var(--texto2);
 }

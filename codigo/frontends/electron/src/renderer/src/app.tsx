@@ -4,17 +4,20 @@ import { combinacao, decidirAtalho } from './atalhos'
 import { AvisoPonte } from './componentes/AvisoPonte'
 import { Atividade } from './componentes/Atividade'
 import { BarraLateral } from './componentes/BarraLateral'
+import { Cabecalho } from './componentes/Cabecalho'
 import { ConfirmacaoHost } from './componentes/Confirmacao'
 import { DetalheJogo } from './componentes/DetalheJogo'
+import { Roteador } from './componentes/Roteador'
 import { Paleta } from './componentes/Paleta'
 import { PlayerRodape } from './componentes/PlayerRodape'
 import { LeitorControle, type EstadoPad } from './controle'
 import { aplicarAparencia, normalizarAparencia } from './estado/aparencia'
 import { reduzirConexao, type EstadoConexao } from './estado/conexao'
-import { erroCarga, recarregar, snapshot } from './estado/dados'
+import { atualizar, erroCarga, recarregar, snapshot } from './estado/dados'
 import { avisosDoResumo, dispensarAviso, juntarAvisos, textoDeFalha, type Aviso } from './estado/notificacoes'
 import { paletaInicial, reduzirPaleta, type ItemBusca } from './estado/paleta'
 import { player } from './estado/player'
+import { avancar, chaveLegada, escutarHash, historico, ir, NOMES_ABAS, podeVoltar, rota, voltar } from './estado/rota'
 import {
   aplicarEventoTrabalho,
   jogoEmAndamento,
@@ -22,9 +25,6 @@ import {
   type EventoTrabalho,
   type Trabalho,
 } from './estado/trabalhos'
-import { Inicio } from './vistas/Inicio'
-import { Lazy } from './componentes/Lazy'
-import { EmptyState } from './componentes/ui'
 
 const DESTINO_DO_ITEM: Record<string, string> = {
   jogo: 'jogos',
@@ -36,20 +36,18 @@ const DESTINO_DO_ITEM: Record<string, string> = {
 export function App() {
   const [modulos, setModulos] = useState<ModuloDTO[]>([])
   const [erro, setErro] = useState<string | null>(null)
-  const [secao, setSecao] = useState('inicio')
   const [focoBusca, setFocoBusca] = useState(0)
   const [paleta, setPaleta] = useState(paletaInicial)
   const [atalhos, setAtalhos] = useState<Record<string, string>>({})
   const [avisos, setAvisos] = useState<Aviso[]>([])
   const [perfil, setPerfil] = useState('Tuco')
   const [conexao, setConexao] = useState<EstadoConexao>('ok')
-  const [detalheId, setDetalheId] = useState<number | null>(null)
   const [revisao, setRevisao] = useState(0)
   const [lixeira, setLixeira] = useState<LixeiraEstado | null>(null)
 
-  /** Recarrega o snapshot, o desfazer pendente e avisa as vistas (gaveta). */
+  /** Recarrega o que mudou no núcleo, o desfazer pendente e avisa as vistas (gaveta). */
   const atualizarTudo = async () => {
-    await recarregar()
+    await atualizar()
     setRevisao((atual) => atual + 1)
     try {
       setLixeira(normalizarLixeira(await window.tucoteca.chamar('lixeira.estado')))
@@ -57,6 +55,8 @@ export function App() {
       setLixeira(null)
     }
   }
+
+  useEffect(() => escutarHash(), [])
 
   useEffect(() => {
     void window.tucoteca
@@ -102,7 +102,14 @@ export function App() {
 
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent) => {
-      const decisao = decidirAtalho(paleta.aberta, combinacao(evento), atalhos, secao)
+      const comb = combinacao(evento)
+      if (!paleta.aberta && (comb === 'Alt+Left' || comb === 'Alt+Right')) {
+        evento.preventDefault()
+        if (comb === 'Alt+Left') voltar()
+        else avancar()
+        return
+      }
+      const decisao = decidirAtalho(paleta.aberta, comb, atalhos, chaveLegada(rota.value))
       if (decisao === null) return
       evento.preventDefault()
       if (decisao.tipo === 'paleta') {
@@ -112,12 +119,21 @@ export function App() {
       } else if (decisao.tipo === 'focar-busca') {
         setFocoBusca((atual) => atual + 1)
       } else {
-        setSecao(decisao.chave)
+        ir(decisao.chave)
       }
     }
+    // botões laterais do mouse (voltar/avançar), como num navegador
+    const aoMouse = (evento: MouseEvent) => {
+      if (evento.button === 3) voltar()
+      else if (evento.button === 4) avancar()
+    }
     window.addEventListener('keydown', aoTeclar)
-    return () => window.removeEventListener('keydown', aoTeclar)
-  }, [paleta.aberta, atalhos, secao])
+    window.addEventListener('mouseup', aoMouse)
+    return () => {
+      window.removeEventListener('keydown', aoTeclar)
+      window.removeEventListener('mouseup', aoMouse)
+    }
+  }, [paleta.aberta, atalhos])
 
   useEffect(() => {
     if (!paleta.aberta) return
@@ -221,13 +237,11 @@ export function App() {
     window.addEventListener('focus', reiniciar)
 
     const navegar = (delta: 1 | -1) => {
-      setSecao((atual) => {
-        if (modulos.length === 0) return atual
-        const bruto = modulos.findIndex((modulo) => modulo.chave === atual)
-        const indice = bruto === -1 ? 0 : bruto
-        const proximo = (indice + delta + modulos.length) % modulos.length
-        return modulos[proximo]?.chave ?? atual
-      })
+      if (modulos.length === 0) return
+      const bruto = modulos.findIndex((modulo) => modulo.chave === rota.value.secao)
+      const indice = bruto === -1 ? 0 : bruto
+      const proximo = modulos[(indice + delta + modulos.length) % modulos.length]
+      if (proximo !== undefined) ir(proximo.chave)
     }
 
     const relogio = window.setInterval(() => {
@@ -238,7 +252,10 @@ export function App() {
       if (acao === 'cima') navegar(-1)
       else if (acao === 'baixo') navegar(1)
       else if (acao === 'ativar') setPaleta((atual) => reduzirPaleta(atual, { tipo: 'abrir' }))
-      else if (acao === 'voltar') setSecao('inicio')
+      else if (acao === 'voltar') {
+        if (podeVoltar(historico.value)) voltar()
+        else ir('inicio')
+      }
     }, 100)
 
     return () => {
@@ -256,6 +273,7 @@ export function App() {
       })
       const ativo = typeof dados.ativo === 'string' ? dados.ativo : outro
       setPerfil(ativo)
+      await recarregar()
       setAvisos((atual) =>
         juntarAvisos(atual, [
           { id: `perfil-${ativo}`, texto: `Perfil trocado para ${ativo}.`, tom: 'info' },
@@ -320,48 +338,50 @@ export function App() {
   }
 
   const colecao = snapshot.value
-  const ativo = modulos.find((modulo) => modulo.chave === secao) ?? modulos[0]
+  const atual = rota.value
+  const modulo = modulos.find((m) => m.chave === atual.secao)
+  const titulo =
+    atual.secao === 'notificacoes'
+      ? 'Notificações'
+      : `${modulo?.nome ?? 'TucoTeca'}${atual.aba !== '' && (NOMES_ABAS[atual.aba] ?? '') !== '' ? ` · ${NOMES_ABAS[atual.aba]}` : ''}`
   const jogando = jogoEmAndamento(listaTrabalhos.value)
   const filaPlayer = player.value.fila
+  const fecharJogo = () => {
+    if (podeVoltar(historico.value)) voltar()
+    else ir('#/jogos')
+  }
   return (
     <>
       <AvisoPonte estado={conexao} aoReconectar={reconectar} />
       <div class="app">
         <main class="shell">
-          <BarraLateral
-            modulos={modulos}
-            ativa={ativo?.chave ?? ''}
-            aoTrocar={setSecao}
-            avisos={avisos}
-            aoDispensarAviso={(id) => setAvisos((atual) => dispensarAviso(atual, id))}
-            perfil={perfil}
-            aoTrocarPerfil={alternarPerfil}
-          />
-          <section class="conteudo">
-            {ativo === undefined || ativo.chave === 'inicio' ? (
-              <Inicio snapshot={colecao ?? {}} aoAvisar={avisar} aoMudou={() => void atualizarTudo()} />
-            ) : ativo.chave === 'jogos' ? (
-              <Lazy key="Jogos" fabrica={() => import('./vistas/Jogos').then((m) => m.Jogos)} props={{ focoBusca, perfil, aoAbrirJogo: (id: number) => setDetalheId(id), aoJogarJogo: (id: number) => void jogar(id), aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
-            ) : ativo.chave === 'musicas' ? (
-              <Lazy key="Musicas" fabrica={() => import('./vistas/Musicas').then((m) => m.Musicas)} props={{ focoBusca, perfil, aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
-            ) : ativo.chave === 'desejos' ? (
-              <Lazy key="Desejos" fabrica={() => import('./vistas/Desejos').then((m) => m.Desejos)} props={{ focoBusca, perfil, aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
-            ) : ativo.chave === 'integracoes' ? (
-              <Lazy key="Integracoes" fabrica={() => import('./vistas/Integracoes').then((m) => m.Integracoes)} props={{ aoAvisar: avisar, aoNavegar: setSecao }} />
-            ) : ativo.chave === 'downloads' ? (
-              <Lazy key="Downloads" fabrica={() => import('./vistas/Downloads').then((m) => m.Downloads)} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
-            ) : ativo.chave === 'videos' ? (
-              <Lazy key="Videos" fabrica={() => import('./vistas/Videos').then((m) => m.Videos)} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
-            ) : ativo.chave === 'youtube' ? (
-              <Lazy key="YouTube" fabrica={() => import('./vistas/YouTube').then((m) => m.YouTube)} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
-            ) : ativo.chave === 'configuracoes' ? (
-              <Lazy key="Configuracoes" fabrica={() => import('./vistas/Configuracoes').then((m) => m.Configuracoes)} props={{ aoAvisar: avisar, aoMudou: () => void atualizarTudo() }} />
-            ) : ativo.chave === 'notificacoes' ? (
-              <Lazy key="Notificacoes" fabrica={() => import('./vistas/Notificacoes').then((m) => m.Notificacoes)} props={{ avisos, aoDispensar: (id: string) => setAvisos((atual) => dispensarAviso(atual, id)), aoLimpar: () => setAvisos([]) }} />
-            ) : (
-              <EmptyState icone="?" titulo="Seção não encontrada." descricao="Escolha outra seção na barra lateral." />
-            )}
-          </section>
+          <BarraLateral modulos={modulos} ativa={atual.secao} jogos={colecao.jogos} jogoAberto={atual.jogo} />
+          <div class="area">
+            <Cabecalho
+              titulo={titulo}
+              avisos={avisos}
+              aoDispensarAviso={(id) => setAvisos((lista) => dispensarAviso(lista, id))}
+              aoBuscar={() => setPaleta((estado) => reduzirPaleta(estado, { tipo: 'abrir' }))}
+              perfil={perfil}
+              aoTrocarPerfil={alternarPerfil}
+            />
+            <section class="conteudo">
+              <Roteador
+                rota={atual}
+                ctx={{
+                  snapshot: colecao ?? {},
+                  focoBusca,
+                  perfil,
+                  avisos,
+                  aoAvisar: avisar,
+                  aoMudou: () => void atualizarTudo(),
+                  aoJogar: (id: number) => void jogar(id),
+                  aoDispensarAviso: (id: string) => setAvisos((lista) => dispensarAviso(lista, id)),
+                  aoLimparAvisos: () => setAvisos([]),
+                }}
+              />
+            </section>
+          </div>
         </main>
         {filaPlayer.length > 0 && <PlayerRodape />}
         <Atividade aoAvisar={avisar} />
@@ -382,11 +402,12 @@ export function App() {
           </footer>
         )}
       </div>
-      {detalheId !== null && (
+      {atual.jogo !== null && (
         <DetalheJogo
-          id={detalheId}
+          key={atual.jogo}
+          id={atual.jogo}
           revisao={revisao}
-          aoFechar={() => setDetalheId(null)}
+          aoFechar={fecharJogo}
           aoMudou={() => void atualizarTudo()}
           aoAvisar={avisar}
         />
@@ -405,11 +426,10 @@ export function App() {
             const item = paleta.itens[indice ?? paleta.selecionado]
             if (item === undefined) return
             if (item.tipo === 'jogo' && Number.isFinite(Number(item.id))) {
-              setSecao('jogos')
-              setDetalheId(Number(item.id))
+              ir(`#/jogo/${Number(item.id)}`)
             } else {
               const chave = DESTINO_DO_ITEM[item.tipo]
-              if (chave !== undefined) setSecao(chave)
+              if (chave !== undefined) ir(chave)
             }
             setPaleta((atual) => reduzirPaleta(atual, { tipo: 'fechar' }))
           }}
