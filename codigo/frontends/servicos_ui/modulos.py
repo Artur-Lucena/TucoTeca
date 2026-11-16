@@ -28,36 +28,28 @@ class Modulo:
 
 
 def modulos_padrao() -> list[Modulo]:
-    """Módulos embutidos, na ordem da barra lateral do desktop Electron."""
+    """Módulos embutidos, na ordem da barra lateral do desktop Electron.
+
+    Desejos, Integrações, Vídeos/YouTube e Notificações viraram abas/painéis
+    destas seções (o renderer mantém as chaves antigas como apelidos de rota).
+    """
     return [
         Modulo("inicio", "Início",
                "Continuar, buscar e cuidar da coleção — sem sair do lugar.",
                "inicio", 10),
         Modulo("jogos", "Jogos",
-               "Todos os seus jogos. Um lugar para começar.",
+               "Biblioteca, desejos e tudo dos seus jogos.",
                "jogos", 20),
+        Modulo("midia", "Filmes e Séries",
+               "Seus vídeos locais e o YouTube; reprodutor interno ou externo.",
+               "midia", 30),
         Modulo("musicas", "Músicas",
                "Sua coleção local, com música em todas as telas.",
-               "musicas", 30),
-        Modulo("desejos", "Desejos",
-               "Guarde os títulos que você quer jogar.",
-               "desejos", 40),
+               "musicas", 40),
         Modulo("downloads", "Downloads",
                "Progresso do qBittorrent, sem sair do Hub.",
                "downloads", 50),
-        Modulo("integracoes", "Integrações",
-               "Catálogos, emuladores e serviços com responsabilidades independentes.",
-               "integracoes", 60),
-        Modulo("videos", "Vídeos",
-               "Importe arquivos locais, pesquise YouTube e abra no reprodutor escolhido.",
-               "videos", 70),
-        Modulo("youtube", "YouTube",
-               "Navegue no YouTube aqui dentro; baixar é sempre ação sua.",
-               "youtube", 80),
-        Modulo("notificacoes", "Notificações",
-               "Avisos do sistema, histórico e terminal de logs.",
-               "notificacoes", 85),
         Modulo("configuracoes", "Configurações",
-               "Aparência, provedores, estatísticas, backups e coleção.",
+               "Aparência, integrações, estatísticas, backups e coleção.",
                "configuracoes", 90),
     ]

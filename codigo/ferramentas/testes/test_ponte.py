@@ -110,9 +110,54 @@ def teste_modulos_listar_via_ponte():
     r = _chamar(ponte, {"id": 8, "metodo": "modulos.listar"})
     afirmar(r["ok"] is True, r)
     chaves = [m["chave"] for m in r["resultado"]]
-    afirmar(chaves == ["inicio", "jogos", "musicas", "desejos",
-                       "downloads", "integracoes", "videos", "youtube",
-                       "notificacoes", "configuracoes"], chaves)
+    afirmar(chaves == ["inicio", "jogos", "midia", "musicas", "downloads",
+                       "configuracoes"], chaves)
+
+
+def teste_revisao_sobe_so_na_categoria_alterada():
+    from servicos_ui import ServicoBiblioteca
+    tmp = Path(tempfile.mkdtemp(prefix="suite-revisao-"))
+    db = tmp / "hub.db"
+    core.get_db(db).close()
+    ponte = Ponte(ServicoBiblioteca(db))
+    antes = _chamar(ponte, {"id": 1, "metodo": "nucleo.revisao"})["resultado"]
+    afirmar({"jogos", "musicas", "desejos", "videos", "downloads"} <= set(antes), antes)
+    con = core.get_db(db)
+    try:
+        jogo = core.criar_jogo(con, {"titulo": "Revisado", "executable_path": ""})
+        core.atualizar_jogo(con, jogo["id"], {"nota": 9})
+        con.commit()
+    finally:
+        con.close()
+    depois = _chamar(ponte, {"id": 2, "metodo": "nucleo.revisao"})["resultado"]
+    afirmar(depois["jogos"] >= antes["jogos"] + 2, (antes, depois))
+    afirmar(depois["musicas"] == antes["musicas"] and depois["desejos"] == antes["desejos"],
+            (antes, depois))
+
+
+def teste_snapshot_parcial_e_busca_leve():
+    from servicos_ui import ServicoBiblioteca
+    tmp = Path(tempfile.mkdtemp(prefix="suite-parcial-"))
+    db = tmp / "hub.db"
+    con = core.get_db(db)
+    try:
+        core.criar_jogo(con, {"titulo": "Hollow Knight", "executable_path": ""})
+        con.commit()
+    finally:
+        con.close()
+    ponte = Ponte(ServicoBiblioteca(db))
+    r = _chamar(ponte, {"id": 1, "metodo": "nucleo.snapshot", "params": {"partes": ["jogos"]}})
+    afirmar(r["ok"] is True and set(r["resultado"]) == {"jogos", "sistema"}, r)
+    afirmar(r["resultado"]["sistema"]["jogos"] == 1, r)
+    afirmar(r["resultado"]["sistema"]["recentes"][0].get("capa_url") == "", r)
+    vazio = _chamar(ponte, {"id": 2, "metodo": "nucleo.snapshot", "params": {"partes": []}})
+    afirmar(set(vazio["resultado"]) == {"sistema"}, vazio)
+    ruim = _chamar(ponte, {"id": 3, "metodo": "nucleo.snapshot", "params": {"partes": ["x"]}})
+    afirmar(ruim["ok"] is False and "partes" in ruim["erro"], ruim)
+    busca = _chamar(ponte, {"id": 4, "metodo": "nucleo.buscar", "params": {"termo": "hollow"}})
+    afirmar(busca["ok"] is True and len(busca["resultado"]) == 1, busca)
+    item = busca["resultado"][0]
+    afirmar(item["tipo"] == "jogo" and item["capa_url"] == "" and "PC" in item["sub"], item)
 
 
 def teste_bloqueio_de_lock_na_partida():

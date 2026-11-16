@@ -62,7 +62,17 @@ def _ping(servico, params) -> dict:
 
 
 def _snapshot(servico, params) -> dict:
-    return servico.snapshot()
+    partes = params.get("partes")
+    if partes is None:
+        return servico.snapshot()
+    validas = ("jogos", "musicas", "desejos", "videos", "fila_musicas")
+    if not isinstance(partes, list) or any(p not in validas for p in partes):
+        raise ValueError("partes deve ser uma lista com: " + ", ".join(validas))
+    return servico.snapshot(partes=partes)
+
+
+def _revisao(servico, params) -> dict:
+    return servico.revisao()
 
 
 def _modulos(servico, params) -> list:
@@ -535,6 +545,7 @@ def _aviso_pos_sessao(servico, ident) -> str:
 METODOS = {
     "nucleo.ping": _ping,
     "nucleo.snapshot": _snapshot,
+    "nucleo.revisao": _revisao,
     "nucleo.buscar": _buscar,
     "nucleo.saude": _saude,
     "modulos.listar": _modulos,

@@ -345,6 +345,27 @@ def _termo_fts(termo: str) -> str:
     palavras = re.findall(r"\w+", str(termo or ""), flags=re.UNICODE)
     return " AND ".join('"' + p + '"*' for p in palavras)
 
+REVISOES_TABELAS = ("jogos", "musicas", "desejos", "videos", "downloads")
+
+
+def _garantir_revisoes(con: sqlite3.Connection) -> None:
+    """Contador por categoria, mantido por triggers: o desktop só recarrega o
+    que mudou (`nucleo.revisao`). Recriado a cada abertura (IF NOT EXISTS),
+    então sobrevive a reconstruções de tabela."""
+    con.execute("CREATE TABLE IF NOT EXISTS revisoes "
+                "(categoria TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)")
+    for tabela in REVISOES_TABELAS:
+        con.execute("INSERT OR IGNORE INTO revisoes(categoria, n) VALUES (?, 0)", (tabela,))
+        for evento, sufixo in (("INSERT", "ri"), ("UPDATE", "ru"), ("DELETE", "rd")):
+            con.execute(
+                f"CREATE TRIGGER IF NOT EXISTS {tabela}_{sufixo} AFTER {evento} ON {tabela} "
+                f"BEGIN UPDATE revisoes SET n = n + 1 WHERE categoria = '{tabela}'; END")
+
+
+def ler_revisoes(con: sqlite3.Connection) -> dict[str, int]:
+    return {r[0]: int(r[1]) for r in con.execute("SELECT categoria, n FROM revisoes")}
+
+
 def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     con.row_factory = sqlite3.Row
     # DELETE (não WAL): sem sidecars -wal/-shm, portátil no NTFS compartilhado.
@@ -373,6 +394,7 @@ def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     _garantir_tabela_desejos(con)
     _garantir_tabela_videos(con)
     garantir_fts(con)
+    _garantir_revisoes(con)
     con.commit()
 
 SCHEMA_VIDEOS = """
