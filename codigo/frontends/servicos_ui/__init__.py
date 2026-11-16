@@ -25,6 +25,7 @@ from .integracoes import (
 from .integracoes import (
     url_integracao as _url_integracao,
 )
+from .mix_colecoes import MixColecoes
 from .mix_conquistas import MixConquistas
 from .mix_desejos import MixDesejos
 from .mix_emulacao import MixEmulacao
@@ -41,7 +42,7 @@ from .sistema import _sem_acento, busca_global, capa_url, resumo_sistema, saude_
 
 class ServicoBiblioteca(MixNucleo, MixScans, MixSaneamento, MixSessoes,
                         MixMidia, MixTorrents, MixEmulacao, MixDesejos,
-                        MixConquistas, MixMeta):
+                        MixConquistas, MixMeta, MixColecoes):
     """Fachada da biblioteca: contratos por dominio via mixins."""
 
     def adicionar_integracao(self, dados):

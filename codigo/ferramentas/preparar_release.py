@@ -106,6 +106,7 @@ def conferir_app(dist: Path, exigir_runtime: bool = True) -> dict:
     for obrigatorio in ("codigo/frontends/ponte.py", "codigo/frontends/ponte_paridade.py",
                         "codigo/frontends/ponte_params.py",
                         "codigo/frontends/ponte_meta.py",
+                        "codigo/frontends/ponte_colecoes.py",
                         "codigo/bib_core.py",
                         "codigo/ferramentas/abrir_hub.py", "VERSION", "LICENSE"):
         if not (recursos / obrigatorio).is_file():

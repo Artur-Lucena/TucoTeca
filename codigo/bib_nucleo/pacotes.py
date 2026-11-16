@@ -62,9 +62,13 @@ def _dados_exportacao(con: sqlite3.Connection) -> dict:
                for r in con.execute("SELECT * FROM musicas ORDER BY id").fetchall()]
     except sqlite3.OperationalError:
         mus = []  # banco pré-v12: sem tabela, sem músicas
+    from bib_nucleo.banco.colecoes import exportar_colecoes
+    from bib_nucleo.banco.meta import exportar_meta
     return {"exportado_em": agora_iso(),
             "jogos": [_jogo_limpo(row_to_dict(r)) for r in rows],
-            "musicas": mus}
+            "musicas": mus,
+            "colecoes": exportar_colecoes(con),
+            "jogos_meta": exportar_meta(con)}
 
 
 def exportar_json(destino, db_path=None) -> dict:
@@ -379,6 +383,11 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
         try:
             res = importar_lista(con, lista)
             avisos = []
+            if isinstance(dados, dict):
+                from bib_nucleo.banco.colecoes import importar_colecoes
+                from bib_nucleo.banco.meta import importar_meta
+                res["colecoes"] = importar_colecoes(con, dados.get("colecoes"))
+                res["jogos_meta"] = importar_meta(con, dados.get("jogos_meta"))
             capas = 0
             for arq, ident in manifesto.items():
                 cat = cats.get(f"capas/{Path(arq).name}")
@@ -515,7 +524,8 @@ def importar_pacote(origem, db_path=None, restaurar_saves: bool = False) -> dict
             "total_no_banco": res["total_no_banco"],
             "capas": capas, "presets": presets, "saves": saves,
             "saves_ignorados": saves_ignorados, "musicas": musicas,
-            "musicas_ignoradas": musicas_ignoradas}
+            "musicas_ignoradas": musicas_ignoradas,
+            "colecoes": res.get("colecoes", 0), "jogos_meta": res.get("jogos_meta", 0)}
 
 
 def fazer_backup(db_path: Path, manter: int = 10) -> dict:

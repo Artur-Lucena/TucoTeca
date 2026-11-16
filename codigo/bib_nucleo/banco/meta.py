@@ -162,5 +162,33 @@ def uuids_sem_meta(con: sqlite3.Connection) -> list[tuple[int, str]]:
         "ORDER BY j.titulo COLLATE NOCASE")]
 
 
-__all__ = ["SCHEMA_META", "CAMPOS", "EDITAVEIS", "garantir_tabela_meta", "ler_meta",
+ARTE_LOCAL = ("hero", "logo", "icone", "screenshots")
+
+
+def exportar_meta(con: sqlite3.Connection) -> list[dict]:
+    """Para o pacote: tudo menos os caminhos de arte (são locais desta máquina)."""
+    garantir_tabela_meta(con)
+    saida = []
+    for (uuid,) in con.execute("SELECT uuid FROM jogos_meta ORDER BY uuid").fetchall():
+        m = ler_meta(con, uuid)
+        saida.append({k: v for k, v in m.items() if k not in ARTE_LOCAL and k != "atualizado_em"})
+    return saida
+
+
+def importar_meta(con: sqlite3.Connection, lista) -> int:
+    """Aplica metadados do pacote aos jogos que existem (por uuid); campos
+    travados no pacote continuam travados. Devolve quantos jogos receberam."""
+    vivos = {r[0] for r in con.execute("SELECT uuid FROM jogos WHERE uuid <> ''")}
+    n = 0
+    for item in lista if isinstance(lista, list) else []:
+        if not isinstance(item, dict) or item.get("uuid") not in vivos:
+            continue
+        campos = {k: v for k, v in item.items() if k not in ARTE_LOCAL and k not in ("uuid", "travado")}
+        travado = [t for t in item.get("travado") or [] if isinstance(t, str) and t not in ARTE_LOCAL]
+        gravar_meta(con, item["uuid"], campos, travar=travado)
+        n += 1
+    return n
+
+
+__all__ = ["exportar_meta", "importar_meta", "SCHEMA_META", "CAMPOS", "EDITAVEIS", "garantir_tabela_meta", "ler_meta",
            "gravar_meta", "salvar_edicao", "uuids_sem_meta"]

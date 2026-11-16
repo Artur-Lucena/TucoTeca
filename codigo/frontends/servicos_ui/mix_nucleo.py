@@ -19,7 +19,7 @@ class MixNucleo:
         self._escrita = threading.RLock()
         self.spotify = spotify.ClienteSpotify()
 
-    PARTES = ("jogos", "musicas", "desejos", "videos", "fila_musicas")
+    PARTES = ("jogos", "musicas", "desejos", "videos", "fila_musicas", "colecoes")
 
     def snapshot(self, partes=None):
         """Coleção para o desktop. `partes` limita as listas devolvidas (o
@@ -35,6 +35,9 @@ class MixNucleo:
                 saida["fila_musicas"] = core.listar_downloads(con)
             if "videos" in pedidas:
                 saida["videos"] = core.listar_videos(con)
+            if "colecoes" in pedidas:
+                from bib_nucleo.banco.colecoes import listar_colecoes
+                saida["colecoes"] = listar_colecoes(con)
         if "jogos" in pedidas:
             for j in jogos:
                 j.update(capa_url=capa_url(j.get("capa")), plataforma=core.plataforma_jogo(j))

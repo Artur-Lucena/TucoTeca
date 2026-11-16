@@ -346,6 +346,8 @@ def _termo_fts(termo: str) -> str:
     return " AND ".join('"' + p + '"*' for p in palavras)
 
 REVISOES_TABELAS = ("jogos", "musicas", "desejos", "videos", "downloads")
+# tabela → categoria do contador (várias tabelas podem somar na mesma)
+REVISOES_EXTRAS = (("colecoes", "colecoes"), ("colecao_jogos", "colecoes"))
 
 
 def _garantir_revisoes(con: sqlite3.Connection) -> None:
@@ -354,12 +356,12 @@ def _garantir_revisoes(con: sqlite3.Connection) -> None:
     então sobrevive a reconstruções de tabela."""
     con.execute("CREATE TABLE IF NOT EXISTS revisoes "
                 "(categoria TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)")
-    for tabela in REVISOES_TABELAS:
-        con.execute("INSERT OR IGNORE INTO revisoes(categoria, n) VALUES (?, 0)", (tabela,))
+    for tabela, categoria in [(t, t) for t in REVISOES_TABELAS] + list(REVISOES_EXTRAS):
+        con.execute("INSERT OR IGNORE INTO revisoes(categoria, n) VALUES (?, 0)", (categoria,))
         for evento, sufixo in (("INSERT", "ri"), ("UPDATE", "ru"), ("DELETE", "rd")):
             con.execute(
                 f"CREATE TRIGGER IF NOT EXISTS {tabela}_{sufixo} AFTER {evento} ON {tabela} "
-                f"BEGIN UPDATE revisoes SET n = n + 1 WHERE categoria = '{tabela}'; END")
+                f"BEGIN UPDATE revisoes SET n = n + 1 WHERE categoria = '{categoria}'; END")
 
 
 def ler_revisoes(con: sqlite3.Connection) -> dict[str, int]:
@@ -394,6 +396,8 @@ def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     _garantir_tabela_desejos(con)
     _garantir_tabela_videos(con)
     garantir_fts(con)
+    from bib_nucleo.banco.colecoes import garantir_tabelas_colecoes
+    garantir_tabelas_colecoes(con)
     _garantir_revisoes(con)
     from bib_nucleo.banco.meta import garantir_tabela_meta
     garantir_tabela_meta(con)

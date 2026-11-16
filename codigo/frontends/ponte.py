@@ -65,7 +65,7 @@ def _snapshot(servico, params) -> dict:
     partes = params.get("partes")
     if partes is None:
         return servico.snapshot()
-    validas = ("jogos", "musicas", "desejos", "videos", "fila_musicas")
+    validas = ("jogos", "musicas", "desejos", "videos", "fila_musicas", "colecoes")
     if not isinstance(partes, list) or any(p not in validas for p in partes):
         raise ValueError("partes deve ser uma lista com: " + ", ".join(validas))
     return servico.snapshot(partes=partes)
@@ -723,6 +723,8 @@ class Ponte:
         base.update(metodos_paridade(self.trabalhos))
         from ponte_meta import metodos_meta
         base.update(metodos_meta(self.trabalhos))
+        from ponte_colecoes import metodos_colecoes
+        base.update(metodos_colecoes(self.trabalhos))
         self.metodos = base
 
     def _publicar_evento(self, evento: dict) -> None:
