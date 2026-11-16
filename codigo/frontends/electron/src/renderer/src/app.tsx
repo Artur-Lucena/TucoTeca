@@ -6,7 +6,6 @@ import { Atividade } from './componentes/Atividade'
 import { BarraLateral } from './componentes/BarraLateral'
 import { Cabecalho } from './componentes/Cabecalho'
 import { ConfirmacaoHost } from './componentes/Confirmacao'
-import { DetalheJogo } from './componentes/DetalheJogo'
 import { Roteador } from './componentes/Roteador'
 import { Paleta } from './componentes/Paleta'
 import { PlayerRodape } from './componentes/PlayerRodape'
@@ -343,13 +342,11 @@ export function App() {
   const titulo =
     atual.secao === 'notificacoes'
       ? 'Notificações'
-      : `${modulo?.nome ?? 'TucoTeca'}${atual.aba !== '' && (NOMES_ABAS[atual.aba] ?? '') !== '' ? ` · ${NOMES_ABAS[atual.aba]}` : ''}`
+      : atual.jogo !== null
+        ? 'Jogos'
+        : `${modulo?.nome ?? 'TucoTeca'}${atual.aba !== '' && (NOMES_ABAS[atual.aba] ?? '') !== '' ? ` · ${NOMES_ABAS[atual.aba]}` : ''}`
   const jogando = jogoEmAndamento(listaTrabalhos.value)
   const filaPlayer = player.value.fila
-  const fecharJogo = () => {
-    if (podeVoltar(historico.value)) voltar()
-    else ir('#/jogos')
-  }
   return (
     <>
       <AvisoPonte estado={conexao} aoReconectar={reconectar} />
@@ -371,6 +368,7 @@ export function App() {
                 ctx={{
                   snapshot: colecao ?? {},
                   focoBusca,
+                  revisao,
                   perfil,
                   avisos,
                   aoAvisar: avisar,
@@ -402,16 +400,7 @@ export function App() {
           </footer>
         )}
       </div>
-      {atual.jogo !== null && (
-        <DetalheJogo
-          key={atual.jogo}
-          id={atual.jogo}
-          revisao={revisao}
-          aoFechar={fecharJogo}
-          aoMudou={() => void atualizarTudo()}
-          aoAvisar={avisar}
-        />
-      )}
+
       {paleta.aberta && (
         <Paleta
           estado={paleta}

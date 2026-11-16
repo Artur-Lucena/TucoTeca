@@ -5,7 +5,9 @@ describe('rota', () => {
   it('analisa seções, abas e o jogo aberto', () => {
     expect(analisar('#/jogos')).toEqual({ secao: 'jogos', aba: 'biblioteca', jogo: null })
     expect(analisar('#/jogos/desejos')).toEqual({ secao: 'jogos', aba: 'desejos', jogo: null })
-    expect(analisar('#/jogo/12')).toEqual({ secao: 'jogos', aba: 'biblioteca', jogo: 12 })
+    expect(analisar('#/jogo/12')).toEqual({ secao: 'jogos', aba: 'visao', jogo: 12 })
+    expect(analisar('#/jogo/12/conquistas')).toEqual({ secao: 'jogos', aba: 'conquistas', jogo: 12 })
+    expect(analisar('#/jogo/12/xyz').aba).toBe('visao')
     expect(analisar('#/musicas')).toEqual({ secao: 'musicas', aba: '', jogo: null })
   })
 
@@ -30,7 +32,8 @@ describe('rota', () => {
   it('formata omitindo a aba padrão', () => {
     expect(formatar({ secao: 'jogos', aba: 'biblioteca', jogo: null })).toBe('#/jogos')
     expect(formatar({ secao: 'configuracoes', aba: 'integracoes', jogo: null })).toBe('#/configuracoes/integracoes')
-    expect(formatar({ secao: 'jogos', aba: 'biblioteca', jogo: 3 })).toBe('#/jogo/3')
+    expect(formatar({ secao: 'jogos', aba: 'visao', jogo: 3 })).toBe('#/jogo/3')
+    expect(formatar({ secao: 'jogos', aba: 'saves', jogo: 3 })).toBe('#/jogo/3/saves')
   })
 
   it('chave legada para busca e atalhos', () => {
@@ -38,6 +41,7 @@ describe('rota', () => {
     expect(chaveLegada(analisar('#/midia/youtube'))).toBe('youtube')
     expect(chaveLegada(analisar('#/midia'))).toBe('videos')
     expect(chaveLegada(analisar('#/jogos'))).toBe('jogos')
+    expect(chaveLegada(analisar('#/jogo/4'))).toBe('jogo')
   })
 })
 

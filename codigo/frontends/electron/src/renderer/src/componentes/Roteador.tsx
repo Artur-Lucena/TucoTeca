@@ -9,6 +9,8 @@ import { EmptyState } from './ui'
 export interface ContextoVistas {
   snapshot: Snapshot
   focoBusca: number
+  /** Contador de mudanças da coleção (a página do jogo relê quando muda). */
+  revisao: number
   perfil: string
   avisos: Aviso[]
   aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
@@ -22,6 +24,15 @@ export interface ContextoVistas {
 export function Roteador({ rota, ctx }: { rota: Rota; ctx: ContextoVistas }) {
   const { focoBusca, perfil, aoAvisar, aoMudou } = ctx
   const comuns = { aoAvisar, aoMudou }
+  if (rota.jogo !== null) {
+    return (
+      <Lazy
+        key={`jogo-${rota.jogo}`}
+        fabrica={() => import('../vistas/PaginaJogo').then((m) => m.PaginaJogo)}
+        props={{ id: rota.jogo, aba: rota.aba, revisao: ctx.revisao, ...comuns }}
+      />
+    )
+  }
   switch (rota.secao) {
     case 'inicio':
       return <Inicio snapshot={ctx.snapshot} aoAvisar={aoAvisar} aoMudou={aoMudou} />

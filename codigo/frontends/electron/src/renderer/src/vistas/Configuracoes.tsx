@@ -3,6 +3,7 @@ import { PainelColecao } from '../componentes/PainelColecao'
 import { PainelControles } from '../componentes/PainelControles'
 import { PainelEmuladores } from '../componentes/PainelEmuladores'
 import { PainelFerramentasMidia } from '../componentes/PainelFerramentasMidia'
+import { PainelMetadados } from '../componentes/PainelMetadados'
 import { PainelSaneamento } from '../componentes/PainelSaneamento'
 import {
   aplicarAparencia,
@@ -156,6 +157,8 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
           Salvar provedores
         </button>
       </div>
+
+      <PainelMetadados aoAvisar={aoAvisar} />
 
       <PainelEmuladores aoAvisar={aoAvisar} />
 

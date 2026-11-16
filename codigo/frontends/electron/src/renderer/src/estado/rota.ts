@@ -18,7 +18,16 @@ export const ABAS: Record<string, string[]> = {
   notificacoes: [],
 }
 
+/** Abas da página do jogo (`#/jogo/12/conquistas`); a primeira é a padrão. */
+export const ABAS_JOGO = ['visao', 'conquistas', 'emulacao', 'saves', 'manutencao', 'editar']
+
 export const NOMES_ABAS: Record<string, string> = {
+  visao: 'Visão geral',
+  conquistas: 'Conquistas',
+  emulacao: 'Emulação',
+  saves: 'Saves',
+  manutencao: 'Manutenção',
+  editar: 'Editar',
   biblioteca: 'Biblioteca',
   desejos: 'Desejos',
   videos: 'Vídeos',
@@ -37,7 +46,7 @@ const APELIDOS: Record<string, string> = {
 export interface Rota {
   secao: string
   aba: string
-  /** `#/jogo/:id` → jogo aberto por cima da seção Jogos. */
+  /** `#/jogo/:id[/aba]` → página do jogo (a seção marcada continua Jogos). */
   jogo: number | null
 }
 
@@ -51,7 +60,8 @@ export function analisar(entrada: string): Rota {
   const [primeira = 'inicio', segunda = ''] = partes
   if (primeira === 'jogo') {
     const id = Number(segunda)
-    return Number.isInteger(id) && id > 0 ? { secao: 'jogos', aba: 'biblioteca', jogo: id } : { ...INICIO }
+    const aba = ABAS_JOGO.includes(partes[2] ?? '') ? (partes[2] as string) : ABAS_JOGO[0]
+    return Number.isInteger(id) && id > 0 ? { secao: 'jogos', aba, jogo: id } : { ...INICIO }
   }
   if (APELIDOS[primeira] !== undefined && partes.length === 1) return analisar(APELIDOS[primeira])
   const abas = ABAS[primeira]
@@ -62,13 +72,16 @@ export function analisar(entrada: string): Rota {
 
 /** Rota → hash canônico (aba padrão omitida). */
 export function formatar(rota: Rota): string {
-  if (rota.jogo !== null) return `#/jogo/${rota.jogo}`
+  if (rota.jogo !== null) {
+    return rota.aba === '' || rota.aba === ABAS_JOGO[0] ? `#/jogo/${rota.jogo}` : `#/jogo/${rota.jogo}/${rota.aba}`
+  }
   const padrao = ABAS[rota.secao]?.[0] ?? ''
   return rota.aba === '' || rota.aba === padrao ? `#/${rota.secao}` : `#/${rota.secao}/${rota.aba}`
 }
 
 /** Chave usada pelas regras antigas (busca da seção, atalhos): `jogos/desejos` → `desejos`. */
 export function chaveLegada(rota: Rota): string {
+  if (rota.jogo !== null) return 'jogo' // sem busca própria: Ctrl+F abre a paleta
   if (rota.secao === 'jogos' && rota.aba === 'desejos') return 'desejos'
   if (rota.secao === 'midia') return rota.aba
   if (rota.secao === 'configuracoes' && rota.aba === 'integracoes') return 'integracoes'

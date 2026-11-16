@@ -189,7 +189,8 @@
   color: var(--texto);
 }
 
-.detalhe .fechar {
+.detalhe .fechar,
+.pagina-jogo .fechar {
   padding: var(--espaco-xs) 10px;
   border: 1px solid var(--borda);
   border-radius: 8px;
@@ -199,7 +200,8 @@
   cursor: pointer;
 }
 
-.detalhe .fechar:hover {
+.detalhe .fechar:hover,
+.pagina-jogo .fechar:hover {
   border-color: var(--realce);
   color: var(--texto);
 }
@@ -215,12 +217,14 @@
   min-width: 110px;
 }
 
-.detalhe section {
+.detalhe section,
+.pagina-jogo section {
   padding-top: var(--espaco-md);
   border-top: 1px solid var(--borda);
 }
 
-.detalhe section h3 {
+.detalhe section h3,
+.pagina-jogo section h3 {
   margin: 0 0 var(--espaco-sm);
   font-size: 13px;
   font-weight: 600;
@@ -235,7 +239,8 @@
   margin-bottom: 10px;
 }
 
-.detalhe label {
+.detalhe label,
+.pagina-jogo label {
   display: grid;
   gap: var(--espaco-xs);
   font-size: 13px;
@@ -244,7 +249,10 @@
 
 .detalhe input,
 .detalhe select,
-.detalhe textarea {
+.detalhe textarea,
+.pagina-jogo input,
+.pagina-jogo select,
+.pagina-jogo textarea {
   width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--borda);
@@ -255,7 +263,8 @@
   font-size: 13px;
 }
 
-.detalhe textarea {
+.detalhe textarea,
+.pagina-jogo textarea {
   min-height: 90px;
   margin-bottom: 10px;
   resize: vertical;
@@ -265,17 +274,20 @@
   flex: none;
 }
 
-.detalhe .acao.primaria {
+.detalhe .acao.primaria,
+.pagina-jogo .acao.primaria {
   border-color: var(--realce);
   background: var(--realce-suave);
 }
 
-.detalhe .acao:disabled {
+.detalhe .acao:disabled,
+.pagina-jogo .acao:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.detalhe .acao.perigo:hover {
+.detalhe .acao.perigo:hover,
+.pagina-jogo .acao.perigo:hover {
   border-color: #ff6b6b;
   background: rgba(255, 107, 107, 0.12);
 }
@@ -430,7 +442,8 @@
 /* checkbox com rótulo ao lado (o .detalhe label padrão é em grade) */
 
 .detalhe input[type='checkbox'],
-.painel-paridade input[type='checkbox'] {
+.painel-paridade input[type='checkbox'],
+.pagina-jogo input[type='checkbox'] {
   width: auto;
   accent-color: var(--realce);
 }
@@ -533,4 +546,427 @@
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: var(--espaco-sm);
   margin-bottom: var(--espaco-sm);
+}
+
+
+/* ---------------------------------------------------------------- página do jogo (1.4.2) */
+.pagina-jogo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-lg);
+  margin: -28px -32px 0;
+}
+
+.pagina-jogo > .abas,
+.pagina-jogo > :not(.hero-jogo):not(.abas) {
+  margin-right: 32px;
+  margin-left: 32px;
+}
+
+.pagina-jogo > .abas {
+  margin-top: -4px;
+  margin-bottom: 0;
+}
+
+.hero-jogo {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 340px;
+  overflow: hidden;
+  background: var(--painel);
+}
+
+.hero-fundo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-jogo.sem-hero .hero-fundo {
+  filter: blur(28px) saturate(1.2);
+  transform: scale(1.2);
+  opacity: 0.55;
+}
+
+.hero-vazio {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--realce-suave), var(--painel));
+  color: var(--texto2);
+  font-size: 96px;
+  font-weight: 700;
+}
+
+.hero-jogo::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 20%, rgba(10, 10, 16, 0.65) 65%, var(--fundo) 100%);
+  content: '';
+}
+
+:root[data-tema='claro'] .hero-jogo::after {
+  background: linear-gradient(180deg, transparent 20%, rgba(244, 245, 248, 0.7) 65%, var(--fundo) 100%);
+}
+
+.hero-conteudo {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: var(--espaco-xl) 32px var(--espaco-md);
+}
+
+.hero-logo {
+  max-width: min(420px, 60%);
+  max-height: 140px;
+  object-fit: contain;
+  object-position: left bottom;
+  filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.5));
+}
+
+.hero-titulo {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.1;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
+}
+
+.hero-linha,
+.hero-jogando {
+  margin: 0;
+  color: var(--texto2);
+  font-size: 13px;
+}
+
+.hero-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-sm);
+}
+
+/* `.acao` é flex: 1 por padrão; aqui os botões têm o tamanho do texto */
+.hero-acoes .acao,
+.bloco-topo .acao,
+.cta-dados .acao,
+.bloco-jogo > .acao {
+  flex: none;
+  align-self: flex-start;
+}
+
+.hero-acoes .hero-jogar {
+  min-width: 140px;
+  border-color: var(--realce);
+  background: var(--realce);
+  color: #fff;
+  font-weight: 600;
+}
+
+.hero-acoes .hero-jogar:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.hero-metricas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-xl);
+  margin: var(--espaco-xs) 0 0;
+}
+
+.hero-metricas dt {
+  color: var(--texto2);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.hero-metricas dd {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sobre-jogo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--espaco-xl);
+  align-items: start;
+}
+
+.sobre-principal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-lg);
+  min-width: 0;
+}
+
+.bloco-jogo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-sm);
+}
+
+.bloco-jogo h3 {
+  margin: 0;
+  color: var(--texto2);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.bloco-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--espaco-md);
+}
+
+.cta-dados {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--espaco-lg);
+  padding: var(--espaco-lg);
+  border: 1px dashed var(--borda);
+  border-radius: var(--raio);
+  background: var(--cartao);
+}
+
+.cta-dados p {
+  margin: var(--espaco-xs) 0 0;
+}
+
+.descricao-jogo {
+  line-height: 1.6;
+}
+
+.descricao-jogo p {
+  margin: 0 0 10px;
+  white-space: pre-line;
+}
+
+.descricao-jogo.recortada {
+  max-height: 220px;
+  overflow: hidden;
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
+}
+
+.link-acao {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--realce);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.link-acao:hover {
+  text-decoration: underline;
+}
+
+.ficha-jogo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-md);
+  padding: var(--espaco-lg);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--cartao);
+}
+
+.ficha-capa {
+  width: 100%;
+  border-radius: 8px;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+
+.ficha-jogo dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.ficha-jogo dt {
+  color: var(--texto2);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.ficha-jogo dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.generos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-estatico {
+  padding: 3px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 999px;
+  color: var(--texto2);
+  font-size: 12px;
+}
+
+.origem-dados {
+  margin: 0;
+  font-size: 11px;
+}
+
+.galeria-jogo {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--espaco-sm);
+}
+
+.galeria-item {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--cartao);
+  aspect-ratio: 16 / 9;
+  cursor: zoom-in;
+}
+
+.galeria-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s;
+}
+
+.galeria-item:hover img {
+  transform: scale(1.04);
+}
+
+.galeria-grande {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+}
+
+.lista-retro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lista-retro li {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-md);
+  padding: 10px var(--espaco-md);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--cartao);
+  opacity: 0.6;
+}
+
+.lista-retro li.ganha {
+  opacity: 1;
+  border-color: var(--realce);
+}
+
+.lista-retro li > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.retro-marca {
+  font-size: 18px;
+}
+
+.retro-pontos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.retro-pontos small {
+  color: var(--texto2);
+  font-weight: 400;
+}
+
+.conquistas-jogo,
+.editar-jogo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xl);
+  max-width: 980px;
+}
+
+.grade-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.campo-largo {
+  margin-bottom: var(--espaco-sm);
+}
+
+.artes-candidatas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--espaco-sm);
+}
+
+.artes-candidatas.tipo-icone,
+.artes-candidatas.tipo-logo {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.arte-candidata {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xs);
+  padding: 6px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--cartao);
+  color: var(--texto2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.arte-candidata:hover {
+  border-color: var(--realce);
+}
+
+.arte-candidata img {
+  width: 100%;
+  height: 110px;
+  object-fit: contain;
+  background: var(--sobreposicao);
+  border-radius: 6px;
+}
+
+@media (max-width: 1100px) {
+  .sobre-jogo {
+    grid-template-columns: 1fr;
+  }
+
+  .ficha-capa {
+    display: none;
+  }
 }
