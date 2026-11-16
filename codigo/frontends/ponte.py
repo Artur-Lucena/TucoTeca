@@ -725,6 +725,8 @@ class Ponte:
         base.update(metodos_meta(self.trabalhos))
         from ponte_colecoes import metodos_colecoes
         base.update(metodos_colecoes(self.trabalhos))
+        from ponte_midia import metodos_midia
+        base.update(metodos_midia(self.trabalhos))
         self.metodos = base
 
     def _publicar_evento(self, evento: dict) -> None:

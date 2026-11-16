@@ -398,6 +398,8 @@ def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     garantir_fts(con)
     from bib_nucleo.banco.colecoes import garantir_tabelas_colecoes
     garantir_tabelas_colecoes(con)
+    from bib_nucleo.midia.banco import garantir_tabelas_midia
+    garantir_tabelas_midia(con)
     _garantir_revisoes(con)
     from bib_nucleo.banco.meta import garantir_tabela_meta
     garantir_tabela_meta(con)
