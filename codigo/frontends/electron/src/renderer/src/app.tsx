@@ -9,6 +9,8 @@ import { ConfirmacaoHost } from './componentes/Confirmacao'
 import { Roteador } from './componentes/Roteador'
 import { Paleta } from './componentes/Paleta'
 import { PlayerRodape } from './componentes/PlayerRodape'
+import { PlayerVideo } from './componentes/PlayerVideo'
+import { reproduzindo } from './estado/midia'
 import { LeitorControle, type EstadoPad } from './controle'
 import { aplicarAparencia, normalizarAparencia } from './estado/aparencia'
 import { reduzirConexao, type EstadoConexao } from './estado/conexao'
@@ -343,8 +345,8 @@ export function App() {
   const titulo =
     atual.secao === 'notificacoes'
       ? 'Notificações'
-      : atual.jogo !== null
-        ? 'Jogos'
+      : atual.jogo !== null || atual.titulo !== undefined
+        ? (modulo?.nome ?? 'TucoTeca')
         : `${modulo?.nome ?? 'TucoTeca'}${atual.aba !== '' && (NOMES_ABAS[atual.aba] ?? '') !== '' ? ` · ${NOMES_ABAS[atual.aba]}` : ''}`
   const jogando = jogoEmAndamento(listaTrabalhos.value)
   const filaPlayer = player.value.fila
@@ -385,6 +387,15 @@ export function App() {
         {filaPlayer.length > 0 && <PlayerRodape />}
         <Atividade aoAvisar={avisar} />
         <ConfirmacaoHost />
+        {reproduzindo.value !== null && (
+          <PlayerVideo
+            key={reproduzindo.value}
+            arquivo={reproduzindo.value}
+            aoFechar={() => (reproduzindo.value = null)}
+            aoMudou={() => void atualizarTudo()}
+            aoAvisar={avisar}
+          />
+        )}
         {(jogando !== null || lixeira?.disponivel === true) && (
           <footer class="status">
             {jogando !== null && (

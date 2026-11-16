@@ -24,6 +24,11 @@ export interface ContextoVistas {
 export function Roteador({ rota, ctx }: { rota: Rota; ctx: ContextoVistas }) {
   const { focoBusca, perfil, aoAvisar, aoMudou } = ctx
   const comuns = { aoAvisar, aoMudou }
+  if (rota.titulo !== undefined) {
+    return (
+      <Lazy key={`titulo-${rota.titulo}`} fabrica={() => import('../vistas/PaginaTitulo').then((m) => m.PaginaTitulo)} props={{ imdb: rota.titulo, aoAvisar }} />
+    )
+  }
   if (rota.loja !== undefined) {
     return (
       <Lazy key={`loja-${rota.loja}`} fabrica={() => import('../vistas/PaginaLoja').then((m) => m.PaginaLoja)} props={{ appid: rota.loja, ...comuns }} />
@@ -66,8 +71,18 @@ export function Roteador({ rota, ctx }: { rota: Rota; ctx: ContextoVistas }) {
           <Abas secao="midia" ativa={rota.aba} />
           {rota.aba === 'youtube' ? (
             <Lazy key="YouTube" fabrica={() => import('../vistas/YouTube').then((m) => m.YouTube)} props={comuns} />
-          ) : (
+          ) : rota.aba === 'videos' ? (
             <Lazy key="Videos" fabrica={() => import('../vistas/Videos').then((m) => m.Videos)} props={comuns} />
+          ) : rota.aba === 'continuar' ? (
+            <Lazy key="Continuar" fabrica={() => import('../vistas/midia/AbasMidia').then((m) => m.Continuar)} props={{ aoAvisar }} />
+          ) : rota.aba === 'descobrir' ? (
+            <Lazy key="Descobrir" fabrica={() => import('../vistas/midia/AbasMidia').then((m) => m.Descobrir)} props={{ aoAvisar }} />
+          ) : rota.aba === 'lista' ? (
+            <Lazy key="MinhaLista" fabrica={() => import('../vistas/midia/AbasMidia').then((m) => m.MinhaLista)} props={{ aoAvisar }} />
+          ) : rota.aba === 'calendario' ? (
+            <Lazy key="Calendario" fabrica={() => import('../vistas/midia/AbasMidia').then((m) => m.Calendario)} props={{ aoAvisar }} />
+          ) : (
+            <Lazy key="BibliotecaMidia" fabrica={() => import('../vistas/midia/BibliotecaMidia').then((m) => m.BibliotecaMidia)} props={{ aoAvisar }} />
           )}
         </>
       )

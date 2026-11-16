@@ -11,7 +11,7 @@ import { signal } from '@preact/signals'
 export const ABAS: Record<string, string[]> = {
   inicio: [],
   jogos: ['biblioteca', 'catalogo', 'desejos', 'colecoes'],
-  midia: ['videos', 'youtube'],
+  midia: ['biblioteca', 'continuar', 'descobrir', 'lista', 'calendario', 'videos', 'youtube'],
   musicas: [],
   downloads: [],
   configuracoes: ['geral', 'integracoes'],
@@ -30,6 +30,10 @@ export const NOMES_ABAS: Record<string, string> = {
   editar: 'Editar',
   biblioteca: 'Biblioteca',
   catalogo: 'Catálogo',
+  continuar: 'Continuar',
+  descobrir: 'Descobrir',
+  lista: 'Minha lista',
+  calendario: 'Calendário',
   colecoes: 'Coleções',
   desejos: 'Desejos',
   videos: 'Vídeos',
@@ -52,6 +56,8 @@ export interface Rota {
   jogo: number | null
   /** `#/loja/:appid` → página do jogo na loja Steam (dentro de Jogos › Catálogo). */
   loja?: string
+  /** `#/titulo/:imdb` → filme ou série do Cinemeta (dentro de Filmes e Séries). */
+  titulo?: string
 }
 
 const INICIO: Rota = { secao: 'inicio', aba: '', jogo: null }
@@ -67,6 +73,9 @@ export function analisar(entrada: string): Rota {
     const aba = ABAS_JOGO.includes(partes[2] ?? '') ? (partes[2] as string) : ABAS_JOGO[0]
     return Number.isInteger(id) && id > 0 ? { secao: 'jogos', aba, jogo: id } : { ...INICIO }
   }
+  if (primeira === 'titulo') {
+    return /^tt\d{5,10}$/.test(segunda) ? { secao: 'midia', aba: 'biblioteca', jogo: null, titulo: segunda } : { ...INICIO }
+  }
   if (primeira === 'loja') {
     return /^\d{1,10}$/.test(segunda) ? { secao: 'jogos', aba: 'catalogo', jogo: null, loja: segunda } : { ...INICIO }
   }
@@ -80,6 +89,7 @@ export function analisar(entrada: string): Rota {
 /** Rota → hash canônico (aba padrão omitida). */
 export function formatar(rota: Rota): string {
   if (rota.loja !== undefined) return `#/loja/${rota.loja}`
+  if (rota.titulo !== undefined) return `#/titulo/${rota.titulo}`
   if (rota.jogo !== null) {
     return rota.aba === '' || rota.aba === ABAS_JOGO[0] ? `#/jogo/${rota.jogo}` : `#/jogo/${rota.jogo}/${rota.aba}`
   }
@@ -89,7 +99,7 @@ export function formatar(rota: Rota): string {
 
 /** Chave usada pelas regras antigas (busca da seção, atalhos): `jogos/desejos` → `desejos`. */
 export function chaveLegada(rota: Rota): string {
-  if (rota.jogo !== null || rota.loja !== undefined) return 'jogo' // sem busca própria: Ctrl+F abre a paleta
+  if (rota.jogo !== null || rota.loja !== undefined || rota.titulo !== undefined) return 'jogo' // sem busca própria: Ctrl+F abre a paleta
   if (rota.secao === 'jogos' && rota.aba === 'desejos') return 'desejos'
   if (rota.secao === 'midia') return rota.aba
   if (rota.secao === 'configuracoes' && rota.aba === 'integracoes') return 'integracoes'

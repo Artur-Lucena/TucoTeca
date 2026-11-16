@@ -44,6 +44,10 @@
   letter-spacing: 0.6px;
 }
 
+.secao + .secao {
+  margin-top: var(--espaco-xl);
+}
+
 .secao h2 {
   margin: 0 0 14px;
   font-size: 16px;

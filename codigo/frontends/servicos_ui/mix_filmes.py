@@ -23,15 +23,21 @@ def poster_dto(imdb, remoto) -> str:
 
 
 class MixFilmes:
-    def _salvar_posters(self, cancelado=lambda: False):
-        """Copia os pôsteres que faltam (títulos com arquivo no disco ou na lista) — rede, ação do usuário."""
+    def _salvar_posters(self, cancelado=lambda: False, so=None):
+        """Copia os pôsteres que faltam (títulos com arquivo no disco ou na lista, ou só os de `so`) — rede,
+        ação do usuário."""
         from bib_nucleo.arquivos import gravar_atomico
         from bib_nucleo.rede import online, rede_ativa
         if not rede_ativa():
             return 0
-        faltam = self._midia(lambda con: [(r[0], r[1]) for r in con.execute(
-            "SELECT imdb_id, poster FROM midia_titulos WHERE poster <> '' AND (na_lista=1 OR imdb_id IN "
-            "(SELECT imdb_id FROM midia_arquivos WHERE ausente=0))")])
+        if so:
+            sql = f"SELECT imdb_id, poster FROM midia_titulos WHERE poster <> '' AND imdb_id IN ({','.join('?' * len(so))})"
+            params = list(so)
+        else:
+            sql = ("SELECT imdb_id, poster FROM midia_titulos WHERE poster <> '' AND (na_lista=1 OR imdb_id IN "
+                   "(SELECT imdb_id FROM midia_arquivos WHERE ausente=0))")
+            params = []
+        faltam = self._midia(lambda con: [(r[0], r[1]) for r in con.execute(sql, params)])
         n = 0
         for imdb, url in faltam:
             if cancelado() or any(pasta_posters().glob(f"{imdb}.*")):
@@ -270,7 +276,7 @@ class MixFilmes:
             exigir_rede("Buscar o título no catálogo")
             m = cinemeta.meta(tipo, imdb)
             self._midia(lambda con: mb.gravar_titulo(con, m), escrever=True)
-        self._salvar_posters()
+            self._salvar_posters(so=[imdb])  # só o pôster do título que acabou de entrar
 
     def midia_lista_alternar(self, imdb, tipo):
         self._garantir_titulo(imdb, tipo)

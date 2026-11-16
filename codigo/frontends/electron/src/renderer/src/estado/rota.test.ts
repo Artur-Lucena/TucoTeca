@@ -19,14 +19,17 @@ describe('rota', () => {
     expect(analisar('#/nada')).toEqual({ secao: 'inicio', aba: '', jogo: null })
     expect(analisar('#/jogo/abc').secao).toBe('inicio')
     expect(analisar('#/jogo/0').secao).toBe('inicio')
-    expect(analisar('#/midia/xyz')).toEqual({ secao: 'midia', aba: 'videos', jogo: null })
+    expect(analisar('#/midia/xyz')).toEqual({ secao: 'midia', aba: 'biblioteca', jogo: null })
+    expect(analisar('#/titulo/tt0903747')).toEqual({ secao: 'midia', aba: 'biblioteca', jogo: null, titulo: 'tt0903747' })
+    expect(analisar('#/titulo/x').secao).toBe('inicio')
   })
 
   it('aceita as chaves antigas como apelidos', () => {
     expect(formatar(analisar('desejos'))).toBe('#/jogos/desejos')
     expect(formatar(analisar('#/desejos'))).toBe('#/jogos/desejos')
     expect(formatar(analisar('integracoes'))).toBe('#/configuracoes/integracoes')
-    expect(formatar(analisar('videos'))).toBe('#/midia')
+    expect(formatar(analisar('videos'))).toBe('#/midia/videos')
+    expect(formatar(analisar('#/titulo/tt0133093'))).toBe('#/titulo/tt0133093')
     expect(formatar(analisar('youtube'))).toBe('#/midia/youtube')
     expect(formatar(analisar('notificacoes'))).toBe('#/notificacoes')
     expect(formatar(analisar('jogos'))).toBe('#/jogos')
@@ -43,7 +46,7 @@ describe('rota', () => {
   it('chave legada para busca e atalhos', () => {
     expect(chaveLegada(analisar('#/jogos/desejos'))).toBe('desejos')
     expect(chaveLegada(analisar('#/midia/youtube'))).toBe('youtube')
-    expect(chaveLegada(analisar('#/midia'))).toBe('videos')
+    expect(chaveLegada(analisar('#/midia/videos'))).toBe('videos')
     expect(chaveLegada(analisar('#/jogos'))).toBe('jogos')
     expect(chaveLegada(analisar('#/jogo/4'))).toBe('jogo')
   })
