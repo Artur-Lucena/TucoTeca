@@ -721,6 +721,8 @@ class Ponte:
         # import tardio: no app instalado o sys.path só fica pronto em preparar_ambiente()
         from ponte_paridade import metodos_paridade
         base.update(metodos_paridade(self.trabalhos))
+        from ponte_meta import metodos_meta
+        base.update(metodos_meta(self.trabalhos))
         self.metodos = base
 
     def _publicar_evento(self, evento: dict) -> None:

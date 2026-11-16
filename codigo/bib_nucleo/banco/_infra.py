@@ -395,6 +395,8 @@ def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     _garantir_tabela_videos(con)
     garantir_fts(con)
     _garantir_revisoes(con)
+    from bib_nucleo.banco.meta import garantir_tabela_meta
+    garantir_tabela_meta(con)
     con.commit()
 
 SCHEMA_VIDEOS = """

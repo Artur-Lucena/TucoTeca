@@ -9,7 +9,7 @@ import os
 from executar import afirmar
 
 PADRAO = {"steamrip", "fitgirl", "azahar", "desmume", "qbittorrent",
-          "spotify", "capas"}
+          "spotify", "capas", "metadados"}
 
 
 def _modo_aviao():
