@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { caminhoDaUrlMidia, faixaRange, tipoDoArquivo } from './midia'
+import { caminhoDaUrlMidia, faixaRange, raizesDaResposta, raizMidiaAceita, tipoDoArquivo } from './midia'
 
 describe('faixaRange', () => {
   it('sem Range devolve o arquivo inteiro com 200', () => {
@@ -82,5 +82,35 @@ describe('caminhoDaUrlMidia', () => {
     expect(
       caminhoDaUrlMidia('/home/tuco/col', 'tucoteca-media://arquivo/home/tuco/outro.wav', 'linux'),
     ).toBeNull()
+  })
+})
+
+describe('pastas de Filmes e Séries', () => {
+  const home = 'C:\\Tucoteca'
+  const url = (caminho: string) => `tucoteca-media://arquivo/${encodeURIComponent(caminho)}`
+
+  it('serve arquivo dentro de uma pasta escolhida', () => {
+    expect(caminhoDaUrlMidia(home, url('D:/Filmes/Matrix.mkv'), 'win32', ['D:\\Filmes'])).toBe('D:/Filmes/Matrix.mkv')
+  })
+
+  it('recusa fora das pastas, subida com .. e pasta que é o disco inteiro', () => {
+    expect(caminhoDaUrlMidia(home, url('D:/Outros/x.mkv'), 'win32', ['D:\\Filmes'])).toBeNull()
+    expect(caminhoDaUrlMidia(home, url('D:/Filmes/../segredo.mkv'), 'win32', ['D:\\Filmes'])).toBeNull()
+    expect(caminhoDaUrlMidia(home, url('D:/qualquer.mkv'), 'win32', ['D:\\'])).toBeNull()
+    expect(caminhoDaUrlMidia(home, url('D:/Filmes/Matrix.mkv'), 'win32')).toBeNull()
+  })
+
+  it('raiz aceita: absoluta e não-raiz de disco', () => {
+    expect(raizMidiaAceita('D:\\Filmes')).toBe(true)
+    expect(raizMidiaAceita('D:\\')).toBe(false)
+    expect(raizMidiaAceita('D:')).toBe(false)
+    expect(raizMidiaAceita('relativa/pasta')).toBe(false)
+    expect(raizMidiaAceita('')).toBe(false)
+  })
+
+  it('lê as raízes da resposta do núcleo e descarta as ruins', () => {
+    expect(raizesDaResposta({ pastas: [{ caminho: 'D:\\Filmes' }, { caminho: 'C:\\' }, { x: 1 }, null] })).toEqual(['D:\\Filmes'])
+    expect(raizesDaResposta(null)).toEqual([])
+    expect(raizesDaResposta({ pastas: 'x' })).toEqual([])
   })
 })

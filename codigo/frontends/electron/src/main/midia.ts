@@ -1,4 +1,4 @@
-import { extname } from 'node:path'
+import { extname, isAbsolute, parse, resolve } from 'node:path'
 import { caminhoPermitido } from './caminhos'
 
 /** Recorte pedido para o handler de mídia (200 inteiro; 206 faixa; 416 recusa). */
@@ -50,14 +50,33 @@ export function faixaRange(cabecalho: string | null | undefined, tamanho: number
   return { status: 206, inicio, fim }
 }
 
+/** Pasta de Filmes e Séries aceitável: absoluta e que não seja a raiz de um disco. */
+export function raizMidiaAceita(raiz: string): boolean {
+  if (typeof raiz !== 'string' || raiz.trim() === '' || !isAbsolute(raiz)) return false
+  const r = resolve(raiz)
+  const raizDisco = parse(r).root
+  return r.replace(/[\\/]+$/, '') !== raizDisco.replace(/[\\/]+$/, '')
+}
+
+/** Pastas de mídia da resposta de `midia.pastas` (e afins), só as aceitáveis. */
+export function raizesDaResposta(resultado: unknown): string[] {
+  const pastas = (resultado as { pastas?: unknown } | null)?.pastas
+  if (!Array.isArray(pastas)) return []
+  return pastas
+    .map((p) => (p !== null && typeof p === 'object' ? String((p as { caminho?: unknown }).caminho ?? '') : ''))
+    .filter(raizMidiaAceita)
+}
+
 /**
  * Resolve `tucoteca-media://arquivo/<caminho escapado>` em caminho local,
- * recusando (null) qualquer alvo fora da coleção.
+ * recusando (null) qualquer alvo fora da coleção e das pastas de mídia
+ * escolhidas pelo usuário (`raizes`).
  */
 export function caminhoDaUrlMidia(
   home: string,
   url: string,
   plataforma: NodeJS.Platform = process.platform,
+  raizes: readonly string[] = [],
 ): string | null {
   let alvo: string
   try {
@@ -68,6 +87,8 @@ export function caminhoDaUrlMidia(
     return null
   }
   if (plataforma === 'win32' && /^\/[A-Za-z]:/.test(alvo)) alvo = alvo.slice(1)
-  if (!caminhoPermitido(home, alvo, { plataforma })) return null
-  return alvo
+  const dentro =
+    caminhoPermitido(home, alvo, { plataforma }) ||
+    raizes.some((raiz) => raizMidiaAceita(raiz) && caminhoPermitido(raiz, alvo, { plataforma }))
+  return dentro ? alvo : null
 }

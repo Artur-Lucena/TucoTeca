@@ -28,10 +28,10 @@ export function registrarProtocoloMidia(homeDe: () => string): void {
  * Serve áudio/vídeo/imagem local por `tucoteca-media://` com suporte a
  * `Range` (o `<audio>` do renderer pede faixas para o seek).
  */
-export function registrarProtocoloMedia(homeDe: () => string): void {
+export function registrarProtocoloMedia(homeDe: () => string, raizesDe: () => readonly string[] = () => []): void {
   protocol.handle('tucoteca-media', async (pedido) => {
     const home = homeDe()
-    const alvo = home ? caminhoDaUrlMidia(home, pedido.url) : null
+    const alvo = home ? caminhoDaUrlMidia(home, pedido.url, process.platform, raizesDe()) : null
     if (alvo === null) return new Response('fora da coleção', { status: 403 })
 
     let tamanho: number

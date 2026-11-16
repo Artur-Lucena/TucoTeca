@@ -11,7 +11,40 @@ from bib_nucleo.midia import banco as mb
 INTERVALO_SEGUIDAS = 12 * 3600
 
 
+def pasta_posters():
+    return core.DADOS_DIR / "posters"
+
+
+def poster_dto(imdb, remoto) -> str:
+    """Pôster salvo no disco (file://) ou, se ainda não há cópia, o endereço do Cinemeta."""
+    for arq in pasta_posters().glob(f"{imdb}.*") if imdb else ():
+        return arq.resolve().as_uri()
+    return str(remoto or "")
+
+
 class MixFilmes:
+    def _salvar_posters(self, cancelado=lambda: False):
+        """Copia os pôsteres que faltam (títulos com arquivo no disco ou na lista) — rede, ação do usuário."""
+        from bib_nucleo.arquivos import gravar_atomico
+        from bib_nucleo.rede import online, rede_ativa
+        if not rede_ativa():
+            return 0
+        faltam = self._midia(lambda con: [(r[0], r[1]) for r in con.execute(
+            "SELECT imdb_id, poster FROM midia_titulos WHERE poster <> '' AND (na_lista=1 OR imdb_id IN "
+            "(SELECT imdb_id FROM midia_arquivos WHERE ausente=0))")])
+        n = 0
+        for imdb, url in faltam:
+            if cancelado() or any(pasta_posters().glob(f"{imdb}.*")):
+                continue
+            try:
+                raw, ext, _ = online.baixar_imagem(url, limite=3_000_000)
+            except ValueError:
+                continue
+            pasta_posters().mkdir(parents=True, exist_ok=True)
+            gravar_atomico(pasta_posters() / f"{imdb}{ext}", raw)
+            n += 1
+        return n
+
     def _midia(self, operacao, escrever=False):
         if escrever:
             with self._escrita, closing(core.get_db(self.db_path)) as con:
@@ -58,6 +91,7 @@ class MixFilmes:
                             escrever=True)
             casados, revisar = c["casados"], c["revisar"]
             avisos += c["erros"][:2]
+            self._salvar_posters(cancelado)
         elif not rede_ativa():
             avisos.append("Sem rede: os arquivos foram indexados, mas a identificação no catálogo fica para depois.")
         if progresso:
@@ -80,7 +114,8 @@ class MixFilmes:
                     "FROM midia_arquivos a JOIN midia_titulos t ON t.imdb_id = a.imdb_id "
                     "WHERE a.ausente=0 GROUP BY t.imdb_id ORDER BY t.nome COLLATE NOCASE"):
                 titulos.append({"imdb_id": r["imdb_id"], "tipo": r["tipo"], "nome": r["nome"], "ano": r["ano"],
-                                "poster": r["poster"], "arquivos": int(r["n"]), "adicionado": r["quando"]})
+                                "poster": poster_dto(r["imdb_id"], r["poster"]), "arquivos": int(r["n"]),
+                                "adicionado": r["quando"]})
             vistos = mb.progresso(con)
             for t in titulos:
                 prefixo = t["imdb_id"]
@@ -124,6 +159,7 @@ class MixFilmes:
                                    for v in salvo["meta"].get("videos") or [] if isinstance(v, dict)])
             dto = {k: salvo[k] for k in ("imdb_id", "tipo", "nome", "ano", "poster", "fundo", "logo", "descricao",
                                          "generos", "na_lista", "seguindo")}
+            dto["poster"] = poster_dto(imdb, salvo["poster"])
             dto["nota"] = str(salvo["meta"].get("imdbRating") or "")
             dto["duracao"] = str(salvo["meta"].get("runtime") or "")
             if salvo["tipo"] == "movie":
@@ -213,13 +249,13 @@ class MixFilmes:
         if a.get("temporada") is not None:
             rotulo += f" · T{a['temporada']}E{a['episodio']}"
         return {"arquivo": int(a["id"]), "chave": chave, "imdb_id": a.get("imdb_id") or "", "titulo": rotulo,
-                "poster": a.get("poster") or "", "fundo": a.get("fundo") or "", "motivo": motivo,
+                "poster": poster_dto(a.get("imdb_id"), a.get("poster")), "fundo": a.get("fundo") or "", "motivo": motivo,
                 "fracao": round(p["posicao"] / p["duracao"], 3) if p and p["duracao"] else 0}
 
     def midia_lista(self):
         def ler(con):
             return [{"imdb_id": r["imdb_id"], "tipo": r["tipo"], "nome": r["nome"], "ano": r["ano"],
-                     "poster": r["poster"], "seguindo": bool(r["seguindo"])}
+                     "poster": poster_dto(r["imdb_id"], r["poster"]), "seguindo": bool(r["seguindo"])}
                     for r in con.execute("SELECT * FROM midia_titulos WHERE na_lista=1 ORDER BY nome COLLATE NOCASE")]
         return self._midia(ler)
 
@@ -234,6 +270,7 @@ class MixFilmes:
             exigir_rede("Buscar o título no catálogo")
             m = cinemeta.meta(tipo, imdb)
             self._midia(lambda con: mb.gravar_titulo(con, m), escrever=True)
+        self._salvar_posters()
 
     def midia_lista_alternar(self, imdb, tipo):
         self._garantir_titulo(imdb, tipo)

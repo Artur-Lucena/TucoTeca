@@ -158,13 +158,18 @@ def teste_ponte_fluxo_completo():
     db = _banco()
     chamar, esperar = _ponte(db)
     afirmar(chamar("midia.pasta_adicionar", caminho=str(raiz))["ok"])
+    from bib_nucleo.rede import online
+    png = (b"\x89PNG\r\n\x1a\n" + b"0" * 64, ".png", "")
     with patch.object(indexar, "MIN_BYTES", 1024), patch.object(cinemeta, "buscar", side_effect=_buscar), \
-         patch.object(cinemeta, "meta", side_effect=_meta):
+         patch.object(cinemeta, "meta", side_effect=_meta), \
+         patch.object(online, "baixar_imagem", return_value=png) as baixar:
         t = chamar("midia.varrer")["resultado"]["trabalho"]
         fim = esperar(t["id"])
     afirmar(fim["estado"] == "ok" and "3 identificado" in fim["detalhe"]["aviso"], fim)
+    afirmar(baixar.call_count == 2, "um pôster por título identificado")
     bib = chamar("midia.biblioteca")["resultado"]
     afirmar([t["nome"] for t in bib["titulos"]] == ["Breaking Bad", "The Matrix"] and len(bib["revisar"]) == 1, bib)
+    afirmar(all(t["poster"].startswith("file:") for t in bib["titulos"]), "pôster salvo no disco")
 
     serie = chamar("midia.titulo", imdb="tt0903747")["resultado"]
     eps = serie["temporadas"][0]["episodios"]
@@ -187,11 +192,11 @@ def teste_ponte_fluxo_completo():
     afirmar(vtt.startswith("WEBVTT") and "00:00:01.000" in vtt, vtt)
 
     esquisito = bib["revisar"][0]["id"]
-    with patch.object(cinemeta, "meta", side_effect=_meta):
+    with patch.object(cinemeta, "meta", side_effect=_meta), patch.object(online, "baixar_imagem", return_value=png):
         r = chamar("midia.corrigir", arquivo=esquisito, imdb="tt0133093", tipo="movie")
     afirmar(r["ok"] and chamar("midia.biblioteca")["resultado"]["revisar"] == [], r)
 
-    with patch.object(cinemeta, "meta", side_effect=_meta):
+    with patch.object(cinemeta, "meta", side_effect=_meta), patch.object(online, "baixar_imagem", return_value=png):
         afirmar(chamar("midia.lista_alternar", imdb="tt0903747", tipo="series")["resultado"]["na_lista"] is True)
         afirmar(chamar("midia.seguir", imdb="tt0903747", seguir=True)["ok"])
     afirmar([t["imdb_id"] for t in chamar("midia.lista")["resultado"]] == ["tt0903747"])
