@@ -710,3 +710,13 @@
   color: var(--texto2);
   font-size: 12px;
 }
+
+.biblioteca-colecao {
+  padding: 5px var(--espaco-sm);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+  font-size: 12px;
+}

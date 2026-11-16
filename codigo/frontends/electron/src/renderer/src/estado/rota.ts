@@ -10,7 +10,7 @@ import { signal } from '@preact/signals'
  */
 export const ABAS: Record<string, string[]> = {
   inicio: [],
-  jogos: ['biblioteca', 'desejos'],
+  jogos: ['biblioteca', 'catalogo', 'desejos', 'colecoes'],
   midia: ['videos', 'youtube'],
   musicas: [],
   downloads: [],
@@ -29,6 +29,8 @@ export const NOMES_ABAS: Record<string, string> = {
   manutencao: 'Manutenção',
   editar: 'Editar',
   biblioteca: 'Biblioteca',
+  catalogo: 'Catálogo',
+  colecoes: 'Coleções',
   desejos: 'Desejos',
   videos: 'Vídeos',
   youtube: 'YouTube',
@@ -48,6 +50,8 @@ export interface Rota {
   aba: string
   /** `#/jogo/:id[/aba]` → página do jogo (a seção marcada continua Jogos). */
   jogo: number | null
+  /** `#/loja/:appid` → página do jogo na loja Steam (dentro de Jogos › Catálogo). */
+  loja?: string
 }
 
 const INICIO: Rota = { secao: 'inicio', aba: '', jogo: null }
@@ -63,6 +67,9 @@ export function analisar(entrada: string): Rota {
     const aba = ABAS_JOGO.includes(partes[2] ?? '') ? (partes[2] as string) : ABAS_JOGO[0]
     return Number.isInteger(id) && id > 0 ? { secao: 'jogos', aba, jogo: id } : { ...INICIO }
   }
+  if (primeira === 'loja') {
+    return /^\d{1,10}$/.test(segunda) ? { secao: 'jogos', aba: 'catalogo', jogo: null, loja: segunda } : { ...INICIO }
+  }
   if (APELIDOS[primeira] !== undefined && partes.length === 1) return analisar(APELIDOS[primeira])
   const abas = ABAS[primeira]
   if (abas === undefined) return { ...INICIO }
@@ -72,6 +79,7 @@ export function analisar(entrada: string): Rota {
 
 /** Rota → hash canônico (aba padrão omitida). */
 export function formatar(rota: Rota): string {
+  if (rota.loja !== undefined) return `#/loja/${rota.loja}`
   if (rota.jogo !== null) {
     return rota.aba === '' || rota.aba === ABAS_JOGO[0] ? `#/jogo/${rota.jogo}` : `#/jogo/${rota.jogo}/${rota.aba}`
   }
@@ -81,7 +89,7 @@ export function formatar(rota: Rota): string {
 
 /** Chave usada pelas regras antigas (busca da seção, atalhos): `jogos/desejos` → `desejos`. */
 export function chaveLegada(rota: Rota): string {
-  if (rota.jogo !== null) return 'jogo' // sem busca própria: Ctrl+F abre a paleta
+  if (rota.jogo !== null || rota.loja !== undefined) return 'jogo' // sem busca própria: Ctrl+F abre a paleta
   if (rota.secao === 'jogos' && rota.aba === 'desejos') return 'desejos'
   if (rota.secao === 'midia') return rota.aba
   if (rota.secao === 'configuracoes' && rota.aba === 'integracoes') return 'integracoes'

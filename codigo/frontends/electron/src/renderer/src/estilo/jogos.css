@@ -573,8 +573,14 @@
   display: flex;
   align-items: flex-end;
   min-height: 340px;
-  overflow: hidden;
   background: var(--painel);
+}
+
+/* só a arte é recortada: menus do topo (ex.: Coleções) podem passar da borda */
+.hero-arte {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 
 .hero-fundo {
@@ -969,4 +975,190 @@
   .ficha-capa {
     display: none;
   }
+}
+
+/* ---------------------------------------------------------------- catálogo e coleções (1.4.3) */
+.catalogo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xl);
+}
+
+.catalogo-busca {
+  display: flex;
+  gap: var(--espaco-sm);
+  max-width: 560px;
+}
+
+.catalogo-busca .busca {
+  flex: 1;
+}
+
+.catalogo-busca .acao {
+  flex: none;
+}
+
+.catalogo-secao h2 {
+  margin: 0 0 var(--espaco-md);
+  font-size: 17px;
+}
+
+.catalogo-nota {
+  margin: 0;
+  font-size: 12px;
+}
+
+.grade-loja {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--espaco-md);
+}
+
+.cartao-loja {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-sm);
+  padding: 0 0 10px;
+  overflow: hidden;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.cartao-loja:hover {
+  border-color: var(--realce);
+  transform: translateY(-2px);
+}
+
+.cartao-loja img {
+  width: 100%;
+  aspect-ratio: 460 / 215;
+  object-fit: cover;
+  background: var(--sobreposicao);
+}
+
+.cartao-loja-nome {
+  padding: 0 var(--espaco-md);
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cartao-loja-rodape {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--espaco-sm);
+  padding: 0 var(--espaco-md);
+  color: var(--texto2);
+  font-size: 12px;
+}
+
+.preco.promo {
+  border-color: var(--realce);
+  background: var(--realce-suave);
+}
+
+.colecoes {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: var(--espaco-xl);
+  align-items: start;
+}
+
+.colecoes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-md);
+}
+
+.colecoes-lista .busca {
+  flex: 1;
+  min-width: 0;
+}
+
+.colecoes-lista ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.colecao-item {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--espaco-sm) 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--texto2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.colecao-item:hover {
+  background: var(--sobreposicao);
+  color: var(--texto);
+}
+
+.colecao-item.ativo {
+  background: var(--realce-suave);
+  color: var(--texto);
+}
+
+.colecoes-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--espaco-md);
+  margin-bottom: var(--espaco-lg);
+}
+
+.colecoes-topo h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.colecoes-jogo {
+  position: relative;
+}
+
+.colecoes-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-sm);
+  width: 280px;
+  max-height: 340px;
+  padding: var(--espaco-md);
+  overflow-y: auto;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--cartao);
+  box-shadow: var(--sombra);
+}
+
+.colecoes-popover label.marcar {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-sm);
+  color: var(--texto);
+}
+
+.hero-acoes .colecoes-jogo > .acao {
+  flex: none;
 }

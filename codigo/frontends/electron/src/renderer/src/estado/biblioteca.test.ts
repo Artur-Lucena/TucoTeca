@@ -21,6 +21,12 @@ describe('itensBiblioteca', () => {
     expect(itensBiblioteca(undefined, '', 'todos')).toEqual([])
   })
 
+  it('filtra por coleção (uuids)', () => {
+    const comUuid = jogos.map((j) => ({ ...j, uuid: `u${j.id}` }))
+    expect(itensBiblioteca(comUuid, '', 'todos', new Set(['u3'])).map((j) => j.id)).toEqual([3])
+    expect(itensBiblioteca(comUuid, '', 'todos', new Set()).length).toBe(0)
+  })
+
   it('aguenta 2 000 jogos', () => {
     const muitos = Array.from({ length: 2000 }, (_, i) => ({ id: i + 1, titulo: `Jogo ${i}` }))
     expect(itensBiblioteca(muitos, '199', 'todos').length).toBe(12) // 199, 1199, 1990–1999

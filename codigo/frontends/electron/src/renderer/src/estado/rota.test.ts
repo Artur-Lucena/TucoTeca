@@ -9,6 +9,9 @@ describe('rota', () => {
     expect(analisar('#/jogo/12/conquistas')).toEqual({ secao: 'jogos', aba: 'conquistas', jogo: 12 })
     expect(analisar('#/jogo/12/xyz').aba).toBe('visao')
     expect(analisar('#/musicas')).toEqual({ secao: 'musicas', aba: '', jogo: null })
+    expect(analisar('#/loja/367520')).toEqual({ secao: 'jogos', aba: 'catalogo', jogo: null, loja: '367520' })
+    expect(analisar('#/loja/abc').secao).toBe('inicio')
+    expect(analisar('#/jogos/colecoes').aba).toBe('colecoes')
   })
 
   it('o que não reconhece vira Início ou a aba padrão', () => {
@@ -34,6 +37,7 @@ describe('rota', () => {
     expect(formatar({ secao: 'configuracoes', aba: 'integracoes', jogo: null })).toBe('#/configuracoes/integracoes')
     expect(formatar({ secao: 'jogos', aba: 'visao', jogo: 3 })).toBe('#/jogo/3')
     expect(formatar({ secao: 'jogos', aba: 'saves', jogo: 3 })).toBe('#/jogo/3/saves')
+    expect(formatar(analisar('#/loja/620'))).toBe('#/loja/620')
   })
 
   it('chave legada para busca e atalhos', () => {

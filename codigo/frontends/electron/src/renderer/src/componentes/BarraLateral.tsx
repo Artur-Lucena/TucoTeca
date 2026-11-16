@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import type { ModuloDTO } from '../../../shared/protocolo'
-import type { JogoResumo } from '../derivacoes'
+import type { ColecaoResumo, JogoResumo } from '../derivacoes'
 import { itensBiblioteca, janelaVisivel, type ModoBiblioteca } from '../estado/biblioteca'
 import { ir } from '../estado/rota'
 
@@ -8,6 +8,7 @@ interface Props {
   modulos: ModuloDTO[]
   ativa: string
   jogos: JogoResumo[] | undefined
+  colecoes: ColecaoResumo[]
   jogoAberto: number | null
 }
 
@@ -19,7 +20,7 @@ const MODOS: Array<{ chave: ModoBiblioteca; nome: string }> = [
 ]
 
 /** Barra lateral: as seis seções e, abaixo, a biblioteca de jogos (lista virtualizada). */
-export function BarraLateral({ modulos, ativa, jogos, jogoAberto }: Props) {
+export function BarraLateral({ modulos, ativa, jogos, colecoes, jogoAberto }: Props) {
   return (
     <aside class="barra-lateral">
       <div class="marca">TucoTeca</div>
@@ -40,18 +41,21 @@ export function BarraLateral({ modulos, ativa, jogos, jogoAberto }: Props) {
           </button>
         ))}
       </nav>
-      <BibliotecaLateral jogos={jogos} jogoAberto={jogoAberto} />
+      <BibliotecaLateral jogos={jogos} colecoes={colecoes} jogoAberto={jogoAberto} />
     </aside>
   )
 }
 
-function BibliotecaLateral({ jogos, jogoAberto }: { jogos: JogoResumo[] | undefined; jogoAberto: number | null }) {
+function BibliotecaLateral({ jogos, colecoes, jogoAberto }: { jogos: JogoResumo[] | undefined; colecoes: ColecaoResumo[]; jogoAberto: number | null }) {
   const [termo, setTermo] = useState('')
   const [modo, setModo] = useState<ModoBiblioteca>('todos')
+  const [colecaoId, setColecaoId] = useState<number | null>(null)
   const [rolagem, setRolagem] = useState(0)
   const [altura, setAltura] = useState(400)
   const caixa = useRef<HTMLDivElement>(null)
-  const itens = useMemo(() => itensBiblioteca(jogos, termo, modo), [jogos, termo, modo])
+  const colecao = colecoes.find((c) => c.id === colecaoId)
+  const filtroColecao = useMemo(() => (colecao === undefined ? undefined : new Set(colecao.uuids)), [colecao])
+  const itens = useMemo(() => itensBiblioteca(jogos, termo, modo, filtroColecao), [jogos, termo, modo, filtroColecao])
 
   useEffect(() => {
     const el = caixa.current
@@ -66,7 +70,7 @@ function BibliotecaLateral({ jogos, jogoAberto }: { jogos: JogoResumo[] | undefi
   useEffect(() => {
     if (caixa.current !== null) caixa.current.scrollTop = 0
     setRolagem(0)
-  }, [termo, modo])
+  }, [termo, modo, colecaoId])
 
   const janela = janelaVisivel(itens.length, ALTURA_ITEM, rolagem, altura)
   return (
@@ -97,9 +101,27 @@ function BibliotecaLateral({ jogos, jogoAberto }: { jogos: JogoResumo[] | undefi
           </button>
         ))}
       </div>
+      {colecoes.length > 0 && (
+        <select
+          class="biblioteca-colecao"
+          aria-label="Filtrar por coleção"
+          value={colecao === undefined ? '' : String(colecao.id)}
+          onChange={(e) => {
+            const v = (e.target as HTMLSelectElement).value
+            setColecaoId(v === '' ? null : Number(v))
+          }}
+        >
+          <option value="">Todas as coleções</option>
+          {colecoes.map((c) => (
+            <option key={c.id} value={String(c.id)}>
+              {c.nome} ({c.uuids.length})
+            </option>
+          ))}
+        </select>
+      )}
       <div class="biblioteca-lista" ref={caixa} onScroll={(e) => setRolagem((e.target as HTMLDivElement).scrollTop)}>
         {itens.length === 0 ? (
-          <p class="biblioteca-vazia">{termo.trim() !== '' || modo !== 'todos' ? 'Nada com esse filtro.' : 'Nenhum jogo ainda.'}</p>
+          <p class="biblioteca-vazia">{termo.trim() !== '' || modo !== 'todos' || colecao !== undefined ? 'Nada com esse filtro.' : 'Nenhum jogo ainda.'}</p>
         ) : (
           <ul style={{ paddingTop: `${janela.antes}px`, paddingBottom: `${janela.depois}px` }}>
             {itens.slice(janela.inicio, janela.fim).map((item) => (

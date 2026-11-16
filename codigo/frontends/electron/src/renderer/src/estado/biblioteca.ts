@@ -27,11 +27,14 @@ export function itensBiblioteca(
   jogos: JogoResumo[] | undefined,
   termo: string,
   modo: ModoBiblioteca,
+  /** Só os jogos desta coleção (uuids); ausente = todos. */
+  colecao?: ReadonlySet<string>,
 ): ItemBiblioteca[] {
   const q = semAcento(String(termo ?? '').trim())
   let lista = (jogos ?? []).filter((j) => {
     const id = Number(j.id)
     if (!Number.isInteger(id) || id <= 0 || String(j.titulo ?? '').trim() === '') return false
+    if (colecao !== undefined && !colecao.has(String(j.uuid ?? ''))) return false
     return q === '' || semAcento(j.titulo).includes(q)
   })
   if (modo === 'favoritos') lista = lista.filter(eFavorito)

@@ -24,6 +24,11 @@ export interface ContextoVistas {
 export function Roteador({ rota, ctx }: { rota: Rota; ctx: ContextoVistas }) {
   const { focoBusca, perfil, aoAvisar, aoMudou } = ctx
   const comuns = { aoAvisar, aoMudou }
+  if (rota.loja !== undefined) {
+    return (
+      <Lazy key={`loja-${rota.loja}`} fabrica={() => import('../vistas/PaginaLoja').then((m) => m.PaginaLoja)} props={{ appid: rota.loja, ...comuns }} />
+    )
+  }
   if (rota.jogo !== null) {
     return (
       <Lazy
@@ -40,7 +45,11 @@ export function Roteador({ rota, ctx }: { rota: Rota; ctx: ContextoVistas }) {
       return (
         <>
           <Abas secao="jogos" ativa={rota.aba} />
-          {rota.aba === 'desejos' ? (
+          {rota.aba === 'catalogo' ? (
+            <Lazy key="Catalogo" fabrica={() => import('../vistas/jogos/Catalogo').then((m) => m.Catalogo)} props={{ aoAvisar }} />
+          ) : rota.aba === 'colecoes' ? (
+            <Lazy key="Colecoes" fabrica={() => import('../vistas/jogos/Colecoes').then((m) => m.Colecoes)} props={comuns} />
+          ) : rota.aba === 'desejos' ? (
             <Lazy key="Desejos" fabrica={() => import('../vistas/Desejos').then((m) => m.Desejos)} props={{ focoBusca, perfil, ...comuns }} />
           ) : (
             <Lazy

@@ -17,7 +17,15 @@ export interface SistemaResumo {
   [campo: string]: unknown
 }
 
+/** Coleção do snapshot: os jogos vão pelo uuid. */
+export interface ColecaoResumo {
+  id: number
+  nome: string
+  uuids: string[]
+}
+
 export interface Snapshot {
+  colecoes?: ColecaoResumo[]
   jogos?: JogoResumo[]
   musicas?: JogoResumo[]
   desejos?: JogoResumo[]

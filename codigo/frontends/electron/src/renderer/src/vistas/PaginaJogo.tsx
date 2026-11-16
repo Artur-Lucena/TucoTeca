@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { confirmar } from '../componentes/Confirmacao'
+import { ColecoesDoJogo } from '../componentes/jogo/ColecoesDoJogo'
 import { ConquistasJogo } from '../componentes/jogo/ConquistasJogo'
 import { EditarJogo } from '../componentes/jogo/EditarJogo'
 import { HeroJogo } from '../componentes/jogo/HeroJogo'
@@ -127,6 +128,7 @@ export function PaginaJogo({ id, aba, revisao, aoMudou, aoAvisar }: Props) {
         aoFavoritar={() => void favoritar()}
         aoBuscarDados={() => void buscarDados()}
         aoRemover={() => void remover()}
+        extras={<ColecoesDoJogo id={id} aoMudou={aoMudou} aoAvisar={aoAvisar} />}
       />
       <nav class="abas" aria-label="Abas do jogo">
         {abas.map((a) => (

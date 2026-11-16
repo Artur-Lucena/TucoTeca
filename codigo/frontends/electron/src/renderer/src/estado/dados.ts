@@ -60,6 +60,7 @@ const PARTE_DA_CATEGORIA: Record<string, string> = {
   desejos: 'desejos',
   videos: 'videos',
   downloads: 'fila_musicas',
+  colecoes: 'colecoes',
 }
 
 /** Partes do snapshot cujas categorias mudaram; `null` = sem base, recarregar tudo. */

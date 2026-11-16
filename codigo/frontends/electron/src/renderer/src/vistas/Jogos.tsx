@@ -55,6 +55,29 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
   const grade = useRef<HTMLDivElement>(null)
   const [arrastando, setArrastando] = useState(false)
   const [previa, setPrevia] = useState<{ itens: ItemPrevia[]; avisos: string[] } | null>(null)
+  const [lendoLojas, setLendoLojas] = useState<number | null>(null)
+
+  // fim da leitura das lojas instaladas (trabalho na ponte) → prévia de seleção
+  useEffect(() => {
+    if (lendoLojas === null) return
+    return window.tucoteca.assinar('trabalho', (dados) => {
+      const e = dados as { id?: number; motivo?: string; estado?: string; erro?: string; detalhe?: { itens?: ItemPrevia[]; aviso?: string } } | null
+      if (e?.id !== lendoLojas || e.motivo !== 'fim') return
+      setLendoLojas(null)
+      const itens = Array.isArray(e.detalhe?.itens) ? e.detalhe.itens : []
+      if (e.estado === 'ok' && itens.length > 0) setPrevia({ itens, avisos: [] })
+    })
+  }, [lendoLojas])
+
+  const lerLojas = async () => {
+    try {
+      const r = await window.tucoteca.chamar<{ trabalho?: { id?: number } }>('jogos.lojas_prever')
+      const ident = Number(r?.trabalho?.id)
+      if (Number.isInteger(ident)) setLendoLojas(ident)
+    } catch (falha) {
+      aoAvisar?.(textoDeFalha(falha), 'atencao')
+    }
+  }
 
   /** Pastas/exe/ROMs soltos → prévia só-leitura na ponte → modal de seleção. */
   const aoSoltar = async (evento: DragEvent) => {
@@ -206,6 +229,9 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
           }}
         >
           + Importar pasta
+        </button>
+        <button type="button" class="acao" onClick={() => void lerLojas()} disabled={lendoLojas !== null} title="Steam, Epic, GOG, Hydra, Riot e programas do Windows">
+          {lendoLojas !== null ? 'Lendo lojas…' : 'Importar de lojas instaladas'}
         </button>
         <p>{resumoDe(lista.length, total, filtro, ordem, busca)}</p>
       </header>

@@ -12,6 +12,7 @@ import { PlayerRodape } from './componentes/PlayerRodape'
 import { LeitorControle, type EstadoPad } from './controle'
 import { aplicarAparencia, normalizarAparencia } from './estado/aparencia'
 import { reduzirConexao, type EstadoConexao } from './estado/conexao'
+import { normalizarColecoes } from './estado/colecoes'
 import { atualizar, erroCarga, recarregar, snapshot } from './estado/dados'
 import { avisosDoResumo, dispensarAviso, juntarAvisos, textoDeFalha, type Aviso } from './estado/notificacoes'
 import { paletaInicial, reduzirPaleta, type ItemBusca } from './estado/paleta'
@@ -352,7 +353,7 @@ export function App() {
       <AvisoPonte estado={conexao} aoReconectar={reconectar} />
       <div class="app">
         <main class="shell">
-          <BarraLateral modulos={modulos} ativa={atual.secao} jogos={colecao.jogos} jogoAberto={atual.jogo} />
+          <BarraLateral modulos={modulos} ativa={atual.secao} jogos={colecao.jogos} colecoes={normalizarColecoes(colecao.colecoes)} jogoAberto={atual.jogo} />
           <div class="area">
             <Cabecalho
               titulo={titulo}

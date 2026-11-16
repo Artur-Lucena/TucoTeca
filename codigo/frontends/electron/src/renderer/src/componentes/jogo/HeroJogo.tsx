@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact'
 import { metricasDoJogo, type PaginaJogo } from '../../estado/paginaJogo'
 import { iniciais } from '../PosterCard'
 
@@ -10,10 +11,12 @@ interface Props {
   aoFavoritar: () => void
   aoBuscarDados: () => void
   aoRemover: () => void
+  /** Ações extras ao lado das principais (ex.: Coleções). */
+  extras?: ComponentChildren
 }
 
 /** Topo da página do jogo: arte de fundo, logo (ou título), ações e números. */
-export function HeroJogo({ pagina, jogando, buscando, aoJogar, aoFavoritar, aoBuscarDados, aoRemover }: Props) {
+export function HeroJogo({ pagina, jogando, buscando, aoJogar, aoFavoritar, aoBuscarDados, aoRemover, extras }: Props) {
   const { jogo, meta } = pagina
   const hero = window.tucoteca.imagemUrl(meta.hero_url)
   const capa = window.tucoteca.imagemUrl(String(jogo.capa_url ?? ''))
@@ -23,13 +26,15 @@ export function HeroJogo({ pagina, jogando, buscando, aoJogar, aoFavoritar, aoBu
   const fundo = hero !== '' ? hero : capa
   return (
     <header class={`hero-jogo${hero === '' ? ' sem-hero' : ''}`}>
-      {fundo !== '' ? (
-        <img class="hero-fundo" src={fundo} alt="" />
-      ) : (
-        <div class="hero-fundo hero-vazio" aria-hidden="true">
-          {iniciais(titulo)}
-        </div>
-      )}
+      <div class="hero-arte">
+        {fundo !== '' ? (
+          <img class="hero-fundo" src={fundo} alt="" />
+        ) : (
+          <div class="hero-fundo hero-vazio" aria-hidden="true">
+            {iniciais(titulo)}
+          </div>
+        )}
+      </div>
       <div class="hero-conteudo">
         {logo !== '' ? <img class="hero-logo" src={logo} alt={titulo} /> : <h1 class="hero-titulo">{titulo}</h1>}
         {linha !== '' && <p class="hero-linha">{linha}</p>}
@@ -43,6 +48,7 @@ export function HeroJogo({ pagina, jogando, buscando, aoJogar, aoFavoritar, aoBu
           <button type="button" class="acao" onClick={aoBuscarDados} disabled={buscando} title="Steam, SteamGridDB, RetroAchievements…">
             {buscando ? 'Buscando dados…' : pagina.enriquecido ? '↻ Atualizar dados' : 'Buscar dados'}
           </button>
+          {extras}
           <button type="button" class="acao perigo" onClick={aoRemover}>
             Remover
           </button>
