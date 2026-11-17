@@ -78,6 +78,7 @@ em [HISTORICO.md](HISTORICO.md).
 | `config.py` | leitura única das `BIBLIOTECA_*` (paths, listas `;`/`,`, bools 0/1), defaults e singleton `cfg` — consumida por `base.py`, builders e testes |
 | `base.py` | casa, raízes Win/Linux/Mac, tradução de caminhos, lock, texto, logs |
 | `banco/` (pacote) | schema, migrações por colunas, CRUD jogos/músicas/fila, capas — fatiado em `_infra`/`jogos`/`catalogo` com fachada de compatibilidade (`__all__` idêntico) |
+| `banco/meta.py` / `banco/colecoes.py` | metadados dos provedores por `uuid` (com campos travados pela edição manual) e coleções de jogos; ambos viajam no pacote |
 | `banco_desejos.py` | wishlist local, sincronização preservadora e histórico obtido |
 | `scans/` (pacote) / `scans_hydra.py` | lojas/disco/ROMs e adaptador Hydra, preview, dedup e restore — `scans.py` fatiado na F2 do O2 sem mudar contratos |
 | `emuladores/` (pacote) | Azahar/DeSmuME, processos/sessões, presets e overlay de mods — fatiado na F1 do O2 sem mudar contratos |
@@ -96,6 +97,10 @@ em [HISTORICO.md](HISTORICO.md).
 | `rede/fontes.py` | catálogos SteamRip/FitGirl, seleção de hosts e downloads |
 | `rede/metadados.py` / `rede/binarios.py` | Steam de referência e instalação verificada de ferramentas |
 | `rede/letras.py` / `rede/capas_libretro.py` / `rede/sponsorblock.py` | LRCLIB/LRC, capas e segmentos opt-in |
+| `rede/provedores/` | Steam, SteamGridDB, RetroAchievements e HowLongToBeat para a página do jogo: cache com validade, ritmo por host, HTML vira texto, arte em `dados/artes/<uuid>/` |
+| `rede/loja_steam.py` | vitrine, busca e página pública da loja Steam (pt-BR, preço BR) |
+| `rede/cinemeta.py` | catálogo, busca e ficha do Cinemeta (filmes/séries por id IMDb); sem streams |
+| `midia/` (pacote) | Filmes e Séries: tabelas, leitor de nomes de release, indexador só-leitura das pastas escolhidas, casamento com o Cinemeta, legendas SRT→VTT e calendário |
 | `rede/torrents.py` (alias `torrents.py`) | leitura local de `.torrent/.fastresume`, sem depender da rede |
 | `ferramentas.py` | manifesto editável, resolução relativa e comandos de sidecars/zipapps |
 | `qbit.py` | perfil independente e Web API local do qBittorrent |
@@ -115,8 +120,10 @@ em [HISTORICO.md](HISTORICO.md).
 | `frontends/desktop.py` | Abre o app Electron pelo checkout (exige `npm install` + `npm run build`); o usuário final usa o instalador |
 | `frontends/ponte.py` | Ponte NDJSON (stdin/stdout, sem TCP) entre o Electron e os casos de uso; lock com evento `bloqueio`, jobs com progresso |
 | `frontends/ponte_paridade.py` | Métodos da ponte que devolvem ao Electron o que o antigo Qt fazia (emulação, controles, manutenção, letras/EQ/volume, arrastar-soltar); trava de jogo aberto |
+| `frontends/ponte_meta.py` / `ponte_colecoes.py` / `ponte_midia.py` | métodos da ponte da página do jogo e provedores, coleções/loja/lojas instaladas e Filmes e Séries (rede e varreduras como trabalho) |
+| `frontends/ponte_params.py` | validação de parâmetros da ponte com mensagens padronizadas |
 | `frontends/servicos_ui/` (pacote) | Casos de uso do desktop em mixins por domínio, `resumo_sistema`, `busca_global`, registro de módulos |
-| `frontends/electron/` | Desktop: processo principal (protocolos `tucoteca-img`/`tucoteca-media`, menu, ponte), preload isolado e renderer Preact; `electron-builder.config.cjs` gera o instalador |
+| `frontends/electron/` | Desktop: processo principal (protocolos `tucoteca-img`/`tucoteca-media`, menu, ponte), preload isolado e renderer Preact (rotas por hash em `estado/rota.ts`, navegação por controle em `navegacao/foco.ts`, CSS por área em `estilo/`); `electron-builder.config.cjs` gera o instalador |
 | `frontends/app_tui.py` + `tui_*.py` | TUI em mixins por domínio (entry point e `tui.curses` patchável preservados) |
 | `ferramentas/abrir_hub.py` | Prepara ambiente/runtime do checkout ou do app instalado (usado pela ponte) |
 | `ferramentas/build_utils.py` | SHA-256 de arquivo, escritor de `.tar.xz` e download verificado (cache + `.part` atômico) |

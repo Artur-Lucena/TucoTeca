@@ -113,6 +113,28 @@ derivam a capacidade do `tipo` e da presença de `url` (`_capacidades_para`).
 - **URLs** precisam ser `https` válidas e sem credenciais embutidas
   (`online.url_https`).
 
+## Provedores de metadados de jogos
+
+A página do jogo é alimentada por provedores em `bib_nucleo/rede/provedores/`
+(Steam, SteamGridDB, RetroAchievements, HowLongToBeat). Para acrescentar um:
+
+1. Crie `bib_nucleo/rede/provedores/<nome>.py` com
+   `buscar(jogo: dict, meta: dict) -> dict`. Devolva só campos de
+   `banco/meta.py` (`descricao`, `generos`, `desenvolvedora`, ids…) e, para
+   arte, `hero_url`/`logo_url`/`icone_url`/`screenshots_urls`. Use
+   `online.requisitar_json` (já exige rede e valida https),
+   `_apoio.obter` (cache com validade) e `_apoio.respeitar_ritmo` (por host).
+   Texto de loja passa por `_apoio.html_para_texto` — nada de HTML chega ao
+   renderer. Falha vira `ValueError` com mensagem curta.
+2. Registre em `PROVEDORES` (`provedores/__init__.py`): chave, nome,
+   descrição, o que fornece, credenciais (`online._ENVS`) e se nasce ligado.
+   A ordem importa: o primeiro que trouxer um campo vence; campos editados à
+   mão (`travado`) nunca são sobrescritos.
+3. Teste em `test_provedores.py` com `online.requisitar_json` falso.
+
+A tela Configurações › Dados dos jogos lista os provedores sozinha
+(`metadados.provedores`).
+
 ## Ponteiros
 
 - Template copiável: `codigo/bib_nucleo/rede/_modelo.py`.
