@@ -42,7 +42,8 @@ def _pixel(x: float, y: float) -> tuple[int, int, int, int]:
     if _dentro_t(x, y):
         return (*LETRA, 255)
     t = (x + y) / 2
-    return (*(round(a + (b - a) * t) for a, b in zip(TOPO, BASE)), 255)
+    r, g, b = (round(de + (para - de) * t) for de, para in zip(TOPO, BASE))
+    return (r, g, b, 255)
 
 
 def renderizar(lado: int, amostras: int = 4) -> bytes:
