@@ -3,6 +3,24 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.4.6] - 2026-11-17
+
+Arrumação, sem mudar o que o app faz.
+
+### Alterado
+
+- Código da interface reagrupado pelas mesmas seções do app: telas de Jogos,
+  Filmes e Séries e Configurações em pastas próprias; componentes da janela,
+  de cada área e genéricos separados; teclado, controle e foco juntos.
+- Índice da documentação e mapa da arquitetura descrevem a nova organização.
+
+### Removido
+
+- Notas de sessões de trabalho antigas (`docs/arquivo/`), que seguem no
+  histórico do Git.
+- `TucoTeca-Electron.bat`, que duplicava o lançador de desenvolvimento
+  (`frontends/desktop.py`) e o `TucoTeca.bat` da raiz.
+
 ## [1.4.5] - 2026-11-17
 
 O hub em três pilares: Jogos à la Hydra, Filmes e Séries à la Stremio (com os
