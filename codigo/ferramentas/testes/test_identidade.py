@@ -1,4 +1,4 @@
-"""Fase C: uuid, restore, relatório, diagnosticar, procurar, relink."""
+"""Identidade dos jogos: uuid, restore, relatório de importação, diagnosticar, procurar e religar."""
 import sqlite3
 import tempfile
 import zipfile

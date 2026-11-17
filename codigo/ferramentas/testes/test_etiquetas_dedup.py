@@ -1,4 +1,4 @@
-"""Fase D: etiquetas, dedup, splitter, skip-junk, appid, lock e selos."""
+"""Etiquetas, deduplicação, separador de títulos, filtro de lixo, appid, lock e selos."""
 import tempfile
 import urllib.request
 from pathlib import Path

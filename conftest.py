@@ -1,9 +1,7 @@
 """Pytest coleta por AST e usa a mesma sandbox por processo do runner stdlib."""
 from __future__ import annotations
 
-import ast
-import os
-import re
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -14,26 +12,28 @@ import pytest
 
 RAIZ = Path(__file__).resolve().parent
 RUNNER = RAIZ / "codigo/ferramentas/testes/executar.py"
+# varredura, ambiente, timeout e regra de pulo vêm do runner (uma fonte só)
+_spec = importlib.util.spec_from_file_location("executar_runner", RUNNER)
+EXECUTAR = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(EXECUTAR)
 
 
 class CasoIsolado(pytest.Item):
     def runtest(self):
-        parent = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "Temp/opencode"
-        parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="pytest-tucoteca-", dir=parent) as tmp:
-            env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8", PYTHONFAULTHANDLER="1")
+        with tempfile.TemporaryDirectory(prefix="pytest-tucoteca-", dir=EXECUTAR.pasta_dos_casos()) as tmp:
+            env = EXECUTAR.ambiente_caso()
             cmd = [sys.executable, "-B", str(RUNNER), "--caso", self.path.name, self.name, "--raiz", tmp]
             cobertura = self.config.getoption("--cobertura")
             if cobertura:
                 cmd.extend(("--coverage-arquivo", str(Path(tmp) / ".coverage")))
             r = subprocess.run(cmd, env=env, capture_output=True,
-                               text=True, encoding="utf-8", errors="replace", timeout=120)
+                               text=True, encoding="utf-8", errors="replace", timeout=EXECUTAR.TIMEOUT_CASO)
             if cobertura and (Path(tmp) / ".coverage").is_file():
                 pasta = self.config._tucoteca_cobertura
                 shutil.copy2(Path(tmp) / ".coverage", pasta / f".coverage.{self.path.stem}.{self.name}")
         if r.returncode:
             pytest.fail(f"Processo do caso encerrou com código {r.returncode}.\n" + r.stdout + r.stderr, pytrace=False)
-        if re.search(r"\bskip\b|\[pula\]", r.stdout, re.I):
+        if EXECUTAR.PULO.search(r.stdout):
             pytest.skip(r.stdout.strip())
 
     def reportinfo(self):
@@ -44,10 +44,8 @@ class ModuloIsolado(pytest.Module):
     def collect(self):
         # Não importa módulos no processo compartilhado: constantes HOME
         # de um caso não podem contaminar o seguinte nem acessar a coleção real.
-        tree = ast.parse(self.path.read_text(encoding="utf-8"))
-        for no in tree.body:
-            if isinstance(no, ast.FunctionDef) and no.name.startswith("teste_"):
-                yield CasoIsolado.from_parent(self, name=no.name)
+        for nome in EXECUTAR.casos(self.path):
+            yield CasoIsolado.from_parent(self, name=nome)
 
 
 def pytest_pycollect_makemodule(module_path, parent):

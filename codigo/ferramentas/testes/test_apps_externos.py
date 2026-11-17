@@ -1,4 +1,4 @@
-"""2.0 — 9 integrações open source + YouTube: sem rede/processos reais."""
+"""Apps externos (editores de imagem, áudio/EQ, players) e YouTube: sem rede nem processos reais."""
 import os
 import subprocess
 import tempfile

@@ -1,4 +1,4 @@
-"""A2-05 (Assistente 2): compatibilidade — stdlib sem Qt, imports por SO, aliases e banco sem reescrita.
+"""Compatibilidade: núcleo só stdlib, imports por SO, aliases legados e banco sem reescrita.
 
 Usa fixtures e dados sintéticos; nenhum serviço/coleção real é tocado.
 """
@@ -21,7 +21,7 @@ def _fontes_nucleo():
     return sorted((NUCLEO).rglob("*.py")) + [CODIGO / "bib_core.py"]
 
 
-def teste_assistente2_compat_nucleo_sem_qt_obrigatorio():
+def teste_compat_nucleo_sem_qt_obrigatorio():
     for arq in _fontes_nucleo():
         texto = arq.read_text(encoding="utf-8")
         afirmar("PySide6" not in texto and "PyQt" not in texto, arq)
@@ -34,7 +34,7 @@ def teste_assistente2_compat_nucleo_sem_qt_obrigatorio():
     afirmar("PySide6" not in sys.modules, "núcleo puxou Qt")
 
 
-def teste_assistente2_compat_imports_de_so_condicionais():
+def teste_compat_imports_de_so_condicionais():
     alvos = ["controles.py", "base.py", "player.py", "volume.py",
              "scans/__init__.py", "scans/lojas.py", "scans/disco.py",
              "scans/roms.py", "scans/analise.py", "scans/metadados.py",
@@ -64,7 +64,7 @@ def teste_assistente2_compat_imports_de_so_condicionais():
     afirmar(hasattr(PL, "__all__") and hasattr(VO, "__all__"))
 
 
-def teste_assistente2_compat_aliases_legados():
+def teste_compat_aliases_legados():
     from bib_nucleo.rede import repacks as RP
     with patch.dict(os.environ, {"BIBLIOTECA_JOGOS_DIR": str(Path(tempfile.mkdtemp()) / "novo"),
                                  "BIBLIOTECA_PIRATAS": str(Path(tempfile.mkdtemp()) / "legado")}):
@@ -92,7 +92,7 @@ def teste_assistente2_compat_aliases_legados():
     afirmar(bib_nucleo.fontes is direto)
 
 
-def teste_assistente2_compat_banco_migra_sem_reescrever():
+def teste_compat_banco_migra_sem_reescrever():
     tmp = Path(tempfile.mkdtemp(prefix="a2-compat-db-"))
     leg = tmp / "leg.db"
     con = sqlite3.connect(str(leg))
