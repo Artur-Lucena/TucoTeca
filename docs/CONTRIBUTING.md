@@ -27,7 +27,7 @@ python3 codigo/ferramentas/testes/executar.py --modulo test_linux_portabilidade
 ```
 
 `--selftest` usa tela simulada e também roda no Windows sem curses. A TUI
-interativa abre com `./BibliotecaHub.sh` (ou `BibliotecaHubMac.command`).
+interativa abre com `./tucoteca.sh`.
 
 ## Pontos de entrada para mudanças
 
@@ -84,7 +84,7 @@ Python 3.10, Ubuntu e macOS reais. Rode `validar.py` antes de commitar.
 - Casos são funções `teste_*` em `codigo/ferramentas/testes/test_*.py`; a
   suíte cria a sandbox sozinha, inclusive com `--caso`. O pytest coleta pelo
   mesmo runner (`--cobertura` mede os casos; saída em `.provas/cobertura/`).
-- Lint: `ruff check codigo conftest.py` limpo; as exceções (`E501`, `E402` e
+- Lint: `ruff check codigo` limpo; as exceções (`E501`, `E402` e
   `F403` nas fachadas de pacote) estão justificadas no `pyproject.toml`. Um
   `--fix` automático não é neutro (`F401`, `F841`, `I001`): rode a suíte depois.
 - Simule rede/subprocessos e use arquivos pequenos em fixtures. Executáveis

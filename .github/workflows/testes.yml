@@ -45,7 +45,7 @@ jobs:
       - name: Ferramentas
         run: python -m pip install pytest coverage ruff
       - name: Lint
-        run: ruff check codigo conftest.py
+        run: ruff check codigo
       - name: Suíte com cobertura dos subprocessos
         run: python -B -m pytest --cobertura
       - name: Relatório de cobertura

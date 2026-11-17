@@ -23,9 +23,9 @@ SHA = "a" * 40
 def _repo_falso(versao="1.2.0", pyproject="1.2.0", changelog=True) -> Path:
     repo = Path(tempfile.mkdtemp(prefix="suite-release-")) / "repo"
     arquivos = {
-        "VERSION": versao + "\n",
+        "codigo/VERSION": versao + "\n",
         "pyproject.toml": f'[project]\nname = "tucoteca"\nversion = "{pyproject}"\n',
-        "CHANGELOG.md": (f"# Changelog\n\n## [{versao}] - 2026-11-11\n\n### Adicionado\n\n- Instalador.\n\n"
+        "docs/CHANGELOG.md": (f"# Changelog\n\n## [{versao}] - 2026-11-11\n\n### Adicionado\n\n- Instalador.\n\n"
                          "## [1.0.0] - 2026-01-01\n\n- antigo\n") if changelog else "# Changelog\n",
         "README.md": "TucoTeca", "LICENSE": "MIT",
         # está na lista explícita E sai na varredura de docs/ (regressão de duplicata)
@@ -43,11 +43,11 @@ def _dist_falso(repo: Path, versao="1.2.0", runtime=True, extra: str | None = No
     dist = repo / "codigo/frontends/electron/dist"
     recursos = dist / "win-unpacked/resources/tucoteca"
     for nome in REL.ESSENCIAIS_APP:
-        if nome == "VERSION":
+        if nome == "codigo/VERSION":
             continue
         (recursos / nome).parent.mkdir(parents=True, exist_ok=True)
         (recursos / nome).write_text("#", encoding="utf-8")
-    (recursos / "VERSION").write_text(versao + "\n", encoding="utf-8")
+    (recursos / "codigo/VERSION").write_text(versao + "\n", encoding="utf-8")
     if runtime:
         py = recursos / "programa/windows-x64/python"
         py.mkdir(parents=True)
@@ -176,7 +176,7 @@ def teste_runtime_python_confere_hash_e_troca_pasta():
 def teste_versoes_do_repositorio_coerentes():
     """O próprio checkout precisa passar no gate de versão do preparador."""
     versao = REL.ler_versao(REL.REPO)
-    afirmar(versao == (REL.REPO / "VERSION").read_text(encoding="utf-8").strip(), versao)
+    afirmar(versao == (REL.REPO / "codigo/VERSION").read_text(encoding="utf-8").strip(), versao)
 
 
 def teste_icone_ico_valido_e_reproduzivel():
@@ -212,7 +212,7 @@ def teste_fontes_incluem_electron_sem_artefatos():
 
 def teste_user_agent_segue_version():
     from bib_nucleo import versao
-    esperado = (REL.REPO / "VERSION").read_text(encoding="utf-8").strip()
+    esperado = (REL.REPO / "codigo/VERSION").read_text(encoding="utf-8").strip()
     afirmar(versao.versao_app() == esperado, versao.versao_app())
     afirmar(versao.user_agent().startswith(f"TucoTeca/{esperado} (+https://github.com/"), versao.user_agent())
     afirmar(versao.user_agent("x").endswith("; x)"), versao.user_agent("x"))

@@ -17,7 +17,7 @@ labels: bug
 ```powershell
 py -3.14 codigo/ferramentas/diagnosticar.py --json
 ```
-- Versão (veja `VERSION`):
+- Versão (veja `codigo/VERSION` ou Sobre o TucoTeca):
 - SO:
 - Interface: app instalado / checkout (Electron) / TUI:
 

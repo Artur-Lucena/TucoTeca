@@ -1,4 +1,8 @@
-"""Pytest coleta por AST e usa a mesma sandbox por processo do runner stdlib."""
+"""Pytest coleta por AST e usa a mesma sandbox por processo do runner stdlib.
+
+Fica junto dos testes: é o conftest inicial do `testpaths` do pyproject.toml,
+então `pytest` (e `--cobertura`) continua funcionando a partir da raiz.
+"""
 from __future__ import annotations
 
 import importlib.util
@@ -10,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-RAIZ = Path(__file__).resolve().parent
-RUNNER = RAIZ / "codigo/ferramentas/testes/executar.py"
+RUNNER = Path(__file__).resolve().parent / "executar.py"
+RAIZ = RUNNER.parents[3]
 # varredura, ambiente, timeout e regra de pulo vêm do runner (uma fonte só)
 _spec = importlib.util.spec_from_file_location("executar_runner", RUNNER)
 EXECUTAR = importlib.util.module_from_spec(_spec)

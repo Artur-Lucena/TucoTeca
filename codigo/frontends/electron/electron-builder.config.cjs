@@ -2,7 +2,7 @@
 //
 // O app instalado leva, em resources/tucoteca/, só o que a ponte precisa:
 // núcleo Python (bib_core + bib_nucleo), ponte.py + servicos_ui, abrir_hub,
-// VERSION, LICENSE e os docs abertos pelo menu Ajuda. Coleção, dados e
+// codigo/VERSION, LICENSE e os docs abertos pelo menu Ajuda. Coleção, dados e
 // provas nunca entram (a coleção do instalado fica em Documentos\TucoTeca).
 //
 // Python: o runtime embutido vem de programa/windows-x64/python
@@ -13,7 +13,7 @@ const { existsSync, readFileSync } = require('node:fs')
 const { join } = require('node:path')
 
 const REPO = join(__dirname, '..', '..', '..')
-const versao = readFileSync(join(REPO, 'VERSION'), 'utf8').trim()
+const versao = readFileSync(join(REPO, 'codigo', 'VERSION'), 'utf8').trim()
 const runtime = join(REPO, 'programa', 'windows-x64', 'python')
 const temRuntime = existsSync(join(runtime, 'python.exe'))
 const semRuntime = process.env.TUCOTECA_SEM_RUNTIME === '1'
@@ -32,6 +32,7 @@ const extraResources = [
     to: 'tucoteca/codigo',
     filter: [
       'bib_core.py',
+      'VERSION',
       'bib_nucleo/**/*.py',
       'frontends/__init__.py',
       'frontends/ponte*.py',
@@ -42,7 +43,6 @@ const extraResources = [
     ],
   },
   { from: join(REPO, 'docs'), to: 'tucoteca/docs', filter: ['LEGAL.md', 'DESKTOP_ELECTRON.md', 'SECURITY.md'] },
-  { from: join(REPO, 'VERSION'), to: 'tucoteca/VERSION' },
   { from: join(REPO, 'LICENSE'), to: 'tucoteca/LICENSE' },
 ]
 if (temRuntime) {

@@ -30,7 +30,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(CODIGO))
 sys.path.insert(0, str(FRONTENDS))
 
-# ---- contrato comum com o conftest.py (pytest coleta os mesmos casos) ----
+# ---- contrato comum com conftest.py (ao lado; o pytest coleta os mesmos casos) ----
 TIMEOUT_CASO = 120
 PULO = re.compile(r"\bskip\b|\[pula\]", re.I)
 

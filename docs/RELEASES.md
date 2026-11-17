@@ -8,13 +8,13 @@ etapa toca a coleção pessoal: o app instalado usa `Documentos\TucoTeca`
 A entrega Windows é um instalador NSIS (`electron-builder`), por usuário e
 sem admin. Ele leva o app Electron e, em `resources/tucoteca/`, o núcleo
 Python (`bib_core`, `bib_nucleo`), a ponte (`ponte.py`, `servicos_ui`),
-`abrir_hub.py`, `VERSION`, `LICENSE`, os docs do menu Ajuda e o Python
-embutido. A TUI (`BibliotecaHub.sh`) segue para Linux/macOS pelos fontes.
+`abrir_hub.py`, `codigo/VERSION`, `LICENSE`, os docs do menu Ajuda e o Python
+embutido. A TUI (`tucoteca.sh`) segue para Linux/macOS pelos fontes.
 
 ## 1. Finalizar e congelar
 
-- Atualize `VERSION`, a versão em `pyproject.toml` e em
-  `codigo/frontends/electron/package.json`, e a seção do `CHANGELOG.md` (o
+- Atualize `codigo/VERSION`, a versão em `pyproject.toml` e em
+  `codigo/frontends/electron/package.json`, e a seção do `docs/CHANGELOG.md` (o
   preparador recusa versões divergentes ou sem seção).
 - Não escreva o SHA do próprio commit em um arquivo desse commit.
 - Rode os gates e faça commit; o checkout precisa ficar limpo.
@@ -23,7 +23,7 @@ embutido. A TUI (`BibliotecaHub.sh`) segue para Linux/macOS pelos fontes.
 py -3.14 -B codigo/ferramentas/testes/executar.py
 npm --prefix codigo/frontends/electron run typecheck
 npm --prefix codigo/frontends/electron test
-ruff check codigo conftest.py
+ruff check codigo
 $sha = git rev-parse HEAD
 ```
 

@@ -19,7 +19,7 @@ e não é apagada ao atualizar ou desinstalar.
 ### Linux e macOS (TUI no terminal)
 1. Tenha Python 3.10+.
 2. Baixe os fontes (`tucoteca-<versão>-fontes.zip`) e extraia.
-3. Execute `./BibliotecaHub.sh` (Linux) ou `BibliotecaHubMac.command` (macOS).
+3. No terminal, execute `./tucoteca.sh` (no macOS, na 1ª vez: `chmod +x tucoteca.sh`).
 
 ## Executar pelos fontes (desenvolvimento)
 ```
@@ -36,7 +36,7 @@ Requer Python 3.14 (`py -3.14`) e Node 24.
 - [Colaboração](docs/CONTRIBUTING.md), [Releases](docs/RELEASES.md),
   [Roadmap](docs/ROADMAP.md), [Segurança](docs/SECURITY.md) e
   [Aviso legal](docs/LEGAL.md).
-- Mudanças por versão: [CHANGELOG.md](CHANGELOG.md).
+- Mudanças por versão: [CHANGELOG](docs/CHANGELOG.md).
 
 ## Licença
 MIT. Veja LICENSE.

@@ -78,7 +78,7 @@ def passo_ruff():
         sujo = [ln for ln in (r.stdout or "").splitlines() if ln.strip()]
         return bool(ok_c) and not sujo, {"modo": "substituto",
                                          "compile": bool(ok_c), "trailing": sujo}
-    ok, tail, seg, cmd = _rodar("ruff", ruff + ["check", "codigo", "conftest.py",
+    ok, tail, seg, cmd = _rodar("ruff", ruff + ["check", "codigo",
                                                 "--cache-dir", str(REPO / ".provas" / "ruff-cache-local")])
     return ok, {"modo": "ruff", "cmd": cmd,
                 "achados": [ln for ln in tail if "Found" in ln or ": " in ln][:8]}

@@ -33,9 +33,10 @@ pelos fontes. O Qt Quick e o modo clássico Tk foram removidos.
 Tucoteca/
 ├── README.md                         entrada funcional e técnica
 ├── LICENSE                           licença do código do Hub
-├── TucoTeca.bat                       entrada Windows; BibliotecaHub.bat é alias
-├── BibliotecaHub.sh/Mac.command       TUI no Linux/macOS (pelos fontes)
-├── CHANGELOG.md / VERSION          notas por versão e versão atual
+├── AGENTS.md                         regras de trabalho (pessoas e agentes)
+├── pyproject.toml                    projeto Python, Ruff, pytest e mypy
+├── TucoTeca.bat                      Windows pelos fontes (o usuário final usa o instalador)
+├── tucoteca.sh                       TUI no Linux/macOS (pelos fontes)
 ├── .github/workflows/                matriz de testes (manual)
 ├── docs/
 │   ├── ARQUITETURA.md                 este mapa
@@ -46,8 +47,10 @@ Tucoteca/
 │   ├── ROADMAP.md                     estado e próximos passos
 │   ├── SECURITY.md                    contato e superfície de risco
 │   ├── LEGAL.md                       aviso legal
+│   ├── CHANGELOG.md                   notas por versão
 │   └── exemplos/provedor_modelo.py    template de provedor de rede
 ├── codigo/
+│   ├── VERSION                       versão atual (também no app instalado)
 │   ├── bib_core.py                   fachada de compatibilidade
 │   ├── bib_nucleo/                   núcleo e domínios pessoais
 │   │   └── rede/                     adaptadores com BIBLIOTECA_REDE
@@ -111,7 +114,7 @@ não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 | `sessoes_manuais.py` / `estatisticas.py` | reconciliação idempotente e histórico de sessões novas |
 | `preferencias_pessoais.py` | Tuco/Isa, favoritos/filtros, atalhos e recursos opt-in |
 | `everything.py` | `es.exe` BYOB, limitado às raízes escolhidas; scanner como fallback |
-| `versao.py` | versão (`VERSION`) e User-Agent das requisições, num lugar só |
+| `versao.py` | versão (`codigo/VERSION`) e User-Agent das requisições, num lugar só |
 
 ### Frontends e ferramentas
 
@@ -279,7 +282,7 @@ Casos cobrem persistência, identidade, scanners, overlays, rollback,
 downloads simulados, ponte, TUI, áudio e volume;
 o renderer/main do Electron têm testes vitest próprios. `executar.py` cria sandbox,
 descobre `teste_*` e informa os pulos e falhas por ambiente.
-`conftest.py` coleta por AST e executa os mesmos casos em processos separados;
+`testes/conftest.py` coleta por AST e executa os mesmos casos em processos separados;
 `pytest --cobertura` agrega cobertura dos subprocessos. Provas nativas e
 smokes remotos são separados dos casos herméticos e não usam jogos reais.
 

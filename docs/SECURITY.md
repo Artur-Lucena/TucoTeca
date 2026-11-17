@@ -10,7 +10,7 @@ Não abra issue pública. Escreva para o mantenedor (perfil do GitHub
 
 - o que acontece e o impacto;
 - passos para reproduzir;
-- versão (`VERSION`) e SO.
+- versão (`codigo/VERSION` ou Sobre o TucoTeca) e SO.
 
 ## Escopo e superfície de risco
 

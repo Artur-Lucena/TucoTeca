@@ -109,7 +109,7 @@ function falhar(mensagem: string, codigo: number): void {
 
 function lerVersao(): string {
   try {
-    const texto = readFileSync(join(RAIZ, 'VERSION'), 'utf8').trim()
+    const texto = readFileSync(join(RAIZ, 'codigo', 'VERSION'), 'utf8').trim()
     return texto === '' ? 'desconhecida' : texto
   } catch {
     return 'desconhecida'
