@@ -1,4 +1,4 @@
-import type { ColecaoResumo, JogoResumo } from '../derivacoes'
+import type { ColecaoResumo, JogoResumo } from './derivacoes'
 
 /** Lista do snapshot → coleções válidas (sem nome ou id ruins). */
 export function normalizarColecoes(bruto: unknown): ColecaoResumo[] {

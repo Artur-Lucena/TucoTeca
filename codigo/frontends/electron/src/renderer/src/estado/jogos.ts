@@ -1,4 +1,4 @@
-import type { JogoResumo } from '../derivacoes'
+import type { JogoResumo } from './derivacoes'
 
 /** Filtros da tela Jogos (mesmos nomes do Qt; `pendencias` usa a saúde da coleção). */
 export const FILTROS_JOGOS = [

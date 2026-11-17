@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
-import { confirmar } from '../../componentes/Confirmacao'
+import { confirmar } from '../../componentes/ui/Confirmacao'
 import { EmptyState, Modal } from '../../componentes/ui'
 import { filtrarTitulos, type FiltroTipo, type TituloResumo } from '../../estado/midia'
 import { textoDeFalha } from '../../estado/notificacoes'

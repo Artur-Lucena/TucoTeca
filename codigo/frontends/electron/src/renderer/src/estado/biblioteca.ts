@@ -1,4 +1,4 @@
-import type { JogoResumo } from '../derivacoes'
+import type { JogoResumo } from './derivacoes'
 import { semAcento } from './jogos'
 
 /** Recorte da biblioteca lateral (à la Hydra): todos, favoritos ou jogados recentemente. */

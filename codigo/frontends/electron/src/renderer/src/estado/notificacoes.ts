@@ -1,4 +1,4 @@
-import type { SistemaResumo } from '../derivacoes'
+import type { SistemaResumo } from './derivacoes'
 
 export interface Aviso {
   id: string

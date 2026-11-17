@@ -4,7 +4,7 @@ import { snapshot } from '../estado/dados'
 import { EmptyState } from '../componentes/ui'
 import { textoDeFalha } from '../estado/notificacoes'
 import { listaTrabalhos } from '../estado/trabalhos'
-import { confirmar } from '../componentes/Confirmacao'
+import { confirmar } from '../componentes/ui/Confirmacao'
 
 interface Props {
   aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void

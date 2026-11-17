@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'preact/hooks'
-import { Cartao } from '../componentes/Cartao'
+import { Cartao } from '../componentes/jogo/Cartao'
 import { reproduzindo } from '../estado/midia'
 import { ListaContinuar, type ItemContinuar } from './midia/AbasMidia'
 import { EmptyState, Metric } from '../componentes/ui'
-import { PainelSessoes } from '../componentes/PainelSessoes'
-import { continuarJogando, type Snapshot } from '../derivacoes'
+import { PainelSessoes } from '../componentes/jogo/PainelSessoes'
+import { continuarJogando, type Snapshot } from '../estado/derivacoes'
 
 interface Props {
   snapshot: Snapshot

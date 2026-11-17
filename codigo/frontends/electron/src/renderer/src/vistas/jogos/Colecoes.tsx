@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks'
-import { confirmar } from '../../componentes/Confirmacao'
-import { PosterCard } from '../../componentes/PosterCard'
+import { confirmar } from '../../componentes/ui/Confirmacao'
+import { PosterCard } from '../../componentes/jogo/PosterCard'
 import { EmptyState } from '../../componentes/ui'
 import { jogosDaColecao, normalizarColecoes, validarNomeColecao } from '../../estado/colecoes'
 import { snapshot } from '../../estado/dados'

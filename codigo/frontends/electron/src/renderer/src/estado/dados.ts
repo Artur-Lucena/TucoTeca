@@ -1,5 +1,5 @@
 import { signal } from '@preact/signals'
-import type { Snapshot } from '../derivacoes'
+import type { Snapshot } from './derivacoes'
 
 export interface SaudeColecao {
   total?: number
