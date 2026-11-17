@@ -94,7 +94,7 @@ valendo como apelidos de rota, inclusive nos atalhos pessoais.
 - **Aparência**: tema escuro/claro (`:root[data-tema]`, mesmos tokens de cor),
   densidade compacta/confortável/Big Picture e tamanho do texto (80–150%) viram
   o zoom da janela (`webFrame.setZoomFactor`). Aplicada ao abrir e ao salvar.
-- **Confirmações**: `confirmar()` (diálogo do app, `componentes/Confirmacao.tsx`)
+- **Confirmações**: `confirmar()` (diálogo do app, `componentes/ui/Confirmacao.tsx`)
   — nunca `window.confirm`. Esc/Enter são tratados na captura para não fechar a
   gaveta do detalhe junto.
 - **Carregamento por seção**: `Lazy` com `key` por seção e componente nomeado

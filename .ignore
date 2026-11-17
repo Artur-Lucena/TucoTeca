@@ -4,3 +4,6 @@
 /dist/
 /.provas/
 /areas/
+/codigo/frontends/electron/node_modules/
+/codigo/frontends/electron/out/
+/codigo/frontends/electron/dist/

@@ -7,11 +7,13 @@ se localizar; o fluxo de colaboração está em `CONTRIBUTING.md`.
 
 - [ARQUITETURA.md](ARQUITETURA.md) — mapa de pastas, responsabilidade por
   módulo, modelo de dados, fluxos, concorrência e variáveis de ambiente.
-- [DESKTOP_ELECTRON.md](DESKTOP_ELECTRON.md) — desktop Electron: ponte NDJSON,
-  módulos, segurança, provas e app instalado.
-- [INTEGRACOES.md](INTEGRACOES.md) — como adicionar uma integração ao hub
-  (contrato, template e testes).
-- [ROADMAP.md](ROADMAP.md) — o que falta até a próxima release.
+- [DESKTOP_ELECTRON.md](DESKTOP_ELECTRON.md) — desktop Electron: seções, abas
+  e páginas, ponte NDJSON, controle/Big Picture, segurança, provas e app
+  instalado.
+- [INTEGRACOES.md](INTEGRACOES.md) — como adicionar uma integração ou um
+  provedor de dados de jogo (contrato, template e testes).
+- [ROADMAP.md](ROADMAP.md) — estado atual, o que falta validar e o que vem
+  depois.
 
 ## Colaboração, releases e legal
 
@@ -23,6 +25,6 @@ se localizar; o fluxo de colaboração está em `CONTRIBUTING.md`.
 ## Histórico
 
 - [HISTORICO.md](HISTORICO.md) — auditorias, revisões técnicas e reconciliação
-  do Git consolidadas (registro, não instrução vigente).
-- [arquivo/](arquivo/) — material de sessões de trabalho antigas (QoL 1.5,
-  planos das fatias Electron e organização local de `dist/`).
+  do Git consolidadas (registro, não instrução vigente). O material das
+  sessões antigas (QoL 1.5, planos das fatias Electron) segue no histórico do
+  Git, antes da 1.4.5.
