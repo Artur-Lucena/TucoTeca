@@ -35,13 +35,17 @@ Tucoteca/
 ├── LICENSE                           licença do código do Hub
 ├── TucoTeca.bat                       entrada Windows; BibliotecaHub.bat é alias
 ├── BibliotecaHub.sh/Mac.command       TUI no Linux/macOS (pelos fontes)
-├── .github/workflows/                matriz de testes
+├── CHANGELOG.md / VERSION          notas por versão e versão atual
+├── .github/workflows/                matriz de testes (manual)
 ├── docs/
 │   ├── ARQUITETURA.md                 este mapa
-│   ├── CONTRIBUTING.md                ambiente, testes e colaboração
-│   ├── SECURITY.md                    canal de contato de segurança
+│   ├── DESKTOP_ELECTRON.md            telas, ponte, controle, segurança, provas
+│   ├── INTEGRACOES.md                 como acrescentar integração/provedor
+│   ├── CONTRIBUTING.md                ambiente, testes e convenções
 │   ├── RELEASES.md                    instalador, anexos e publicação
-│   └── HISTORICO.md                   auditorias e revisões antigas
+│   ├── ROADMAP.md                     estado e próximos passos
+│   ├── SECURITY.md                    contato e superfície de risco
+│   └── LEGAL.md                       aviso legal
 ├── codigo/
 │   ├── bib_core.py                   fachada de compatibilidade
 │   ├── bib_nucleo/                   núcleo e domínios pessoais
@@ -52,7 +56,6 @@ Tucoteca/
 │   │   ├── preparar_release.py        anexos da release (instalador + fontes)
 │   │   └── testes/                   casos e runner em sandbox
 │   └── historico/                    arquivo local, ignorado
-├── midia/fontes-capas/                opcional: placeholders gerados localmente
 ├── programa/                         runtime instalado localmente, ignorado
 ├── dados/                            coleção local, ignorada
 └── dist/                             gerados, ignorados
@@ -62,14 +65,12 @@ Tucoteca/
 árvores intermediárias. Não são fontes, não entram na entrega de engenharia.
 As pastas físicas locais podem conter material de sessões antigas; o comando
 de entrega seleciona somente fontes/documentos por allowlist.
-Um clone limpo não precisa conter `midia/`, `programa/`, `dados/` ou `dist/`.
+Um clone limpo não precisa conter `programa/`, `dados/` ou `dist/`.
 A pasta do projeto pode ser a **única** do PC: com `dados/` e `programa/`
 na raiz (ambos ignorados pelo Git), `resolve_home()` em `base.py` prefere a
 própria árvore à instalação canônica — bundles e clone dev compartilham a
 mesma regra. Links do Wine (`dosdevices/*`, junctions de pastas do usuário)
 não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
-A reconciliação do histórico remoto com as revisões locais está registrada
-em [HISTORICO.md](HISTORICO.md).
 
 ## Responsabilidade por módulo
 
@@ -127,14 +128,14 @@ em [HISTORICO.md](HISTORICO.md).
 | `frontends/electron/src/renderer/src/` | `vistas/` (uma pasta por seção com mais de uma tela: `jogos/`, `midia/`, `configuracoes/`), `componentes/` (`casca/` da janela, `jogo/`, `midia/`, `musica/`, `config/`, `ui/` genérica), `estado/` (lógica pura testada, rotas em `rota.ts`), `navegacao/` (teclado, controle e foco espacial) e `estilo/` (CSS por área) |
 | `frontends/app_tui.py` + `tui_*.py` | TUI em mixins por domínio (entry point e `tui.curses` patchável preservados) |
 | `ferramentas/abrir_hub.py` | Prepara ambiente/runtime do checkout ou do app instalado (usado pela ponte) |
-| `ferramentas/build_utils.py` | SHA-256 de arquivo, escritor de `.tar.xz` e download verificado (cache + `.part` atômico) |
+| `ferramentas/build_utils.py` | SHA-256 de arquivo e download verificado (cache + `.part` atômico) |
 | `ferramentas/diagnosticar.py` | sintaxe/exports/dependências/pastas/SQLite somente-leitura |
 | `ferramentas/empacotar_fontes.py` | entrega da árvore atual (Python + Electron) + SHA-256, sem coleção |
 | `ferramentas/preparar_runtime_python.py` | Python embeddable oficial, SHA-256 fixado, para `programa/windows-x64/python` |
 | `ferramentas/gerar_icone.py` | ícone do app (`resources/icon.ico`), reproduzível, só stdlib |
 | `ferramentas/preparar_release.py` | confere git/versões/instalador/runtime e gera fontes, notas, `release.json` e `SHA256SUMS` |
 | `ferramentas/semear_prova_electron.py` | coleção sintética para selftest do app (nunca a coleção real) |
-| `ferramentas/provar_qbit_runtime.py` / `provar_rede_runtime.py` | provas nativas opcionais (qBittorrent e rede), fora da suíte hermética |
+| `ferramentas/provar_runtime.py` | provas nativas opcionais (`qbit`, `rede`), fora da suíte hermética |
 | `ferramentas/validar.py` | gates locais: Ruff, mypy, suíte, cobertura, Electron e Git |
 
 ## Estado e modelo de dados
@@ -262,8 +263,9 @@ duplicatas e escapes, com limites de tamanho/arquivos e backup pré-sobrescrita.
 | `BIBLIOTECA_QBIT_API` | URL explícita da API em loopback |
 | `BIBLIOTECA_QUICKJS/DENO` | runtime JavaScript explícito para yt-dlp |
 | `HYDRA_DB_PATH` | origem Hydra explícita |
-| `TUCOTECA_RAIZ` / `TUCOTECA_PYTHON` / `TUCOTECA_USERDATA` | app Electron: fontes Python, intérprete e userData (ver DESKTOP_ELECTRON.md) |
 
+As variáveis `TUCOTECA_*` do app Electron estão em
+[DESKTOP_ELECTRON](DESKTOP_ELECTRON.md#desenvolvimento-e-verificação).
 Defaults de caminhos refletem a máquina original. Ao desenvolver, use
 overrides de ambiente. O app instalado usa `Documentos\TucoTeca` como casa;
 o checkout usa a própria raiz e reconhece a coleção legada

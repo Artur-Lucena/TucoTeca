@@ -27,9 +27,16 @@ npm --prefix codigo/frontends/electron ci
 npm --prefix codigo/frontends/electron run build
 TucoTeca.bat
 ```
-Requer Python 3.14 (`py -3.14`) e Node 24. Detalhes em
-[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md); release em
-[docs/RELEASES.md](docs/RELEASES.md).
+Requer Python 3.14 (`py -3.14`) e Node 24.
+
+## Documentação
+- [Arquitetura](docs/ARQUITETURA.md) — mapa de pastas, módulos, dados e fluxos.
+- [Desktop Electron](docs/DESKTOP_ELECTRON.md) — telas, ponte, controle e segurança.
+- [Integrações](docs/INTEGRACOES.md) — como acrescentar um provedor.
+- [Colaboração](docs/CONTRIBUTING.md), [Releases](docs/RELEASES.md),
+  [Roadmap](docs/ROADMAP.md), [Segurança](docs/SECURITY.md) e
+  [Aviso legal](docs/LEGAL.md).
+- Mudanças por versão: [CHANGELOG.md](CHANGELOG.md).
 
 ## Licença
 MIT. Veja LICENSE.

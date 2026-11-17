@@ -26,7 +26,7 @@ Provadas só por simulação, respostas falsas ou em ambiente de desenvolvimento
 - Provedores e catálogos de verdade: Steam, SteamGridDB, RetroAchievements,
   HowLongToBeat (API não oficial) e Cinemeta.
 - Reprodução real de vídeo no player interno (retomada e legendas na tela).
-- Controle físico (mapeamento padrão Xbox/PlayStation; antes, XInput do Qt),
+- Controle físico (mapeamento padrão Xbox/PlayStation),
   UAC real ("Abrir como administrador"), equalização com FFmpeg instalado e
   atualização real de emulador.
 - Instalar e abrir o instalador numa máquina Windows limpa.

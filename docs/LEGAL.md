@@ -42,9 +42,8 @@ Algumas integrações acessam serviços que têm termos próprios. Ao usá-las, 
 
 ## Conteúdo e direitos autorais
 
-- A árvore atual **não contém** capas comerciais versionadas. A pasta opcional
-  `midia/fontes-capas/` pode ser criada localmente com placeholders neutros por
-  `codigo/ferramentas/gerar_placeholders.py`; ela não é necessária ao runtime.
+- A árvore atual **não contém** capas comerciais versionadas; as provas usam
+  capas sintéticas geradas na hora.
 - O histórico remoto antigo continha capas comerciais e foi preservado durante
   a reconciliação. Sua remoção da árvore atual não elimina os blobs dos commits
   antigos; não foi feita nova reescrita ou force-push. O repositório é privado.
@@ -58,8 +57,7 @@ Algumas integrações acessam serviços que têm termos próprios. Ao usá-las, 
 ## Escopo de uso
 
 - O projeto é **pessoal**, para Tuco/Isa, sem release pública automatizada.
-- Os bundles gerados contêm componentes de código aberto; suas licenças
-  acompanham cada componente (ver `manifesto-runtime.json`, `FONTE.txt` e
-  `LICENSE-TucoTeca.txt` dentro do pacote).
+- O instalador contém componentes de código aberto (Electron, Python
+  embutido); suas licenças acompanham cada componente.
 - Este aviso pode ser atualizado a qualquer momento; a versão vigente é a do
   repositório.

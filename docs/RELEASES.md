@@ -13,8 +13,9 @@ embutido. A TUI (`BibliotecaHub.sh`) segue para Linux/macOS pelos fontes.
 
 ## 1. Finalizar e congelar
 
-- Atualize `VERSION`, a versão em `pyproject.toml` e a seção do
-  `CHANGELOG.md` (o preparador recusa versões divergentes ou sem seção).
+- Atualize `VERSION`, a versão em `pyproject.toml` e em
+  `codigo/frontends/electron/package.json`, e a seção do `CHANGELOG.md` (o
+  preparador recusa versões divergentes ou sem seção).
 - Não escreva o SHA do próprio commit em um arquivo desse commit.
 - Rode os gates e faça commit; o checkout precisa ficar limpo.
 
