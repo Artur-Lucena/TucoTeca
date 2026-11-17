@@ -1,6 +1,6 @@
 import { ir } from '../../estado/rota'
 
-export interface CartaoTitulo {
+interface CartaoTitulo {
   imdb_id: string
   tipo: 'movie' | 'series'
   nome: string

@@ -80,7 +80,7 @@ export function proximoParaAssistir(temporadas: Temporada[] | undefined): Episod
   return noDisco.find((e) => !(e.progresso?.assistido ?? false)) ?? noDisco[0] ?? null
 }
 
-export interface GrupoCalendario<T> {
+interface GrupoCalendario<T> {
   rotulo: string
   itens: T[]
 }

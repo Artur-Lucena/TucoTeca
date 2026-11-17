@@ -1,7 +1,7 @@
 import { moeda, semAcento } from './formato'
 
 /** Item de desejo vindo do snapshot (`listar_desejos`); campos extras passam. */
-export interface DesejoResumo {
+interface DesejoResumo {
   id?: number
   appid?: string | number
   titulo?: string

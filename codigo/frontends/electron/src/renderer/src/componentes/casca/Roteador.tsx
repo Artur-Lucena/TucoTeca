@@ -7,7 +7,7 @@ import { Lazy } from './Lazy'
 import { EmptyState } from '../ui'
 import { type AoAvisar } from '../../estado/notificacoes'
 
-export interface ContextoVistas {
+interface ContextoVistas {
   snapshot: Snapshot
   focoBusca: number
   /** Contador de mudanças da coleção (a página do jogo relê quando muda). */

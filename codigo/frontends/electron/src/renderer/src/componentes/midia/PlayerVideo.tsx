@@ -10,7 +10,7 @@ interface Sessao {
 }
 
 /** De onde vem o vídeo: arquivo de Filmes e Séries ou item da videoteca (YouTube baixado). */
-export type FontePlayer =
+type FontePlayer =
   | { tipo: 'midia'; arquivo: number }
   | { tipo: 'videoteca'; id: number; caminho: string; titulo: string }
 

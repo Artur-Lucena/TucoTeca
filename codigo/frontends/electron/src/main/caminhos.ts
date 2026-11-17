@@ -1,6 +1,6 @@
 import { isAbsolute, join, relative, resolve } from 'node:path'
 
-export interface OpcoesCaminho {
+interface OpcoesCaminho {
   plataforma?: NodeJS.Platform
 }
 
@@ -25,7 +25,7 @@ export function caminhoPermitido(home: string, alvo: string, opcoes?: OpcoesCami
   return relativo !== '' && !relativo.startsWith('..') && !isAbsolute(relativo)
 }
 
-export interface EntradaRaizHome {
+interface EntradaRaizHome {
   /** `app.isPackaged`. */
   empacotado: boolean
   /** `app.getAppPath()` (no checkout: codigo/frontends/electron). */
@@ -38,7 +38,7 @@ export interface EntradaRaizHome {
 }
 
 /** Pasta (dentro de resources/) onde o instalador copia núcleo, ponte e docs. */
-export const PASTA_NUCLEO_EMPACOTADO = 'tucoteca'
+const PASTA_NUCLEO_EMPACOTADO = 'tucoteca'
 
 /**
  * Raiz dos fontes Python e pasta da coleção.

@@ -4,7 +4,7 @@ export interface Diagnostico {
   rom: { estado?: string; candidatos?: string[] }
 }
 
-export type AcaoReparo =
+type AcaoReparo =
   | { tipo: 'usar-emulador-atual'; caminho: string }
   | { tipo: 'escolher-exe' }
   | { tipo: 'escolher-rom'; candidatos: string[] }

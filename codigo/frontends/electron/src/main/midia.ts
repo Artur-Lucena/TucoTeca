@@ -2,7 +2,7 @@ import { extname, isAbsolute, parse, resolve } from 'node:path'
 import { caminhoDoPathname, caminhoPermitido } from './caminhos'
 
 /** Recorte pedido para o handler de mídia (200 inteiro; 206 faixa; 416 recusa). */
-export interface FaixaPedido {
+interface FaixaPedido {
   status: number
   inicio: number
   fim: number

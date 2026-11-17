@@ -27,7 +27,7 @@ export interface JogoDaLista extends JogoResumo {
   etiquetas_lista?: string[]
 }
 
-export interface OpcoesFiltroJogos {
+interface OpcoesFiltroJogos {
   filtro?: FiltroJogo
   busca?: string
   idsPendentes?: number[]
@@ -89,8 +89,6 @@ export function ordenarJogos(jogos: JogoDaLista[], ordem: OrdemJogo): JogoDaList
 
 /** Status de jogo do núcleo (mesma lista do formulário do Qt). */
 export const STATUS_JOGOS = ['backlog', 'jogando', 'zerado', 'pausado', 'abandonado'] as const
-
-export type StatusJogo = (typeof STATUS_JOGOS)[number]
 
 /** Limites de etiqueta do núcleo (`banco/jogos.py`): 30 chars, 20 etiquetas. */
 const ETIQUETA_MAX = 30

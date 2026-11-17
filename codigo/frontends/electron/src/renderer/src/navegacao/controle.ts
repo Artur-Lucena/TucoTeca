@@ -13,9 +13,9 @@ export interface EstadoPad {
 }
 
 export type Direcao = 'cima' | 'baixo' | 'esquerda' | 'direita'
-export type AcaoControle = Direcao | 'ativar' | 'voltar' | 'aba-anterior' | 'aba-seguinte' | 'busca'
+type AcaoControle = Direcao | 'ativar' | 'voltar' | 'aba-anterior' | 'aba-seguinte' | 'busca'
 
-export interface OpcoesControle {
+interface OpcoesControle {
   primeiroAtrasoMs?: number
   repeticaoMs?: number
 }

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { hostname } from 'node:os'
 
-export interface DepsLock {
+interface DepsLock {
   host: string
   plataforma: string
   vivo: (pid: number) => boolean

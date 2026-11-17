@@ -1,9 +1,9 @@
 import { signal } from '@preact/signals'
 
 /** Estado de um trabalho da ponte (`Trabalhos` do `ponte.py`). */
-export type EstadoTrabalho = 'rodando' | 'cancelando' | 'ok' | 'erro' | 'cancelado'
+type EstadoTrabalho = 'rodando' | 'cancelando' | 'ok' | 'erro' | 'cancelado'
 
-export type MotivoTrabalho = 'inicio' | 'progresso' | 'cancelamento' | 'fim'
+type MotivoTrabalho = 'inicio' | 'progresso' | 'cancelamento' | 'fim'
 
 export interface Trabalho {
   id: number

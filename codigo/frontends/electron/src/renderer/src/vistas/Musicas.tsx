@@ -36,7 +36,7 @@ interface FaixaMusica extends JogoResumo {
 }
 
 /** Filtro local: todas as palavras (sem acento) em título/artista/álbum. */
-export function filtrarMusicas(musicas: FaixaMusica[], busca: string): FaixaMusica[] {
+function filtrarMusicas(musicas: FaixaMusica[], busca: string): FaixaMusica[] {
   const palavras = semAcento(busca).trim().split(/\s+/).filter(Boolean)
   if (palavras.length === 0) return musicas
   return musicas.filter((m) => {

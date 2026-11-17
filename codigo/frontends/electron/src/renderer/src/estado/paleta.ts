@@ -22,7 +22,7 @@ export const paletaInicial: EstadoPaleta = {
   selecionado: 0,
 }
 
-export type EventoPaleta =
+type EventoPaleta =
   | { tipo: 'abrir' }
   | { tipo: 'fechar' }
   | { tipo: 'alternar' }

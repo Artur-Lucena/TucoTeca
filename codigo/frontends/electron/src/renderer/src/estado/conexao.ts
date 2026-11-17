@@ -1,6 +1,6 @@
 export type EstadoConexao = 'ok' | 'reabrindo' | 'caiu'
 
-export type EventoConexao = { tipo: 'caiu' } | { tipo: 'reabrindo' } | { tipo: 'ok' }
+type EventoConexao = { tipo: 'caiu' } | { tipo: 'reabrindo' } | { tipo: 'ok' }
 
 /**
  * Estado da ponte no renderer: queda vem de qualquer estado; "reabrindo" só

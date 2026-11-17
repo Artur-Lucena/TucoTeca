@@ -1,4 +1,4 @@
-export interface EventoTecla {
+interface EventoTecla {
   key: string
   ctrlKey: boolean
   altKey: boolean
@@ -45,13 +45,13 @@ export function combinacao(evento: EventoTecla): string | null {
   return [...partes, base].join('+')
 }
 
-export type AcaoAtalho =
+type AcaoAtalho =
   | { tipo: 'paleta' }
   | { tipo: 'secao'; chave: string }
   | { tipo: 'busca' }
 
 /** Seções com campo de busca próprio: `buscar` (Ctrl+F) foca o campo em vez da paleta. */
-export const SECOES_COM_BUSCA = ['jogos', 'musicas', 'desejos', 'videos']
+const SECOES_COM_BUSCA = ['jogos', 'musicas', 'desejos', 'videos']
 
 const SECOES = [
   'inicio',
@@ -79,7 +79,7 @@ export function acaoDoAtalho(
   return null
 }
 
-export type DecisaoAtalho =
+type DecisaoAtalho =
   | { tipo: 'paleta' }
   | { tipo: 'secao'; chave: string }
   | { tipo: 'fechar' }

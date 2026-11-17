@@ -4,7 +4,7 @@ import { formatarPreco, type PrecoSteam } from '../../estado/desejos'
 import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { ir } from '../../estado/rota'
 
-export interface CartaoLoja {
+interface CartaoLoja {
   appid: string
   nome: string
   imagem: string
@@ -96,7 +96,7 @@ export function Catalogo({ aoAvisar }: Props) {
   )
 }
 
-export function GradeLoja({ itens }: { itens: CartaoLoja[] }) {
+function GradeLoja({ itens }: { itens: CartaoLoja[] }) {
   return (
     <div class="grade-loja">
       {itens.map((c) => {

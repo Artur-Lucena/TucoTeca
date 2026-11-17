@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { EventoPonte, PedidoPonte, RespostaPonte } from '../shared/protocolo'
 
-export interface DepsDescoberta {
+interface DepsDescoberta {
   existe: (caminho: string) => boolean
   plataforma: NodeJS.Platform
   env: Record<string, string | undefined>
@@ -92,7 +92,7 @@ export class Pendentes {
   }
 }
 
-export interface OpcoesPonte {
+interface OpcoesPonte {
   raiz: string
   db?: string
   ignorarLock?: boolean
@@ -102,7 +102,7 @@ export interface OpcoesPonte {
 /** Fábrica do processo filho; nos testes entra um fake no lugar do `spawn`. */
 export type FabricaProcesso = typeof spawn
 
-export interface DepsClientePonte {
+interface DepsClientePonte {
   criarProcesso?: FabricaProcesso
 }
 

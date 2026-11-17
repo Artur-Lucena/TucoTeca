@@ -2,7 +2,7 @@ import { shell } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 
-export interface OpcoesMenu {
+interface OpcoesMenu {
   raiz: string
   aoAbrirSobre: () => void
 }
