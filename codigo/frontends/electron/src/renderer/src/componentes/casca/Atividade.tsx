@@ -1,4 +1,4 @@
-import { listaTrabalhos } from '../../estado/trabalhos'
+import { cancelarTrabalho, listaTrabalhos } from '../../estado/trabalhos'
 import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 
 interface Props {
@@ -13,7 +13,7 @@ export function Atividade({ aoAvisar }: Props) {
   if (ativo === undefined) return null
   const parar = async () => {
     try {
-      await window.tucoteca.chamar('trabalhos.cancelar', { id: ativo.id })
+      await cancelarTrabalho(ativo.id)
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }

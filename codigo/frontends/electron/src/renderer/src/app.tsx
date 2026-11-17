@@ -430,7 +430,7 @@ export function App() {
         {reproduzindo.value !== null && (
           <PlayerVideo
             key={reproduzindo.value}
-            arquivo={reproduzindo.value}
+            fonte={{ tipo: 'midia', arquivo: reproduzindo.value }}
             aoFechar={() => (reproduzindo.value = null)}
             aoMudou={() => void atualizarTudo()}
             aoAvisar={avisar}

@@ -107,3 +107,13 @@ export function chavesDaTemporada(t: Temporada, apenasLancados = true, hoje: Dat
   const limite = hojeISO(hoje)
   return t.episodios.filter((e) => !apenasLancados || (e.estreia !== '' && e.estreia <= limite) || e.arquivo !== null).map((e) => e.chave)
 }
+
+/** Busca por título ou canal, todas as palavras, sem acento. */
+export function filtrarVideos<T extends { titulo?: unknown; canal?: unknown }>(videos: T[], busca: string): T[] {
+  const palavras = semAcento(busca).split(/\s+/).filter(Boolean)
+  if (palavras.length === 0) return videos
+  return videos.filter((v) => {
+    const alvo = semAcento(`${String(v.titulo ?? '')} ${String(v.canal ?? '')}`)
+    return palavras.every((p) => alvo.includes(p))
+  })
+}

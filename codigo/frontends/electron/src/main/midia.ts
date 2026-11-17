@@ -1,5 +1,5 @@
 import { extname, isAbsolute, parse, resolve } from 'node:path'
-import { caminhoPermitido } from './caminhos'
+import { caminhoDoPathname, caminhoPermitido } from './caminhos'
 
 /** Recorte pedido para o handler de mídia (200 inteiro; 206 faixa; 416 recusa). */
 export interface FaixaPedido {
@@ -82,11 +82,10 @@ export function caminhoDaUrlMidia(
   try {
     const parsed = new URL(url)
     if (parsed.protocol !== 'tucoteca-media:' || parsed.host !== 'arquivo') return null
-    alvo = decodeURIComponent(parsed.pathname)
+    alvo = caminhoDoPathname(parsed.pathname, plataforma)
   } catch {
     return null
   }
-  if (plataforma === 'win32' && /^\/[A-Za-z]:/.test(alvo)) alvo = alvo.slice(1)
   const dentro =
     caminhoPermitido(home, alvo, { plataforma }) ||
     raizes.some((raiz) => raizMidiaAceita(raiz) && caminhoPermitido(raiz, alvo, { plataforma }))

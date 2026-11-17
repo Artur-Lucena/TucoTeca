@@ -4,6 +4,12 @@ export interface OpcoesCaminho {
   plataforma?: NodeJS.Platform
 }
 
+/** `pathname` de uma URL local → caminho do SO (`/C:/x` vira `C:/x` no Windows). */
+export function caminhoDoPathname(pathname: string, plataforma: NodeJS.Platform = process.platform): string {
+  const alvo = decodeURIComponent(pathname)
+  return plataforma === 'win32' && /^\/[A-Za-z]:/.test(alvo) ? alvo.slice(1) : alvo
+}
+
 /** Só deixa servir arquivos dentro da pasta da coleção (nem caminho vazio). */
 export function caminhoPermitido(home: string, alvo: string, opcoes?: OpcoesCaminho): boolean {
   if (!home || !alvo) return false

@@ -1,4 +1,3 @@
-import { modoTv } from '../../navegacao/foco'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { snapshot } from '../../estado/dados'
 import {
@@ -11,6 +10,7 @@ import {
 import { EmptyState } from '../../componentes/ui'
 import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { confirmar } from '../../componentes/ui/Confirmacao'
+import { useSetasLista } from '../../navegacao/setas'
 
 interface Props {
   /** Incrementa a cada Ctrl+F: foca o campo de busca. */
@@ -59,21 +59,7 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
   const indice = Math.min(selecionado, Math.max(0, lista.length - 1))
   const escolhido = lista[indice]
 
-  useEffect(() => {
-    const aoTeclar = (evento: KeyboardEvent) => {
-      if (modoTv() && evento.key.startsWith('Arrow')) return
-      if (evento.ctrlKey || evento.altKey || evento.metaKey) return
-      if (document.querySelector('.paleta-fundo') !== null) return
-      const alvo = evento.target as HTMLElement | null
-      if (alvo !== null && alvo.closest('input, textarea, select') !== null && alvo !== campo.current) return
-      if (evento.key !== 'ArrowDown' && evento.key !== 'ArrowUp') return
-      evento.preventDefault()
-      const passo = evento.key === 'ArrowDown' ? 1 : -1
-      setSelecionado((atual) => Math.max(0, Math.min(lista.length - 1, atual + passo)))
-    }
-    window.addEventListener('keydown', aoTeclar)
-    return () => window.removeEventListener('keydown', aoTeclar)
-  }, [lista.length])
+  useSetasLista(lista.length, setSelecionado, undefined, campo)
 
   const abrirSteam = async () => {
     const appid = escolhido?.appid

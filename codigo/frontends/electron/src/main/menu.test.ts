@@ -23,7 +23,7 @@ function porRotulo(itens: Item[], rotulo: string): Item {
 }
 
 describe('montarMenu', () => {
-  it('tem TucoTeca (Sobre + Sair), Exibir (recarregar/F12/tela cheia/zoom) e Ajuda', () => {
+  it('tem TucoTeca (Sobre + Sair), Exibir (recarregar/F12/tela cheia, sem zoom) e Ajuda', () => {
     const sobre = vi.fn()
     const menu = montarMenu({ raiz: 'C:/repo', aoAbrirSobre: sobre }) as Item[]
     expect(menu.map((item) => item.label)).toEqual(['TucoTeca', 'Exibir', 'Ajuda'])
@@ -38,9 +38,8 @@ describe('montarMenu', () => {
     expect(porRotulo(exibir, 'Ferramentas de desenvolvedor').accelerator).toBe('F12')
     expect(porRotulo(exibir, 'Tela cheia').role).toBe('togglefullscreen')
     expect(porRotulo(exibir, 'Tela cheia').accelerator).toBe('F11')
-    expect(porRotulo(exibir, 'Aumentar zoom').role).toBe('zoomIn')
-    expect(porRotulo(exibir, 'Diminuir zoom').role).toBe('zoomOut')
-    expect(porRotulo(exibir, 'Zoom padrão').role).toBe('resetZoom')
+    // o tamanho da interface fica só em Configurações → Aparência
+    expect(exibir.some((item) => item.role === 'zoomIn' || item.role === 'resetZoom')).toBe(false)
   })
 
   it('Ajuda abre os documentos locais do repo', () => {

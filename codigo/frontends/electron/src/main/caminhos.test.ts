@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { join, resolve } from 'node:path'
-import { caminhoPermitido, resolverRaizHome } from './caminhos'
+import { caminhoDoPathname, caminhoPermitido, resolverRaizHome } from './caminhos'
 
 describe('caminhoPermitido', () => {
   it('aceita arquivo dentro da coleção (Windows, sem diferenciar caixa)', () => {
@@ -60,5 +60,13 @@ describe('resolverRaizHome', () => {
     expect(r).toEqual({ raiz: join(r0, 'fontes'), home: join(r0, 'colecao') })
     const vazio = resolverRaizHome({ ...base, empacotado: true, env: { BIBLIOTECA_HOME: '  ' } })
     expect(vazio.home).toBe(join(r0, 'Users', 'x', 'Documents', 'TucoTeca'))
+  })
+})
+
+describe('caminhoDoPathname', () => {
+  it('tira a barra antes da letra do disco só no Windows e decodifica', () => {
+    expect(caminhoDoPathname('/C:/Hub/capa%20a.png', 'win32')).toBe('C:/Hub/capa a.png')
+    expect(caminhoDoPathname('/home/tuco/a.png', 'linux')).toBe('/home/tuco/a.png')
+    expect(caminhoDoPathname('/C:/x', 'linux')).toBe('/C:/x')
   })
 })

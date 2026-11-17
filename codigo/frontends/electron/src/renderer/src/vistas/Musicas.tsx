@@ -1,13 +1,13 @@
-import { modoTv } from '../navegacao/foco'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { snapshot } from '../estado/dados'
 import { EmptyState } from '../componentes/ui'
 import { type AoAvisar, textoDeFalha } from '../estado/notificacoes'
 import { faixaAtual, player, playerInicial, tocarFila } from '../estado/player'
-import { listaTrabalhos } from '../estado/trabalhos'
+import { cancelarTrabalho, listaTrabalhos } from '../estado/trabalhos'
 import type { JogoResumo } from '../estado/derivacoes'
 import { confirmar } from '../componentes/ui/Confirmacao'
 import { semAcento } from '../estado/formato'
+import { useSetasLista } from '../navegacao/setas'
 
 /** Rótulos dos presets de `PRESETS_EQ` (equalizadores.py). */
 const ROTULO_EQ: Record<string, string> = {
@@ -71,37 +71,7 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
     player.value = tocarFila(player.value, lista, indiceAlvo)
   }
 
-  useEffect(() => {
-    const aoTeclar = (evento: KeyboardEvent) => {
-      if (modoTv() && evento.key.startsWith('Arrow')) return
-      if (evento.ctrlKey || evento.altKey || evento.metaKey) return
-      if (document.querySelector('.paleta-fundo') !== null) return
-      if (document.querySelector('.detalhe-fundo') !== null) return
-      const alvo = evento.target as HTMLElement | null
-      if (
-        alvo !== null &&
-        alvo !== campo.current &&
-        alvo.closest('input, textarea, select') !== null
-      ) {
-        return
-      }
-      if (evento.key === 'Enter') {
-        if (alvo === campo.current || lista.length === 0) return
-        evento.preventDefault()
-        tocar(indice)
-        return
-      }
-      if (evento.key !== 'ArrowDown' && evento.key !== 'ArrowUp') return
-      evento.preventDefault()
-      const passo = evento.key === 'ArrowDown' ? 1 : -1
-      setSelecionado((atual) => {
-        const base = Math.min(atual, Math.max(0, lista.length - 1))
-        return Math.max(0, Math.min(lista.length - 1, base + passo))
-      })
-    }
-    window.addEventListener('keydown', aoTeclar)
-    return () => window.removeEventListener('keydown', aoTeclar)
-  }, [lista, indice])
+  useSetasLista(lista.length, setSelecionado, () => tocar(indice), campo)
 
   const remover = async () => {
     if (escolhida?.id === undefined) return
@@ -170,7 +140,7 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
 
   const pararTrabalho = async (id: number) => {
     try {
-      await window.tucoteca.chamar('trabalhos.cancelar', { id })
+      await cancelarTrabalho(id)
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }
