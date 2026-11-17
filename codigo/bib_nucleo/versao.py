@@ -23,7 +23,7 @@ def versao_app() -> str:
 
 
 def user_agent(detalhe: str = "") -> str:
-    """`TucoTeca/1.4.0 (+repo)`; `detalhe` entra entre parênteses quando informado."""
+    """`TucoTeca/1.4.5 (+repo)`; `detalhe` entra entre parênteses quando informado."""
     extra = f"; {detalhe}" if detalhe else ""
     return f"TucoTeca/{versao_app()} (+{REPOSITORIO}{extra})"
 
