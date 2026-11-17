@@ -1,3 +1,4 @@
+import { modoTv } from '../navegacao/foco'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { snapshot } from '../estado/dados'
 import { semAcento } from '../estado/jogos'
@@ -72,6 +73,7 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
 
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent) => {
+      if (modoTv() && evento.key.startsWith('Arrow')) return
       if (evento.ctrlKey || evento.altKey || evento.metaKey) return
       if (document.querySelector('.paleta-fundo') !== null) return
       if (document.querySelector('.detalhe-fundo') !== null) return

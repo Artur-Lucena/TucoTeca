@@ -1,0 +1,502 @@
+/* YouTube */
+
+.yt-player {
+  margin: var(--espaco-md) 0;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  max-width: 720px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+
+.yt-player iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.yt-textos {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.yt-acoes {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+/* Navegador YouTube */
+
+.navegador-youtube {
+  margin: var(--espaco-md) 0;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  overflow: hidden;
+  background: var(--cartao);
+}
+
+.navegador-barra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--espaco-sm);
+  border-bottom: 1px solid var(--borda);
+}
+
+/* ---------------------------------------------------------------- Filmes e Séries (1.4.4) */
+.midia-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-sm);
+  margin-bottom: var(--espaco-lg);
+}
+
+.midia-barra .busca {
+  flex: 1;
+  min-width: 180px;
+}
+
+.midia-barra .acao,
+.midia-barra .biblioteca-modos .chip {
+  flex: none;
+}
+
+.midia-barra select {
+  padding: 7px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+}
+
+.midia-barra .catalogo-busca {
+  flex: 1;
+}
+
+.grade-titulos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--espaco-lg) var(--espaco-md);
+}
+
+.cartao-titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cartao-titulo-poster {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 2 / 3;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--cartao);
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.cartao-titulo:hover .cartao-titulo-poster,
+.cartao-titulo:focus-visible .cartao-titulo-poster {
+  border-color: var(--realce);
+  transform: translateY(-2px);
+}
+
+.cartao-titulo-poster img {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cartao-titulo-vazio {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--texto2);
+  font-size: 40px;
+  font-weight: 700;
+}
+
+.cartao-titulo-selo {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(10, 10, 16, 0.78);
+  color: #fff;
+  font-size: 11px;
+}
+
+.cartao-titulo-barra {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.cartao-titulo-barra > span {
+  display: block;
+  height: 100%;
+  background: var(--realce);
+}
+
+.cartao-titulo-nome {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.grade-continuar {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--espaco-md);
+}
+
+.cartao-continuar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cartao-continuar-arte {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--cartao);
+}
+
+.cartao-continuar-arte img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cartao-continuar-play {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(10, 10, 16, 0.7);
+  color: #fff;
+  font-size: 18px;
+}
+
+.cartao-continuar:hover .cartao-continuar-arte {
+  border-color: var(--realce);
+}
+
+.lista-revisar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lista-revisar li {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-md);
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--cartao);
+}
+
+.lista-revisar .acao {
+  flex: none;
+}
+
+.revisar-nome {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.campo-curto {
+  width: 70px;
+}
+
+.lista-episodios {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.episodio {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-md);
+  padding: var(--espaco-sm);
+  border-radius: 10px;
+}
+
+.episodio:hover {
+  background: var(--sobreposicao);
+}
+
+.episodio.fora-do-disco .episodio-textos {
+  opacity: 0.6;
+}
+
+.episodio-miniatura {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 176px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--cartao);
+}
+
+.episodio-miniatura img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.episodio-play {
+  position: relative;
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(10, 10, 16, 0.75);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.episodio-play:hover {
+  background: var(--realce);
+}
+
+.episodio-textos {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.episodio-resumo {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--texto2);
+  font-size: 12px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.episodio-marca {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--borda);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--texto2);
+  font: inherit;
+  cursor: pointer;
+}
+
+.episodio-marca.ativo {
+  border-color: var(--realce);
+  background: var(--realce);
+  color: #fff;
+}
+
+.hero-titulo.so-leitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.hero-barra {
+  position: relative;
+  max-width: 320px;
+  border-radius: 2px;
+}
+
+.caminho-arquivo {
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.acao.mais {
+  flex: none;
+  align-self: center;
+  margin-top: var(--espaco-lg);
+}
+
+.descobrir {
+  display: flex;
+  flex-direction: column;
+}
+
+.calendario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-lg);
+}
+
+.calendario-dia h3 {
+  margin: 0 0 var(--espaco-sm);
+  color: var(--texto2);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.calendario-dia ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.calendario-item {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-md);
+  width: 100%;
+  padding: var(--espaco-sm);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.calendario-item.futuro {
+  border-style: dashed;
+}
+
+.calendario-item img {
+  width: 40px;
+  height: 60px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.calendario-item > span:nth-child(2) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.player-tela {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+}
+
+.player-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--espaco-md);
+  padding: var(--espaco-sm) var(--espaco-lg);
+  background: rgba(10, 10, 16, 0.9);
+  color: #fff;
+}
+
+.player-topo .acao {
+  flex: none;
+}
+
+.player-video-grande {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  background: #000;
+}
+
+.player-sem-suporte {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--espaco-lg);
+  padding: var(--espaco-xl);
+  color: #fff;
+  text-align: center;
+}
+
+.player-sem-suporte .acao {
+  flex: none;
+}
+
+.midia-biblioteca {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xl);
+}
+
+.midia-biblioteca > .midia-barra {
+  margin-bottom: 0;
+}

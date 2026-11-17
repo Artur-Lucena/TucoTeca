@@ -1,3 +1,4 @@
+import { bytes } from './formato'
 /** `jogo.diagnosticar` → partes do exe e da ROM (bib_nucleo/emuladores/lancamento.py). */
 export interface Diagnostico {
   exe: { estado?: string; gravado?: string; atual?: string; nome?: string }
@@ -55,15 +56,6 @@ export function lerDiagnostico(d: Diagnostico): LeituraDiagnostico {
 }
 
 /** Bytes → texto curto (pt-BR). */
-export function tamanhoLegivel(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return '—'
-  const unidades = ['B', 'KB', 'MB', 'GB', 'TB']
-  let valor = bytes
-  let i = 0
-  while (valor >= 1024 && i < unidades.length - 1) {
-    valor /= 1024
-    i += 1
-  }
-  const casas = i === 0 ? 0 : valor < 10 ? 1 : 0
-  return `${valor.toLocaleString('pt-BR', { maximumFractionDigits: casas, minimumFractionDigits: casas })} ${unidades[i]}`
+export function tamanhoLegivel(valor: number): string {
+  return bytes(valor)
 }

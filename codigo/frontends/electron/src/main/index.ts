@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'elec
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { registrarProtocoloMedia, registrarProtocoloMidia } from './arquivos'
+import { raizesDaResposta } from './midia'
 import { resolverRaizHome } from './caminhos'
 import { lockOrfao } from './lock'
 import { montarMenu } from './menu'
@@ -56,6 +57,9 @@ try {
 const CAMINHO_LOCK = join(HOME, '.biblioteca.lock')
 
 let ponte: ClientePonte | null = null
+/** Pastas de Filmes e Séries que o protocolo de mídia também serve (vêm do núcleo). */
+let raizesMidia: string[] = []
+const METODOS_PASTAS_MIDIA = new Set(['midia.pastas', 'midia.pasta_adicionar', 'midia.pasta_remover'])
 let fechando = false
 let bloqueioAtual: string | null = null
 let reabrindoPonte = false
@@ -93,6 +97,8 @@ async function conectar(ignorarLockExtra = false): Promise<void> {
 
   cliente.iniciar()
   await cliente.chamar('nucleo.ping')
+  // banco antigo/sem pastas: segue sem raízes extras
+  raizesMidia = raizesDaResposta(await cliente.chamar('midia.pastas').catch(() => null))
 }
 
 function falhar(mensagem: string, codigo: number): void {
@@ -208,14 +214,18 @@ async function principal(): Promise<void> {
   }
 
   registrarProtocoloMidia(() => HOME)
-  registrarProtocoloMedia(() => HOME)
+  registrarProtocoloMedia(() => HOME, () => raizesMidia)
   instalarMenu()
 
   ipcMain.handle('ponte:chamar', (_evento, metodo: string, params?: Record<string, unknown>) => {
     const cliente = ponte
     if (!cliente) return Promise.reject(new Error('a ponte ainda não iniciou'))
     if (cliente.encerrado) return Promise.reject(new Error('a ponte encerrou — clique em Reconectar'))
-    return cliente.chamar(metodo, params)
+    if (!METODOS_PASTAS_MIDIA.has(metodo)) return cliente.chamar(metodo, params)
+    return cliente.chamar(metodo, params).then((resultado) => {
+      raizesMidia = raizesDaResposta(resultado)
+      return resultado
+    })
   })
 
   ipcMain.handle('dialogo:escolher-pasta', async () => {

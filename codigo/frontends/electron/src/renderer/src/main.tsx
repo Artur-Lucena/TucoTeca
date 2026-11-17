@@ -1,6 +1,6 @@
 import { render } from 'preact'
 import { App } from './app'
-import './estilo.css'
+import './estilo'
 
 // Arrastar arquivos só tem efeito nas áreas que tratam o drop (ex.: Jogos);
 // no resto da janela o padrão do navegador (abrir o arquivo) é cancelado.

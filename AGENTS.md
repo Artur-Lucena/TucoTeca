@@ -17,6 +17,13 @@ entram no Git.
 - Segredos recusados devem ser atualizados pelo usuário no Hub, nunca no chat.
 - Repositório e releases continuam privados. Não anexar provas/dados locais.
 - Steam é catálogo/wishlist/referência, não launcher nem sync de conquistas.
+- Rede só por ação do usuário. Exceções aprovadas: o Calendário de Filmes e
+  Séries renova as séries seguidas ao abrir a aba (no máximo a cada 12 h) e o
+  RetroAchievements lê o progresso da conta do próprio usuário, com a chave
+  que ele informou. Abrir Catálogo/Descobrir conta como pedido do usuário.
+- Filmes e Séries: só os arquivos do usuário + catálogo Cinemeta; nada de
+  streams, torrents ou addons. O indexador só lê nomes, tamanhos e 2 MB por
+  arquivo dentro das pastas escolhidas.
 - Entrega Windows sem assinatura é decisão do usuário; comunicar, não bloquear.
 
 ## Código e validação

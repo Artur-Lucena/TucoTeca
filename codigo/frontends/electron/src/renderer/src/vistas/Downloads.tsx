@@ -1,3 +1,4 @@
+import { bytes } from '../estado/formato'
 import { useEffect, useState } from 'preact/hooks'
 import { snapshot } from '../estado/dados'
 import { EmptyState } from '../componentes/ui'
@@ -30,16 +31,7 @@ interface RespostaListar {
   erros: string[]
 }
 
-function formatarBytes(n: number): string {
-  let valor = Number(n || 0)
-  for (const un of ['B', 'KB', 'MB', 'GB', 'TB']) {
-    if (valor < 1024 || un === 'TB') {
-      return `${valor.toFixed(1).replace('.', ',')} ${un}`
-    }
-    valor /= 1024
-  }
-  return `${valor.toFixed(1)} TB`
-}
+const formatarBytes = (n: number): string => bytes(Number(n || 0))
 
 /** Tela Downloads: torrents em andamento/concluídos, importar e organizar. */
 export function Downloads({ aoAvisar, aoMudou }: Props) {

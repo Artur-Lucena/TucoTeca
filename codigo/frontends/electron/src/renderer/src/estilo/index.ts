@@ -1,0 +1,11 @@
+// Ordem importa (cascata): tokens → base → componentes → casca → áreas → ajustes.
+import './tokens.css'
+import './base.css'
+import './componentes.css'
+import './shell.css'
+import './jogos.css'
+import './musicas.css'
+import './midia.css'
+import './downloads.css'
+import './config.css'
+import './ajustes.css'

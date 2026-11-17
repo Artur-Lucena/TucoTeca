@@ -19,22 +19,47 @@ class MixNucleo:
         self._escrita = threading.RLock()
         self.spotify = spotify.ClienteSpotify()
 
-    def snapshot(self):
+    PARTES = ("jogos", "musicas", "desejos", "videos", "fila_musicas", "colecoes")
+
+    def snapshot(self, partes=None):
+        """Coleção para o desktop. `partes` limita as listas devolvidas (o
+        `sistema` vem sempre); sem `partes`, tudo — como a TUI e os testes usam."""
+        from bib_nucleo.preferencias_pessoais import aplicar_perfil
+        pedidas = set(self.PARTES if partes is None else partes)
+        saida = {}
         with closing(core.get_db(self.db_path)) as con:
-            jogos = core.listar_jogos(con)
+            jogos = aplicar_perfil(core.listar_jogos(con))
             musicas = core.listar_musicas(con)
             desejos = core.listar_desejos(con)
-            fila_musicas = core.listar_downloads(con)
-            videos = core.listar_videos(con)
-        for j in jogos:
-            j.update(capa_url=capa_url(j.get("capa")), plataforma=core.plataforma_jogo(j))
-        for m in musicas:
-            m["capa_url"] = capa_url(m.get("musica_capa"))
-        from bib_nucleo.preferencias_pessoais import aplicar_perfil
-        jogos = aplicar_perfil(jogos)
-        return {"jogos": jogos, "musicas": musicas, "desejos": desejos, "videos": videos,
-                "fila_musicas": fila_musicas,
-                "sistema": resumo_sistema(jogos, musicas, desejos)}
+            if "fila_musicas" in pedidas:
+                saida["fila_musicas"] = core.listar_downloads(con)
+            if "videos" in pedidas:
+                saida["videos"] = core.listar_videos(con)
+            if "colecoes" in pedidas:
+                from bib_nucleo.banco.colecoes import listar_colecoes
+                saida["colecoes"] = listar_colecoes(con)
+        if "jogos" in pedidas:
+            for j in jogos:
+                j.update(capa_url=capa_url(j.get("capa")), plataforma=core.plataforma_jogo(j))
+            saida["jogos"] = jogos
+        if "musicas" in pedidas:
+            for m in musicas:
+                m["capa_url"] = capa_url(m.get("musica_capa"))
+            saida["musicas"] = musicas
+        if "desejos" in pedidas:
+            saida["desejos"] = desejos
+        sistema = resumo_sistema(jogos, musicas, desejos)
+        for r in sistema["recentes"]:
+            r.setdefault("capa_url", capa_url(r.get("capa")))
+            r.setdefault("plataforma", core.plataforma_jogo(r))
+        saida["sistema"] = sistema
+        return saida
+
+    def revisao(self):
+        """Contadores por categoria (triggers do banco): mudou → recarregar."""
+        from bib_nucleo.banco._infra import ler_revisoes
+        with closing(core.get_db(self.db_path)) as con:
+            return ler_revisoes(con)
 
     def jogo(self, gid):
         with closing(core.get_db(self.db_path)) as con:
@@ -172,9 +197,21 @@ class MixNucleo:
         return tamanho_pasta(exe.parent)
 
     def buscar(self, termo, limite=12):
-        snap = self.snapshot()
-        return busca_global(snap["jogos"], snap["musicas"], snap["desejos"], [],
-                            str(termo or ""), int(limite))
+        """Paleta: lê só as tabelas (sem capas, disco nem resumo) e põe capa
+        apenas nos resultados."""
+        from bib_nucleo.preferencias_pessoais import aplicar_perfil
+        with closing(core.get_db(self.db_path)) as con:
+            jogos = aplicar_perfil(core.listar_jogos(con))
+            musicas = core.listar_musicas(con)
+            desejos = core.listar_desejos(con)
+        for j in jogos:
+            j["plataforma"] = core.plataforma_jogo(j)
+        capas = {("jogo", j["id"]): j.get("capa") for j in jogos}
+        capas.update({("musica", m["id"]): m.get("musica_capa") for m in musicas})
+        itens = busca_global(jogos, musicas, desejos, [], str(termo or ""), int(limite))
+        for item in itens:
+            item["capa_url"] = capa_url(capas.get((item["tipo"], item["id"])))
+        return itens
 
     def preferencias(self):
         from bib_nucleo.preferencias_pessoais import PERFIS, ler_preferencias

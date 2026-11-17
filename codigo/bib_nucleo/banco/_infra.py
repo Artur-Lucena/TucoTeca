@@ -15,40 +15,49 @@ from pathlib import Path
 from bib_nucleo.banco_desejos import _garantir_tabela_desejos
 from bib_nucleo.base import BACKUP_DIR
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS jogos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    titulo TEXT NOT NULL,
-    executable_path TEXT DEFAULT '',
-    wine_prefix TEXT DEFAULT '',
-    launch_options TEXT DEFAULT '',
-    status TEXT DEFAULT 'backlog',
-    nota INTEGER,
-    favorito INTEGER DEFAULT 0,
-    horas REAL DEFAULT 0,
-    ultima_execucao TEXT,
-    observacoes TEXT DEFAULT '',
-    origem TEXT DEFAULT 'manual',
-    shop TEXT DEFAULT '',
-    object_id TEXT DEFAULT '',
-    capa TEXT DEFAULT '',
-    confianca REAL DEFAULT 0,
-    exe_win TEXT DEFAULT '',
-    exe_linux TEXT DEFAULT '',
-    exe_mac TEXT DEFAULT '',
-    game_code TEXT DEFAULT '',
-    regiao TEXT DEFAULT '',
-    azahar_preset TEXT DEFAULT '',
-    uuid TEXT DEFAULT '',
-    etiquetas TEXT DEFAULT '',
-    save_path TEXT DEFAULT '',
-    azahar_mods TEXT DEFAULT '',
-    azahar_mods_off INTEGER DEFAULT 0,
-    criado_em TEXT,
-    atualizado_em TEXT,
-    UNIQUE(titulo, executable_path, launch_options)
-);
-"""
+# Fonte única das colunas de `jogos`: gera o SCHEMA e a reconstrução da
+# migração de UNIQUE (antes a lista de colunas era escrita duas vezes à mão).
+COLUNAS_JOGOS: tuple[tuple[str, str], ...] = (
+    ("id", "INTEGER PRIMARY KEY AUTOINCREMENT"),
+    ("titulo", "TEXT NOT NULL"),
+    ("executable_path", "TEXT DEFAULT ''"),
+    ("wine_prefix", "TEXT DEFAULT ''"),
+    ("launch_options", "TEXT DEFAULT ''"),
+    ("status", "TEXT DEFAULT 'backlog'"),
+    ("nota", "INTEGER"),
+    ("favorito", "INTEGER DEFAULT 0"),
+    ("horas", "REAL DEFAULT 0"),
+    ("ultima_execucao", "TEXT"),
+    ("observacoes", "TEXT DEFAULT ''"),
+    ("origem", "TEXT DEFAULT 'manual'"),
+    ("shop", "TEXT DEFAULT ''"),
+    ("object_id", "TEXT DEFAULT ''"),
+    ("capa", "TEXT DEFAULT ''"),
+    ("confianca", "REAL DEFAULT 0"),
+    ("exe_win", "TEXT DEFAULT ''"),
+    ("exe_linux", "TEXT DEFAULT ''"),
+    ("exe_mac", "TEXT DEFAULT ''"),
+    ("game_code", "TEXT DEFAULT ''"),
+    ("regiao", "TEXT DEFAULT ''"),
+    ("azahar_preset", "TEXT DEFAULT ''"),
+    ("uuid", "TEXT DEFAULT ''"),
+    ("etiquetas", "TEXT DEFAULT ''"),
+    ("save_path", "TEXT DEFAULT ''"),
+    ("azahar_mods", "TEXT DEFAULT ''"),
+    ("azahar_mods_off", "INTEGER DEFAULT 0"),
+    ("criado_em", "TEXT"),
+    ("atualizado_em", "TEXT"),
+)
+
+
+def _ddl_jogos(tabela: str, se_nao_existe: bool = True) -> str:
+    colunas = ",\n".join(f"    {nome} {tipo}" for nome, tipo in COLUNAS_JOGOS)
+    criar = "CREATE TABLE IF NOT EXISTS" if se_nao_existe else "CREATE TABLE"
+    return (f"\n{criar} {tabela} (\n{colunas},\n"
+            "    UNIQUE(titulo, executable_path, launch_options)\n);\n")
+
+
+SCHEMA = _ddl_jogos("jogos")
 
 # Migração de bancos antigos: v1 (sem capa/confianca), v2 (sem exe por SO),
 # v3 (sem game_code/regiao), v4 (sem azahar_preset), v5 (sem uuid),
@@ -94,11 +103,7 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
                          str(BACKUP_DIR / f"pre-migracao-unique-{ts}.db"))
     except OSError:
         pass
-    cols = ["id", "titulo", "executable_path", "exe_win", "exe_linux", "exe_mac", "wine_prefix",
-            "launch_options", "status", "nota", "favorito", "horas", "ultima_execucao",
-            "observacoes", "origem", "shop", "object_id", "game_code", "regiao",
-            "azahar_preset", "uuid", "etiquetas", "save_path", "azahar_mods", "azahar_mods_off",
-            "capa", "confianca", "criado_em", "atualizado_em"]
+    cols = [nome for nome, _ in COLUNAS_JOGOS]
     todos = ", ".join(cols)
     # banco legado sem UNIQUE: funde triplos repetidos (soma horas, preserva
     # texto) em vez de abortar a migração no meio e órfã jogos_nova
@@ -135,39 +140,7 @@ def _garantir_unique_triplo(con: sqlite3.Connection, db_path: Path) -> None:
                     % ",".join("?" * len(sai)), sai)
     if dups:
         con.commit()
-    con.executescript(f"""
-        CREATE TABLE jogos_nova (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            titulo TEXT NOT NULL,
-            executable_path TEXT DEFAULT '',
-            exe_win TEXT DEFAULT '',
-            exe_linux TEXT DEFAULT '',
-            exe_mac TEXT DEFAULT '',
-            wine_prefix TEXT DEFAULT '',
-            launch_options TEXT DEFAULT '',
-            status TEXT DEFAULT 'backlog',
-            nota INTEGER,
-            favorito INTEGER DEFAULT 0,
-            horas REAL DEFAULT 0,
-            ultima_execucao TEXT,
-            observacoes TEXT DEFAULT '',
-            origem TEXT DEFAULT 'manual',
-            shop TEXT DEFAULT '',
-            object_id TEXT DEFAULT '',
-            game_code TEXT DEFAULT '',
-            regiao TEXT DEFAULT '',
-            azahar_preset TEXT DEFAULT '',
-            uuid TEXT DEFAULT '',
-            etiquetas TEXT DEFAULT '',
-            save_path TEXT DEFAULT '',
-            azahar_mods TEXT DEFAULT '',
-            azahar_mods_off INTEGER DEFAULT 0,
-            capa TEXT DEFAULT '',
-            confianca REAL DEFAULT 0,
-            criado_em TEXT,
-            atualizado_em TEXT,
-            UNIQUE(titulo, executable_path, launch_options)
-        );
+    con.executescript(_ddl_jogos("jogos_nova", se_nao_existe=False) + f"""
         INSERT INTO jogos_nova ({todos}) SELECT {todos} FROM jogos ORDER BY id;
         DROP TABLE jogos;
         ALTER TABLE jogos_nova RENAME TO jogos;
@@ -372,6 +345,29 @@ def _termo_fts(termo: str) -> str:
     palavras = re.findall(r"\w+", str(termo or ""), flags=re.UNICODE)
     return " AND ".join('"' + p + '"*' for p in palavras)
 
+REVISOES_TABELAS = ("jogos", "musicas", "desejos", "videos", "downloads")
+# tabela → categoria do contador (várias tabelas podem somar na mesma)
+REVISOES_EXTRAS = (("colecoes", "colecoes"), ("colecao_jogos", "colecoes"))
+
+
+def _garantir_revisoes(con: sqlite3.Connection) -> None:
+    """Contador por categoria, mantido por triggers: o desktop só recarrega o
+    que mudou (`nucleo.revisao`). Recriado a cada abertura (IF NOT EXISTS),
+    então sobrevive a reconstruções de tabela."""
+    con.execute("CREATE TABLE IF NOT EXISTS revisoes "
+                "(categoria TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)")
+    for tabela, categoria in [(t, t) for t in REVISOES_TABELAS] + list(REVISOES_EXTRAS):
+        con.execute("INSERT OR IGNORE INTO revisoes(categoria, n) VALUES (?, 0)", (categoria,))
+        for evento, sufixo in (("INSERT", "ri"), ("UPDATE", "ru"), ("DELETE", "rd")):
+            con.execute(
+                f"CREATE TRIGGER IF NOT EXISTS {tabela}_{sufixo} AFTER {evento} ON {tabela} "
+                f"BEGIN UPDATE revisoes SET n = n + 1 WHERE categoria = '{categoria}'; END")
+
+
+def ler_revisoes(con: sqlite3.Connection) -> dict[str, int]:
+    return {r[0]: int(r[1]) for r in con.execute("SELECT categoria, n FROM revisoes")}
+
+
 def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     con.row_factory = sqlite3.Row
     # DELETE (não WAL): sem sidecars -wal/-shm, portátil no NTFS compartilhado.
@@ -400,6 +396,13 @@ def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     _garantir_tabela_desejos(con)
     _garantir_tabela_videos(con)
     garantir_fts(con)
+    from bib_nucleo.banco.colecoes import garantir_tabelas_colecoes
+    garantir_tabelas_colecoes(con)
+    from bib_nucleo.midia.banco import garantir_tabelas_midia
+    garantir_tabelas_midia(con)
+    _garantir_revisoes(con)
+    from bib_nucleo.banco.meta import garantir_tabela_meta
+    garantir_tabela_meta(con)
     con.commit()
 
 SCHEMA_VIDEOS = """

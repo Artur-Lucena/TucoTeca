@@ -250,3 +250,16 @@ def teste_tui_relink():
     finally:
         con.close()
     afirmar(launch == str(cand), launch)
+
+
+def teste_schema_jogos_vem_de_colunas_jogos():
+    """SCHEMA e a reconstrução da migração saem da mesma lista de colunas."""
+    import sqlite3
+
+    from bib_nucleo.banco import _infra
+    nomes = [n for n, _ in _infra.COLUNAS_JOGOS]
+    afirmar(len(nomes) == len(set(nomes)), "coluna repetida em COLUNAS_JOGOS")
+    for sql, tabela in ((_infra.SCHEMA, "jogos"), (_infra._ddl_jogos("jogos_nova", False), "jogos_nova")):
+        con = sqlite3.connect(":memory:")
+        con.executescript(sql)
+        afirmar([r[1] for r in con.execute(f"PRAGMA table_info({tabela})")] == nomes, tabela)

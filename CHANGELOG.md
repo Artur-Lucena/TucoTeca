@@ -3,6 +3,99 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.4.5] - 2026-11-17
+
+O hub em três pilares: Jogos à la Hydra, Filmes e Séries à la Stremio (com os
+seus arquivos) e Músicas. Reúne as etapas 1.4.1–1.4.5, conferidas no app
+instalado, sem rede, com dados de teste.
+
+### Adicionado
+
+- **Navegação nova**: seis seções (Início, Jogos, Filmes e Séries, Músicas,
+  Downloads, Configurações) com abas; cada tela tem endereço (`#/jogos/desejos`,
+  `#/jogo/12`), com voltar/avançar (botões, Alt+←/→, botões do mouse).
+  Cabeçalho com busca e sino de notificações. Os atalhos antigos continuam
+  valendo.
+- **Biblioteca lateral** de jogos: filtro, Favoritos/Recentes, filtro por
+  coleção e lista rápida mesmo com milhares de jogos.
+- **Página do jogo**: arte de fundo, logo, horas, última vez, conquistas e
+  horas para zerar; abas Visão geral, Conquistas, Emulação, Saves, Manutenção e
+  Editar.
+- **Dados dos jogos** (botão "Buscar dados" ou em lote): Steam (descrição em
+  pt-BR, gêneros, estúdio, arte, screenshots), SteamGridDB (fundo, logo,
+  ícone), RetroAchievements (seu progresso, com a sua chave) e HowLongToBeat
+  (desligado por padrão). O que você corrigir à mão fica travado.
+- **Coleções** de jogos, **Catálogo** da loja Steam (vitrine, busca, preço BR,
+  página da loja com "Adicionar aos Desejos") e **Importar de lojas
+  instaladas** (Steam, Epic, GOG, Hydra, Riot, Windows).
+- **Filmes e Séries**: escolha as pastas; o app só lê os nomes (nada é copiado)
+  e identifica cada título no Cinemeta. Página do título com temporadas e
+  episódios, player interno que retoma de onde parou e lê legendas `.srt`/`.vtt`
+  ao lado do arquivo (formatos sem suporte vão para o reprodutor externo),
+  Continuar, Descobrir, Minha lista e Calendário das séries seguidas. Início
+  ganha "Continuar assistindo".
+- **Controle**: direcional/analógico movem o foco pela tela, A ativa, B fecha
+  ou volta, LB/RB trocam de aba, Start abre a busca. **Big Picture** com anel
+  de foco, setas que andam pela tela e casca mais simples.
+
+### Alterado
+
+- Desejos agora é aba de Jogos; Integrações, aba de Configurações; Vídeos e
+  YouTube, abas de Filmes e Séries; Notificações, o sino do cabeçalho.
+- O pacote de exportação leva coleções e os dados dos jogos (sem a arte, que é
+  local).
+- Depois de cada ação o app recarrega só o que mudou; a busca global não monta
+  mais a coleção inteira.
+
+### Segurança e privacidade
+
+- O protocolo de mídia só serve a coleção e as pastas de Filmes e Séries que
+  você escolheu (recusa disco inteiro, `..` e o resto).
+- Rede só quando você pede. Exceções: o Calendário renova as séries seguidas
+  ao abrir a aba (no máximo a cada 12 h) e o RetroAchievements lê o seu
+  progresso com a chave que você informou. Modo avião (`BIBLIOTECA_REDE=0`)
+  continua valendo para tudo.
+
+### Limites conhecidos
+
+- Steam, SteamGridDB, RetroAchievements, HowLongToBeat e Cinemeta foram
+  provados com respostas simuladas; o primeiro uso real é a primeira prova
+  com os serviços. Textos do Cinemeta vêm em inglês.
+- Controle provado com um gamepad simulado no mapeamento padrão.
+
+## [1.4.0] - 2026-11-14
+
+Primeira etapa da 1.4 (hub de Jogos, Filmes e Séries e Músicas): correções e
+limpeza antes das telas novas. Visual igual ao da 1.3.1 (conferido por
+captura de tela do app instalado).
+
+### Corrigido
+
+- **Buscar capa** no detalhe do jogo nunca mostrava resultados (lia o campo
+  errado da resposta).
+- O exemplo de regras de conquista estava num formato que o app recusava;
+  agora mostra o formato aceito e os operadores.
+- Detalhe do jogo: botões "Avaliar" repetidos e duas seções de saves viraram
+  uma só de cada.
+
+### Alterado
+
+- Tamanhos em Downloads seguem o formato do resto do app ("512 B", "1,5 KB").
+- Vídeos com mais de uma hora mostram a duração como 1:02:03.
+
+### Interno
+
+- CSS dividido por área (`estilo/*.css`), seletores repetidos fundidos e
+  espaçamentos com tokens; o teste falha se um seletor se repetir.
+- Formatação pt-BR (horas, tamanhos, duração, datas, tempo relativo, preço)
+  num módulo só, com testes.
+- Validação de parâmetros da ponte num módulo comum (`ponte_params`), com as
+  mesmas mensagens de erro.
+- Colunas da tabela de jogos numa lista só; leitores de save das conquistas
+  numa tabela.
+- Removido `baixar_fonte_steamrip` do serviço de desejos (sem uso; a TUI
+  segue com o próprio fluxo).
+
 ## [1.3.1] - 2026-11-14
 
 Revisão completa da 1.3.0: segurança, recursos que não funcionavam e limpeza.

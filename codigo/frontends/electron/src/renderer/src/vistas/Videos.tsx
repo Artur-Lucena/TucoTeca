@@ -1,3 +1,5 @@
+import { modoTv } from '../navegacao/foco'
+import { duracao } from '../estado/formato'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { snapshot } from '../estado/dados'
 import { EmptyState } from '../componentes/ui'
@@ -20,12 +22,7 @@ interface VideoItem {
 
 export const REPRODUTORES = ['auto', 'vlc', 'mpv', 'mpchc']
 
-function formatarDuracao(segundos: number | undefined): string {
-  const total = Math.max(0, Math.round(Number(segundos ?? 0)))
-  const m = Math.floor(total / 60)
-  const s = total % 60
-  return `${m}:${String(s).padStart(2, '0')}`
-}
+const formatarDuracao = duracao
 
 /** Tela Vídeos: lista, player interno e reprodutor externo. */
 export function Videos({ aoAvisar, aoMudou }: Props) {
@@ -49,6 +46,7 @@ export function Videos({ aoAvisar, aoMudou }: Props) {
 
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent) => {
+      if (modoTv() && evento.key.startsWith('Arrow')) return
       if (evento.ctrlKey || evento.altKey || evento.metaKey) return
       if (document.querySelector('.paleta-fundo') !== null) return
       const alvo = evento.target as HTMLElement | null

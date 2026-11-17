@@ -1,3 +1,4 @@
+import { horas } from './formato'
 /** `biblioteca-20261114-171503-123456.db` → `14/11/2026 17:15` ('' se o nome não segue o padrão). */
 export function dataDoBackup(nome: string): string {
   const m = /^biblioteca-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/.exec(nome)
@@ -38,8 +39,8 @@ export function alturasMeses(meses: number[]): number[] {
 }
 
 /** Horas legíveis em pt-BR (1,5 h). */
-export function horasTexto(horas: number): string {
-  return `${horas.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h`
+export function horasTexto(valor: number): string {
+  return horas(valor)
 }
 
 /** `saves-20261114-171503-123456.zip` → `14/11/2026 17:15` ('' fora do padrão). */

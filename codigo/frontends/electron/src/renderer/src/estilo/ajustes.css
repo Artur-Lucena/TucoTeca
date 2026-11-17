@@ -1,0 +1,169 @@
+/* Regras genéricas que, no estilo.css original, vinham depois de regras
+   de área com a mesma especificidade: ficam por último para manter a cascata. */
+
+.vista-acoes .acao {
+  flex: none;
+}
+
+.desejo-textos strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desejo-textos span {
+  color: var(--texto2);
+  font-size: 13px;
+}
+
+.form-desejo label,
+.form-integracao label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-xs);
+  font-size: 13px;
+  color: var(--texto2);
+}
+
+.form-desejo input,
+.form-integracao input,
+.form-integracao select,
+.busca-integracao {
+  padding: 7px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 9px;
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.form-desejo input:focus,
+.form-integracao input:focus,
+.form-integracao select:focus,
+.busca-integracao:focus {
+  border-color: var(--realce);
+}
+
+.busca-integracao {
+  flex: 1;
+  min-width: 140px;
+}
+
+.download-textos strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-textos span {
+  color: var(--texto2);
+  font-size: 12px;
+}
+
+.yt-textos strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yt-textos span {
+  color: var(--texto2);
+  font-size: 12px;
+}
+
+.desejo-capa img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.navegador-barra input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+}
+
+.empty-state h3 {
+  margin: 0;
+  color: var(--texto);
+  font-size: var(--text-xl);
+}
+
+.empty-state p {
+  margin: 0;
+  max-width: 320px;
+}
+
+.modal-topo h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.lista-simples li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-sm);
+  padding: var(--espaco-xs) var(--espaco-sm);
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+  font-size: 13px;
+}
+
+.lista-simples label,
+.detalhe-linha > label,
+label.marcar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-sm);
+  color: var(--texto);
+}
+
+.download-acoes .acao {
+  white-space: nowrap;
+}
+
+.capa-candidata img,
+.capa-candidata .capa-vazia {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.vista-acoes select,
+.filtros select {
+  padding: 6px var(--espaco-sm);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+}
+
+.galeria img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--raio-sm);
+  object-fit: cover;
+}
+
+.modal-topo .acao,
+.confirmacao-botoes .acao {
+  flex: none;
+  width: auto;
+  min-width: 0;
+  padding-inline: var(--espaco-lg);
+}
+
+.modal-topo .acao {
+  padding: var(--espaco-xs) 10px;
+}

@@ -19,7 +19,9 @@ _lock = threading.RLock()
 _ENVS = {"steam_key": "BIBLIOTECA_STEAM_API_KEY",
          "steamgriddb_key": "BIBLIOTECA_STEAMGRIDDB_KEY",
          "spotify_client_id": "BIBLIOTECA_SPOTIFY_CLIENT_ID",
-         "spotify_client_secret": "BIBLIOTECA_SPOTIFY_CLIENT_SECRET"}
+         "spotify_client_secret": "BIBLIOTECA_SPOTIFY_CLIENT_SECRET",
+         "retro_user": "BIBLIOTECA_RETRO_USER",
+         "retro_key": "BIBLIOTECA_RETRO_KEY"}
 
 
 def configurar_provedores(dados: dict):
@@ -49,7 +51,8 @@ def estado_provedores() -> dict:
 
 # Formato usual de cada credencial (para aviso de conferência, não para validar).
 _FORMATO = {"steam_key": 32, "steamgriddb_key": 32,
-            "spotify_client_id": 32, "spotify_client_secret": 32}
+            "spotify_client_id": 32, "spotify_client_secret": 32,
+            "retro_user": None, "retro_key": 32}
 
 
 def dicas_provedores() -> dict:
@@ -67,7 +70,7 @@ def dicas_provedores() -> dict:
             saida[chave] = {"configurada": False, "tamanho": 0, "aviso": ""}
             continue
         esperado = _FORMATO[chave]
-        divergente = len(valor) != esperado
+        divergente = esperado is not None and len(valor) != esperado
         saida[chave] = {
             "configurada": True,
             "tamanho": len(valor),
@@ -134,7 +137,7 @@ def cache_path(categoria: str, chave: str, ext=".json") -> Path:
     return base.DADOS_DIR / "cache-provedores" / categoria / (digest + ext)
 
 
-def baixar_imagem(url: str, timeout=15) -> tuple[bytes, str, str]:
+def baixar_imagem(url: str, timeout=15, limite=2_000_000) -> tuple[bytes, str, str]:
     if not url_https(url):
         raise ValueError("Endereço de imagem inválido.")
     alvo = cache_path("imagens", url, ".img")
@@ -146,7 +149,7 @@ def baixar_imagem(url: str, timeout=15) -> tuple[bytes, str, str]:
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
-                raw = r.read(2_000_001)
+                raw = r.read(limite + 1)
         except (urllib.error.URLError, OSError):
             raise ValueError("Não foi possível baixar a imagem deste provedor.") from None
     if raw.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -159,8 +162,8 @@ def baixar_imagem(url: str, timeout=15) -> tuple[bytes, str, str]:
         ext = ".gif"
     else:
         raise ValueError("O provedor retornou conteúdo que não é uma imagem suportada.")
-    if len(raw) > 2_000_000 or len(raw) < 32:
-        raise ValueError("Imagem vazia ou maior que 2 MB.")
+    if len(raw) > limite or len(raw) < 32:
+        raise ValueError(f"Imagem vazia ou maior que {limite // 1_000_000} MB.")
     if not alvo.is_file():
         gravar_atomico(alvo, raw)
     return raw, ext, str(alvo)

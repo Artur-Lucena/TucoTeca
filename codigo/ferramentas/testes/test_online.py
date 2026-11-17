@@ -17,7 +17,9 @@ def teste_config_provedores_preserva_chaves_e_nao_expoe_segredos():
                                     "spotify_client_secret": "segredo-spotify"})
     afirmar(online.chave_provedor("steam_key") == "segredo-steam")
     estado = online.estado_provedores()
-    afirmar(all(isinstance(v, bool) for v in estado.values()) and all(estado.values()), estado)
+    configuradas = ("steam_key", "steamgriddb_key", "spotify_client_id", "spotify_client_secret")
+    afirmar(all(isinstance(v, bool) for v in estado.values()), estado)
+    afirmar(all(estado[c] for c in configuradas) and not estado["retro_key"], estado)
     afirmar("segredo" not in repr(estado))
 
 

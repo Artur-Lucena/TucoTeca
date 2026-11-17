@@ -57,7 +57,7 @@ class Integracao:
 INTEGRACAO_TIPOS = ("catalogo", "emulador", "download", "musicas_online",
                     "provedores", "link")
 # Vocabulario fixo de capacidades (ver docstring do modulo).
-CAPACIDADES = ("busca", "abrir", "midia", "download", "emulador", "config")
+CAPACIDADES = ("busca", "abrir", "midia", "download", "emulador", "config", "metadados")
 _CORES = ("#62d4ad", "#b5a0ff", "#f0bb77", "#7eaaff", "#67cff1", "#7ce3b8", "#6cd5f5")
 
 
@@ -114,7 +114,7 @@ def _validar_personalizada(dados: dict) -> dict:
 
 
 CHAVES_PADRAO = frozenset({"steamrip", "fitgirl", "azahar", "desmume",
-                             "qbittorrent", "spotify", "capas"})
+                             "qbittorrent", "spotify", "capas", "metadados"})
 
 
 def salvar_personalizada(dados: dict) -> dict:
@@ -176,6 +176,9 @@ def integracoes_padrao():
                    "musicas_online", "SP", "#7ce3b8", capacidades=("midia",)),
         Integracao("capas", "Capas online", "Steam, SteamGridDB, Wikipedia, iTunes, MusicBrainz e Deezer.",
                    "provedores", "AR", "#6cd5f5", capacidades=("midia",)),
+        Integracao("metadados", "Dados dos jogos", "Steam, SteamGridDB, RetroAchievements e "
+                   "HowLongToBeat: descrição, arte, conquistas e horas.",
+                   "provedores", "MD", "#9fd36c", capacidades=("metadados",)),
     ):
         registro.registrar(item)
     for d in carregar_personalizadas():

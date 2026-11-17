@@ -41,6 +41,27 @@ describe('LeitorControle', () => {
     expect(leitor.avaliar(pad({ b: true }), 140)).toBe('voltar')
   })
 
+  it('esquerda/direita repetem como cima/baixo; diagonal não anda', () => {
+    const leitor = new LeitorControle({ primeiroAtrasoMs: 350, repeticaoMs: 140 })
+    leitor.reiniciar(solto)
+    expect(leitor.avaliar(pad({ direita: true }), 0)).toBe('direita')
+    expect(leitor.avaliar(pad({ direita: true }), 400)).toBe('direita')
+    leitor.avaliar(solto, 450)
+    expect(leitor.avaliar(pad({ esquerda: true }), 460)).toBe('esquerda')
+    leitor.avaliar(solto, 470)
+    expect(leitor.avaliar(pad({ cima: true, direita: true }), 480)).toBeNull()
+  })
+
+  it('LB/RB trocam de aba e Start abre a busca, uma vez por pressão', () => {
+    const leitor = new LeitorControle()
+    leitor.reiniciar(solto)
+    expect(leitor.avaliar(pad({ rb: true }), 0)).toBe('aba-seguinte')
+    expect(leitor.avaliar(pad({ rb: true }), 100)).toBeNull()
+    expect(leitor.avaliar(pad({ lb: true }), 200)).toBe('aba-anterior')
+    leitor.avaliar(solto, 300)
+    expect(leitor.avaliar(pad({ start: true }), 400)).toBe('busca')
+  })
+
   it('pad recém-ligado exige neutro antes de qualquer ação (hotplug/foco)', () => {
     const leitor = new LeitorControle()
     leitor.reiniciar(pad({ cima: true }))

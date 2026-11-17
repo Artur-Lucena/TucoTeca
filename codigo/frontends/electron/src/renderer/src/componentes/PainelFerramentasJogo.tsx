@@ -24,6 +24,7 @@ interface Ferramentas {
 export function PainelFerramentasJogo({ id, bloqueado, aoAvisar }: Props) {
   const [dados, setDados] = useState<Ferramentas | null>(null)
   const [ocupado, setOcupado] = useState(false)
+  const [novasOrigens, setNovasOrigens] = useState('')
 
   const carregar = async () => {
     try {
@@ -79,6 +80,22 @@ export function PainelFerramentasJogo({ id, bloqueado, aoAvisar }: Props) {
     }
   }
 
+  const configurarSaves = async () => {
+    const caminhos = novasOrigens.split(',').map((c) => c.trim()).filter(Boolean)
+    if (caminhos.length === 0) return aoAvisar('Informe uma ou mais pastas de saves, separadas por vírgula.', 'atencao')
+    setOcupado(true)
+    try {
+      await window.tucoteca.chamar('saves.configurar', { id, caminhos })
+      setNovasOrigens('')
+      aoAvisar('Pastas de saves configuradas.')
+      await carregar()
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    } finally {
+      setOcupado(false)
+    }
+  }
+
   const abrirPasta = async () => {
     try {
       await window.tucoteca.abrirPasta(dados.pasta_screenshots)
@@ -93,7 +110,7 @@ export function PainelFerramentasJogo({ id, bloqueado, aoAvisar }: Props) {
     <div class="painel-paridade">
       <h4>Saves</h4>
       {dados.saves.length === 0 ? (
-        <p class="sub">Nenhuma pasta de saves configurada (configure abaixo, em Saves).</p>
+        <p class="sub">Nenhuma pasta de saves configurada ainda.</p>
       ) : (
         <ul class="lista-simples">
           {dados.saves.map((s) => (
@@ -101,6 +118,17 @@ export function PainelFerramentasJogo({ id, bloqueado, aoAvisar }: Props) {
           ))}
         </ul>
       )}
+      <div class="detalhe-linha">
+        <input
+          value={novasOrigens}
+          placeholder="pastas de saves, separadas por vírgula"
+          aria-label="Pastas de saves"
+          onInput={(e) => setNovasOrigens((e.target as HTMLInputElement).value)}
+        />
+        <button type="button" class="acao" disabled={ocupado} onClick={() => void configurarSaves()}>
+          Definir pastas
+        </button>
+      </div>
       <div class="detalhe-linha">
         <button type="button" class="acao" disabled={travado || dados.saves.length === 0} onClick={() => void snapshotAgora()}>
           Criar snapshot agora

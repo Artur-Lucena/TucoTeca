@@ -61,6 +61,7 @@ const ROTULO_CAPACIDADE: Record<string, string> = {
   download: 'download',
   emulador: 'emulador',
   config: 'configuração',
+  metadados: 'dados de jogo',
 }
 
 /** Rótulo legível do tipo (também usado no formulário de nova integração). */

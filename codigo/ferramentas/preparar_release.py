@@ -104,6 +104,10 @@ def conferir_app(dist: Path, exigir_runtime: bool = True) -> dict:
     if not recursos.is_dir():
         raise ValueError(f"{recursos} ausente: o instalador não veio do build atual")
     for obrigatorio in ("codigo/frontends/ponte.py", "codigo/frontends/ponte_paridade.py",
+                        "codigo/frontends/ponte_params.py",
+                        "codigo/frontends/ponte_meta.py",
+                        "codigo/frontends/ponte_colecoes.py",
+                        "codigo/frontends/ponte_midia.py",
                         "codigo/bib_core.py",
                         "codigo/ferramentas/abrir_hub.py", "VERSION", "LICENSE"):
         if not (recursos / obrigatorio).is_file():

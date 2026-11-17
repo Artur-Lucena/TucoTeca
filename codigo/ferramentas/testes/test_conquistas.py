@@ -208,3 +208,18 @@ def teste_conquistas_falha_sincronizacao_preserva_catalogo_e_progresso():
             pass
     afirmar((C.pasta_conquistas(jogo) / "catalogo.json").read_bytes() == catalogo)
     afirmar(C.avaliar_save(jogo)["desbloqueadas"] == 1)
+
+
+def teste_leitores_save_tabela_e_padrao_generico():
+    import tempfile
+    from pathlib import Path
+
+    from bib_nucleo import conquistas as C
+    afirmar(set(C.LEITORES_SAVE) == {"3934270", "686060"}, C.LEITORES_SAVE)
+    afirmar(C._regras_padrao("999999", {"itens": []}) == {})
+    afirmar("class_unlock_medic" in C._regras_padrao("686060", {"itens": []}))
+    pasta = Path(tempfile.mkdtemp(prefix="suite-leitores-"))
+    (pasta / "progression.json").write_text('{"nivel": 3}', encoding="utf-8")
+    achado = C.localizar_save({"save_path": str(pasta)}, "999999", {})
+    afirmar(achado.name == "progression.json", achado)
+    afirmar(C.ler_save_nativo(achado, "999999") == {"nivel": 3})
