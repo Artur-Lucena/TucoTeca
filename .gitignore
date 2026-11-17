@@ -19,19 +19,14 @@ Thumbs.db
 *.bak
 *.tmp
 .vscode/
-# Saída do portátil (ferramentas/montar_portatil.py) — artefato, não fonte
-dist/
-programa/
+# Downloads e árvores intermediárias de build
 codigo/ferramentas/.cache/
 codigo/ferramentas/.build/
 # Trava de instância e atalho locais — máquina, não repo
 .biblioteca.lock
 *.lnk
 # Saídas de teste locais
-baseline-testes.json
-pos-fix-repacks.json
 resultados-testes.json
-resultados-qt.json
 pos-*.json
 pos-*.log
 .provas/

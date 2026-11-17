@@ -20,6 +20,7 @@ import shutil
 import struct
 import sys
 import wave
+import zlib
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -63,6 +64,43 @@ def _wav(caminho: Path, freq: float, segundos: float = 2.0, taxa: int = 8000) ->
     return hashlib.sha256(caminho.read_bytes()).hexdigest()
 
 
+# capa sintética: degradê estável derivado do título (só stdlib)
+def _cor(nome: str, deslocamento: int = 0) -> tuple[int, int, int]:
+    h = 0
+    for ch in nome:
+        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+    r = (h >> (deslocamento * 8)) & 0xFF
+    g = (h >> ((deslocamento + 2) * 8)) & 0xFF
+    b = (h >> ((deslocamento + 4) * 8)) & 0xFF
+    # mantém médio-escuro e saturação discreta para uso como fundo
+    return (64 + r % 128, 64 + g % 96, 96 + b % 128)
+
+
+def _png(caminho: Path, largura: int, altura: int, nome: str) -> None:
+    c1, c2 = _cor(nome, 0), _cor(nome, 3)
+    linhas = []
+    for y in range(altura):
+        linha = bytearray()
+        linha.append(0)  # filtro None
+        for x in range(largura):
+            t = (x / max(1, largura - 1) + y / max(1, altura - 1)) / 2
+            linha.append(int(c1[0] + (c2[0] - c1[0]) * t))
+            linha.append(int(c1[1] + (c2[1] - c1[1]) * t))
+            linha.append(int(c1[2] + (c2[2] - c1[2]) * t))
+        linhas.append(bytes(linha))
+    raw = b"".join(linhas)
+
+    def bloco(tipo: bytes, dados: bytes) -> bytes:
+        return (struct.pack(">I", len(dados)) + tipo + dados
+                + struct.pack(">I", zlib.crc32(tipo + dados) & 0xFFFFFFFF))
+
+    ihdr = struct.pack(">IIBBBBB", largura, altura, 8, 2, 0, 0, 0)
+    png = (b"\x89PNG\r\n\x1a\n" + bloco(b"IHDR", ihdr)
+           + bloco(b"IDAT", zlib.compress(raw, 9))
+           + bloco(b"IEND", b""))
+    caminho.write_bytes(png)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Semeia coleção sintética p/ provas do Electron")
     ap.add_argument("--destino", required=True, help="pasta de prova (fora da coleção real)")
@@ -82,7 +120,6 @@ def main(argv=None) -> int:
             sys.path.insert(0, caminho)
 
     import bib_core as core
-    import gerar_placeholders as placeholders
 
     core.garantir_dirs()
     con = core.get_db(core.DEFAULT_DB)
@@ -96,7 +133,7 @@ def main(argv=None) -> int:
             if horas:
                 core.adicionar_horas(con, jogo["id"], horas)
             nome_capa = f"semente-{jogo['id']}.png"
-            placeholders._png(core.CAPAS_DIR / nome_capa, 300, 400, titulo)
+            _png(core.CAPAS_DIR / nome_capa, 300, 400, titulo)
             con.execute("UPDATE jogos SET capa=? WHERE id=?", (nome_capa, jogo["id"]))
             if ultima:
                 con.execute("UPDATE jogos SET ultima_execucao=? WHERE id=?",

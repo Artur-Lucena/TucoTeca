@@ -18,15 +18,15 @@ IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git", ".provas",
              ".pytest_cache", ".ruff_cache", ".venv",
              # artefatos do app Electron (dependências e builds), não fontes
              "node_modules", "out", "dist"}
-RAIZ_ARQUIVOS = {"README.md", "docs/CONTRIBUTING.md", "LICENSE", ".gitignore", ".gitattributes",
+RAIZ_ARQUIVOS = {"README.md", "LICENSE", ".gitignore", ".gitattributes",
                  "BibliotecaHub.bat", "BibliotecaHub.sh", "BibliotecaHubMac.command"}
-RAIZ_ARQUIVOS.update({"TucoTeca.bat", "VERSION", "CHANGELOG.md", "docs/SECURITY.md",
+RAIZ_ARQUIVOS.update({"TucoTeca.bat", "VERSION", "CHANGELOG.md",
                       "pyproject.toml", "conftest.py", "AGENTS.md"})
-EXTENSOES = {"codigo": {".py", ".bat",
+EXTENSOES = {"codigo": {".py",
                         # interface Electron (main/preload/renderer, config e ícone)
                         ".ts", ".tsx", ".css", ".html", ".json", ".cjs", ".ico"},
              "docs": {".md"},
-              ".github": {".yml", ".yaml", ".md"}, "midia": {".png", ".jpg", ".jpeg"}}
+             ".github": {".yml", ".yaml", ".md"}}
 
 # arquivos sem extensão útil que também são fonte
 NOMES_EXTRAS = {".gitignore"}
