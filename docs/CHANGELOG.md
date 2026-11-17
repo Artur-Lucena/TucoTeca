@@ -3,6 +3,50 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.4.7] - 2026-11-17
+
+Revisão geral: menos arquivos, menos código repetido e a raiz do projeto
+enxuta. O app faz o mesmo, com alguns acertos.
+
+### Alterado
+
+- A aba Vídeos usa o mesmo player de Filmes e Séries (retoma de onde parou,
+  abre no reprodutor externo) e busca por título ou canal, sem acento. Os
+  vídeos baixados ficam só em Vídeos (a lista repetida saiu do YouTube).
+- O Início mostra os jogos com o mesmo cartão da biblioteca; clicar abre o jogo.
+- Jogo, loja e filme/série usam o mesmo topo e a mesma ficha; a loja mostra
+  o preço uma vez só.
+- A prévia de importação abre como janela de diálogo, como as demais.
+- O tamanho da interface fica só em Configurações → Aparência (o menu
+  Exibir não tem mais zoom).
+- Raiz do projeto com 8 arquivos: `tucoteca.sh` é o lançador de Linux e
+  macOS; `CHANGELOG.md` foi para `docs/` e `VERSION` para `codigo/`.
+
+### Corrigido
+
+- Jogo sem título mostrava a capa vazia em branco (agora "?").
+- Episódios "a estrear" e "temporada vista" usavam a data em UTC e trocavam
+  de dia perto da meia-noite.
+- "Abrir pasta" diferenciava maiúsculas de minúsculas no Windows.
+- Logo quebrada num filme/série escondia o nome do título.
+- Com um diálogo ou o player aberto, as setas ainda mexiam na lista de baixo.
+
+### Removido
+
+- Lançadores `BibliotecaHub.bat` e `BibliotecaHubMac.command` (use
+  `TucoTeca.bat` ou `tucoteca.sh`) e `BibliotecaHub.sh` (agora `tucoteca.sh`).
+- Módulos sem uso: API local de leitura, patches de ROM, pastas vigiadas e
+  organizador por cópia/hardlink, além de opções de configuração sem efeito.
+- Notas antigas (`docs/HISTORICO.md`, `docs/INDICE.md` e o histórico de
+  integração anterior à 1.0 neste arquivo), que seguem no histórico do Git.
+
+### Interno
+
+- `bib_core` reexporta só os 179 nomes usados (eram 386); módulos fundidos
+  (`apps_externos.py`, `ponte_dominios.py`, `banco/desejos.py`,
+  `scans/hydra.py`); testes reorganizados por assunto e um runner único para
+  a suíte e o pytest.
+
 ## [1.4.6] - 2026-11-17
 
 Arrumação, sem mudar o que o app faz.
