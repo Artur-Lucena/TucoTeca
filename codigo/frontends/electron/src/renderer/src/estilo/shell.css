@@ -720,3 +720,42 @@
   font: inherit;
   font-size: 12px;
 }
+
+/* ---------------------------------------------------------------- controle e Big Picture (1.4.5) */
+/* anel de foco visível ao usar controle (some ao mexer o mouse) e sempre no Big Picture */
+:root.navegando-controle :focus,
+:root[data-densidade='bigpicture'] :focus-visible {
+  outline: 3px solid var(--realce);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+:root.navegando-controle .cartao-titulo:focus .cartao-titulo-poster,
+:root.navegando-controle .cartao-loja:focus,
+:root.navegando-controle .cartao-continuar:focus .cartao-continuar-arte {
+  border-color: var(--realce);
+  transform: translateY(-3px) scale(1.02);
+}
+
+/* Big Picture: casca mais simples (sem a lista lateral de jogos) e alvos maiores */
+:root[data-densidade='bigpicture'] .biblioteca-lateral {
+  display: none;
+}
+
+:root[data-densidade='bigpicture'] .barra-lateral nav .item {
+  padding: 12px 14px;
+  font-size: 15px;
+}
+
+:root[data-densidade='bigpicture'] .topo-busca kbd {
+  display: none;
+}
+
+:root[data-densidade='bigpicture'] .aba {
+  padding: 10px 18px;
+  font-size: 15px;
+}
+
+:root[data-densidade='bigpicture'] .grade-titulos {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
