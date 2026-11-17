@@ -33,16 +33,24 @@ pelos fontes. O Qt Quick e o modo clássico Tk foram removidos.
 Tucoteca/
 ├── README.md                         entrada funcional e técnica
 ├── LICENSE                           licença do código do Hub
-├── TucoTeca.bat                       entrada Windows; BibliotecaHub.bat é alias
-├── BibliotecaHub.sh/Mac.command       TUI no Linux/macOS (pelos fontes)
-├── .github/workflows/                matriz de testes
+├── AGENTS.md                         regras de trabalho (pessoas e agentes)
+├── pyproject.toml                    projeto Python, Ruff, pytest e mypy
+├── TucoTeca.bat                      Windows pelos fontes (o usuário final usa o instalador)
+├── tucoteca.sh                       TUI no Linux/macOS (pelos fontes)
+├── .github/workflows/                matriz de testes (manual)
 ├── docs/
 │   ├── ARQUITETURA.md                 este mapa
-│   ├── CONTRIBUTING.md                ambiente, testes e colaboração
-│   ├── SECURITY.md                    canal de contato de segurança
+│   ├── DESKTOP_ELECTRON.md            telas, ponte, controle, segurança, provas
+│   ├── INTEGRACOES.md                 como acrescentar integração/provedor
+│   ├── CONTRIBUTING.md                ambiente, testes e convenções
 │   ├── RELEASES.md                    instalador, anexos e publicação
-│   └── HISTORICO.md                   auditorias e revisões antigas
+│   ├── ROADMAP.md                     estado e próximos passos
+│   ├── SECURITY.md                    contato e superfície de risco
+│   ├── LEGAL.md                       aviso legal
+│   ├── CHANGELOG.md                   notas por versão
+│   └── exemplos/provedor_modelo.py    template de provedor de rede
 ├── codigo/
+│   ├── VERSION                       versão atual (também no app instalado)
 │   ├── bib_core.py                   fachada de compatibilidade
 │   ├── bib_nucleo/                   núcleo e domínios pessoais
 │   │   └── rede/                     adaptadores com BIBLIOTECA_REDE
@@ -52,7 +60,6 @@ Tucoteca/
 │   │   ├── preparar_release.py        anexos da release (instalador + fontes)
 │   │   └── testes/                   casos e runner em sandbox
 │   └── historico/                    arquivo local, ignorado
-├── midia/fontes-capas/                opcional: placeholders gerados localmente
 ├── programa/                         runtime instalado localmente, ignorado
 ├── dados/                            coleção local, ignorada
 └── dist/                             gerados, ignorados
@@ -62,14 +69,12 @@ Tucoteca/
 árvores intermediárias. Não são fontes, não entram na entrega de engenharia.
 As pastas físicas locais podem conter material de sessões antigas; o comando
 de entrega seleciona somente fontes/documentos por allowlist.
-Um clone limpo não precisa conter `midia/`, `programa/`, `dados/` ou `dist/`.
+Um clone limpo não precisa conter `programa/`, `dados/` ou `dist/`.
 A pasta do projeto pode ser a **única** do PC: com `dados/` e `programa/`
 na raiz (ambos ignorados pelo Git), `resolve_home()` em `base.py` prefere a
 própria árvore à instalação canônica — bundles e clone dev compartilham a
 mesma regra. Links do Wine (`dosdevices/*`, junctions de pastas do usuário)
 não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
-A reconciliação do histórico remoto com as revisões locais está registrada
-em [HISTORICO.md](HISTORICO.md).
 
 ## Responsabilidade por módulo
 
@@ -78,9 +83,9 @@ em [HISTORICO.md](HISTORICO.md).
 | `config.py` | leitura única das `BIBLIOTECA_*` (paths, listas `;`/`,`, bools 0/1), defaults e singleton `cfg` — consumida por `base.py`, builders e testes |
 | `base.py` | casa, raízes Win/Linux/Mac, tradução de caminhos, lock, texto, logs |
 | `banco/` (pacote) | schema, migrações por colunas, CRUD jogos/músicas/fila, capas — fatiado em `_infra`/`jogos`/`catalogo` com fachada de compatibilidade (`__all__` idêntico) |
+| `banco/desejos.py` | wishlist local, sincronização preservadora e histórico obtido |
 | `banco/meta.py` / `banco/colecoes.py` | metadados dos provedores por `uuid` (com campos travados pela edição manual) e coleções de jogos; ambos viajam no pacote |
-| `banco_desejos.py` | wishlist local, sincronização preservadora e histórico obtido |
-| `scans/` (pacote) / `scans_hydra.py` | lojas/disco/ROMs e adaptador Hydra, preview, dedup e restore — `scans.py` fatiado na F2 do O2 sem mudar contratos |
+| `scans/` (pacote) | lojas/disco/ROMs e leitor do Hydra (`scans/hydra.py`), preview, dedup e restore |
 | `emuladores/` (pacote) | Azahar/DeSmuME, processos/sessões, presets e overlay de mods — fatiado na F1 do O2 sem mudar contratos |
 | `atualizacao.py` | download e atualização transacional, manifesto, rollback |
 | `pacotes.py` | JSON, ZIP de coleção e backups versionados |
@@ -104,14 +109,12 @@ em [HISTORICO.md](HISTORICO.md).
 | `rede/torrents.py` (alias `torrents.py`) | leitura local de `.torrent/.fastresume`, sem depender da rede |
 | `ferramentas.py` | manifesto editável, resolução relativa e comandos de sidecars/zipapps |
 | `qbit.py` | perfil independente e Web API local do qBittorrent |
-| `saves.py` | origens explícitas, snapshots SHA-256 e restauração com backup anterior |
+| `saves.py` | origens explícitas, snapshots SHA-256, restauração com backup anterior e galeria de screenshots por jogo |
+| `apps_externos.py` | editores de imagem (Krita/GIMP/PhotoDemon), áudio/EQ (Audacity, APO, Peace, presets FFmpeg) e players (VLC/MPV/MPC-HC) por tabela |
 | `sessoes_manuais.py` / `estatisticas.py` | reconciliação idempotente e histórico de sessões novas |
 | `preferencias_pessoais.py` | Tuco/Isa, favoritos/filtros, atalhos e recursos opt-in |
-| `screenshots.py` / `pastas_vigiadas.py` | imagens locais e detecção de arquivos estáveis |
-| `organizacao_local.py` / `patches_rom.py` | cópia/hardlinks explícitos e IPS/BPS em uma nova ROM |
 | `everything.py` | `es.exe` BYOB, limitado às raízes escolhidas; scanner como fallback |
-| `api_local.py` | leitura HTTP opt-in, loopback, token, Host/Origin, sem rotas de execução |
-| `versao.py` | versão (`VERSION`) e User-Agent das requisições, num lugar só |
+| `versao.py` | versão (`codigo/VERSION`) e User-Agent das requisições, num lugar só |
 
 ### Frontends e ferramentas
 
@@ -120,21 +123,21 @@ em [HISTORICO.md](HISTORICO.md).
 | `frontends/desktop.py` | Abre o app Electron pelo checkout (exige `npm install` + `npm run build`); o usuário final usa o instalador |
 | `frontends/ponte.py` | Ponte NDJSON (stdin/stdout, sem TCP) entre o Electron e os casos de uso; lock com evento `bloqueio`, jobs com progresso |
 | `frontends/ponte_paridade.py` | Métodos da ponte que devolvem ao Electron o que o antigo Qt fazia (emulação, controles, manutenção, letras/EQ/volume, arrastar-soltar); trava de jogo aberto |
-| `frontends/ponte_meta.py` / `ponte_colecoes.py` / `ponte_midia.py` | métodos da ponte da página do jogo e provedores, coleções/loja/lojas instaladas e Filmes e Séries (rede e varreduras como trabalho) |
-| `frontends/ponte_params.py` | validação de parâmetros da ponte com mensagens padronizadas |
+| `frontends/ponte_dominios.py` | métodos da ponte da 1.4: página do jogo e provedores, coleções/loja/lojas instaladas e Filmes e Séries (rede e varreduras como trabalho) |
+| `frontends/ponte_params.py` | validação de parâmetros da ponte com mensagens padronizadas (`texto`, `inteiro`, `ident`, `opcao`, …) |
 | `frontends/servicos_ui/` (pacote) | Casos de uso do desktop em mixins por domínio, `resumo_sistema`, `busca_global`, registro de módulos |
 | `frontends/electron/` | Desktop: processo principal (protocolos `tucoteca-img`/`tucoteca-media`, menu, ponte), preload isolado e renderer Preact; `electron-builder.config.cjs` gera o instalador |
 | `frontends/electron/src/renderer/src/` | `vistas/` (uma pasta por seção com mais de uma tela: `jogos/`, `midia/`, `configuracoes/`), `componentes/` (`casca/` da janela, `jogo/`, `midia/`, `musica/`, `config/`, `ui/` genérica), `estado/` (lógica pura testada, rotas em `rota.ts`), `navegacao/` (teclado, controle e foco espacial) e `estilo/` (CSS por área) |
 | `frontends/app_tui.py` + `tui_*.py` | TUI em mixins por domínio (entry point e `tui.curses` patchável preservados) |
 | `ferramentas/abrir_hub.py` | Prepara ambiente/runtime do checkout ou do app instalado (usado pela ponte) |
-| `ferramentas/build_utils.py` | SHA-256 de arquivo, escritor de `.tar.xz` e download verificado (cache + `.part` atômico) |
+| `ferramentas/build_utils.py` | SHA-256 de arquivo e download verificado (cache + `.part` atômico) |
 | `ferramentas/diagnosticar.py` | sintaxe/exports/dependências/pastas/SQLite somente-leitura |
 | `ferramentas/empacotar_fontes.py` | entrega da árvore atual (Python + Electron) + SHA-256, sem coleção |
 | `ferramentas/preparar_runtime_python.py` | Python embeddable oficial, SHA-256 fixado, para `programa/windows-x64/python` |
 | `ferramentas/gerar_icone.py` | ícone do app (`resources/icon.ico`), reproduzível, só stdlib |
 | `ferramentas/preparar_release.py` | confere git/versões/instalador/runtime e gera fontes, notas, `release.json` e `SHA256SUMS` |
 | `ferramentas/semear_prova_electron.py` | coleção sintética para selftest do app (nunca a coleção real) |
-| `ferramentas/provar_qbit_runtime.py` / `provar_rede_runtime.py` | provas nativas opcionais (qBittorrent e rede), fora da suíte hermética |
+| `ferramentas/provar_runtime.py` | provas nativas opcionais (`qbit`, `rede`), fora da suíte hermética |
 | `ferramentas/validar.py` | gates locais: Ruff, mypy, suíte, cobertura, Electron e Git |
 
 ## Estado e modelo de dados
@@ -249,8 +252,7 @@ duplicatas e escapes, com limites de tamanho/arquivos e backup pré-sobrescrita.
 | `BIBLIOTECA_AZAHAR_FLAGS/DESMUME_FLAGS` | opções de lançamento |
 | `BIBLIOTECA_JOGOS_DIR` (alias legado `BIBLIOTECA_PIRATAS`) | pasta dos downloads de jogos (padrão `Meus Jogos Locais`; se a antiga `Piratas` já existir e a nova não, continua usando a antiga) |
 | `BIBLIOTECA_7Z` | caminho explícito do 7-Zip |
-| `BIBLIOTECA_REDE` | `0` bloqueia ações remotas do Hub; não é firewall dos apps externos nem bloqueio da API loopback |
-| `BIBLIOTECA_WATCH` | pasta de pacotes vigiada; extração automática só com opt-in |
+| `BIBLIOTECA_REDE` | `0` bloqueia ações remotas do Hub; não é firewall dos apps externos |
 | `BIBLIOTECA_EVERYTHING` | caminho BYOB do CLI `es.exe` |
 | `BIBLIOTECA_MUSICA_DIR` | origem de áudio local/Harmoni |
 | `BIBLIOTECA_YTDLP/FFMPEG` | ferramentas externas |
@@ -262,8 +264,9 @@ duplicatas e escapes, com limites de tamanho/arquivos e backup pré-sobrescrita.
 | `BIBLIOTECA_QBIT_API` | URL explícita da API em loopback |
 | `BIBLIOTECA_QUICKJS/DENO` | runtime JavaScript explícito para yt-dlp |
 | `HYDRA_DB_PATH` | origem Hydra explícita |
-| `TUCOTECA_RAIZ` / `TUCOTECA_PYTHON` / `TUCOTECA_USERDATA` | app Electron: fontes Python, intérprete e userData (ver DESKTOP_ELECTRON.md) |
 
+As variáveis `TUCOTECA_*` do app Electron estão em
+[DESKTOP_ELECTRON](DESKTOP_ELECTRON.md#desenvolvimento-e-verificação).
 Defaults de caminhos refletem a máquina original. Ao desenvolver, use
 overrides de ambiente. O app instalado usa `Documentos\TucoTeca` como casa;
 o checkout usa a própria raiz e reconhece a coleção legada
@@ -279,7 +282,7 @@ Casos cobrem persistência, identidade, scanners, overlays, rollback,
 downloads simulados, ponte, TUI, áudio e volume;
 o renderer/main do Electron têm testes vitest próprios. `executar.py` cria sandbox,
 descobre `teste_*` e informa os pulos e falhas por ambiente.
-`conftest.py` coleta por AST e executa os mesmos casos em processos separados;
+`testes/conftest.py` coleta por AST e executa os mesmos casos em processos separados;
 `pytest --cobertura` agrega cobertura dos subprocessos. Provas nativas e
 smokes remotos são separados dos casos herméticos e não usam jogos reais.
 

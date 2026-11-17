@@ -2,7 +2,7 @@ import { shell } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 
-export interface OpcoesMenu {
+interface OpcoesMenu {
   raiz: string
   aoAbrirSobre: () => void
 }
@@ -27,10 +27,6 @@ export function montarMenu(opcoes: OpcoesMenu): MenuItemConstructorOptions[] {
           role: 'toggleDevTools',
           accelerator: 'F12',
         },
-        { type: 'separator' },
-        { label: 'Aumentar zoom', role: 'zoomIn' },
-        { label: 'Diminuir zoom', role: 'zoomOut' },
-        { label: 'Zoom padrão', role: 'resetZoom' },
         { type: 'separator' },
         { label: 'Tela cheia', role: 'togglefullscreen', accelerator: 'F11' },
       ],

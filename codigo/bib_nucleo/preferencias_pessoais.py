@@ -25,7 +25,6 @@ def ler_preferencias():
             "perfis": {p: dict(perfis[p]) if isinstance(perfis.get(p), dict) else {} for p in PERFIS},
             "atalhos": {**ATALHOS, **{k: v for k, v in atalhos.items()
                                     if k in ATALHOS and isinstance(v, str)}},
-            "watch": str(dados.get("watch") or ""), "watch_auto": bool(dados.get("watch_auto", False)),
             "sponsorblock": bool(dados.get("sponsorblock", False))}
 
 

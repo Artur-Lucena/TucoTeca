@@ -31,13 +31,15 @@ entram no Git.
 - Núcleo Python stdlib; o desktop é o app Electron (`codigo/frontends/electron`,
   ponte NDJSON em `ponte.py`). A TUI curses atende Linux/macOS. Não
   reintroduzir tkinter, Qt/PySide6 nem um "modo clássico".
-- Preserve aliases legados (`BibliotecaHub.*`) e a integração S0–S8/R4/R5.
+- Raiz enxuta: só README, LICENSE, AGENTS.md, pyproject.toml, `.git*`, um
+  lançador por SO (`TucoTeca.bat`, `tucoteca.sh`) e as pastas `.github`,
+  `codigo`, `docs`. Os aliases `BibliotecaHub.*` foram removidos na 1.4.7.
 - Não reescrever o domínio para implementar a paridade visual.
 - Testes: `py -3.14 -B codigo/ferramentas/testes/executar.py [--modulo <modulo>]`.
   Suíte completa: sem argumentos. Pytest/cobertura quando disponíveis.
   Electron: `npm --prefix codigo/frontends/electron run typecheck` e `npm test`.
   Gates juntos: `py -3.14 -B codigo/ferramentas/validar.py`.
-- Lint: `ruff check codigo conftest.py` (venv própria em `.provas/venv-ruff` se
+- Lint: `ruff check codigo` (venv própria em `.provas/venv-ruff` se
   o Python global não tiver) e `git diff --check`.
 - Provas e caches ficam em `.provas/`.
 - Não reduzir gates, mascarar falhas, inventar provas físicas/remotas ou tratar
@@ -49,6 +51,6 @@ entram no Git.
 - Commits focados, staging por caminhos explícitos; não usar `git add .`.
 - Push, merge, tags e releases só com pedido explícito do usuário.
 - Nunca resetar, sobrescrever ou apagar alterações que você não criou.
-- `VERSION`, `README.md`, `CHANGELOG.md`, lock de release e publicação: por
-  pedido explícito. A versão vive em `VERSION`, `pyproject.toml` e
+- `codigo/VERSION`, `README.md`, `docs/CHANGELOG.md`, lock de release e
+  publicação: por pedido explícito. A versão vive em `codigo/VERSION`, `pyproject.toml` e
   `codigo/frontends/electron/package.json` — sempre as três juntas.

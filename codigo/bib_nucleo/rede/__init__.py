@@ -13,9 +13,6 @@ import os
 
 __all__ = ["rede_ativa", "exigir_rede"]
 
-_MODULOS = ("fontes", "repacks", "torrents", "videos_youtube",
-            "musica_online", "spotify", "online")
-
 
 def rede_ativa() -> bool:
     """Rede liberada? (default sim; `BIBLIOTECA_REDE=0` desliga)."""

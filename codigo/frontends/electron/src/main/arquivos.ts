@@ -2,7 +2,7 @@ import { net, protocol } from 'electron'
 import { createReadStream, statSync } from 'node:fs'
 import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
-import { caminhoPermitido } from './caminhos'
+import { caminhoDoPathname, caminhoPermitido } from './caminhos'
 import { caminhoDaUrlMidia, faixaRange, tipoDoArquivo } from './midia'
 
 /** Serve capas locais por `tucoteca-img://`, só de dentro da coleção. */
@@ -11,9 +11,7 @@ export function registrarProtocoloMidia(homeDe: () => string): void {
     const home = homeDe()
     let alvo: string
     try {
-      const url = new URL(pedido.url)
-      alvo = decodeURIComponent(url.pathname)
-      if (process.platform === 'win32' && /^\/[A-Za-z]:/.test(alvo)) alvo = alvo.slice(1)
+      alvo = caminhoDoPathname(new URL(pedido.url).pathname)
     } catch {
       return new Response('URL inválida', { status: 400 })
     }

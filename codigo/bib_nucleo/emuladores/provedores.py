@@ -3,10 +3,7 @@
 """Emuladores: registro de provedores (um registro, N emuladores)."""
 from __future__ import annotations
 
-import sqlite3
-
 from bib_nucleo import emuladores as _E
-from bib_nucleo.banco import contar_por_origem
 from bib_nucleo.base import ROM_EXTS_3DS
 
 
@@ -99,38 +96,11 @@ def provedor_por_extensao(ext: str) -> dict | None:
     return None
 
 
-def provedor_nome(jogo_ou_origem) -> str:
-    """'Azahar · Nintendo 3DS' p/ ROMs; origem crua p/ jogos de PC."""
-    origem = jogo_ou_origem.get("origem") if isinstance(jogo_ou_origem, dict) \
-        else jogo_ou_origem
-    prov = provedor_por_origem(origem or "")
-    if prov is None:
-        return origem or ""
-    return f"{prov['nome']} · {'/'.join(prov['sistemas'])}"
-
-
 def jogos_do_provedor(jogos: list[dict], chave: str) -> list[dict]:
     """Só os jogos que o provider consegue rodar (p/ filtro da UI)."""
     return [j for j in (jogos or [])
             if (provedor_por_origem(j.get("origem") or "") or {}).get("chave") == chave]
 
 
-def provedores_resumo(con: sqlite3.Connection) -> list[dict]:
-    """Um item por provider: chave, nome, sistemas, nº de jogos, instalado."""
-    cont = contar_por_origem(con)
-    out = []
-    for chave, prov in provedores().items():
-        n = sum(cont.get(o, 0) for o in prov["origens"])
-        try:
-            exe = prov["exe"]() or ""
-        except Exception:
-            exe = ""
-        out.append({"chave": chave, "nome": prov["nome"],
-                    "sistemas": prov["sistemas"], "n": n,
-                    "instalado": bool(exe)})
-    return out
-
-
-__all__ = ["_aplicar_preset", "_prov_azahar", "_prov_desmume", "jogos_do_provedor",
-           "provedor_nome", "provedor_por_extensao", "provedor_por_origem",
-           "provedores", "provedores_resumo"]
+__all__ = ["_aplicar_preset", "_prov_azahar", "_prov_desmume", "jogos_do_provedor", "provedor_por_extensao", "provedor_por_origem",
+           "provedores"]

@@ -112,7 +112,7 @@ export interface Historico {
   posicao: number
 }
 
-export type AcaoHistorico =
+type AcaoHistorico =
   | { tipo: 'ir'; hash: string }
   | { tipo: 'voltar' }
   | { tipo: 'avancar' }

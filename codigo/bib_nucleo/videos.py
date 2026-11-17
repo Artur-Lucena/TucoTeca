@@ -26,14 +26,6 @@ def sha_arquivo_video(p: Path) -> str:
     return h.hexdigest()
 
 
-def texto_video(v: dict | None) -> str:
-    """Rótulo único (`Canal — Título` ou só `Título`). GUI+TUI."""
-    v = v or {}
-    tit = str(v.get("titulo") or "").strip()
-    canal = str(v.get("canal") or "").strip()
-    return f"{canal} — {tit}" if canal else tit
-
-
 def varrer_videos(pasta: str | os.PathLike) -> list[dict]:
     """Lista vídeos importáveis com sha. Só leitura, nunca levanta."""
     from bib_nucleo.base import VIDEO_EXTS
@@ -107,11 +99,5 @@ def importar_videos(con: sqlite3.Connection,
     return {"novos": novos, "ignorados": ignorados, "erros": erros}
 
 
-def abrir_video(caminho: str, reprodutor: str = "auto") -> dict:
-    """Abre no reprodutor da 2.0 (ação explícita). Só delega."""
-    from bib_nucleo.reprodutores_video import reproduzir_video
-    return reproduzir_video(caminho, reprodutor=reprodutor)
-
-
-__all__ = ["sha_arquivo_video", "texto_video", "varrer_videos",
-           "importar_videos", "abrir_video"]
+__all__ = ["sha_arquivo_video", "varrer_videos",
+           "importar_videos"]

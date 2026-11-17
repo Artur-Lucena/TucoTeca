@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'preact/hooks'
-import { EmptyState } from '../../componentes/ui'
+import { BlocoDescricao, EmptyState, FichaLateral, Hero } from '../../componentes/ui'
 import { chavesDaTemporada, fracao, proximoParaAssistir, reproduzindo, rotuloEpisodio, type Episodio, type TituloCompleto } from '../../estado/midia'
-import { data } from '../../estado/formato'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { data, hojeISO } from '../../estado/formato'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { ir } from '../../estado/rota'
 
 interface Props {
   imdb: string
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /** Página de filme/série (`#/titulo/:imdb`): ficha do Cinemeta + o que você tem no disco. */
@@ -16,7 +16,6 @@ export function PaginaTitulo({ imdb, aoAvisar }: Props) {
   const [erro, setErro] = useState<string | null>(null)
   const [temporada, setTemporada] = useState<number | null>(null)
   const [versao, setVersao] = useState(0)
-  const [semFundo, setSemFundo] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -79,21 +78,27 @@ export function PaginaTitulo({ imdb, aoAvisar }: Props) {
   const arquivoFilme = !serie ? (t.arquivos ?? [])[0] : undefined
   const assistirId = serie ? proximo?.arquivo ?? null : arquivoFilme?.id ?? null
   const progressoFilme = !serie ? fracao(t.progresso) : 0
-  const fundo = !semFundo && t.fundo !== '' ? t.fundo : t.poster
   const ficha = [t.ano, t.duracao, t.nota !== '' ? `IMDb ${t.nota}` : '', t.generos.slice(0, 3).join(', ')].filter((x) => x !== '')
 
   return (
     <article class="pagina-jogo pagina-titulo">
-      <header class={`hero-jogo${semFundo || t.fundo === '' ? ' sem-hero' : ''}`}>
-        <div class="hero-arte">{fundo !== '' && <img class="hero-fundo" src={window.tucoteca.imagemUrl(fundo)} alt="" onError={() => setSemFundo(true)} />}</div>
-        <div class="hero-conteudo">
-          {t.logo !== '' ? <img class="hero-logo" src={t.logo} alt={t.nome} onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} /> : null}
-          <h1 class={`hero-titulo${t.logo !== '' ? ' so-leitor' : ''}`}>{t.nome}</h1>
-          <p class="hero-linha">
-            {serie ? 'Série' : 'Filme'}
-            {ficha.length > 0 ? ` · ${ficha.join(' · ')}` : ''}
-          </p>
-          <div class="hero-acoes">
+      <Hero
+        arte={t.fundo !== '' ? window.tucoteca.imagemUrl(t.fundo) : ''}
+        reserva={t.poster !== '' ? window.tucoteca.imagemUrl(t.poster) : ''}
+        logo={t.logo}
+        titulo={t.nome}
+        linha={`${serie ? 'Série' : 'Filme'}${ficha.length > 0 ? ` · ${ficha.join(' · ')}` : ''}`}
+        rodape={
+          !serie &&
+          progressoFilme > 0 &&
+          progressoFilme < 1 && (
+            <span class="cartao-titulo-barra hero-barra">
+              <span style={{ width: `${Math.round(progressoFilme * 100)}%` }} />
+            </span>
+          )
+        }
+        acoes={
+          <>
             {assistirId !== null ? (
               <button type="button" class="acao primaria hero-jogar" onClick={() => (reproduzindo.value = assistirId)}>
                 ▶ {serie && proximo ? `Assistir ${rotuloEpisodio(proximo.temporada, proximo.episodio)}` : progressoFilme > 0 && progressoFilme < 1 ? 'Continuar' : 'Assistir'}
@@ -116,25 +121,13 @@ export function PaginaTitulo({ imdb, aoAvisar }: Props) {
                 {t.progresso?.assistido ? 'Marcar como não visto' : 'Marcar como visto'}
               </button>
             )}
-          </div>
-          {!serie && progressoFilme > 0 && progressoFilme < 1 && (
-            <span class="cartao-titulo-barra hero-barra">
-              <span style={{ width: `${Math.round(progressoFilme * 100)}%` }} />
-            </span>
-          )}
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <div class="sobre-jogo">
         <div class="sobre-principal">
-          {t.descricao !== '' && (
-            <section class="bloco-jogo">
-              <h3>Sinopse</h3>
-              <div class="descricao-jogo">
-                <p>{t.descricao}</p>
-              </div>
-            </section>
-          )}
+          <BlocoDescricao titulo="Sinopse" texto={t.descricao} />
           {serie && atual !== undefined && (
             <section class="bloco-jogo">
               <div class="bloco-topo">
@@ -157,10 +150,12 @@ export function PaginaTitulo({ imdb, aoAvisar }: Props) {
             </section>
           )}
         </div>
-        <aside class="ficha-jogo">
-          {t.poster !== '' && <img class="ficha-capa" src={window.tucoteca.imagemUrl(t.poster)} alt="" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />}
-          {!serie && (t.arquivos ?? []).length > 0 && (
-            <dl>
+        <FichaLateral
+          capa={t.poster !== '' ? window.tucoteca.imagemUrl(t.poster) : ''}
+          origem="Cinemeta (em inglês)"
+          extras={
+            !serie &&
+            (t.arquivos ?? []).length > 0 && (
               <div>
                 <dt>No disco</dt>
                 {(t.arquivos ?? []).map((a) => (
@@ -169,10 +164,9 @@ export function PaginaTitulo({ imdb, aoAvisar }: Props) {
                   </dd>
                 ))}
               </div>
-            </dl>
-          )}
-          <p class="sub origem-dados">Dados: Cinemeta (em inglês)</p>
-        </aside>
+            )
+          }
+        />
       </div>
     </article>
   )
@@ -181,7 +175,7 @@ export function PaginaTitulo({ imdb, aoAvisar }: Props) {
 function LinhaEpisodio({ e, aoMarcar }: { e: Episodio; aoMarcar: (assistido: boolean) => void }) {
   const visto = e.progresso?.assistido ?? false
   const f = fracao(e.progresso)
-  const futuro = e.estreia !== '' && e.estreia > new Date().toISOString().slice(0, 10)
+  const futuro = e.estreia !== '' && e.estreia > hojeISO()
   return (
     <li class={`episodio${visto ? ' visto' : ''}${e.arquivo === null ? ' fora-do-disco' : ''}`}>
       <span class="episodio-miniatura">

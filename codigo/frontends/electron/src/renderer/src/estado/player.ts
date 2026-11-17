@@ -13,9 +13,9 @@ export interface Faixa {
 
 export type ModoPlayer = 'sequencia' | 'repetir' | 'aleatorio'
 
-export type EstadoFaixa = 'parado' | 'tocando' | 'pausado'
+type EstadoFaixa = 'parado' | 'tocando' | 'pausado'
 
-export interface EstadoPlayer {
+interface EstadoPlayer {
   fila: Faixa[]
   indice: number
   modo: ModoPlayer
@@ -85,7 +85,7 @@ export function cicloModo(estado: EstadoPlayer): EstadoPlayer {
 }
 
 /** Índice sorteado diferente do atual (fila ≤ 1 mantém o atual). */
-export function indiceAleatorio(estado: EstadoPlayer, sorteio = Math.random): number {
+function indiceAleatorio(estado: EstadoPlayer, sorteio = Math.random): number {
   if (estado.fila.length <= 1) return estado.indice
   let alvo = estado.indice
   for (let tentativa = 0; tentativa < 20 && alvo === estado.indice; tentativa += 1) {

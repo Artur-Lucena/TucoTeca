@@ -1,5 +1,5 @@
 import { signal } from '@preact/signals'
-import { semAcento } from './jogos'
+import { hojeISO, semAcento } from './formato'
 
 /** Arquivo aberto no player interno (o App desenha o player por cima de tudo). */
 export const reproduzindo = signal<number | null>(null)
@@ -80,7 +80,7 @@ export function proximoParaAssistir(temporadas: Temporada[] | undefined): Episod
   return noDisco.find((e) => !(e.progresso?.assistido ?? false)) ?? noDisco[0] ?? null
 }
 
-export interface GrupoCalendario<T> {
+interface GrupoCalendario<T> {
   rotulo: string
   itens: T[]
 }
@@ -104,6 +104,16 @@ export function agruparPorDia<T extends { data: string }>(itens: T[], hoje: Date
 
 /** Chaves de todos os episódios de uma temporada (para "marcar temporada como vista"). */
 export function chavesDaTemporada(t: Temporada, apenasLancados = true, hoje: Date = new Date()): string[] {
-  const limite = hoje.toISOString().slice(0, 10)
+  const limite = hojeISO(hoje)
   return t.episodios.filter((e) => !apenasLancados || (e.estreia !== '' && e.estreia <= limite) || e.arquivo !== null).map((e) => e.chave)
+}
+
+/** Busca por título ou canal, todas as palavras, sem acento. */
+export function filtrarVideos<T extends { titulo?: unknown; canal?: unknown }>(videos: T[], busca: string): T[] {
+  const palavras = semAcento(busca).split(/\s+/).filter(Boolean)
+  if (palavras.length === 0) return videos
+  return videos.filter((v) => {
+    const alvo = semAcento(`${String(v.titulo ?? '')} ${String(v.canal ?? '')}`)
+    return palavras.every((p) => alvo.includes(p))
+  })
 }

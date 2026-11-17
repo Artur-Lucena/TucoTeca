@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'preact/hooks'
 import { acaoDaIntegracao, rotuloTipo, selosDaIntegracao, type IntegracaoDTO } from '../../estado/integracoes'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
   /** Navegação interna (o card de download manda para a tela Downloads). */
   aoNavegar: (secao: string) => void
 }

@@ -18,18 +18,16 @@ IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git", ".provas",
              ".pytest_cache", ".ruff_cache", ".venv",
              # artefatos do app Electron (dependências e builds), não fontes
              "node_modules", "out", "dist"}
-RAIZ_ARQUIVOS = {"README.md", "docs/CONTRIBUTING.md", "LICENSE", ".gitignore", ".gitattributes",
-                 "BibliotecaHub.bat", "BibliotecaHub.sh", "BibliotecaHubMac.command"}
-RAIZ_ARQUIVOS.update({"TucoTeca.bat", "VERSION", "CHANGELOG.md", "docs/SECURITY.md",
-                      "pyproject.toml", "conftest.py", "AGENTS.md"})
-EXTENSOES = {"codigo": {".py", ".bat",
+RAIZ_ARQUIVOS = {"README.md", "LICENSE", ".gitignore", ".gitattributes", "AGENTS.md",
+                 "pyproject.toml", "TucoTeca.bat", "tucoteca.sh"}
+EXTENSOES = {"codigo": {".py",
                         # interface Electron (main/preload/renderer, config e ícone)
                         ".ts", ".tsx", ".css", ".html", ".json", ".cjs", ".ico"},
-             "docs": {".md"},
-              ".github": {".yml", ".yaml", ".md"}, "midia": {".png", ".jpg", ".jpeg"}}
+             "docs": {".md", ".py"},
+             ".github": {".yml", ".yaml", ".md"}}
 
 # arquivos sem extensão útil que também são fonte
-NOMES_EXTRAS = {".gitignore"}
+NOMES_EXTRAS = {".gitignore", "VERSION"}
 
 
 def _link(path: Path) -> bool:
@@ -73,8 +71,8 @@ def empacotar_fontes(destino: Path, repo: Path = REPO, revisao: str | None = Non
     manifesto: dict[str, Any] = {"esquema": 1, "projeto": "TucoTeca", "origem": "árvore de trabalho",
                   "gerado_em": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   "arquivos": {}}
-    if (repo / "VERSION").is_file():
-        manifesto["versao"] = (repo / "VERSION").read_text(encoding="utf-8").strip()
+    if (repo / "codigo/VERSION").is_file():
+        manifesto["versao"] = (repo / "codigo/VERSION").read_text(encoding="utf-8").strip()
     if revisao is not None:
         manifesto["revisao_git"] = revisao
     with destino_temporario(destino) as tmp, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as out:

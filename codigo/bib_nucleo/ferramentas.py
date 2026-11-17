@@ -199,14 +199,6 @@ def comando_externo(executavel: str) -> list[str]:
     return [executavel]
 
 
-def resumo_ferramentas() -> list[dict]:
-    out = []
-    for nome in FERRAMENTAS:
-        exe = localizar_ferramenta(nome)
-        out.append({"nome": nome, "executavel": exe, "incluido": bool(exe)})
-    return out
-
-
 __all__ = ["MANIFESTO_RUNTIME", "raiz_runtime", "runtime_portatil", "pasta_ferramentas",
-           "manifesto_runtime", "localizar_ferramenta", "emulador_local_dir", "resumo_ferramentas",
+           "manifesto_runtime", "localizar_ferramenta", "emulador_local_dir",
             "comando_externo", "ferramenta_suportada"]

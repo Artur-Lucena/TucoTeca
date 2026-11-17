@@ -1,4 +1,4 @@
-"""S7 (fluxos externos): letras LRCLIB, capa LibRetro, desejo -> fontes -> coleção.
+"""Fluxos externos: letras LRCLIB, capa LibRetro, desejo -> fontes -> coleção.
 
 Tudo hermético: rede simulada e banco em arquivo temporário.
 """

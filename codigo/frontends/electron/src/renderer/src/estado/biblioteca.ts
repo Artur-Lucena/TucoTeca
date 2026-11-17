@@ -1,10 +1,10 @@
 import type { JogoResumo } from './derivacoes'
-import { semAcento } from './jogos'
+import { semAcento } from './formato'
 
 /** Recorte da biblioteca lateral (à la Hydra): todos, favoritos ou jogados recentemente. */
 export type ModoBiblioteca = 'todos' | 'favoritos' | 'recentes'
 
-export interface ItemBiblioteca {
+interface ItemBiblioteca {
   id: number
   titulo: string
   capa_url: string
@@ -56,7 +56,7 @@ export function itensBiblioteca(
   }))
 }
 
-export interface Janela {
+interface Janela {
   inicio: number
   fim: number
   /** Espaço (px) acima e abaixo dos itens desenhados. */

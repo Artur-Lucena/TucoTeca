@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lerDiagnostico, tamanhoLegivel } from './manutencao'
+import { lerDiagnostico } from './manutencao'
 
 describe('lerDiagnostico', () => {
   it('tudo ok não sugere reparo', () => {
@@ -28,14 +28,5 @@ describe('lerDiagnostico', () => {
     expect(lerDiagnostico({ exe: { estado: 'ausente', gravado: 'C:/x.exe' }, rom: {} }).linhas[0]).toBe(
       'Executável não encontrado: C:/x.exe',
     )
-  })
-})
-
-describe('tamanhoLegivel', () => {
-  it('escala as unidades', () => {
-    expect(tamanhoLegivel(512)).toBe('512 B')
-    expect(tamanhoLegivel(1536)).toBe('1,5 KB')
-    expect(tamanhoLegivel(42 * 1024 ** 3)).toBe('42 GB')
-    expect(tamanhoLegivel(-1)).toBe('—')
   })
 })

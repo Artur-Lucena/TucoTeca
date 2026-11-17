@@ -30,7 +30,7 @@ capacidade nova não exige mexer na interface.
 
 ### Passo 1 — criar o módulo de rede
 
-Copie `codigo/bib_nucleo/rede/_modelo.py` para
+Copie `docs/exemplos/provedor_modelo.py` para
 `codigo/bib_nucleo/rede/<fonte>.py` e ajuste. Ele já traz o esqueleto de
 `buscar`/`detalhes` com validação de entrada, `rede_ativa()`, timeout curto,
 User-Agent e retorno simples — e é **importável sem efeito colateral**
@@ -137,7 +137,7 @@ A tela Configurações › Dados dos jogos lista os provedores sozinha
 
 ## Ponteiros
 
-- Template copiável: `codigo/bib_nucleo/rede/_modelo.py`.
+- Template copiável: `docs/exemplos/provedor_modelo.py`.
 - Registro e capacidades: `codigo/frontends/servicos_ui/integracoes.py`.
 - Provedores reais de referência: `codigo/bib_nucleo/rede/musica_online.py`,
   `metadados.py`.

@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'preact/hooks'
-import { snapshot } from '../../estado/dados'
-import { EmptyState } from '../../componentes/ui'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { NavegadorYouTube } from '../../componentes/midia/NavegadorYouTube'
 import { listaTrabalhos } from '../../estado/trabalhos'
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
   aoMudou: () => void
 }
 
@@ -19,9 +17,8 @@ interface ResultadoYouTube {
   thumb?: string
 }
 
-/** Tela YouTube: busca online + biblioteca local + download/MP3. */
+/** Tela YouTube: busca online, assistir embutido e baixar vídeo/MP3 (os baixados ficam em Vídeos). */
 export function YouTube({ aoAvisar, aoMudou }: Props) {
-  const videos = (snapshot.value?.videos ?? []) as Array<Record<string, unknown>>
   const [termo, setTermo] = useState('')
   const [resultados, setResultados] = useState<ResultadoYouTube[]>([])
   const [buscando, setBuscando] = useState(false)
@@ -127,23 +124,6 @@ export function YouTube({ aoAvisar, aoMudou }: Props) {
                   MP3
                 </button>
               </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <h2>Videoteca local ({videos.length})</h2>
-      {videos.length === 0 ? (
-        <EmptyState icone="▶" titulo="Nada importado ainda." descricao="Busque e baixe vídeos do YouTube." />
-      ) : (
-        <ul class="lista-videos">
-          {videos.map((video, posicao) => (
-            <li class="linha" key={String(video.id ?? posicao)}>
-              <span class="video-icone">▶</span>
-              <span class="video-textos">
-                <strong>{String(video.titulo ?? '')}</strong>
-                <span>{String(video.canal ?? '')}</span>
-              </span>
             </li>
           ))}
         </ul>

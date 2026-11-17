@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 
 interface Sessao {
-  arquivo: number
   caminho: string
   chave: string
   titulo: string
@@ -10,21 +9,32 @@ interface Sessao {
   legendas: Array<{ indice: number; idioma: string }>
 }
 
+/** De onde vem o vídeo: arquivo de Filmes e Séries ou item da videoteca (YouTube baixado). */
+type FontePlayer =
+  | { tipo: 'midia'; arquivo: number }
+  | { tipo: 'videoteca'; id: number; caminho: string; titulo: string }
+
 interface Props {
-  arquivo: number
+  fonte: FontePlayer
   aoFechar: () => void
   aoMudou: () => void
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 const SALVAR_A_CADA = 10_000
 
+async function abrirSessao(fonte: FontePlayer): Promise<Sessao> {
+  if (fonte.tipo === 'midia') return window.tucoteca.chamar<Sessao>('midia.reproduzir', { arquivo: fonte.arquivo })
+  const r = await window.tucoteca.chamar<{ titulo?: string; posicao?: number; sha?: string }>('videos.local', { id: fonte.id })
+  return { caminho: fonte.caminho, chave: String(r.sha ?? ''), titulo: String(r.titulo || fonte.titulo), posicao: Number(r.posicao ?? 0), legendas: [] }
+}
+
 /**
- * Player interno de Filmes e Séries: retoma de onde parou, legendas locais
- * (SRT/VTT viram VTT na ponte) e progresso salvo a cada 10 s, ao pausar e ao
- * fechar. Formato que o Chromium não toca → oferece o reprodutor externo.
+ * Player interno (Filmes e Séries e vídeos baixados): retoma de onde parou,
+ * legendas locais (SRT/VTT viram VTT na ponte) e progresso salvo a cada 10 s,
+ * ao pausar e ao fechar. Formato que o Chromium não toca → reprodutor externo.
  */
-export function PlayerVideo({ arquivo, aoFechar, aoMudou, aoAvisar }: Props) {
+export function PlayerVideo({ fonte, aoFechar, aoMudou, aoAvisar }: Props) {
   const [sessao, setSessao] = useState<Sessao | null>(null)
   const [faixas, setFaixas] = useState<Array<{ idioma: string; url: string }>>([])
   const [semSuporte, setSemSuporte] = useState(false)
@@ -36,13 +46,14 @@ export function PlayerVideo({ arquivo, aoFechar, aoMudou, aoAvisar }: Props) {
     const urls: string[] = []
     void (async () => {
       try {
-        const s = await window.tucoteca.chamar<Sessao>('midia.reproduzir', { arquivo })
+        const s = await abrirSessao(fonte)
         if (!vivo) return
         setSessao(s)
         const carregadas: Array<{ idioma: string; url: string }> = []
         for (const leg of s.legendas) {
           try {
-            const r = await window.tucoteca.chamar<{ vtt: string }>('midia.legenda', { arquivo, indice: leg.indice })
+            if (fonte.tipo !== 'midia') break
+            const r = await window.tucoteca.chamar<{ vtt: string }>('midia.legenda', { arquivo: fonte.arquivo, indice: leg.indice })
             const url = URL.createObjectURL(new Blob([r.vtt], { type: 'text/vtt' }))
             urls.push(url)
             carregadas.push({ idioma: leg.idioma, url })
@@ -60,18 +71,20 @@ export function PlayerVideo({ arquivo, aoFechar, aoMudou, aoAvisar }: Props) {
       vivo = false
       for (const u of urls) URL.revokeObjectURL(u)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- abre uma vez por arquivo
-  }, [arquivo])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- abre uma vez por fonte (o pai remonta por `key`)
+  }, [])
 
   const salvar = (forcar = false) => {
     const v = video.current
-    if (v === null || sessao === null || !Number.isFinite(v.duration) || v.duration <= 0) return
+    if (v === null || sessao === null || sessao.chave === '' || !Number.isFinite(v.duration) || v.duration <= 0) return
     const agora = Date.now()
     if (!forcar && agora - ultimoSalvo.current < SALVAR_A_CADA) return
     ultimoSalvo.current = agora
-    void window.tucoteca
-      .chamar('midia.salvar_posicao', { chave: sessao.chave, posicao: v.currentTime, duracao: v.duration })
-      .catch(() => undefined)
+    const pedido =
+      fonte.tipo === 'midia'
+        ? window.tucoteca.chamar('midia.salvar_posicao', { chave: sessao.chave, posicao: v.currentTime, duracao: v.duration })
+        : window.tucoteca.chamar('videos.salvar_posicao', { sha: sessao.chave, posicao: v.currentTime })
+    void pedido.catch(() => undefined)
   }
 
   const fechar = () => {
@@ -94,7 +107,8 @@ export function PlayerVideo({ arquivo, aoFechar, aoMudou, aoAvisar }: Props) {
   const externo = async () => {
     try {
       salvar(true)
-      await window.tucoteca.chamar('midia.externo', { arquivo })
+      if (fonte.tipo === 'midia') await window.tucoteca.chamar('midia.externo', { arquivo: fonte.arquivo })
+      else await window.tucoteca.chamar('videos.reproduzir', { id: fonte.id, reprodutor: 'auto' })
       aoAvisar('Abrindo no reprodutor externo.')
       aoFechar()
     } catch (falha) {

@@ -1,23 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Contratos da interface desktop, independentes de Qt e de widgets.
+"""Casos de uso do desktop: `ServicoBiblioteca` composto de mixins por domínio.
 
-Pacote por contrato (F3 do O2): `integracoes`, `sistema` e mixins por
-dominio (`mix_*`). Compat total: `from servicos_ui import ServicoBiblioteca`
-(único patch em testes é `ServicoBiblioteca.jogo`, que continua valendo —
-classe definida uma vez aqui) e todos os nomes de módulo continuam iguais.
+Consumidores usam `from servicos_ui import ServicoBiblioteca`; o resto
+(`integracoes`, `sistema`, `modulos`, `mix_*`) é importado do módulo dono.
 """
 from __future__ import annotations
 
 from .integracoes import (
-    _CORES,
-    CHAVES_PADRAO,
-    INTEGRACAO_TIPOS,
-    Integracao,
-    RegistroIntegracoes,
     _arquivo_personalizadas,
-    _validar_personalizada,
-    carregar_personalizadas,
     integracoes_padrao,
     remover_personalizada,
     salvar_personalizada,
@@ -37,8 +28,6 @@ from .mix_saneamento import MixSaneamento
 from .mix_scans import MixScans
 from .mix_sessoes import MixSessoes
 from .mix_torrents import MixTorrents
-from .modulos import Modulo, modulos_padrao
-from .sistema import _sem_acento, busca_global, capa_url, resumo_sistema, saude_colecao
 
 
 class ServicoBiblioteca(MixNucleo, MixScans, MixSaneamento, MixSessoes,
@@ -63,14 +52,4 @@ class ServicoBiblioteca(MixNucleo, MixScans, MixSaneamento, MixSessoes,
         return _url_integracao(self.integracoes, chave, termo)
 
 
-__all__ = ["ServicoBiblioteca", "Integracao", "RegistroIntegracoes",
-           "INTEGRACAO_TIPOS", "CHAVES_PADRAO", "_CORES",
-           "Modulo", "modulos_padrao",
-           "_arquivo_personalizadas", "carregar_personalizadas",
-           "_validar_personalizada", "salvar_personalizada",
-           "remover_personalizada", "integracoes_padrao", "url_integracao",
-           "capa_url", "resumo_sistema", "saude_colecao", "_sem_acento",
-           "busca_global"]
-
-# Reexport com o nome historico p/ `from servicos_ui import url_integracao`.
-url_integracao = _url_integracao
+__all__ = ["ServicoBiblioteca", "_arquivo_personalizadas"]

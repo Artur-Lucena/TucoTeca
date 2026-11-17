@@ -8,8 +8,8 @@ Fluxo (detalhado em docs/RELEASES.md):
     npm --prefix codigo/frontends/electron run dist
     py -3.14 -B codigo/ferramentas/preparar_release.py --revisao <SHA> --saida dist/release/v<versao>
 
-Exige checkout limpo no SHA informado, versões coerentes (VERSION,
-pyproject.toml e seção no CHANGELOG), o instalador da mesma versão e a
+Exige checkout limpo no SHA informado, versões coerentes (codigo/VERSION,
+pyproject.toml e seção em docs/CHANGELOG.md), o instalador da mesma versão e a
 árvore `win-unpacked` sem dados pessoais. Não publica nada: criar a release
 no GitHub é um passo posterior e explícito. Recusa sobrescrever entregas.
 """
@@ -39,8 +39,8 @@ PROIBIDOS = re.compile(
 
 
 def ler_versao(repo: Path = REPO) -> str:
-    """VERSION manda; pyproject e CHANGELOG precisam concordar."""
-    versao = (repo / "VERSION").read_text(encoding="utf-8").strip()
+    """codigo/VERSION manda; pyproject, package.json e CHANGELOG precisam concordar."""
+    versao = (repo / "codigo/VERSION").read_text(encoding="utf-8").strip()
     if not re.fullmatch(r"\d+\.\d+\.\d+", versao):
         raise ValueError(f"VERSION inválido: {versao!r}")
     # regex em vez de tomllib: o projeto ainda suporta Python 3.10
@@ -60,7 +60,7 @@ def ler_versao(repo: Path = REPO) -> str:
 
 
 def secao_changelog(repo: Path, versao: str) -> str:
-    texto = (repo / "CHANGELOG.md").read_text(encoding="utf-8")
+    texto = (repo / "docs/CHANGELOG.md").read_text(encoding="utf-8")
     m = re.search(rf"^## \[{re.escape(versao)}\][^\n]*\n(.*?)(?=^## \[|\Z)", texto, re.M | re.S)
     return m.group(1).strip() if m else ""
 
@@ -98,18 +98,18 @@ def localizar_instalador(dist: Path, versao: str) -> Path:
     return instalador
 
 
+# o que o app instalado precisa para abrir a ponte (conferido em win-unpacked)
+ESSENCIAIS_APP = ("codigo/frontends/ponte.py", "codigo/frontends/ponte_paridade.py",
+                  "codigo/frontends/ponte_params.py", "codigo/frontends/ponte_dominios.py",
+                  "codigo/bib_core.py", "codigo/ferramentas/abrir_hub.py", "codigo/VERSION", "LICENSE")
+
+
 def conferir_app(dist: Path, exigir_runtime: bool = True) -> dict:
     """Confere a árvore win-unpacked que gerou o instalador."""
     recursos = dist / "win-unpacked" / "resources" / "tucoteca"
     if not recursos.is_dir():
         raise ValueError(f"{recursos} ausente: o instalador não veio do build atual")
-    for obrigatorio in ("codigo/frontends/ponte.py", "codigo/frontends/ponte_paridade.py",
-                        "codigo/frontends/ponte_params.py",
-                        "codigo/frontends/ponte_meta.py",
-                        "codigo/frontends/ponte_colecoes.py",
-                        "codigo/frontends/ponte_midia.py",
-                        "codigo/bib_core.py",
-                        "codigo/ferramentas/abrir_hub.py", "VERSION", "LICENSE"):
+    for obrigatorio in ESSENCIAIS_APP:
         if not (recursos / obrigatorio).is_file():
             raise ValueError(f"app empacotado sem {obrigatorio}")
     proibidos = sorted(p.relative_to(recursos).as_posix() for p in recursos.rglob("*")
@@ -124,7 +124,7 @@ def conferir_app(dist: Path, exigir_runtime: bool = True) -> dict:
     if marcador.is_file():
         versao_runtime = json.loads(marcador.read_text(encoding="utf-8")).get("versao")
     return {"python_embutido": python.is_file(), "python_versao": versao_runtime,
-            "versao_app": (recursos / "VERSION").read_text(encoding="utf-8").strip()}
+            "versao_app": (recursos / "codigo/VERSION").read_text(encoding="utf-8").strip()}
 
 
 NOTAS = """# TucoTeca {versao}
@@ -157,7 +157,7 @@ def escrever_notas(destino: Path, versao: str, revisao: str, instalador: str,
         "instalado (`py -3.14`).\n")
     texto = NOTAS.format(versao=versao, revisao=revisao, instalador=instalador,
                          data=datetime.date.today().isoformat(), aviso_runtime=aviso,
-                         novidades=novidades or "Veja CHANGELOG.md.")
+                         novidades=novidades or "Veja docs/CHANGELOG.md.")
     caminho = destino / "NOTAS-RELEASE.md"
     caminho.write_text(texto, encoding="utf-8")
     return caminho

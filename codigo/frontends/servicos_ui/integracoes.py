@@ -22,7 +22,7 @@ declara, num vocabulario fixo (`CAPACIDADES`), o que a integracao faz:
 exports e formatos atuais continuam validos: `capacidades` tem default `()`.
 
 Para adicionar uma integracao em 3 passos (modulo de rede -> registro aqui ->
-teste hermetico), copie `bib_nucleo/rede/_modelo.py` e siga
+teste hermetico), copie `docs/exemplos/provedor_modelo.py` e siga
 `docs/INTEGRACOES.md`.
 """
 from __future__ import annotations

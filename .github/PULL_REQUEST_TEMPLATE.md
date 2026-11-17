@@ -15,6 +15,6 @@ npm --prefix codigo/frontends/electron run typecheck
 **Checklist**
 - [ ] Suíte Python e vitest verdes
 - [ ] `git diff --check` limpo (sem espaços no fim / conflitos)
-- [ ] Docs atualizadas (`ARQUITETURA.md`, `DESKTOP_ELECTRON.md`, `CHANGELOG.md`)
+- [ ] Docs atualizadas (`ARQUITETURA.md`, `DESKTOP_ELECTRON.md`, `docs/CHANGELOG.md`)
 - [ ] Nenhum dado pessoal/coleção incluído no diff
 - [ ] Sem segredos (tokens, credenciais)

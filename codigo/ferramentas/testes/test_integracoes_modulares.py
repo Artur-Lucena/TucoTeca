@@ -31,8 +31,19 @@ def _modo_aviao():
     return _Ctx()
 
 
+def _carregar_modelo():
+    """O template mora em docs/exemplos (fora do pacote instalado)."""
+    import importlib.util
+    from pathlib import Path
+    arq = Path(__file__).resolve().parents[3] / "docs" / "exemplos" / "provedor_modelo.py"
+    spec = importlib.util.spec_from_file_location("provedor_modelo", arq)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def teste_modelo_rede_importavel_e_valida_entrada_sem_efeito_colateral():
-    from bib_nucleo.rede import _modelo
+    _modelo = _carregar_modelo()
     from servicos_ui.integracoes import CAPACIDADES, integracoes_padrao
     afirmar(callable(_modelo.buscar) and callable(_modelo.detalhes), "template sem funcoes")
     afirmar(_modelo.FONTE and _modelo.NOME, "template sem identidade")
@@ -57,7 +68,7 @@ def teste_modelo_rede_importavel_e_valida_entrada_sem_efeito_colateral():
 
 
 def teste_modelo_rede_respeita_modo_aviao():
-    from bib_nucleo.rede import _modelo
+    _modelo = _carregar_modelo()
     with _modo_aviao():
         afirmar(_modelo.buscar("jogo legal") == [], "busca tentou rede no modo aviao")
         afirmar(_modelo.detalhes("abc-123") is None, "detalhes tentou rede no modo aviao")

@@ -1,4 +1,4 @@
-"""Persistência da wishlist local; contrato público reexportado por banco.py."""
+"""Persistência da wishlist local; contrato público reexportado por banco/."""
 from __future__ import annotations
 
 import sqlite3

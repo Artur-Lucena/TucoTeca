@@ -1,6 +1,6 @@
 import { signal } from '@preact/signals'
 
-export interface OpcoesConfirmacao {
+interface OpcoesConfirmacao {
   titulo: string
   texto: string
   /** Rótulo do botão de confirmar (padrão "Confirmar"). */
@@ -9,7 +9,7 @@ export interface OpcoesConfirmacao {
   perigo?: boolean
 }
 
-export interface PedidoConfirmacao extends OpcoesConfirmacao {
+interface PedidoConfirmacao extends OpcoesConfirmacao {
   resolver: (ok: boolean) => void
 }
 

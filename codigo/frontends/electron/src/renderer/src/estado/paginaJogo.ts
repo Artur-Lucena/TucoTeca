@@ -2,7 +2,7 @@ import type { JogoDaLista } from './jogos'
 import { horas as formatarHoras, relativo } from './formato'
 import { ABAS_JOGO } from './rota'
 
-export interface ConquistaRetro {
+interface ConquistaRetro {
   id: number
   titulo: string
   descricao: string
@@ -11,7 +11,7 @@ export interface ConquistaRetro {
   hardcore: boolean
 }
 
-export interface RetroProgresso {
+interface RetroProgresso {
   id: string
   titulo: string
   console: string
@@ -22,7 +22,7 @@ export interface RetroProgresso {
   conquistas: ConquistaRetro[]
 }
 
-export interface MetaJogo {
+interface MetaJogo {
   steam_appid: string
   sgdb_id: string
   retro_id: string
@@ -122,7 +122,7 @@ export function normalizarPagina(bruto: unknown): PaginaJogo {
   }
 }
 
-export interface Metrica {
+interface Metrica {
   rotulo: string
   valor: string
 }

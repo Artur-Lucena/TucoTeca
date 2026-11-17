@@ -124,14 +124,6 @@ def _precos_lote(appids: list[str], regiao: str, timeout: int = 15) -> dict:
     return saida
 
 
-def preco_steam(appid: str, regiao: str = "br", timeout: int = 15):
-    """Preço do app em centavos (ou `gratis`); None sem rede/appid inválido."""
-    appid = str(appid or "").strip()
-    if not appid.isdigit():
-        return None
-    return _precos_lote([appid], (regiao or "br").lower(), timeout).get(appid)
-
-
 def _cache_precos_path():
     from bib_nucleo import base
     return base.DADOS_DIR / "precos-steam.json"

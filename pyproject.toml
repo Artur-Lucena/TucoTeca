@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tucoteca"
-version = "1.4.6"
+version = "1.4.7"
 description = "Hub local-first de jogos, musicas e videos (nucleo Python stdlib + desktop Electron)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,9 +26,6 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "coverage>=7", "ruff>=0.6", "mypy>=1.11"]
-
-[project.scripts]
-tucoteca = "frontends.desktop:main"
 
 [tool.setuptools]
 package-dir = { "" = "codigo" }
@@ -67,21 +64,19 @@ select = ["E", "F", "W", "I"]
 #
 # E501 - linhas longas sao preferidas a quebrar contrato/mensagem de erro.
 # E402 - imports no meio do arquivo quebram ciclos de importacao de proposito
-#        (banco<->banco_desejos, scans<->scans_hydra,
+#        (banco<->banco/desejos, scans<->scans/hydra,
 #        emuladores<->sessoes_manuais, musicas<->rede.metadados,
 #        baixar<->rede.binarios) ou antecedem o ajuste de sys.path nos
 #        builders. Mover para o topo quebraria o carregamento do nucleo;
 #        a convencao esta documentada em docs/CONTRIBUTING.md e docs/ARQUITETURA.md.
-# F403 - as fachadas de pacote (scans/, emuladores/) reexportam via
-#        `import *` + `__all__` para preservar os contratos das fatias F1/F2;
-#        bib_core.py passou a usar imports nomeados (lista literal __all__).
-ignore = ["E501", "E402", "F403"]
+ignore = ["E501", "E402"]
 
 [tool.ruff.lint.per-file-ignores]
 # F401 na fachada do pacote: os reexports (inclusive `_privados` e os
 # modulos `os`/`shutil`/`subprocess`, alvos de monkeypatch nos testes)
 # SAO o contrato de compatibilidade com o antigo `emuladores.py`; a
 # cobertura nominal e provada pelo teste de completude da fatia F1.
-"codigo/bib_nucleo/emuladores/__init__.py" = ["F401", "F405"]
+# F403: essas fachadas reexportam via `import *` + `__all__`.
+"codigo/bib_nucleo/emuladores/__init__.py" = ["F401", "F403", "F405"]
 # Idem p/ a fachada do pacote de scans (F2 do O2).
-"codigo/bib_nucleo/scans/__init__.py" = ["F401", "F405"]
+"codigo/bib_nucleo/scans/__init__.py" = ["F401", "F403", "F405"]

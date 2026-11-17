@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { confirmar } from '../../componentes/ui/Confirmacao'
 import { EmptyState, Modal } from '../../componentes/ui'
 import { filtrarTitulos, type FiltroTipo, type TituloResumo } from '../../estado/midia'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { GradeTitulos } from './GradeTitulos'
 
 interface Pasta {
@@ -29,7 +29,7 @@ interface Biblioteca {
 }
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /** Minha biblioteca: pastas escolhidas, varredura, títulos no disco e correspondências a revisar. */

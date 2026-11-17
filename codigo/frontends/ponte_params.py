@@ -10,7 +10,7 @@ inteiro positivo", "X deve ser um de: a, b".
 
 Uso no handler:
     caminho = texto(params, "caminho")
-    ident = inteiro(params, "id", positivo=True)
+    jogo = ident(params)
     acao = opcao(params, "acao", ("pausar", "retomar"))
 """
 from __future__ import annotations
@@ -49,6 +49,11 @@ def inteiro(params: dict, chave: str, positivo: bool = False) -> int:
     return valor
 
 
+def ident(params: dict, chave: str = "id") -> int:
+    """Identificador local (inteiro positivo)."""
+    return inteiro(params, chave, positivo=True)
+
+
 def opcao(params: dict, chave: str, opcoes: Iterable[str]) -> str:
     """Valor de um vocabulário fechado."""
     opcoes = tuple(opcoes)
@@ -72,4 +77,4 @@ def lista(params: dict, chave: str) -> list:
     return valor
 
 
-__all__ = ["texto", "inteiro", "opcao", "objeto", "lista"]
+__all__ = ["texto", "inteiro", "ident", "opcao", "objeto", "lista"]

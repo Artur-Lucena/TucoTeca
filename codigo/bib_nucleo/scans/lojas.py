@@ -109,7 +109,7 @@ def find_hydra_db() -> Path | None:
     return None
 
 
-from bib_nucleo.scans_hydra import (
+from bib_nucleo.scans.hydra import (
     EXEC_RE,
     OBJID_RE,
     PLAYTIME_RE,

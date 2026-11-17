@@ -1,9 +1,8 @@
-import { modoTv } from '../../navegacao/foco'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { PosterCard } from '../../componentes/jogo/PosterCard'
 import { PreviaImportacao } from '../../componentes/jogo/PreviaImportacao'
 import { EmptyState } from '../../componentes/ui'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { saude, snapshot } from '../../estado/dados'
 import { juntarPrevias, type ItemPrevia } from '../../estado/importacao'
 import {
@@ -15,6 +14,7 @@ import {
   type JogoDaLista,
   type OrdemJogo,
 } from '../../estado/jogos'
+import { teclaDaLista } from '../../navegacao/setas'
 
 const ROTULO_FILTRO: Record<FiltroJogo, string> = {
   todos: 'Todos',
@@ -42,7 +42,7 @@ interface Props {
   /** Joga o jogo selecionado (botão Jogar, duplo clique e Enter). */
   aoJogarJogo?: (id: number) => void
   /** Toast global. */
-  aoAvisar?: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar?: AoAvisar
   /** Recarrega snapshot após mutação. */
   aoMudou?: () => void
 }
@@ -155,14 +155,8 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
 
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent) => {
-      if (modoTv() && evento.key.startsWith('Arrow')) return
-      if (evento.ctrlKey || evento.altKey || evento.metaKey) return
-      if (document.querySelector('.paleta-fundo') !== null) return
-      if (document.querySelector('.detalhe-fundo') !== null) return
+      if (!teclaDaLista(evento, campo.current)) return
       const alvo = evento.target as HTMLElement | null
-      if (alvo !== null && alvo !== campo.current && alvo.closest('input, textarea, select') !== null) {
-        return
-      }
       const escolhido = lista[indice]
       const id = escolhido?.id === undefined ? null : Number(escolhido.id)
       if (evento.key === 'Enter' || evento.key === ' ') {

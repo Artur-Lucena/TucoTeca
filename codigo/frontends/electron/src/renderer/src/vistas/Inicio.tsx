@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'preact/hooks'
-import { Cartao } from '../componentes/jogo/Cartao'
+import { PosterCard } from '../componentes/jogo/PosterCard'
 import { reproduzindo } from '../estado/midia'
 import { ListaContinuar, type ItemContinuar } from './midia/AbasMidia'
 import { EmptyState, Metric } from '../componentes/ui'
 import { PainelSessoes } from '../componentes/jogo/PainelSessoes'
 import { continuarJogando, type Snapshot } from '../estado/derivacoes'
+import { ir } from '../estado/rota'
+import { type AoAvisar } from '../estado/notificacoes'
 
 interface Props {
   snapshot: Snapshot
-  aoAvisar?: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar?: AoAvisar
   aoMudou?: () => void
 }
 
@@ -47,9 +49,12 @@ export function Inicio({ snapshot, aoAvisar = () => undefined, aoMudou = () => u
           <EmptyState icone="🎮" titulo="Nada por aqui ainda." descricao="Adicione um jogo na tela Jogos e ele aparece aqui." />
         ) : (
           <div class="grade">
-            {continuar.map((jogo, indice) => (
-              <Cartao key={`${String(jogo.titulo)}-${indice}`} jogo={jogo} />
-            ))}
+            {continuar.map((jogo, indice) => {
+              const abrir = () => ir(`#/jogo/${Number(jogo.id)}`)
+              return (
+                <PosterCard key={`${String(jogo.titulo)}-${indice}`} jogo={jogo} selecionado={false} aoSelecionar={abrir} aoAbrir={abrir} />
+              )
+            })}
           </div>
         )}
       </section>

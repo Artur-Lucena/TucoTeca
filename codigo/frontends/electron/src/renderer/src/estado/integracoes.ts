@@ -11,7 +11,7 @@ export interface IntegracaoDTO {
   capacidades?: string[]
 }
 
-export type AcaoIntegracao =
+type AcaoIntegracao =
   | { tipo: 'abrir'; rotulo: string }
   | { tipo: 'buscar'; rotulo: string }
   | { tipo: 'navegar'; rotulo: string; secao: string }

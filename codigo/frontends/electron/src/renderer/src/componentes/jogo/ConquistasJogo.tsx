@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks'
 import { data } from '../../estado/formato'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import type { PaginaJogo } from '../../estado/paginaJogo'
 import { ir } from '../../estado/rota'
 
@@ -9,7 +9,7 @@ interface Props {
   pagina: PaginaJogo
   buscando: boolean
   aoAtualizarRetro: () => void
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /**

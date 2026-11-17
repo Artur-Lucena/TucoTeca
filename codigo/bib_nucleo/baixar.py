@@ -18,9 +18,6 @@ from pathlib import Path
 
 from bib_nucleo.arquivos import destino_temporario, gravar_atomico
 
-YTDLP_ENV = "BIBLIOTECA_YTDLP"
-FFMPEG_ENV = "BIBLIOTECA_FFMPEG"  # Fase C usa; nome centralizado aqui
-
 _PCT_RE = re.compile(r"\[download\]\s+(\d+(?:\.\d+)?)%")
 
 _COL_TRACK = "Track Name"

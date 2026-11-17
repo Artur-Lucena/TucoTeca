@@ -1,4 +1,5 @@
 import type { JogoResumo } from './derivacoes'
+import { semAcento } from './formato'
 
 /** Filtros da tela Jogos (mesmos nomes do Qt; `pendencias` usa a saúde da coleção). */
 export const FILTROS_JOGOS = [
@@ -26,18 +27,10 @@ export interface JogoDaLista extends JogoResumo {
   etiquetas_lista?: string[]
 }
 
-export interface OpcoesFiltroJogos {
+interface OpcoesFiltroJogos {
   filtro?: FiltroJogo
   busca?: string
   idsPendentes?: number[]
-}
-
-/** Minúsculas sem acento — mesma tolerância da busca do Qt (NFD sem diacríticos). */
-export function semAcento(texto: unknown): string {
-  return String(texto ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
 }
 
 function etiquetasDe(jogo: JogoDaLista): string {
@@ -96,8 +89,6 @@ export function ordenarJogos(jogos: JogoDaLista[], ordem: OrdemJogo): JogoDaList
 
 /** Status de jogo do núcleo (mesma lista do formulário do Qt). */
 export const STATUS_JOGOS = ['backlog', 'jogando', 'zerado', 'pausado', 'abandonado'] as const
-
-export type StatusJogo = (typeof STATUS_JOGOS)[number]
 
 /** Limites de etiqueta do núcleo (`banco/jogos.py`): 30 chars, 20 etiquetas. */
 const ETIQUETA_MAX = 30

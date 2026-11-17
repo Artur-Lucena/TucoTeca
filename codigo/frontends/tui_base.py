@@ -4,11 +4,32 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from queue import SimpleQueue
 
 import bib_core as core
-from late import ModuloTardio
+
+
+# app_tui.py é entry point e módulo importável: rodando como script ele vive
+# em `__main__`, e um `import app_tui` criaria uma segunda cópia. Os mixins
+# resolvem o módulo na hora do uso por este proxy.
+class ModuloTardio:
+    """Proxy: `_W.attr` resolve o módulo por nome (importado) ou `__main__` (script)."""
+
+    def __init__(self, nome: str):
+        self._nome = nome
+
+    def __getattr__(self, nome: str):
+        mod = sys.modules.get(self._nome) or sys.modules.get("__main__")
+        if mod is None:
+            raise AttributeError(f"módulo {self._nome!r} não carregado")
+        return getattr(mod, nome)
+
+    def __dir__(self):
+        mod = sys.modules.get(self._nome) or sys.modules.get("__main__")
+        return dir(mod) if mod is not None else []
+
 
 _T = ModuloTardio("app_tui")
 

@@ -1,5 +1,8 @@
 import type { SistemaResumo } from './derivacoes'
 
+/** Callback de toast que as telas recebem do app. */
+export type AoAvisar = (texto: string, tom?: 'info' | 'atencao') => void
+
 export interface Aviso {
   id: string
   texto: string

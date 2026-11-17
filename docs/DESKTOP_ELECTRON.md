@@ -29,7 +29,7 @@ Entrega: instalador Windows (NSIS). Linux/macOS usam a TUI pelos fontes.
   demorar mais roda como **trabalho** (`trabalhos.listar/cancelar`) e aparece no
   rodapé (`Atividade`).
 
-## Métodos da ponte (137)
+## Métodos da ponte (136)
 
 Contrato provado por `test_ponte.py`, `test_paridade.py`, `test_provedores.py`,
 `test_colecoes.py` e `test_midia.py`. Ações que mexem em
@@ -49,7 +49,7 @@ jogo aberto antes…"); confirmações de ações destrutivas ficam na interface
 | integrações | `integracoes.listar/adicionar/remover/url/buscar` |
 | coleção e sistema | `colecao.backup/exportar/importar`, `backups.listar`, `estatisticas.ler`, `item.excluir/desfazer`, `lixeira.estado`, `sessoes.listar/encerrar`, `sistema.erros/volume/volume_definir/volume_mudo`, `manutencao.plano/sanear`, `ferramentas.listar/abrir`, `provedores.configurar` |
 | página do jogo e provedores | `jogo.pagina`, `jogo.enriquecer`*, `jogos.enriquecer_lote`*, `jogo.meta_salvar/artes_buscar/arte_aplicar`, `metadados.provedores/configurar` |
-| coleções e loja | `colecoes.listar/criar/renomear/apagar/definir`, `jogo.colecoes`, `loja.destaques/buscar/pagina/desejar`, `jogos.lojas_prever`* |
+| coleções e loja | `colecoes.criar/renomear/apagar/definir`, `jogo.colecoes`, `loja.destaques/buscar/pagina/desejar`, `jogos.lojas_prever`* |
 | filmes e séries | `midia.pastas/pasta_adicionar/pasta_remover`, `midia.varrer`*, `midia.biblioteca/titulo/descobrir/continuar/lista/lista_alternar/seguir/calendario`, `midia.atualizar_seguidas`*, `midia.corrigir/reproduzir/externo/salvar_posicao/marcar/legenda` |
 | trabalhos | `trabalhos.listar/cancelar` |
 

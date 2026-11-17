@@ -1,13 +1,14 @@
 import { useState } from 'preact/hooks'
-import { lerDiagnostico, tamanhoLegivel, type Diagnostico, type LeituraDiagnostico } from '../../estado/manutencao'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { lerDiagnostico, type Diagnostico, type LeituraDiagnostico } from '../../estado/manutencao'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { confirmar } from '../ui/Confirmacao'
+import { bytes } from '../../estado/formato'
 
 interface Props {
   id: number
   bloqueado: boolean
   aoMudou: () => void
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 const FILTRO_EXE = [{ nome: 'Executáveis', extensoes: ['exe', 'bat'] }]
@@ -56,7 +57,7 @@ export function PainelManutencaoJogo({ id, bloqueado, aoMudou, aoAvisar }: Props
     setDisco('Medindo…')
     try {
       const r = await window.tucoteca.chamar<{ bytes?: number; arquivos?: number; parcial?: boolean }>('jogo.disco', { id })
-      const texto = `${tamanhoLegivel(Number(r?.bytes ?? 0))} em ${Number(r?.arquivos ?? 0).toLocaleString('pt-BR')} arquivo(s)`
+      const texto = `${bytes(Number(r?.bytes ?? 0))} em ${Number(r?.arquivos ?? 0).toLocaleString('pt-BR')} arquivo(s)`
       setDisco(r?.parcial ? `${texto} (contagem parcial)` : texto)
     } catch (falha) {
       setDisco('')

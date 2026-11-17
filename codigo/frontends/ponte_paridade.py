@@ -12,22 +12,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ponte_params import inteiro, opcao, texto
+from ponte_params import ident, opcao, texto
 
 _MSG_JOGO_ABERTO = ("Feche o jogo aberto antes de mudar mods, texturas, cheats, "
                     "presets, controles ou arquivos da coleção.")
-
-
-def _texto(params, chave, obrigatorio=True) -> str:
-    return texto(params, chave, obrigatorio=obrigatorio)
-
-
-def _id(params) -> int:
-    return inteiro(params, "id", positivo=True)
-
-
-def _opcao(params, chave, opcoes) -> str:
-    return opcao(params, chave, opcoes)
 
 
 def metodos_paridade(trabalhos) -> dict:
@@ -52,32 +40,32 @@ def metodos_paridade(trabalhos) -> dict:
 
     # -- emulação por jogo (3DS/Azahar) ------------------------------------
     def emulacao_jogo(servico, params):
-        return servico.emulacao_jogo(_id(params))
+        return servico.emulacao_jogo(ident(params))
 
     def emulacao_mod(servico, params):
-        acao = _opcao(params, "acao", ("alternar", "desligar_todos", "remover", "importar"))
-        nome = _texto(params, "nome", obrigatorio=acao in ("alternar", "remover"))
-        arquivo = _texto(params, "arquivo", obrigatorio=acao == "importar")
-        return servico.emulacao_mod(_id(params), acao, nome, arquivo)
+        acao = opcao(params, "acao", ("alternar", "desligar_todos", "remover", "importar"))
+        nome = texto(params, "nome", obrigatorio=acao in ("alternar", "remover"))
+        arquivo = texto(params, "arquivo", obrigatorio=acao == "importar")
+        return servico.emulacao_mod(ident(params), acao, nome, arquivo)
 
     def emulacao_cheat(servico, params):
-        acao = _opcao(params, "acao", ("alternar", "adicionar", "remover"))
-        nome = _texto(params, "nome")
-        codigo = _texto(params, "codigo", obrigatorio=acao == "adicionar")
-        return servico.emulacao_cheat(_id(params), acao, nome, codigo)
+        acao = opcao(params, "acao", ("alternar", "adicionar", "remover"))
+        nome = texto(params, "nome")
+        codigo = texto(params, "codigo", obrigatorio=acao == "adicionar")
+        return servico.emulacao_cheat(ident(params), acao, nome, codigo)
 
     def emulacao_textura(servico, params):
-        acao = _opcao(params, "acao", ("alternar", "instalar"))
-        arquivo = _texto(params, "arquivo", obrigatorio=acao == "instalar")
-        return servico.emulacao_textura(_id(params), acao, arquivo)
+        acao = opcao(params, "acao", ("alternar", "instalar"))
+        arquivo = texto(params, "arquivo", obrigatorio=acao == "instalar")
+        return servico.emulacao_textura(ident(params), acao, arquivo)
 
     def emulacao_preset(servico, params):
-        acao = _opcao(params, "acao", ("aplicar", "salvar"))
-        return servico.emulacao_preset(acao, _texto(params, "nome"))
+        acao = opcao(params, "acao", ("aplicar", "salvar"))
+        return servico.emulacao_preset(acao, texto(params, "nome"))
 
     def emulacao_atualizar(servico, params):
         """Instala o release já consultado (rede + escrita) como trabalho."""
-        chave = _texto(params, "chave")
+        chave = texto(params, "chave")
         info = params.get("info")
         if not isinstance(info, dict) or not info.get("tag"):
             raise ValueError("Consulte o release antes de atualizar.")
@@ -99,14 +87,14 @@ def metodos_paridade(trabalhos) -> dict:
                 **servico.controles_tipos()}
 
     def controles_fotografar(servico, params):
-        r = servico.controle_fotografar(_texto(params, "nome"))
+        r = servico.controle_fotografar(texto(params, "nome"))
         return {**dict(r), **servico.controles_presets()}
 
     def controles_aplicar(servico, params):
-        return dict(servico.controle_aplicar(_texto(params, "nome")))
+        return dict(servico.controle_aplicar(texto(params, "nome")))
 
     def controles_gerar(servico, params):
-        r = servico.controle_gerar(_texto(params, "tipo"))
+        r = servico.controle_gerar(texto(params, "tipo"))
         return {**dict(r), **servico.controles_presets()}
 
     def controles_estado(servico, params):
@@ -120,8 +108,8 @@ def metodos_paridade(trabalhos) -> dict:
     def musicas_eq(servico, params):
         """Renderiza a faixa com o preset numa cópia nova (trabalho: pode passar de 30 s)."""
         import bib_core as core
-        caminho = _texto(params, "caminho")
-        preset = _texto(params, "preset")
+        caminho = texto(params, "caminho")
+        preset = texto(params, "preset")
         if preset not in core.PRESETS_EQ:
             raise ValueError(f"preset deve ser um de: {', '.join(sorted(core.PRESETS_EQ))}")
 
@@ -161,21 +149,21 @@ def metodos_paridade(trabalhos) -> dict:
     # -- manutenção de jogos (saneamento, religar, UAC, disco) ---------------
     def manutencao_plano(servico, params):
         """O que o saneamento faria na pasta. Só leitura."""
-        return servico.sanear_plano(_texto(params, "caminho"))
+        return servico.sanear_plano(texto(params, "caminho"))
 
     def manutencao_sanear(servico, params):
         """Aplica o saneamento (instaladores vão para .hub-lixo, reversível)."""
-        return dict(servico.sanear_pasta(_texto(params, "caminho")))
+        return dict(servico.sanear_pasta(texto(params, "caminho")))
 
     def jogo_religar(servico, params):
-        campo = _opcao(params, "campo", ("launch_options", "executable_path", "exe_win", "exe_linux"))
-        servico.religar_jogo(_id(params), campo, _texto(params, "caminho"))
-        return servico.diagnosticar_jogo(_id(params))
+        campo = opcao(params, "campo", ("launch_options", "executable_path", "exe_win", "exe_linux"))
+        servico.religar_jogo(ident(params), campo, texto(params, "caminho"))
+        return servico.diagnosticar_jogo(ident(params))
 
     def jogo_jogar_elevado(servico, params):
         """Abre como administrador (UAC do Windows). Sem rastreio automático de
         horas: o núcleo abre uma sessão manual para registrar ao terminar."""
-        return dict(servico.iniciar_jogo_elevado(_id(params)))
+        return dict(servico.iniciar_jogo_elevado(ident(params)))
 
     # -- ferramentas de mídia externas (editores, equalizadores, players) ----
     def ferramentas_listar(servico, params):
@@ -191,7 +179,7 @@ def metodos_paridade(trabalhos) -> dict:
     # -- importar por arrastar e soltar: prévia → seleção → importação -------
     def jogos_prever(servico, params):
         """Prévia só-leitura: pasta varre PC+ROMs; arquivo é classificado."""
-        caminho = _texto(params, "caminho")
+        caminho = texto(params, "caminho")
         if Path(caminho).is_dir():
             r = servico.prever_pasta(caminho)
             return {"ok": bool(r.get("ok")), "itens": list(r.get("itens") or []),
@@ -224,7 +212,7 @@ def metodos_paridade(trabalhos) -> dict:
         horas = params.get("horas")
         if isinstance(horas, bool) or not isinstance(horas, (int, float)):
             raise ValueError("horas deve ser um número")
-        return dict(servico.encerrar_sessao(_texto(params, "arquivo"), float(horas)))
+        return dict(servico.encerrar_sessao(texto(params, "arquivo"), float(horas)))
 
     def sistema_erros(servico, params):
         linhas = params.get("linhas", 40)
@@ -234,10 +222,10 @@ def metodos_paridade(trabalhos) -> dict:
 
     # -- saves do jogo: snapshot agora e restaurar --------------------------
     def saves_snapshot(servico, params):
-        return dict(servico.backup_pos_sessao(_id(params)))
+        return dict(servico.backup_pos_sessao(ident(params)))
 
     def saves_restaurar(servico, params):
-        return dict(servico.restaurar_saves(_id(params), _texto(params, "caminho")))
+        return dict(servico.restaurar_saves(ident(params), texto(params, "caminho")))
 
     novos = {
         "emulacao.jogo": emulacao_jogo,

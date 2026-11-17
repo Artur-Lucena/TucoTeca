@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agruparPorDia, chavesDaTemporada, filtrarTitulos, fracao, proximoParaAssistir, rotuloEpisodio, type Episodio, type TituloResumo } from './midia'
+import { agruparPorDia, chavesDaTemporada, filtrarTitulos, filtrarVideos, fracao, proximoParaAssistir, rotuloEpisodio, type Episodio, type TituloResumo } from './midia'
 
 const ep = (temporada: number, episodio: number, arquivo: number | null, assistido = false, estreia = '2020-01-01'): Episodio => ({
   chave: `tt1:${temporada}:${episodio}`,
@@ -50,5 +50,19 @@ describe('midia', () => {
   it('marcar temporada pega só episódios já lançados (ou no disco)', () => {
     const t = { numero: 1, episodios: [ep(1, 1, null, false, '2020-01-01'), ep(1, 2, null, false, '2999-01-01'), ep(1, 3, 5, false, '')] }
     expect(chavesDaTemporada(t, true, new Date(2026, 0, 1))).toEqual(['tt1:1:1', 'tt1:1:3'])
+  })
+})
+
+describe('filtrarVideos', () => {
+  const videos = [
+    { titulo: 'Análise do jogo', canal: 'Canal Ação' },
+    { titulo: 'Trailer', canal: 'Estúdio' },
+  ]
+  it('busca título ou canal, sem acento e com todas as palavras', () => {
+    expect(filtrarVideos(videos, 'analise')).toHaveLength(1)
+    expect(filtrarVideos(videos, 'estudio')).toEqual([videos[1]])
+    expect(filtrarVideos(videos, 'jogo acao')).toEqual([videos[0]])
+    expect(filtrarVideos(videos, 'jogo trailer')).toEqual([])
+    expect(filtrarVideos(videos, '  ')).toBe(videos)
   })
 })

@@ -48,16 +48,10 @@ def preparar_ambiente() -> None:
     abrir_hub.preparar()
 
 
-def ler_versao() -> str:
-    try:
-        return (RAIZ / "VERSION").read_text(encoding="utf-8").strip() or "0.0.0"
-    except OSError:
-        return "0.0.0"
-
-
 def _ping(servico, params) -> dict:
     from bib_nucleo import base
-    return {"pong": True, "versao": ler_versao(),
+    from bib_nucleo.versao import versao_app
+    return {"pong": True, "versao": versao_app(),
             "home": str(base.HOME_DIR), "db": str(getattr(servico, "db_path", ""))}
 
 
@@ -101,10 +95,6 @@ def _trocar_perfil(servico, params) -> dict:
     return servico.trocar_perfil(nome)
 
 
-def _inteiro(params, chave) -> int:
-    return inteiro(params, chave)
-
-
 def _com_perfil(jogo):
     """Aplica o perfil ativo (favorito por pessoa) ao dicionário do jogo."""
     from bib_nucleo.preferencias_pessoais import aplicar_perfil
@@ -116,7 +106,7 @@ def _saude(servico, params) -> dict:
 
 
 def _jogo_ler(servico, params) -> dict:
-    return _com_perfil(servico.jogo(_inteiro(params, "id")))
+    return _com_perfil(servico.jogo(inteiro(params, "id")))
 
 
 def _jogo_salvar(servico, params) -> dict:
@@ -125,18 +115,18 @@ def _jogo_salvar(servico, params) -> dict:
         raise ValueError("dados deve ser um objeto JSON")
     ident = params.get("id")
     if ident is not None:
-        ident = _inteiro(params, "id")
+        ident = inteiro(params, "id")
     return _com_perfil(servico.salvar_jogo(ident, dados))
 
 
 def _jogo_favoritar(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     servico.favorito(ident)
     return _com_perfil(servico.jogo(ident))
 
 
 def _jogo_observacoes(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     texto = params.get("texto", "")
     if not isinstance(texto, str):
         raise ValueError("texto deve ser texto")
@@ -147,7 +137,7 @@ def _item_excluir(servico, params) -> dict:
     categoria = params.get("categoria", "")
     if categoria not in ("jogos", "desejos", "videos", "musicas"):
         raise ValueError("categoria deve ser jogos, desejos, videos ou musicas")
-    return servico.excluir(categoria, _inteiro(params, "id"))
+    return servico.excluir(categoria, inteiro(params, "id"))
 
 
 def _item_desfazer(servico, params) -> dict:
@@ -267,7 +257,7 @@ def _torrents_organizar(servico, params) -> dict:
 
 
 def _videos_local(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     dados = servico.video_local(ident)
     return {"id": dados.get("id", ident), "titulo": dados.get("titulo", ""),
             "posicao": dados.get("posicao", 0), "sha": dados.get("sha", "")}
@@ -331,7 +321,7 @@ def _pacotes_abrir_instalador(servico, params) -> dict:
 
 
 def _videos_reproduzir(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     reprodutor = params.get("reprodutor", "auto")
     if not isinstance(reprodutor, str) or not reprodutor.strip():
         raise ValueError("reprodutor deve ser um texto")
@@ -349,12 +339,12 @@ def _videos_buscar_online(servico, params) -> list:
 
 
 def _conquistas_avaliar(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     return servico.avaliar_conquistas(ident)
 
 
 def _conquistas_sincronizar(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     appid = params.get("appid", "")
     if not isinstance(appid, str):
         raise ValueError("appid deve ser um texto")
@@ -365,7 +355,7 @@ def _conquistas_sincronizar(servico, params) -> dict:
 
 
 def _conquistas_regras(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     texto = params.get("texto", "")
     if not isinstance(texto, str):
         raise ValueError("texto deve ser um texto")
@@ -376,7 +366,7 @@ def _capas_buscar(servico, params) -> dict:
     categoria = params.get("categoria")
     if categoria not in ("jogos", "musicas", "desejos"):
         raise ValueError("categoria deve ser jogos, musicas ou desejos")
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     provedor = params.get("provedor", "")
     if not isinstance(provedor, str):
         raise ValueError("provedor deve ser um texto")
@@ -388,13 +378,13 @@ def _capas_aplicar(servico, params) -> dict:
     categoria = params.get("categoria")
     if categoria not in ("jogos", "musicas", "desejos"):
         raise ValueError("categoria deve ser jogos, musicas ou desejos")
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     candidato = objeto(params, "candidato")
     return servico.aplicar_capa(categoria, ident, candidato)
 
 
 def _capas_libretro(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     return servico.buscar_capa_libretro(ident)
 
 
@@ -408,22 +398,22 @@ def _emulacao_consultar(servico, params) -> dict:
 
 
 def _ferramentas_jogo(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     return servico.ferramentas_jogo(ident)
 
 
 def _diagnosticar_jogo(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     return servico.diagnosticar_jogo(ident)
 
 
 def _disco_jogo(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     return servico.disco_jogo(ident)
 
 
 def _configurar_saves(servico, params) -> dict:
-    ident = _inteiro(params, "id")
+    ident = inteiro(params, "id")
     caminhos = lista(params, "caminhos")
     return servico.configurar_saves(ident, caminhos)
 
@@ -676,7 +666,7 @@ class Trabalhos:
             return [self.publico(item) for item in self._itens.values()]
 
     def cancelar(self, params) -> dict:
-        ident = _inteiro(params, "id")
+        ident = inteiro(params, "id")
         with self._travas:
             item = self._itens.get(ident)
             if item is None:
@@ -719,14 +709,10 @@ class Ponte:
         })
         # paridade com o antigo desktop Qt (emulação, controles, manutenção…);
         # import tardio: no app instalado o sys.path só fica pronto em preparar_ambiente()
+        from ponte_dominios import metodos_colecoes, metodos_meta, metodos_midia
         from ponte_paridade import metodos_paridade
-        base.update(metodos_paridade(self.trabalhos))
-        from ponte_meta import metodos_meta
-        base.update(metodos_meta(self.trabalhos))
-        from ponte_colecoes import metodos_colecoes
-        base.update(metodos_colecoes(self.trabalhos))
-        from ponte_midia import metodos_midia
-        base.update(metodos_midia(self.trabalhos))
+        for metodos in (metodos_paridade, metodos_meta, metodos_colecoes, metodos_midia):
+            base.update(metodos(self.trabalhos))
         self.metodos = base
 
     def _publicar_evento(self, evento: dict) -> None:
@@ -743,7 +729,7 @@ class Ponte:
         return self.trabalhos.cancelar(params)
 
     def _jogo_jogar(self, servico, params) -> dict:
-        ident = _inteiro(params, "id")
+        ident = inteiro(params, "id")
         jogo = servico.jogo(ident)
         titulo = str(jogo.get("titulo") or ("jogo " + str(ident)))
         estado = {"horas": 0.0, "rastreado": False}
@@ -905,7 +891,7 @@ class Ponte:
                                                   escopo="videos")}
 
     def _jogo_registrar_horas(self, servico, params) -> dict:
-        ident = _inteiro(params, "id")
+        ident = inteiro(params, "id")
         horas = params.get("horas")
         if isinstance(horas, bool) or not isinstance(horas, (int, float)):
             raise ValueError("horas deve ser um número")

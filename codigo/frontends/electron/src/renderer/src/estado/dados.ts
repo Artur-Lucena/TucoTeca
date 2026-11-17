@@ -1,7 +1,7 @@
 import { signal } from '@preact/signals'
 import type { Snapshot } from './derivacoes'
 
-export interface SaudeColecao {
+interface SaudeColecao {
   total?: number
   pendentes?: number
   ids_pendentes?: number[]
@@ -9,10 +9,10 @@ export interface SaudeColecao {
   problemas?: Array<{ id?: number; titulo?: string; motivo?: string }>
 }
 
-export type Chamar = (metodo: string, params?: Record<string, unknown>) => Promise<unknown>
+type Chamar = (metodo: string, params?: Record<string, unknown>) => Promise<unknown>
 
 /** Contadores por categoria do núcleo (`nucleo.revisao`). */
-export type Revisoes = Record<string, number>
+type Revisoes = Record<string, number>
 
 /** Coleção e saúde da ponte, compartilhadas entre as vistas (recarregáveis). */
 export const snapshot = signal<Snapshot | null>(null)

@@ -1,10 +1,10 @@
 import { useState } from 'preact/hooks'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { jogoEmAndamento, listaTrabalhos } from '../../estado/trabalhos'
 import { confirmar } from '../ui/Confirmacao'
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
   aoMudou: () => void
 }
 

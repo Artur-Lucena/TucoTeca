@@ -197,7 +197,7 @@ def baixar_video_youtube(con, video_id: str, progresso=None) -> dict:
     except sqlite3.Error as e:
         return {"ok": False, "erro": f"Videoteca indisponível: {e}"}
     if existente:
-        from bib_nucleo.reprodutores_video import resolver_video
+        from bib_nucleo.apps_externos import resolver_video
         caminho = resolver_video(existente["video_path"])
         if caminho:
             return {"ok": True, "video_id": vid, "path": caminho,

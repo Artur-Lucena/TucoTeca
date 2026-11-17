@@ -5,15 +5,16 @@ import { Inicio } from '../../vistas/Inicio'
 import { Abas } from './Abas'
 import { Lazy } from './Lazy'
 import { EmptyState } from '../ui'
+import { type AoAvisar } from '../../estado/notificacoes'
 
-export interface ContextoVistas {
+interface ContextoVistas {
   snapshot: Snapshot
   focoBusca: number
   /** Contador de mudanças da coleção (a página do jogo relê quando muda). */
   revisao: number
   perfil: string
   avisos: Aviso[]
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
   aoMudou: () => void
   aoJogar: (id: number) => void
   aoDispensarAviso: (id: string) => void

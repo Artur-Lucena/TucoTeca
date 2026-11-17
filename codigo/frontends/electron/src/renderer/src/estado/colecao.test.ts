@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alturasMeses, dataDoBackup, dataDoSnapshot, horasTexto, normalizarResumo } from './colecao'
+import { alturasMeses, dataDoBackup, dataDoSnapshot, normalizarResumo } from './colecao'
 
 describe('dataDoBackup', () => {
   it('lê a data do nome do arquivo', () => {
@@ -20,10 +20,5 @@ describe('resumo do ano', () => {
   it('alturas relativas ao maior mês; tudo zero não divide por zero', () => {
     expect(alturasMeses([5, 10, 0])).toEqual([50, 100, 0])
     expect(alturasMeses([0, 0])).toEqual([0, 0])
-  })
-
-  it('horas em pt-BR', () => {
-    expect(horasTexto(1.25)).toBe('1,3 h')
-    expect(horasTexto(12)).toBe('12 h')
   })
 })

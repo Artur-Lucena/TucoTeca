@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { registrarProtocoloMedia, registrarProtocoloMidia } from './arquivos'
 import { raizesDaResposta } from './midia'
-import { resolverRaizHome } from './caminhos'
+import { caminhoPermitido, resolverRaizHome } from './caminhos'
 import { lockOrfao } from './lock'
 import { montarMenu } from './menu'
 import { ClientePonte } from './ponte'
@@ -109,7 +109,7 @@ function falhar(mensagem: string, codigo: number): void {
 
 function lerVersao(): string {
   try {
-    const texto = readFileSync(join(RAIZ, 'VERSION'), 'utf8').trim()
+    const texto = readFileSync(join(RAIZ, 'codigo', 'VERSION'), 'utf8').trim()
     return texto === '' ? 'desconhecida' : texto
   } catch {
     return 'desconhecida'
@@ -130,9 +130,16 @@ function mostrarSobre(): void {
     detail: detalhe,
     buttons: ['Fechar'],
   }
+  void comJanela(
+    (janela) => dialog.showMessageBox(janela, opcoes),
+    () => dialog.showMessageBox(opcoes),
+  )
+}
+
+/** Diálogos ficam presos à janela do app quando ela existe. */
+function comJanela<T>(comPai: (janela: BrowserWindow) => Promise<T>, solto: () => Promise<T>): Promise<T> {
   const [janela] = BrowserWindow.getAllWindows()
-  if (janela) void dialog.showMessageBox(janela, opcoes)
-  else void dialog.showMessageBox(opcoes)
+  return janela ? comPai(janela) : solto()
 }
 
 function instalarMenu(): void {
@@ -229,10 +236,8 @@ async function principal(): Promise<void> {
   })
 
   ipcMain.handle('dialogo:escolher-pasta', async () => {
-    const [janela] = BrowserWindow.getAllWindows()
-    const resultado = janela
-      ? await dialog.showOpenDialog(janela, { properties: ['openDirectory'] })
-      : await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    const opcoes = { properties: ['openDirectory' as const] }
+    const resultado = await comJanela((j) => dialog.showOpenDialog(j, opcoes), () => dialog.showOpenDialog(opcoes))
     if (resultado.canceled) return null
     return resultado.filePaths[0] ?? null
   })
@@ -252,10 +257,7 @@ async function principal(): Promise<void> {
           .filter((f) => f.extensions.length > 0)
       : []
     const opcoes = { properties: ['openFile' as const], filters: lista }
-    const [janela] = BrowserWindow.getAllWindows()
-    const resultado = janela
-      ? await dialog.showOpenDialog(janela, opcoes)
-      : await dialog.showOpenDialog(opcoes)
+    const resultado = await comJanela((j) => dialog.showOpenDialog(j, opcoes), () => dialog.showOpenDialog(opcoes))
     if (resultado.canceled) return null
     return resultado.filePaths[0] ?? null
   })
@@ -279,12 +281,9 @@ async function principal(): Promise<void> {
   ipcMain.handle('app:abrir-pasta', async (_evento, caminho: string) => {
     const texto = String(caminho ?? '').trim()
     if (texto === '') throw new Error('caminho vazio')
+    // mesma regra dos protocolos (no Windows, sem diferenciar maiúsculas)
     const resolvido = resolve(texto)
-    const home = resolve(HOME)
-    const sep = process.platform === 'win32' ? '\\' : '/'
-    if (resolvido !== home && !resolvido.startsWith(home + sep)) {
-      throw new Error('caminho fora da coleção')
-    }
+    if (!caminhoPermitido(HOME, resolvido)) throw new Error('caminho fora da coleção')
     const erro = await shell.openPath(resolvido)
     if (erro) throw new Error(erro)
   })

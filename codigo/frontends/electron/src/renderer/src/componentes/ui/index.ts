@@ -1,3 +1,5 @@
 export { EmptyState } from './EmptyState'
 export { Metric } from './Metric'
 export { Modal } from './Modal'
+export { BlocoDescricao, FichaLateral } from './Ficha'
+export { Hero, type MetricaHero } from './Hero'

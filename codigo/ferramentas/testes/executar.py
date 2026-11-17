@@ -30,6 +30,31 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(CODIGO))
 sys.path.insert(0, str(FRONTENDS))
 
+# ---- contrato comum com conftest.py (ao lado; o pytest coleta os mesmos casos) ----
+TIMEOUT_CASO = 120
+PULO = re.compile(r"\bskip\b|\[pula\]", re.I)
+
+
+def casos(arquivo: Path) -> list[str]:
+    """Nomes `teste_*` do módulo, lidos por AST (sem importar no processo pai)."""
+    arvore = ast.parse(arquivo.read_text(encoding="utf-8"))
+    return sorted(n.name for n in arvore.body if isinstance(n, ast.FunctionDef) and n.name.startswith("teste_"))
+
+
+def ambiente_caso() -> dict:
+    """Ambiente do subprocesso de um caso: UTF-8, sem bytecode e com o núcleo no PYTHONPATH."""
+    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8", PYTHONFAULTHANDLER="1")
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(CODIGO), str(FRONTENDS)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
+    return env
+
+
+def pasta_dos_casos() -> Path:
+    """Pasta-mãe das sandboxes temporárias (uma por caso)."""
+    pasta = Path(tempfile.gettempdir()) / "opencode"
+    pasta.mkdir(parents=True, exist_ok=True)
+    return pasta
+
 
 def afirmar(cond, msg=""):
     if not cond:
@@ -159,32 +184,27 @@ def main():
 
     total = falhas = pulados = 0
     resultados = []
-    parent = Path(tempfile.gettempdir()) / "opencode"
-    parent.mkdir(exist_ok=True)
+    parent = pasta_dos_casos()
     for arq in sorted(TESTES_DIR.glob("test_*.py")):
         if args.caso and arq.name != args.caso[0]:
             continue
         if args.modulo and arq.stem not in {m.removesuffix(".py") for m in args.modulo}:
             continue
-        tree = ast.parse(arq.read_text(encoding="utf-8"))
-        for nome in sorted(n.name for n in tree.body if isinstance(n, ast.FunctionDef)
-                            and n.name.startswith("teste_")):
+        for nome in casos(arq):
             if args.caso and nome != args.caso[1]:
                 continue
             total += 1
             inicio = time.monotonic()
             with tempfile.TemporaryDirectory(prefix="hub-teste-", dir=parent) as tmp:
-                env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8", PYTHONFAULTHANDLER="1")
-                env["PYTHONPATH"] = os.pathsep.join(
-                    [str(CODIGO), str(FRONTENDS)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
+                env = ambiente_caso()
                 try:
                     r = subprocess.run([sys.executable, "-B", str(Path(__file__).resolve()),
                                         "--caso", arq.name, nome, "--raiz", tmp],
                                        env=env, capture_output=True, text=True, encoding="utf-8",
-                                       timeout=120)
+                                       timeout=TIMEOUT_CASO)
                 except subprocess.TimeoutExpired:
-                    r = subprocess.CompletedProcess([], 1, "", "Teste excedeu 120 segundos.")
-            pulo = r.returncode == 0 and bool(re.search(r"\bskip\b|\[pula\]", r.stdout, re.I))
+                    r = subprocess.CompletedProcess([], 1, "", f"Teste excedeu {TIMEOUT_CASO} segundos.")
+            pulo = r.returncode == 0 and bool(PULO.search(r.stdout))
             status = "FAIL" if r.returncode else "SKIP" if pulo else "PASS"
             pulados += int(pulo)
             resultados.append({"teste": f"{arq.stem}.{nome}", "status": status,

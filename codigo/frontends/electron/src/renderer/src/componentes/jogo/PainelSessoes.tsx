@@ -1,7 +1,7 @@
 import { dataHora } from '../../estado/formato'
 import { useEffect, useState } from 'preact/hooks'
 import { validarHoras } from '../../estado/jogos'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 
 interface Sessao {
   arquivo: string
@@ -14,7 +14,7 @@ interface Props {
   /** Muda quando o snapshot muda (ex.: contador de pendentes): recarrega a lista. */
   revisao: number
   aoMudou: () => void
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 const quando = dataHora

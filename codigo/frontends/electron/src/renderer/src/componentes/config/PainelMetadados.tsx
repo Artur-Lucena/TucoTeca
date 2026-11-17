@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'preact/hooks'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import type { ProvedorMeta } from '../../estado/paginaJogo'
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 interface Estado {

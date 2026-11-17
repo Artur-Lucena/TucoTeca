@@ -9,7 +9,7 @@ import { PainelEmulacao } from '../../componentes/jogo/PainelEmulacao'
 import { PainelFerramentasJogo } from '../../componentes/jogo/PainelFerramentasJogo'
 import { PainelManutencaoJogo } from '../../componentes/jogo/PainelManutencaoJogo'
 import { EmptyState } from '../../componentes/ui'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { abasDoJogo, normalizarPagina, type PaginaJogo as Pagina } from '../../estado/paginaJogo'
 import { ir, NOMES_ABAS } from '../../estado/rota'
 import { jogoEmAndamento, listaTrabalhos } from '../../estado/trabalhos'
@@ -20,7 +20,7 @@ interface Props {
   /** Muda quando a coleção muda (ações em outras telas, fim de tarefas). */
   revisao: number
   aoMudou: () => void
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /** Página do jogo à la Hydra: hero, abas e tudo do jogo num endereço (`#/jogo/12/aba`). */
