@@ -1,6 +1,8 @@
 # Roadmap — TucoTeca
 
-Estado: **1.4.5 publicada** (17/11/2026) — o hub em três pilares: Jogos à la
+Estado: **1.4.6 publicada** (17/11/2026) — arrumação da 1.4.5 (interface
+reagrupada por seção, notas antigas e lançador duplicado fora). A 1.4.5 trouxe
+o hub em três pilares: Jogos à la
 Hydra (navegação nova, biblioteca lateral, página do jogo com provedores,
 coleções, catálogo da loja Steam, importação de lojas instaladas), Filmes e
 Séries à la Stremio com os arquivos do usuário e o catálogo Cinemeta, e
@@ -15,6 +17,7 @@ Músicas; navegação por controle e Big Picture. Antes: 1.3.1 (revisão da 1.3.
 4. ~~1.4.3 — coleções, catálogo Steam, desejos em Jogos, lojas instaladas.~~
 5. ~~1.4.4 — Filmes e Séries (pastas, Cinemeta, player, continuar, lista, calendário).~~
 6. ~~1.4.5 — controle (foco espacial, LB/RB, Start, B) e Big Picture; docs.~~
+7. ~~1.4.6 — arrumação: renderer por seção, poda de arquivos antigos.~~
 
 ## Pendências de validação
 
