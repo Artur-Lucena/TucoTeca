@@ -1,4 +1,3 @@
-import { bytes } from './formato'
 /** `jogo.diagnosticar` → partes do exe e da ROM (bib_nucleo/emuladores/lancamento.py). */
 export interface Diagnostico {
   exe: { estado?: string; gravado?: string; atual?: string; nome?: string }
@@ -53,9 +52,4 @@ export function lerDiagnostico(d: Diagnostico): LeituraDiagnostico {
     acoes.push({ tipo: 'escolher-rom', candidatos })
   }
   return { ok: acoes.length === 0, linhas, acoes }
-}
-
-/** Bytes → texto curto (pt-BR). */
-export function tamanhoLegivel(valor: number): string {
-  return bytes(valor)
 }

@@ -14,10 +14,10 @@ import {
   TEMAS,
   type Aparencia,
 } from '../../estado/aparencia'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
   aoMudou: () => void
 }
 

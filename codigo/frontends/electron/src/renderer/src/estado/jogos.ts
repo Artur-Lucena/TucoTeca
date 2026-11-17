@@ -1,4 +1,5 @@
 import type { JogoResumo } from './derivacoes'
+import { semAcento } from './formato'
 
 /** Filtros da tela Jogos (mesmos nomes do Qt; `pendencias` usa a saúde da coleção). */
 export const FILTROS_JOGOS = [
@@ -30,14 +31,6 @@ export interface OpcoesFiltroJogos {
   filtro?: FiltroJogo
   busca?: string
   idsPendentes?: number[]
-}
-
-/** Minúsculas sem acento — mesma tolerância da busca do Qt (NFD sem diacríticos). */
-export function semAcento(texto: unknown): string {
-  return String(texto ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
 }
 
 function etiquetasDe(jogo: JogoDaLista): string {

@@ -1,8 +1,8 @@
 import { listaTrabalhos } from '../../estado/trabalhos'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /** Rodapé global: trabalho ativo (rótulo + barra + Parar). */

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'preact/hooks'
-import { alturasMeses, dataDoBackup, horasTexto, MESES, normalizarResumo, type ResumoAno } from '../../estado/colecao'
-import { tamanhoLegivel } from '../../estado/manutencao'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { alturasMeses, dataDoBackup, MESES, normalizarResumo, type ResumoAno } from '../../estado/colecao'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { confirmar } from '../ui/Confirmacao'
+import { bytes, horas } from '../../estado/formato'
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
   aoMudou: () => void
 }
 
@@ -124,7 +124,7 @@ export function PainelColecao({ aoAvisar, aoMudou }: Props) {
           {backups.map((b) => (
             <li key={b.nome}>
               <span>{dataDoBackup(b.nome) || b.nome}</span>
-              <span class="sub">{tamanhoLegivel(b.bytes)}</span>
+              <span class="sub">{bytes(b.bytes)}</span>
             </li>
           ))}
         </ul>
@@ -133,11 +133,11 @@ export function PainelColecao({ aoAvisar, aoMudou }: Props) {
       {resumo !== null && (
         <>
           <h4>
-            Horas jogadas em {resumo.ano}: {horasTexto(resumo.total_horas)}
+            Horas jogadas em {resumo.ano}: {horas(resumo.total_horas)}
           </h4>
           <div class="grafico-meses" role="img" aria-label={`Horas por mês em ${resumo.ano}`}>
             {resumo.meses.map((h, i) => (
-              <div key={MESES[i]} class="grafico-mes" title={`${MESES[i]}: ${horasTexto(h)}`}>
+              <div key={MESES[i]} class="grafico-mes" title={`${MESES[i]}: ${horas(h)}`}>
                 <span class="grafico-barra" style={{ height: `${alturas[i]}%` }} />
                 <span class="grafico-rotulo">{MESES[i]}</span>
               </div>
@@ -148,7 +148,7 @@ export function PainelColecao({ aoAvisar, aoMudou }: Props) {
               {resumo.jogos.slice(0, 5).map((j) => (
                 <li key={j.titulo}>
                   <span>{j.titulo}</span>
-                  <span class="sub">{horasTexto(j.horas)}</span>
+                  <span class="sub">{horas(j.horas)}</span>
                 </li>
               ))}
             </ul>

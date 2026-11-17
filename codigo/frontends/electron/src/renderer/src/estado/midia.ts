@@ -1,5 +1,5 @@
 import { signal } from '@preact/signals'
-import { semAcento } from './jogos'
+import { hojeISO, semAcento } from './formato'
 
 /** Arquivo aberto no player interno (o App desenha o player por cima de tudo). */
 export const reproduzindo = signal<number | null>(null)
@@ -104,6 +104,6 @@ export function agruparPorDia<T extends { data: string }>(itens: T[], hoje: Date
 
 /** Chaves de todos os episódios de uma temporada (para "marcar temporada como vista"). */
 export function chavesDaTemporada(t: Temporada, apenasLancados = true, hoje: Date = new Date()): string[] {
-  const limite = hoje.toISOString().slice(0, 10)
+  const limite = hojeISO(hoje)
   return t.episodios.filter((e) => !apenasLancados || (e.estreia !== '' && e.estreia <= limite) || e.arquivo !== null).map((e) => e.chave)
 }

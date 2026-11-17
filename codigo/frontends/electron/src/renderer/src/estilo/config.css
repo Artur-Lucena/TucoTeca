@@ -43,14 +43,6 @@
   border-color: var(--realce);
 }
 
-.form-config .stats {
-  padding: var(--espaco-sm);
-  background: var(--painel);
-  border-radius: var(--raio-sm);
-  font-size: 12px;
-  overflow-x: auto;
-}
-
 .integracao {
   display: grid;
   grid-template-columns: auto 1fr;

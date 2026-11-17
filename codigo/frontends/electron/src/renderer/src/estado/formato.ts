@@ -3,6 +3,27 @@
  * Funções puras (sem DOM); entradas inválidas viram '' ou '—', nunca "NaN".
  */
 
+/** Iniciais para a capa vazia: "Hollow Knight" → "HK". */
+export function iniciais(titulo?: string): string {
+  const partes = String(titulo ?? '?').trim().split(/\s+/)
+  return `${partes[0]?.charAt(0) || '?'}${partes[1]?.charAt(0) ?? ''}`.toUpperCase()
+}
+
+/** Minúsculas sem acento (NFD sem diacríticos), base das buscas. */
+export function semAcento(texto: unknown): string {
+  return String(texto ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
+/** Data local AAAA-MM-DD (toISOString usaria UTC e viraria o dia perto da meia-noite). */
+export function hojeISO(agora: Date = new Date()): string {
+  const m = String(agora.getMonth() + 1).padStart(2, '0')
+  const d = String(agora.getDate()).padStart(2, '0')
+  return `${agora.getFullYear()}-${m}-${d}`
+}
+
 /** Horas jogadas: 1,5 h · 12 h. */
 export function horas(valor: number): string {
   const n = Number(valor)

@@ -1,13 +1,13 @@
 import { useState } from 'preact/hooks'
 import { dataDoSnapshot } from '../../estado/colecao'
-import { tamanhoLegivel } from '../../estado/manutencao'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { confirmar } from '../ui/Confirmacao'
+import { bytes } from '../../estado/formato'
 
 interface Props {
   id: number
   bloqueado: boolean
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 interface Ferramentas {
@@ -139,7 +139,7 @@ export function PainelFerramentasJogo({ id, bloqueado, aoAvisar }: Props) {
           {dados.snapshots.map((s) => (
             <li key={s.path}>
               <span>
-                {dataDoSnapshot(s.nome) || s.nome} <span class="sub">{tamanhoLegivel(s.bytes)}</span>
+                {dataDoSnapshot(s.nome) || s.nome} <span class="sub">{bytes(s.bytes)}</span>
               </span>
               <button type="button" class="acao" disabled={travado} onClick={() => void restaurar(s)}>
                 Restaurar

@@ -1,5 +1,5 @@
 import type { JogoResumo } from './derivacoes'
-import { semAcento } from './jogos'
+import { semAcento } from './formato'
 
 /** Recorte da biblioteca lateral (à la Hydra): todos, favoritos ou jogados recentemente. */
 export type ModoBiblioteca = 'todos' | 'favoritos' | 'recentes'

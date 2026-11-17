@@ -1,6 +1,6 @@
 import type { ComponentChildren } from 'preact'
 import { metricasDoJogo, type PaginaJogo } from '../../estado/paginaJogo'
-import { iniciais } from './PosterCard'
+import { iniciais } from '../../estado/formato'
 
 interface Props {
   pagina: PaginaJogo

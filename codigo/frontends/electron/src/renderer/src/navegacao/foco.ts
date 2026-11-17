@@ -70,7 +70,7 @@ const FOCAVEIS = 'button:not([disabled]), a[href], input:not([disabled]), select
 
 /** Camada de cima (diálogo, player, paleta) ou a janela inteira. */
 export function raizAtiva(doc: Document = document): ParentNode {
-  const camadas = doc.querySelectorAll<HTMLElement>('.player-tela, .modal, .paleta, .detalhe')
+  const camadas = doc.querySelectorAll<HTMLElement>('.player-tela, .modal, .paleta')
   return camadas.length > 0 ? camadas[camadas.length - 1] : doc
 }
 

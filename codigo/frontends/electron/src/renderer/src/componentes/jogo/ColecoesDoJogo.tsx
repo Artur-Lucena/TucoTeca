@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 
 interface Item {
   id: number
@@ -10,7 +10,7 @@ interface Item {
 interface Props {
   id: number
   aoMudou: () => void
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /** Botão “Coleções” do topo do jogo: marca/desmarca e cria coleção na hora. */

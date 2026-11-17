@@ -9,7 +9,7 @@ import {
   type PrecoSteam,
 } from '../../estado/desejos'
 import { EmptyState } from '../../componentes/ui'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { confirmar } from '../../componentes/ui/Confirmacao'
 
 interface Props {
@@ -17,7 +17,7 @@ interface Props {
   focoBusca?: number
   /** Troca de perfil limpa a seleção (a lista não muda com o perfil). */
   perfil?: string
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
   aoMudou: () => void
 }
 

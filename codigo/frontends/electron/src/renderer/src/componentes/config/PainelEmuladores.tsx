@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'preact/hooks'
 import { resumoEmulador, type EmuladorStatus } from '../../estado/emulacao'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { jogoEmAndamento, listaTrabalhos } from '../../estado/trabalhos'
 import { confirmar } from '../ui/Confirmacao'
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /**

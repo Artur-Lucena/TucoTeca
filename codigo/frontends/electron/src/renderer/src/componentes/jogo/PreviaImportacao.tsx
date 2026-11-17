@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { detalheItem, type ItemPrevia } from '../../estado/importacao'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
+import { Modal } from '../ui'
 
 interface Props {
   itens: ItemPrevia[]
   avisos: string[]
   aoFechar: () => void
   aoImportou: () => void
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /**
@@ -20,16 +21,8 @@ export function PreviaImportacao({ itens, avisos, aoFechar, aoImportou, aoAvisar
   const caixa = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    caixa.current?.querySelector<HTMLElement>('button, input')?.focus()
-    const aoTeclar = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        aoFechar()
-      }
-    }
-    window.addEventListener('keydown', aoTeclar)
-    return () => window.removeEventListener('keydown', aoTeclar)
-  }, [aoFechar])
+    caixa.current?.querySelector<HTMLElement>('input, button')?.focus()
+  }, [])
 
   const alternar = (i: number) =>
     setMarcados((atual) => {
@@ -56,9 +49,8 @@ export function PreviaImportacao({ itens, avisos, aoFechar, aoImportou, aoAvisar
   }
 
   return (
-    <div class="detalhe-fundo" onMouseDown={(e) => e.target === e.currentTarget && aoFechar()}>
-      <div class="detalhe painel-paridade" role="dialog" aria-modal="true" aria-label="Importar jogos soltos" ref={caixa}>
-        <h2>Importar {itens.length} item(ns)</h2>
+    <Modal aberto aoFechar={aoFechar} titulo={`Importar ${itens.length} item(ns)`} largura="560px">
+      <div class="painel-paridade" ref={caixa}>
         {avisos.map((a) => (
           <p key={a} class="sub">
             {a}
@@ -86,6 +78,6 @@ export function PreviaImportacao({ itens, avisos, aoFechar, aoImportou, aoAvisar
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { EmptyState } from '../../componentes/ui'
 import { formatarPreco, type PrecoSteam } from '../../estado/desejos'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { ir } from '../../estado/rota'
 
 export interface CartaoLoja {
@@ -20,7 +20,7 @@ interface Secao {
 }
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /** Jogos › Catálogo: vitrine e busca da loja Steam (abrir a aba é o pedido de rede). */

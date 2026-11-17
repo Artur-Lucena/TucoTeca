@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'preact/hooks'
 import { snapshot } from '../../estado/dados'
 import { EmptyState } from '../../componentes/ui'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { NavegadorYouTube } from '../../componentes/midia/NavegadorYouTube'
 import { listaTrabalhos } from '../../estado/trabalhos'
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
   aoMudou: () => void
 }
 

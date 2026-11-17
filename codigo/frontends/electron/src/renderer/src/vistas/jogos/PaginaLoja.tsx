@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { GaleriaJogo } from '../../componentes/jogo/GaleriaJogo'
 import { EmptyState } from '../../componentes/ui'
 import { formatarPreco, type PrecoSteam } from '../../estado/desejos'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { ir } from '../../estado/rota'
 
 interface PaginaSteam {
@@ -28,7 +28,7 @@ interface PaginaSteam {
 interface Props {
   appid: string
   aoMudou: () => void
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /** Página de um jogo da loja Steam (`#/loja/:appid`), com o mesmo topo da página do jogo. */

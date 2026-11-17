@@ -13,13 +13,7 @@ import {
   pularPara,
   type ModoPlayer,
 } from '../../estado/player'
-
-/** m:ss a partir de segundos (NaN/∞ → 0:00). */
-export function tempoMmSs(segundos: number): string {
-  if (!Number.isFinite(segundos) || segundos < 0) return '0:00'
-  const total = Math.floor(segundos)
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
-}
+import { duracao as duracaoTexto } from '../../estado/formato'
 
 const ROTULO_MODO: Record<ModoPlayer, string> = {
   sequencia: 'Sequência',
@@ -120,7 +114,7 @@ export function PlayerRodape() {
             ■
           </button>
           <span class="player-tempo">
-            {tempoMmSs(posicao)} / {tempoMmSs(duracao)}
+            {duracaoTexto(Math.floor(posicao))} / {duracaoTexto(Math.floor(duracao))}
           </span>
           <input
             class="player-barra"

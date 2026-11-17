@@ -5,6 +5,7 @@ import { Inicio } from '../../vistas/Inicio'
 import { Abas } from './Abas'
 import { Lazy } from './Lazy'
 import { EmptyState } from '../ui'
+import { type AoAvisar } from '../../estado/notificacoes'
 
 export interface ContextoVistas {
   snapshot: Snapshot
@@ -13,7 +14,7 @@ export interface ContextoVistas {
   revisao: number
   perfil: string
   avisos: Aviso[]
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
   aoMudou: () => void
   aoJogar: (id: number) => void
   aoDispensarAviso: (id: string) => void

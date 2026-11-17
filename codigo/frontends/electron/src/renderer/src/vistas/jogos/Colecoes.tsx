@@ -5,12 +5,12 @@ import { EmptyState } from '../../componentes/ui'
 import { jogosDaColecao, normalizarColecoes, validarNomeColecao } from '../../estado/colecoes'
 import { snapshot } from '../../estado/dados'
 import type { JogoDaLista } from '../../estado/jogos'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { ir } from '../../estado/rota'
 
 interface Props {
   aoMudou: () => void
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /** Jogos › Coleções: criar, renomear e apagar listas; ver os jogos de cada uma. */

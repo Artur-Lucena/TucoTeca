@@ -15,12 +15,6 @@
   color: var(--texto2);
 }
 
-.numeros {
-  display: flex;
-  gap: var(--espaco-md);
-  margin: 22px 0 28px;
-}
-
 .numero {
   display: flex;
   flex-direction: column;
@@ -82,11 +76,6 @@
 
 .vazio p {
   margin: 0;
-}
-
-.vazio .dica {
-  margin-top: 6px;
-  font-size: 12px;
 }
 
 .painel {
@@ -209,45 +198,6 @@
   transform: translateY(-2px);
   box-shadow: var(--sombra);
   border-color: var(--borda-forte);
-}
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: var(--espaco-md);
-}
-
-.kpi {
-  flex: 1 1 140px;
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-md);
-  padding: var(--espaco-md);
-  background: var(--cartao);
-  border: 1px solid var(--borda);
-  border-radius: var(--raio);
-}
-
-.kpi-icone {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--raio-sm);
-  background: var(--realce-suave);
-  color: var(--realce);
-  font-size: 16px;
-}
-
-.kpi-valor {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.kpi-label {
-  font-size: 12px;
-  color: var(--texto2);
 }
 
 .badge {
@@ -399,15 +349,6 @@
   border-bottom-color: var(--realce);
 }
 
-.toggle.ativo {
-  background: var(--realce);
-  border-color: var(--realce);
-}
-
-.toggle.ativo .toggle-thumb {
-  transform: translateX(16px);
-}
-
 .loading {
   display: inline-flex;
   align-items: center;
@@ -424,7 +365,6 @@
   color: var(--texto2);
 }
 
-p.aviso-inline,
 .painel-emulacao p.aviso {
   margin: 0 0 var(--espaco-sm);
   padding: var(--espaco-sm) var(--espaco-md);

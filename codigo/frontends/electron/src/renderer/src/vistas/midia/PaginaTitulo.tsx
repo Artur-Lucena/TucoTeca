@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'preact/hooks'
 import { EmptyState } from '../../componentes/ui'
 import { chavesDaTemporada, fracao, proximoParaAssistir, reproduzindo, rotuloEpisodio, type Episodio, type TituloCompleto } from '../../estado/midia'
-import { data } from '../../estado/formato'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { data, hojeISO } from '../../estado/formato'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { ir } from '../../estado/rota'
 
 interface Props {
   imdb: string
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /** Página de filme/série (`#/titulo/:imdb`): ficha do Cinemeta + o que você tem no disco. */
@@ -181,7 +181,7 @@ export function PaginaTitulo({ imdb, aoAvisar }: Props) {
 function LinhaEpisodio({ e, aoMarcar }: { e: Episodio; aoMarcar: (assistido: boolean) => void }) {
   const visto = e.progresso?.assistido ?? false
   const f = fracao(e.progresso)
-  const futuro = e.estreia !== '' && e.estreia > new Date().toISOString().slice(0, 10)
+  const futuro = e.estreia !== '' && e.estreia > hojeISO()
   return (
     <li class={`episodio${visto ? ' visto' : ''}${e.arquivo === null ? ' fora-do-disco' : ''}`}>
       <span class="episodio-miniatura">

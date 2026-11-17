@@ -1,3 +1,4 @@
+import { iniciais } from '../../estado/formato'
 import type { JogoDaLista } from '../../estado/jogos'
 
 interface Props {
@@ -65,11 +66,6 @@ export function PosterCard({ jogo, selecionado, aoSelecionar, aoAbrir, aoJogar }
       )}
     </article>
   )
-}
-
-export function iniciais(titulo?: string): string {
-  const partes = String(titulo ?? '?').trim().split(/\s+/)
-  return `${partes[0]?.charAt(0) ?? '?'}${partes[1]?.charAt(0) ?? ''}`.toUpperCase()
 }
 
 function metaDe(jogo: JogoDaLista): string {

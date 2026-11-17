@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { PosterCard } from '../../componentes/jogo/PosterCard'
 import { PreviaImportacao } from '../../componentes/jogo/PreviaImportacao'
 import { EmptyState } from '../../componentes/ui'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { saude, snapshot } from '../../estado/dados'
 import { juntarPrevias, type ItemPrevia } from '../../estado/importacao'
 import {
@@ -42,7 +42,7 @@ interface Props {
   /** Joga o jogo selecionado (botão Jogar, duplo clique e Enter). */
   aoJogarJogo?: (id: number) => void
   /** Toast global. */
-  aoAvisar?: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar?: AoAvisar
   /** Recarrega snapshot após mutação. */
   aoMudou?: () => void
 }

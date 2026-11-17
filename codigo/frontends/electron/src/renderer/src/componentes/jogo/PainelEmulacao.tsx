@@ -6,14 +6,14 @@ import {
   validarCheat,
   type EstadoEmulacao,
 } from '../../estado/emulacao'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { confirmar } from '../ui/Confirmacao'
 
 interface Props {
   id: number
   /** Jogo aberto: a ponte recusa mudanças; os botões ficam desabilitados. */
   bloqueado: boolean
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
 }
 
 /**

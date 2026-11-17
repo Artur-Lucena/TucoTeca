@@ -3,10 +3,10 @@ import { duracao } from '../../estado/formato'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { snapshot } from '../../estado/dados'
 import { EmptyState } from '../../componentes/ui'
-import { textoDeFalha } from '../../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 
 interface Props {
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
   aoMudou: () => void
 }
 

@@ -1,13 +1,13 @@
 import { modoTv } from '../navegacao/foco'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { snapshot } from '../estado/dados'
-import { semAcento } from '../estado/jogos'
 import { EmptyState } from '../componentes/ui'
-import { textoDeFalha } from '../estado/notificacoes'
+import { type AoAvisar, textoDeFalha } from '../estado/notificacoes'
 import { faixaAtual, player, playerInicial, tocarFila } from '../estado/player'
 import { listaTrabalhos } from '../estado/trabalhos'
 import type { JogoResumo } from '../estado/derivacoes'
 import { confirmar } from '../componentes/ui/Confirmacao'
+import { semAcento } from '../estado/formato'
 
 /** Rótulos dos presets de `PRESETS_EQ` (equalizadores.py). */
 const ROTULO_EQ: Record<string, string> = {
@@ -24,7 +24,7 @@ interface Props {
   focoBusca?: number
   /** Troca de perfil recarrega o snapshot (a lista não muda com o perfil). */
   perfil?: string
-  aoAvisar: (texto: string, tom?: 'info' | 'atencao') => void
+  aoAvisar: AoAvisar
   aoMudou: () => void
 }
 

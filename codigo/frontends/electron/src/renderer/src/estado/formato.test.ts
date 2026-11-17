@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { bytes, data, dataHora, duracao, horas, moeda, relativo } from './formato'
+import { bytes, data, dataHora, duracao, hojeISO, horas, iniciais, moeda, relativo, semAcento } from './formato'
 
 describe('formato', () => {
+  it('iniciais, sem acento e data local', () => {
+    expect(iniciais('Hollow Knight')).toBe('HK')
+    expect(iniciais('')).toBe('?')
+    expect(semAcento('Ação É')).toBe('acao e')
+    expect(hojeISO(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05')
+  })
+
   it('horas em pt-BR', () => {
     expect(horas(1.25)).toBe('1,3 h')
     expect(horas(12)).toBe('12 h')
