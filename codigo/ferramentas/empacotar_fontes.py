@@ -25,7 +25,7 @@ RAIZ_ARQUIVOS.update({"TucoTeca.bat", "VERSION", "CHANGELOG.md",
 EXTENSOES = {"codigo": {".py",
                         # interface Electron (main/preload/renderer, config e ícone)
                         ".ts", ".tsx", ".css", ".html", ".json", ".cjs", ".ico"},
-             "docs": {".md"},
+             "docs": {".md", ".py"},
              ".github": {".yml", ".yaml", ".md"}}
 
 # arquivos sem extensão útil que também são fonte

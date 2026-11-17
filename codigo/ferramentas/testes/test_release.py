@@ -42,10 +42,9 @@ def _repo_falso(versao="1.2.0", pyproject="1.2.0", changelog=True) -> Path:
 def _dist_falso(repo: Path, versao="1.2.0", runtime=True, extra: str | None = None) -> Path:
     dist = repo / "codigo/frontends/electron/dist"
     recursos = dist / "win-unpacked/resources/tucoteca"
-    for nome in ("codigo/frontends/ponte.py", "codigo/frontends/ponte_paridade.py", "codigo/frontends/ponte_params.py", "codigo/frontends/ponte_meta.py", "codigo/frontends/ponte_colecoes.py",
-                 "codigo/frontends/ponte_midia.py",
-                 "codigo/bib_core.py",
-                 "codigo/ferramentas/abrir_hub.py", "LICENSE"):
+    for nome in REL.ESSENCIAIS_APP:
+        if nome == "VERSION":
+            continue
         (recursos / nome).parent.mkdir(parents=True, exist_ok=True)
         (recursos / nome).write_text("#", encoding="utf-8")
     (recursos / "VERSION").write_text(versao + "\n", encoding="utf-8")

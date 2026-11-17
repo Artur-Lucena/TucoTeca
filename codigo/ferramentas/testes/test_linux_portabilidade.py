@@ -14,11 +14,11 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import bib_core as core
+from bib_nucleo import apps_externos as EI
+from bib_nucleo import apps_externos as EQ
+from bib_nucleo import apps_externos as RV
 from bib_nucleo import baixar, base, emuladores, player, processos
-from bib_nucleo import editores_imagem as EI
-from bib_nucleo import equalizadores as EQ
 from bib_nucleo import ferramentas as F
-from bib_nucleo import reprodutores_video as RV
 from bib_nucleo import videos as VI
 from bib_nucleo import videos_youtube as YT
 from executar import afirmar

@@ -111,14 +111,6 @@ class MixMidia:
                         pass
         return {"novas": novas, "erros": erros, "cancelado": cancelar.is_set()}
 
-    # 2.0 — mídias open source (backend pronto p/ a interface ligar; outra frente
-    # organiza as abas; aqui só o contrato).
-    def midias_status(self):
-        return {"imagens": core.status_editores(),
-                "equalizadores": core.status_equalizadores(),
-                "videos": core.status_reprodutores(),
-                "eq_presets": sorted(core.PRESETS_EQ)}
-
     def buscar_videos_online(self, termo, limite=10, atualizar=False):
         from bib_nucleo.rede import exigir_rede
         exigir_rede("Buscar vídeos no YouTube")
@@ -191,7 +183,7 @@ class MixMidia:
         return self.alterar(lambda con: core.baixar_audio_youtube(con, video, progresso))
 
     def video_local(self, ident):
-        from bib_nucleo.reprodutores_video import resolver_video
+        from bib_nucleo.apps_externos import resolver_video
         with closing(core.get_db(self.db_path)) as con:
             row = con.execute("SELECT * FROM videos WHERE id=?", (int(ident),)).fetchone()
         if row is None:

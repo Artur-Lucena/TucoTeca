@@ -12,7 +12,7 @@ import uuid as uuid_mod
 from contextlib import closing
 from pathlib import Path
 
-from bib_nucleo.banco_desejos import _garantir_tabela_desejos
+from bib_nucleo.banco.desejos import _garantir_tabela_desejos
 from bib_nucleo.base import BACKUP_DIR
 
 # Fonte única das colunas de `jogos`: gera o SCHEMA e a reconstrução da

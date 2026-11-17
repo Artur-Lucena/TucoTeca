@@ -6,10 +6,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import bib_core as core
-from bib_nucleo import editores_imagem as EI
-from bib_nucleo import equalizadores as EQ
+from bib_nucleo import apps_externos as EI
+from bib_nucleo import apps_externos as EQ
+from bib_nucleo import apps_externos as RV
 from bib_nucleo import online, spotify
-from bib_nucleo import reprodutores_video as RV
 from bib_nucleo import videos_youtube as YT
 from executar import afirmar
 
@@ -309,13 +309,10 @@ def teste_spotify_paginacao_cache_por_contexto():
     cli.fechar()
 
 
-def teste_servico_midias_status_e_videos():
+def teste_servico_videos_vazio():
     import tempfile as _t
 
     from servicos_ui import ServicoBiblioteca
     db = Path(_t.mkdtemp()) / "s.db"
     svc = ServicoBiblioteca(db)
-    st = svc.midias_status()
-    afirmar(set(st) == {"imagens", "equalizadores", "videos", "eq_presets"}, st)
-    afirmar("bass" in st["eq_presets"] and "krita" in st["imagens"] and "vlc" in st["videos"])
     afirmar(svc.listar_videos() == [])

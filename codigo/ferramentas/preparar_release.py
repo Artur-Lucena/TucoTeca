@@ -98,18 +98,18 @@ def localizar_instalador(dist: Path, versao: str) -> Path:
     return instalador
 
 
+# o que o app instalado precisa para abrir a ponte (conferido em win-unpacked)
+ESSENCIAIS_APP = ("codigo/frontends/ponte.py", "codigo/frontends/ponte_paridade.py",
+                  "codigo/frontends/ponte_params.py", "codigo/frontends/ponte_dominios.py",
+                  "codigo/bib_core.py", "codigo/ferramentas/abrir_hub.py", "VERSION", "LICENSE")
+
+
 def conferir_app(dist: Path, exigir_runtime: bool = True) -> dict:
     """Confere a árvore win-unpacked que gerou o instalador."""
     recursos = dist / "win-unpacked" / "resources" / "tucoteca"
     if not recursos.is_dir():
         raise ValueError(f"{recursos} ausente: o instalador não veio do build atual")
-    for obrigatorio in ("codigo/frontends/ponte.py", "codigo/frontends/ponte_paridade.py",
-                        "codigo/frontends/ponte_params.py",
-                        "codigo/frontends/ponte_meta.py",
-                        "codigo/frontends/ponte_colecoes.py",
-                        "codigo/frontends/ponte_midia.py",
-                        "codigo/bib_core.py",
-                        "codigo/ferramentas/abrir_hub.py", "VERSION", "LICENSE"):
+    for obrigatorio in ESSENCIAIS_APP:
         if not (recursos / obrigatorio).is_file():
             raise ValueError(f"app empacotado sem {obrigatorio}")
     proibidos = sorted(p.relative_to(recursos).as_posix() for p in recursos.rglob("*")

@@ -103,11 +103,11 @@ class MixSessoes:
                     "erro": r.get("erro", ""), "avisos": [r["aviso"]] if r.get("aviso") else []}
 
     def ferramentas_jogo(self, gid):
-        from bib_nucleo import saves, screenshots
+        from bib_nucleo import saves
         jogo = self.jogo(gid)
         return {"saves": saves.caminhos_saves(jogo), "snapshots": saves.listar_snapshots(jogo),
-                "screenshots": screenshots.listar_screenshots(jogo),
-                "pasta_screenshots": str(screenshots.pasta_screenshots(jogo))}
+                "screenshots": saves.listar_screenshots(jogo),
+                "pasta_screenshots": str(saves.pasta_screenshots(jogo))}
 
     def configurar_saves(self, gid, caminhos):
         from bib_nucleo.saves import configurar_saves

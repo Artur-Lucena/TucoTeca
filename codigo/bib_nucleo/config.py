@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Configuração centralizada do TucoTeca (somente stdlib).
 
-Fonte única para as variáveis BIBLIOTECA_* (e ISCC_EXE/HYDRA_DB_PATH), com
+Fonte única para as variáveis BIBLIOTECA_* (e HYDRA_DB_PATH), com
 tipos, defaults documentados e parsing dos formatos históricos (`;` para
 listas de caminhos, `,` para hosts, `0/false/no/off` para desligar).
 
@@ -29,7 +29,6 @@ from pathlib import Path
 # --------------------------------------------------------------------------
 _ENV_ESPECIAIS = {
     "seven_zip": "BIBLIOTECA_7Z",
-    "iscc": "ISCC_EXE",
     "hydra_db_path": "HYDRA_DB_PATH",
 }
 
@@ -83,14 +82,14 @@ def _str_ou_none(v) -> str | None:
 # --------------------------------------------------------------------------
 _CAMPOS_PATH = (
     "home", "win_root", "linux_root", "mac_root",
-    "azahar_dir", "desmume_dir", "jogos_dir", "watch", "musica_dir",
+    "azahar_dir", "desmume_dir", "jogos_dir", "musica_dir",
     "seven_zip", "ytdlp", "ffmpeg", "quickjs", "deno",
     "qbittorrent", "qbit_dir", "qbit_profile",
-    "iscc", "krita", "gimp", "photodemon",
+    "krita", "gimp", "photodemon",
     "audacity", "equalizerapo", "peace", "vlc", "mpv", "mpchc",
     "everything", "hydra_db_path", "emulador_3ds", "emulador_nds",
 )
-_CAMPOS_BOOL = {"rede": True, "webengine": True, "capa_musica_auto": True}
+_CAMPOS_BOOL = {"rede": True, "capa_musica_auto": True}
 _CAMPOS_ROOTS = ("scan_roots", "roms_roots", "roms_nds_roots")
 _CAMPOS_STR = {"azahar_flags": "-f", "desmume_flags": "", "preco_regiao": "br"}
 _CAMPOS_STR_OU_NONE = ("steam_id", "qbit_api", "everything_instancia")
@@ -121,7 +120,6 @@ class Config:
 
     # Diretórios de dados & downloads
     jogos_dir: Path | None = None
-    watch: Path | None = None
     musica_dir: Path | None = None
 
     # Ferramentas externas (binários)
@@ -134,7 +132,6 @@ class Config:
     qbit_dir: Path | None = None
     qbit_profile: Path | None = None
     qbit_api: str | None = None
-    iscc: Path | None = None
 
     # Editores / áudio / vídeo
     krita: Path | None = None
@@ -151,7 +148,6 @@ class Config:
     everything: Path | None = None
     everything_instancia: str | None = None
     rede: bool = True
-    webengine: bool = True
     steam_id: str | None = None
     steamrip_hosts: tuple[str, ...] = ()
     preco_regiao: str = "br"

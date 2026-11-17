@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 import bib_core as core
-from late import ModuloTardio
+from tui_base import ModuloTardio
 
 _T = ModuloTardio("app_tui")
 

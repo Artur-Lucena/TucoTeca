@@ -3,7 +3,6 @@
 """Catálogo de jogos: validação, CRUD, etiquetas, mods, capas e horas."""
 from __future__ import annotations
 
-import base64
 import math
 import re
 import sqlite3
@@ -407,17 +406,6 @@ def excluir_jogo(con: sqlite3.Connection, gid: int) -> None:
 
 CAPA_EXTS = {".png": "image/png", ".jpg": "image/jpeg",
              ".jpeg": "image/jpeg", ".webp": "image/webp"}
-
-
-def salvar_capa(con: sqlite3.Connection, gid: int, filename: str, data_b64: str) -> dict:
-    ext = Path(filename or "").suffix.lower()
-    if ext not in CAPA_EXTS:
-        return {"ok": False, "erro": f"extensão inválida. Use: {sorted(CAPA_EXTS)}"}
-    try:
-        raw = base64.b64decode(data_b64, validate=True)
-    except Exception:
-        return {"ok": False, "erro": "base64 inválido"}
-    return salvar_capa_bytes(con, gid, filename, raw)
 
 
 CAPA_LARG, CAPA_ALT = 600, 800  # retrato padrão de todas as capas

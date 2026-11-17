@@ -296,14 +296,6 @@ def _ler_controls() -> tuple[configparser.ConfigParser, Path | None]:
     return ini, cfg
 
 
-def ler_perfil_atual() -> dict:
-    """Perfil `[Controls]` live como {chave: valor} ({} sem config)."""
-    ini, _ = _ler_controls()
-    if not ini.has_section("Controls"):
-        return {}
-    return dict(ini.items("Controls"))
-
-
 def fotografar_perfil(nome: str) -> dict:
     """Guarda o perfil ATIVO como preset Hub (template `profiles\\1`)."""
     from bib_nucleo.base import slugify
@@ -793,8 +785,7 @@ def capturar(poll, timeout: float = 10.0, limiar_eixo: int = 16000) -> dict:
 __all__ = ['GUIDS', 'NOMES_TIPO', 'MAPAS', 'BOTOES_3DS', 'DPAD',
            'gerar_perfil', 'bind_botao', 'bind_eixo', 'bind_analogico',
            'detectar_sdl', 'nomes_sdl', 'perfil_ativo', 'higienizar_controles',
-           'listar_controles', 'ler_estados_xinput',
-           'ler_perfil_atual', 'fotografar_perfil', 'listar_presets_controle',
+           'listar_controles', 'ler_estados_xinput', 'fotografar_perfil', 'listar_presets_controle',
            'aplicar_preset_controle', 'salvar_mapa_gerado', 'ler_estado_xinput',
            'XINPUT_NOMES', 'XINPUT_PARA_SDL', 'xinput_para_sdl',
             'resumir_estado']

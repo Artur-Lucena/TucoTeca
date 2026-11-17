@@ -64,7 +64,7 @@ select = ["E", "F", "W", "I"]
 #
 # E501 - linhas longas sao preferidas a quebrar contrato/mensagem de erro.
 # E402 - imports no meio do arquivo quebram ciclos de importacao de proposito
-#        (banco<->banco_desejos, scans<->scans_hydra,
+#        (banco<->banco/desejos, scans<->scans/hydra,
 #        emuladores<->sessoes_manuais, musicas<->rede.metadados,
 #        baixar<->rede.binarios) ou antecedem o ajuste de sys.path nos
 #        builders. Mover para o topo quebraria o carregamento do nucleo;

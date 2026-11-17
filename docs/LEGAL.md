@@ -9,8 +9,7 @@
 - Um **gerenciador local** de biblioteca de jogos, músicas e vídeos.
 - Organiza arquivos e metadados que **você** já possui ou escolheu baixar.
 - Os dados ficam na sua máquina (`dados/`). Não há conta obrigatória, servidor
-  externo próprio nem telemetria. A API local de leitura é opt-in e somente
-  loopback, com token e sem CORS.
+  externo próprio nem telemetria.
 - Ferramentas de terceiros (yt-dlp, FFmpeg, 7-Zip, qBittorrent, emuladores)
   são **detectadas ou agregadas** como processos independentes, cada uma com
   a sua própria licença, distribuída junto com o runtime.

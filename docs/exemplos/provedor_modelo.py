@@ -1,7 +1,7 @@
 """Modelo copiavel de integracao de rede (NAO e registrado em producao).
 
 Este arquivo e o PASSO 1 do guia `docs/INTEGRACOES.md`: serve para copiar,
-renomear `_modelo.py -> <fonte>.py`, trocar os exemplos e apagar o que nao
+salvar como `codigo/bib_nucleo/rede/<fonte>.py`, trocar os exemplos e apagar o que nao
 usar. Importar este modulo **nao faz rede** nem registra nada: os imports
 externos sao locais as funcoes e a rede so acontece quando o usuario pede
 (`rede_ativa()` + `BIBLIOTECA_REDE`).

@@ -1,10 +1,8 @@
-"""Saves, perfis, patches, pastas, API e integridade — sem rede ou dados reais."""
+"""Saves, perfis, pacotes, rede desligada e integridade — sem rede ou dados reais."""
 import hashlib
 import json
 import os
-import struct
 import tempfile
-import zlib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -19,71 +17,6 @@ def _base():
     jogo = core.criar_jogo(con, {"titulo": "Aventura", "favorito": True})
     con.close()
     return raiz, jogo, ServicoBiblioteca(raiz / "b.db")
-
-
-def _numero_bps(n):
-    dados = bytearray()
-    while True:
-        b = n & 127
-        n >>= 7
-        if n == 0:
-            dados.append(b | 128)
-            return bytes(dados)
-        dados.append(b)
-        n -= 1
-
-
-def _bps(src, dst, acoes):
-    raw = b"BPS1" + _numero_bps(len(src)) + _numero_bps(len(dst)) + _numero_bps(0) + acoes
-    raw += struct.pack("<II", zlib.crc32(src), zlib.crc32(dst))
-    return raw + struct.pack("<I", zlib.crc32(raw))
-
-
-def teste_ips_normal_rle_e_truncamento():
-    from bib_nucleo.patches_rom import aplicar_ips
-    raw = b"PATCH" + b"\0\0\1\0\2XY" + b"\0\0\4\0\0\0\3Z" + b"EOF"
-    afirmar(aplicar_ips(b"abcdef", raw) == b"aXYdZZZ")
-    afirmar(aplicar_ips(b"abcdef", b"PATCHEOF\0\0\3") == b"abc")
-    for ruim in (b"PATCH", b"PATCH\0\0\1\0\3X", b"PATCHEOFx"):
-        try:
-            aplicar_ips(b"abc", ruim)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError("aceitou IPS truncado")
-
-
-def teste_bps_quatro_acoes_crc_e_limites():
-    from bib_nucleo.patches_rom import aplicar_bps
-    src, dst = b"abcdef", b"abXcdcdcd"
-    acoes = (_numero_bps((2 - 1) << 2) + _numero_bps(1) + b"X"
-             + _numero_bps(((2 - 1) << 2) | 2) + _numero_bps(2 << 1)
-             + _numero_bps(((4 - 1) << 2) | 3) + _numero_bps(3 << 1))
-    raw = _bps(src, dst, acoes)
-    afirmar(aplicar_bps(src, raw) == dst)
-    for fonte, patch_bps, limite in ((b"wrong", raw, 100), (src, raw[:-1] + b"!", 100), (src, raw, 2)):
-        try:
-            aplicar_bps(fonte, patch_bps, limite)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError("CRC/tamanho inválido aceito")
-
-
-def teste_patch_preserva_rom_e_rejeita_destino_existente():
-    from bib_nucleo.patches_rom import aplicar_patch
-    raiz = Path(tempfile.mkdtemp())
-    rom, ips, dest = raiz / "original.nds", raiz / "patch.ips", raiz / "nova.nds"
-    rom.write_bytes(b"abc")
-    ips.write_bytes(b"PATCH\0\0\1\0\1XEOF")
-    afirmar(aplicar_patch(rom, ips, dest)["ok"] and dest.read_bytes() == b"aXc")
-    afirmar(rom.read_bytes() == b"abc")
-    try:
-        aplicar_patch(rom, ips, rom)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("sobrescreveu original")
 
 
 def teste_snapshot_saves_manifesto_hash_retencao_e_original_intacto():
@@ -135,50 +68,6 @@ def teste_perfis_independentes_e_atalhos_sem_conflito():
     else:
         raise AssertionError("atalhos conflitantes")
     afirmar(P.salvar_atalhos({"paleta": "Alt+K"})["atalhos"]["paleta"] == "Alt+K")
-
-
-def teste_watch_estabilidade_modificacao_e_nao_repete():
-    from bib_nucleo.pastas_vigiadas import VigiaPasta
-    pasta = Path(tempfile.mkdtemp())
-    arq = pasta / "aventura.rar"
-    arq.write_bytes(b"Rar!\x1a\x07\0" + b"x" * 100)
-    vigia = VigiaPasta(pasta, estabilidade_s=10)
-    afirmar(vigia.consultar(0) == [] and vigia.consultar(9) == [])
-    afirmar(vigia.consultar(10)[0]["path"] == str(arq.resolve()))
-    afirmar(vigia.consultar(20) == [])
-    arq.write_bytes(arq.read_bytes() + b"novo")
-    afirmar(vigia.consultar(21) == [])
-    afirmar(len(vigia.consultar(31)) == 1)
-
-
-def teste_hardlinks_fallback_copia_e_destino_protegido():
-    from bib_nucleo.organizacao_local import copiar_ou_ligar
-    raiz = Path(tempfile.mkdtemp())
-    src = raiz / "origem"
-    src.mkdir()
-    (src / "game.exe").write_bytes(b"MZ123")
-    with patch("os.link", side_effect=OSError("outro volume")):
-        r = copiar_ou_ligar(src, raiz / "copia", hardlinks=True)
-    afirmar(r["copiados"] == 1 and r["hardlinks"] == 0 and (src / "game.exe").is_file())
-    try:
-        copiar_ou_ligar(src, raiz / "copia")
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("destino existente sobrescrito")
-
-
-def teste_api_token_host_origin_e_rotas_de_leitura():
-    from bib_nucleo.api_local import autorizado, consultar
-    raiz, jogo, svc = _base()
-    token = "a" * 43
-    headers = {"Host": "127.0.0.1:8000", "Authorization": "Bearer " + token}
-    afirmar(autorizado(headers, token, 8000))
-    for mudanca in ({"Host": "evil.example:8000"}, {"Origin": "https://evil.example"},
-                    {"Authorization": "Bearer errado"}):
-        afirmar(not autorizado({**headers, **mudanca}, token, 8000))
-    afirmar(consultar(svc, "/jogos")[1][0]["titulo"] == "Aventura")
-    afirmar(consultar(svc, "/executar")[0] == 404)
 
 
 def teste_ferramenta_sha_divergente_preserva_instalacao():

@@ -45,7 +45,8 @@ Tucoteca/
 │   ├── RELEASES.md                    instalador, anexos e publicação
 │   ├── ROADMAP.md                     estado e próximos passos
 │   ├── SECURITY.md                    contato e superfície de risco
-│   └── LEGAL.md                       aviso legal
+│   ├── LEGAL.md                       aviso legal
+│   └── exemplos/provedor_modelo.py    template de provedor de rede
 ├── codigo/
 │   ├── bib_core.py                   fachada de compatibilidade
 │   ├── bib_nucleo/                   núcleo e domínios pessoais
@@ -79,9 +80,9 @@ não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 | `config.py` | leitura única das `BIBLIOTECA_*` (paths, listas `;`/`,`, bools 0/1), defaults e singleton `cfg` — consumida por `base.py`, builders e testes |
 | `base.py` | casa, raízes Win/Linux/Mac, tradução de caminhos, lock, texto, logs |
 | `banco/` (pacote) | schema, migrações por colunas, CRUD jogos/músicas/fila, capas — fatiado em `_infra`/`jogos`/`catalogo` com fachada de compatibilidade (`__all__` idêntico) |
+| `banco/desejos.py` | wishlist local, sincronização preservadora e histórico obtido |
 | `banco/meta.py` / `banco/colecoes.py` | metadados dos provedores por `uuid` (com campos travados pela edição manual) e coleções de jogos; ambos viajam no pacote |
-| `banco_desejos.py` | wishlist local, sincronização preservadora e histórico obtido |
-| `scans/` (pacote) / `scans_hydra.py` | lojas/disco/ROMs e adaptador Hydra, preview, dedup e restore — `scans.py` fatiado na F2 do O2 sem mudar contratos |
+| `scans/` (pacote) | lojas/disco/ROMs e leitor do Hydra (`scans/hydra.py`), preview, dedup e restore |
 | `emuladores/` (pacote) | Azahar/DeSmuME, processos/sessões, presets e overlay de mods — fatiado na F1 do O2 sem mudar contratos |
 | `atualizacao.py` | download e atualização transacional, manifesto, rollback |
 | `pacotes.py` | JSON, ZIP de coleção e backups versionados |
@@ -105,13 +106,11 @@ não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 | `rede/torrents.py` (alias `torrents.py`) | leitura local de `.torrent/.fastresume`, sem depender da rede |
 | `ferramentas.py` | manifesto editável, resolução relativa e comandos de sidecars/zipapps |
 | `qbit.py` | perfil independente e Web API local do qBittorrent |
-| `saves.py` | origens explícitas, snapshots SHA-256 e restauração com backup anterior |
+| `saves.py` | origens explícitas, snapshots SHA-256, restauração com backup anterior e galeria de screenshots por jogo |
+| `apps_externos.py` | editores de imagem (Krita/GIMP/PhotoDemon), áudio/EQ (Audacity, APO, Peace, presets FFmpeg) e players (VLC/MPV/MPC-HC) por tabela |
 | `sessoes_manuais.py` / `estatisticas.py` | reconciliação idempotente e histórico de sessões novas |
 | `preferencias_pessoais.py` | Tuco/Isa, favoritos/filtros, atalhos e recursos opt-in |
-| `screenshots.py` / `pastas_vigiadas.py` | imagens locais e detecção de arquivos estáveis |
-| `organizacao_local.py` / `patches_rom.py` | cópia/hardlinks explícitos e IPS/BPS em uma nova ROM |
 | `everything.py` | `es.exe` BYOB, limitado às raízes escolhidas; scanner como fallback |
-| `api_local.py` | leitura HTTP opt-in, loopback, token, Host/Origin, sem rotas de execução |
 | `versao.py` | versão (`VERSION`) e User-Agent das requisições, num lugar só |
 
 ### Frontends e ferramentas
@@ -121,8 +120,8 @@ não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 | `frontends/desktop.py` | Abre o app Electron pelo checkout (exige `npm install` + `npm run build`); o usuário final usa o instalador |
 | `frontends/ponte.py` | Ponte NDJSON (stdin/stdout, sem TCP) entre o Electron e os casos de uso; lock com evento `bloqueio`, jobs com progresso |
 | `frontends/ponte_paridade.py` | Métodos da ponte que devolvem ao Electron o que o antigo Qt fazia (emulação, controles, manutenção, letras/EQ/volume, arrastar-soltar); trava de jogo aberto |
-| `frontends/ponte_meta.py` / `ponte_colecoes.py` / `ponte_midia.py` | métodos da ponte da página do jogo e provedores, coleções/loja/lojas instaladas e Filmes e Séries (rede e varreduras como trabalho) |
-| `frontends/ponte_params.py` | validação de parâmetros da ponte com mensagens padronizadas |
+| `frontends/ponte_dominios.py` | métodos da ponte da 1.4: página do jogo e provedores, coleções/loja/lojas instaladas e Filmes e Séries (rede e varreduras como trabalho) |
+| `frontends/ponte_params.py` | validação de parâmetros da ponte com mensagens padronizadas (`texto`, `inteiro`, `ident`, `opcao`, …) |
 | `frontends/servicos_ui/` (pacote) | Casos de uso do desktop em mixins por domínio, `resumo_sistema`, `busca_global`, registro de módulos |
 | `frontends/electron/` | Desktop: processo principal (protocolos `tucoteca-img`/`tucoteca-media`, menu, ponte), preload isolado e renderer Preact; `electron-builder.config.cjs` gera o instalador |
 | `frontends/electron/src/renderer/src/` | `vistas/` (uma pasta por seção com mais de uma tela: `jogos/`, `midia/`, `configuracoes/`), `componentes/` (`casca/` da janela, `jogo/`, `midia/`, `musica/`, `config/`, `ui/` genérica), `estado/` (lógica pura testada, rotas em `rota.ts`), `navegacao/` (teclado, controle e foco espacial) e `estilo/` (CSS por área) |
@@ -250,8 +249,7 @@ duplicatas e escapes, com limites de tamanho/arquivos e backup pré-sobrescrita.
 | `BIBLIOTECA_AZAHAR_FLAGS/DESMUME_FLAGS` | opções de lançamento |
 | `BIBLIOTECA_JOGOS_DIR` (alias legado `BIBLIOTECA_PIRATAS`) | pasta dos downloads de jogos (padrão `Meus Jogos Locais`; se a antiga `Piratas` já existir e a nova não, continua usando a antiga) |
 | `BIBLIOTECA_7Z` | caminho explícito do 7-Zip |
-| `BIBLIOTECA_REDE` | `0` bloqueia ações remotas do Hub; não é firewall dos apps externos nem bloqueio da API loopback |
-| `BIBLIOTECA_WATCH` | pasta de pacotes vigiada; extração automática só com opt-in |
+| `BIBLIOTECA_REDE` | `0` bloqueia ações remotas do Hub; não é firewall dos apps externos |
 | `BIBLIOTECA_EVERYTHING` | caminho BYOB do CLI `es.exe` |
 | `BIBLIOTECA_MUSICA_DIR` | origem de áudio local/Harmoni |
 | `BIBLIOTECA_YTDLP/FFMPEG` | ferramentas externas |
