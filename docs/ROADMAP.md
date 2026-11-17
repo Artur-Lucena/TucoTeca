@@ -1,29 +1,38 @@
 # Roadmap — TucoTeca
 
-Estado: **1.3.1 publicada** (14/11/2026) — revisão da 1.3.0: Electron 44.11.3
-(alerta de segurança alto), Python 3.14.10, recursos que não funcionavam
-(backup, importar coleção, sessões abertas, tema/densidade) e limpeza. A 1.3.0
-foi a primeira entrega do desktop Electron como instalador Windows. Antes:
-1.0.1, 1.0.2, 1.0.3 (Mac) e 1.2.0 (fatias Electron F0–F6).
+Estado: **1.4.5 publicada** (17/11/2026) — o hub em três pilares: Jogos à la
+Hydra (navegação nova, biblioteca lateral, página do jogo com provedores,
+coleções, catálogo da loja Steam, importação de lojas instaladas), Filmes e
+Séries à la Stremio com os arquivos do usuário e o catálogo Cinemeta, e
+Músicas; navegação por controle e Big Picture. Antes: 1.3.1 (revisão da 1.3.0),
+1.3.0 (primeiro instalador Electron), 1.0.x e 1.2.0.
 
-## 1.3.0 (entregue)
+## 1.4 (entregue)
 
-1. ~~Empacotamento: instalador NSIS com Python embutido e preparador de release.~~
-2. ~~Coerência: versões unificadas, docs/CI/lançadores sem Qt.~~
-3. ~~Paridade com o antigo Qt (mapa em `DESKTOP_ELECTRON.md`).~~
-4. ~~Acabamento: textos/acentos, layout, correções da auditoria e publicação.~~
+1. ~~1.4.0 — correções e podas (capas, regras de conquista, CSS por área, formatação).~~
+2. ~~1.4.1 — casca: rotas por hash, cabeçalho, seis seções, biblioteca lateral, carga leve.~~
+3. ~~1.4.2 — página do jogo e provedores (Steam, SteamGridDB, RetroAchievements, HowLongToBeat).~~
+4. ~~1.4.3 — coleções, catálogo Steam, desejos em Jogos, lojas instaladas.~~
+5. ~~1.4.4 — Filmes e Séries (pastas, Cinemeta, player, continuar, lista, calendário).~~
+6. ~~1.4.5 — controle (foco espacial, LB/RB, Start, B) e Big Picture; docs.~~
 
-## Pendências de validação (1.3.x)
+## Pendências de validação
 
-Provadas só por simulação ou em ambiente de desenvolvimento:
+Provadas só por simulação, respostas falsas ou em ambiente de desenvolvimento:
 
+- Provedores e catálogos de verdade: Steam, SteamGridDB, RetroAchievements,
+  HowLongToBeat (API não oficial) e Cinemeta.
+- Reprodução real de vídeo no player interno (retomada e legendas na tela).
+- Controle físico (mapeamento padrão Xbox/PlayStation; antes, XInput do Qt),
+  UAC real ("Abrir como administrador"), equalização com FFmpeg instalado e
+  atualização real de emulador.
 - Instalar e abrir o instalador numa máquina Windows limpa.
-- Controle físico (Xbox 360 XInput), UAC real ("Abrir como administrador"),
-  equalização com FFmpeg instalado e atualização real de emulador.
 
-## Depois da 1.3.0
+## Depois da 1.4
 
+- Validadores restantes da ponte para `ponte_params` e `estado/formato.ts` nos
+  cartões antigos.
+- "Adicionar à coleção" pelo menu de contexto dos cartões (hoje na página do jogo).
 - Assinatura de código do instalador (hoje decisão: sem assinatura).
-- Credenciais vivas (Spotify, Steam, SteamGridDB).
 - Desktop Electron para macOS/Linux (hoje só TUI).
 - Atualização automática (hoje desligada: `publish: null`).
