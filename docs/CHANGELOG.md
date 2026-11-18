@@ -3,6 +3,27 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2.0.1] - 2026-11-18
+
+Instalação mais simples.
+
+### Alterado
+
+- Windows: o instalador é de um clique — abre, instala para o seu usuário
+  (sem admin e sem telas) e já abre o TucoTeca. Atualizar é abrir o
+  instalador novo por cima.
+- Instruções de instalação curtas (README e página da release), com o
+  passo do macOS 15 ou mais novo (*Abrir Mesmo Assim* em Privacidade e
+  Segurança), que não aceita mais o "botão direito → Abrir".
+- A página da release traz a instalação no próprio texto; os anexos ficam só
+  os instaladores, os fontes, `release.json` e `SHA256SUMS.txt`.
+
+### Interno
+
+- Código sem os apelidos `nucleo_*` que a retirada do `bib_core` deixou.
+- O preparador do runtime do Mac exige Python 3.12+ (filtro seguro do
+  `tarfile`) em vez de manter uma verificação manual para versões antigas.
+
 ## [2.0.0] - 2026-11-18
 
 O TucoTeca fica estável: o app desktop é a única interface e agora também
