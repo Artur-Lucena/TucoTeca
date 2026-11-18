@@ -270,8 +270,48 @@ def teste_icone_ico_valido_e_reproduzivel():
     afirmar(int.from_bytes(dados[4:6], "little") == len(ICONE.TAMANHOS))
     afirmar(b"\x89PNG" in dados)
     afirmar(ICONE.gerar(destino)[0].read_bytes() == dados, "ícone não é reproduzível")
-    versionado = REL.REPO / "codigo/frontends/electron/resources/icon.ico"
-    afirmar(versionado.read_bytes() == dados, "icon.ico versionado difere do gerador")
+    # versionados: mesmos pixels do gerador (os bytes do PNG dependem do zlib do SO)
+    recursos = REL.REPO / "codigo/frontends/electron/resources"
+    pngs_ico = _pngs_ico((recursos / "icon.ico").read_bytes())
+    afirmar(sorted(pngs_ico) == sorted(ICONE.TAMANHOS), sorted(pngs_ico))
+    for lado in (16, 48, 256):
+        afirmar(pngs_ico[lado] == ICONE.renderizar(lado), f"icon.ico {lado}px difere do gerador")
+    pngs_icns = _pngs_icns((recursos / "icon.icns").read_bytes())
+    for tipo, lado in (("ic11", 32), ("ic07", 128)):
+        afirmar(pngs_icns[tipo] == ICONE.renderizar(lado, 4, ICONE._pixel_mac),
+                f"icon.icns {tipo} difere do gerador")
+
+
+def _pixels_png(png: bytes) -> bytes:
+    """Linhas cruas (filtro + RGBA) de um PNG de um bloco IDAT, como o gerador escreve."""
+    import zlib
+    pos, idat = 8, b""
+    while pos < len(png):
+        n = int.from_bytes(png[pos:pos + 4], "big")
+        if png[pos + 4:pos + 8] == b"IDAT":
+            idat += png[pos + 8:pos + 8 + n]
+        pos += 12 + n
+    return zlib.decompress(idat)
+
+
+def _pngs_ico(dados: bytes) -> dict:
+    n = int.from_bytes(dados[4:6], "little")
+    saida = {}
+    for i in range(n):
+        ent = dados[6 + 16 * i:22 + 16 * i]
+        lado = ent[0] or 256
+        tam, desl = int.from_bytes(ent[8:12], "little"), int.from_bytes(ent[12:16], "little")
+        saida[lado] = _pixels_png(dados[desl:desl + tam])
+    return saida
+
+
+def _pngs_icns(dados: bytes) -> dict:
+    saida, pos = {}, 8
+    while pos < len(dados):
+        n = int.from_bytes(dados[pos + 4:pos + 8], "big")
+        saida[dados[pos:pos + 4].decode("ascii")] = _pixels_png(dados[pos + 8:pos + n])
+        pos += n
+    return saida
 
 
 def teste_fontes_incluem_electron_sem_artefatos():

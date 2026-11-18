@@ -79,6 +79,19 @@ def _inseguro(nome: str) -> bool:
     return nome.startswith(("/", "\\")) or ".." in partes or ":" in nome
 
 
+def _dentro(caminho: PurePosixPath) -> bool:
+    """Caminho relativo que, resolvidos os `..`, continua dentro do pacote."""
+    partes: list[str] = []
+    for p in caminho.parts:
+        if p == "..":
+            if not partes:
+                return False
+            partes.pop()
+        elif p not in ("", "."):
+            partes.append(p)
+    return True
+
+
 def _extrair_zip(pacote: Path, staging: Path) -> None:
     with zipfile.ZipFile(pacote) as z:
         for info in z.infolist():
@@ -97,8 +110,19 @@ def _extrair_tar(pacote: Path, staging: Path) -> None:
             if PurePosixPath(m.name).parts[:1] != ("python",):
                 raise ValueError(f"pacote fora do formato install_only: {m.name!r}")
         tmp = staging / ".tar"
-        # filtro 'data' (3.12+): recusa links para fora, dispositivos e setuid
-        t.extractall(tmp, filter="data")
+        if hasattr(tarfile, "data_filter"):
+            # filtro 'data': recusa links para fora, dispositivos e setuid
+            t.extractall(tmp, filter="data")
+        else:  # Python sem o filtro (ex.: 3.10.11): a mesma recusa, à mão
+            for m in membros:
+                if not (m.isfile() or m.isdir() or m.issym() or m.islnk()):
+                    raise ValueError(f"tipo de entrada recusado no pacote: {m.name!r}")
+                if m.issym() or m.islnk():
+                    alvo = PurePosixPath(m.name).parent / m.linkname if m.issym() else PurePosixPath(m.linkname)
+                    if m.linkname.startswith("/") or not _dentro(alvo):
+                        raise ValueError(f"link inseguro no pacote: {m.name!r} -> {m.linkname!r}")
+                m.mode &= 0o755
+            t.extractall(tmp)
     for item in (tmp / "python").iterdir():
         item.rename(staging / item.name)
     shutil.rmtree(tmp)

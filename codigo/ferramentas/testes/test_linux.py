@@ -7,16 +7,25 @@ from bib_nucleo import banco, scans
 from executar import afirmar
 
 
+def _raiz_posix_e_para_win():
+    """Raiz nativa deste posix e a tradução para o Windows (Mac usa o MAC_ROOT)."""
+    from bib_nucleo import base
+    if base.eh_mac():
+        return base.MAC_ROOT, base.mac_para_win
+    return base.LINUX_ROOT, base.linux_para_win
+
+
 def teste_resolver_exe_fallback_win_no_linux():
     if os.name == "nt":
         print("(só Linux: skip)")
         return
     from bib_nucleo import base
-    lin = Path(str(base.LINUX_ROOT).rstrip("/")) / "Games"
+    raiz, para_win = _raiz_posix_e_para_win()
+    lin = Path(str(raiz).rstrip("/")) / "Games"
     lin.mkdir(parents=True, exist_ok=True)
     alvo = lin / "lx-jogo.exe"
     alvo.write_bytes(b"MZ")
-    win = base.linux_para_win(str(alvo))
+    win = para_win(str(alvo))
     if win == str(alvo):
         print("(sem tradução: skip)")
         return
@@ -27,11 +36,15 @@ def teste_resolver_exe_fallback_win_no_linux():
 
 def teste_exe_existe_via_traduzido():
     from bib_nucleo import base
-    lin = Path(str(base.LINUX_ROOT).rstrip("/")) / "Games"
+    if os.name == "nt":
+        raiz, conv = base.LINUX_ROOT, base.win_para_linux
+    else:
+        raiz, conv = _raiz_posix_e_para_win()
+    lin = Path(str(raiz).rstrip("/")) / "Games"
     lin.mkdir(parents=True, exist_ok=True)
     alvo = lin / "lx-jogo2.exe"
     alvo.write_bytes(b"MZ")
-    outro = base.linux_para_win(str(alvo)) if os.name != "nt" else base.win_para_linux(str(alvo))
+    outro = conv(str(alvo))
     if outro == str(alvo):
         print("(sem tradução: skip)")
         return

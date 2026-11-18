@@ -57,6 +57,19 @@ def teste_traduzir_para_atual_cobre_mac():
 
 def teste_resolver_exe_mac_como_fallback():
     base, mac = _mac()
+    if base.eh_mac():
+        # no Mac o exe_mac é o nativo; o fallback é um exe_linux traduzido
+        real = Path(mac) / "Games" / "linux-fallback.bin"
+        real.write_bytes(b"BIN")
+        gravado = base.mac_para_linux(str(real))
+        afirmar(gravado != str(real), (gravado, str(real)))
+        exe, origem = base.resolver_exe({"executable_path": "", "exe_win": "",
+                                         "exe_linux": gravado, "exe_mac": ""})
+        afirmar(Path(exe) == real and origem == "exe_linux", (exe, origem, str(real)))
+        exe2, origem2 = base.resolver_exe({"executable_path": "", "exe_win": "",
+                                           "exe_linux": gravado, "exe_mac": str(real)})
+        afirmar(Path(exe2) == real and origem2 == "exe_mac", (exe2, origem2))
+        return
     raiz = base.WIN_ROOT if os.name == "nt" else base.LINUX_ROOT
     # no Windows, fallback de outro SO só vale se for executável Win
     # (.AppImage/binário Mac existe no disco mas nunca abre aqui)
