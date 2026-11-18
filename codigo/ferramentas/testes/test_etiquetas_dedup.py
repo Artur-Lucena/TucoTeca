@@ -5,7 +5,6 @@ from pathlib import Path
 
 from bib_nucleo import banco, base, pacotes
 from bib_nucleo import scans as SC
-from bib_nucleo import scans as nucleo_scans
 from executar import afirmar
 
 
@@ -53,9 +52,9 @@ def teste_chave_dedup():
 def teste_import_dedup_barra():
     con, _tmp = _nova_db()
     try:
-        r1 = nucleo_scans.importar_lista(con, [{"titulo": "J", "executable_path": r"D:\G\j.exe"}])
+        r1 = SC.importar_lista(con, [{"titulo": "J", "executable_path": r"D:\G\j.exe"}])
         afirmar(r1["novos"] == 1, r1)
-        r2 = nucleo_scans.importar_lista(con, [{"titulo": "J", "executable_path": "D:/G/j.exe"}])
+        r2 = SC.importar_lista(con, [{"titulo": "J", "executable_path": "D:/G/j.exe"}])
         afirmar(r2["novos"] == 0 and r2["total_no_banco"] == 1, r2)
     finally:
         con.close()
@@ -64,9 +63,9 @@ def teste_import_dedup_barra():
 def teste_import_mesmo_exe_outro_titulo():
     con, _tmp = _nova_db()
     try:
-        nucleo_scans.importar_lista(con, [{"titulo": "Hades II",
+        SC.importar_lista(con, [{"titulo": "Hades II",
                                    "executable_path": r"D:\G\Hades2.exe"}])
-        r = nucleo_scans.importar_lista(con, [{"titulo": "Hades 2",
+        r = SC.importar_lista(con, [{"titulo": "Hades 2",
                                        "executable_path": r"D:\G\Hades2.exe"}])
         afirmar(r["novos"] == 0 and r["total_no_banco"] == 1, r)
     finally:

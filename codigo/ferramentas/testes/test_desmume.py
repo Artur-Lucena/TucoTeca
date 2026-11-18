@@ -4,7 +4,6 @@ import zipfile
 from pathlib import Path
 
 from bib_nucleo import emuladores as EMU
-from bib_nucleo import emuladores as nucleo_emuladores
 from bib_nucleo import scans
 from bib_nucleo.emuladores import provedores
 from executar import afirmar
@@ -72,7 +71,7 @@ def teste_fundir_nds_separa_variantes():
 def teste_preparar_nds_sem_aviso_cripto():
     tmp = Path(tempfile.mkdtemp(prefix="suite-dp-"))
     rom = _rom_nds(tmp)
-    r = nucleo_emuladores.preparar_lancamento({"origem": "rom-nds", "launch_options": str(rom),
+    r = EMU.preparar_lancamento({"origem": "rom-nds", "launch_options": str(rom),
                                   "azahar_preset": "inexistente"})
     afirmar(r["preset_aplicado"] is None and r["aviso"] is not None
             and "aes_keys" not in (r["aviso"] or ""), r)

@@ -161,15 +161,13 @@ Provas de tela usam `--remote-debugging-port` e CDP sobre o app empacotado.
 
 ## App instalado
 
-`npm run dist` (Windows) gera `dist/TucoTeca-Setup-<versão>-x64.exe` (NSIS por
-usuário, sem admin); `npm run dist:mac` (num Mac) gera
-`dist/TucoTeca-<versão>-mac-<arm64|x64>.dmg`, uma por arquitetura cujo Python
-estiver em `programa/`. Os dois levam núcleo Python, ponte e o Python da
-plataforma em `resources/tucoteca/` (`electron-builder.config.cjs`). A ponte
-roda com `windowsHide` (sem console) no Windows. Build, prova e anexos:
-`docs/RELEASES.md`. Sem assinatura de código no Windows nem notarização no
-macOS (assinatura ad-hoc; decisão do usuário): na 1ª vez, botão direito →
-Abrir.
+`npm run dist` (Windows) gera o instalador de um clique
+`TucoTeca-Setup-<versão>-x64.exe` (por usuário, sem admin; instala e abre o
+app); `npm run dist:mac` (num Mac) gera uma `.dmg` por arquitetura cujo
+Python estiver em `programa/`. Ambos levam núcleo, ponte e o Python da
+plataforma em `resources/tucoteca/` (`electron-builder.config.cjs`). Sem
+assinatura no Windows nem notarização no macOS (decisão do usuário).
+Instalação do usuário: README; build e publicação: `docs/RELEASES.md`.
 
 ## Limites conhecidos
 

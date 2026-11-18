@@ -8,8 +8,7 @@ from unittest.mock import patch
 from bib_nucleo import apps_externos as EI
 from bib_nucleo import apps_externos as EQ
 from bib_nucleo import apps_externos as RV
-from bib_nucleo import banco, base, online, scans, spotify
-from bib_nucleo import videos as nucleo_videos
+from bib_nucleo import banco, base, online, scans, spotify, videos
 from bib_nucleo import videos_youtube as YT
 from executar import afirmar
 
@@ -166,7 +165,7 @@ def teste_videos_import_dedup_e_crud():
     db = Path(tmp) / "v.db"
     con = banco.get_db(db)
     try:
-        r = nucleo_videos.importar_videos(con, str(src))
+        r = videos.importar_videos(con, str(src))
         afirmar(r["novos"] == 2 and r["ignorados"] == 1, r)
         lista = banco.listar_videos(con)
         afirmar(len(lista) == 2, lista)

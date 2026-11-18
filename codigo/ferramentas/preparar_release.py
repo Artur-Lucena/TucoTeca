@@ -116,6 +116,7 @@ RECURSOS = {
 }
 PYTHON_EMBUTIDO = {"windows-x64": "python.exe", "macos-x64": "bin/python3", "macos-arm64": "bin/python3"}
 CONFERENCIA_MAC = "conferencia-mac.json"
+NOTAS_ARQUIVO = "NOTAS-RELEASE.md"  # corpo da release; não é anexo
 
 # o que o app instalado precisa para abrir a ponte (conferido no app empacotado)
 ESSENCIAIS_APP = ("codigo/frontends/ponte.py", "codigo/frontends/ponte_paridade.py",
@@ -148,60 +149,49 @@ def conferir_app(dist: Path, exigir_runtime: bool = True, plataforma: str = "win
             "versao_app": (recursos / "codigo/VERSION").read_text(encoding="utf-8").strip()}
 
 
-NOTAS = """# TucoTeca {versao}
+NOTAS = """## Instalar
 
-Revisão `{revisao}` · {data}
-
-## Instalação (Windows 10/11, 64 bits)
-
-1. Baixe `{instalador}`.
-2. Execute-o e escolha a pasta (instala só para o seu usuário, sem admin).
-3. Abra o TucoTeca pelo atalho do Menu Iniciar ou da Área de Trabalho.
-
-A coleção fica em `Documentos\\TucoTeca` (ou em `BIBLIOTECA_HOME`, se
-definido) e **não** é apagada ao atualizar ou desinstalar.
-
-O instalador não é assinado: na primeira execução o Windows SmartScreen pode
-avisar ("O Windows protegeu o computador" → "Mais informações" →
-"Executar assim mesmo"). Confira o SHA-256 em `SHA256SUMS.txt` antes.
-{aviso_runtime}{secao_mac}
+**Windows 10/11** — baixe `{instalador}` e abra. Ele instala para o seu
+usuário e já abre o TucoTeca. Se o Windows avisar que protegeu o computador:
+*Mais informações → Executar assim mesmo*.
+{secao_mac}
+A coleção fica em *Documentos/TucoTeca* e continua lá ao atualizar ou
+desinstalar. Para atualizar, é só instalar a versão nova por cima.
+{aviso_runtime}
 ## Novidades
 
 {novidades}
-"""
 
+---
+Revisão `{revisao}` · {data} · conferir downloads: `SHA256SUMS.txt`
+"""
 
 NOTAS_MAC = """
-## Instalação (macOS 13 Ventura ou mais novo — Apple Silicon ou Intel)
-
-1. Baixe a imagem do seu Mac:{lista}
-2. Abra a `.dmg` e arraste o TucoTeca para **Aplicativos**.
-3. Na primeira vez, clique com o botão direito no TucoTeca → **Abrir** →
-   **Abrir**. O app não é notarizado pela Apple (exige conta paga), então o
-   macOS pergunta uma vez. Se ele disser que o app "está danificado", rode no
-   Terminal: `xattr -dr com.apple.quarantine /Applications/TucoTeca.app`.
-
-A coleção fica em `Documentos/TucoTeca`. Ferramentas opcionais (FFmpeg,
-yt-dlp, 7-Zip) vêm do Homebrew: `brew install ffmpeg yt-dlp sevenzip`.
+**macOS 13 ou mais novo** — baixe {lista}, abra e arraste o TucoTeca para
+*Aplicativos*. Na primeira vez, clique com o botão direito no app → *Abrir*
+(no macOS 15 ou mais novo: tente abrir, depois *Ajustes do Sistema →
+Privacidade e Segurança → Abrir Mesmo Assim*). O macOS pergunta uma vez
+porque o app não é notarizado pela Apple.
 """
 
-ROTULO_ARCH = {"macos-arm64": "Apple Silicon (M1, M2, M3…)", "macos-x64": "Intel"}
+ROTULO_ARCH = {"macos-arm64": "Apple Silicon: M1, M2…", "macos-x64": "Intel"}
 
 
 def escrever_notas(destino: Path, versao: str, revisao: str, instalador: str,
                    novidades: str, app: dict, dmgs: dict | None = None) -> Path:
+    """Texto da página da release (vai no corpo, não como anexo)."""
     aviso = "" if app["python_embutido"] else (
         "\n**Atenção:** este build não embute Python; é preciso ter o Python 3.14 "
         "instalado (`py -3.14`).\n")
     secao_mac = ""
     if dmgs:
-        lista = "".join(f"\n   - {ROTULO_ARCH.get(info['plataforma'], info['plataforma'])}: `{nome}`"
-                        for nome, info in sorted(dmgs.items()))
-        secao_mac = NOTAS_MAC.format(lista=lista)
+        opcoes = [f"`{nome}` ({ROTULO_ARCH.get(info['plataforma'], info['plataforma'])})"
+                  for nome, info in sorted(dmgs.items())]
+        secao_mac = NOTAS_MAC.format(lista=" ou ".join(opcoes))
     texto = NOTAS.format(versao=versao, revisao=revisao, instalador=instalador,
                          data=datetime.date.today().isoformat(), aviso_runtime=aviso,
                          secao_mac=secao_mac, novidades=novidades or "Veja docs/CHANGELOG.md.")
-    caminho = destino / "NOTAS-RELEASE.md"
+    caminho = destino / NOTAS_ARQUIVO
     caminho.write_text(texto, encoding="utf-8")
     return caminho
 
@@ -286,7 +276,7 @@ def preparar(revisao: str, saida: Path, *, repo: Path = REPO, dist: Path = DIST_
         empacotar_fontes(staging / f"tucoteca-{versao}-fontes.zip", repo=repo, revisao=revisao)
         escrever_notas(staging, versao, revisao, instalador.name,
                        secao_changelog(repo, versao), app, dmgs)
-        anexos = {p.name: _ativo(p) for p in sorted(staging.iterdir())}
+        anexos = {p.name: _ativo(p) for p in sorted(staging.iterdir()) if p.name != NOTAS_ARQUIVO}
         instaladores = {instalador.name: {"plataforma": "windows-x64",
                                           "python_embutido": app["python_embutido"],
                                           "python_versao": app["python_versao"]}}
@@ -299,7 +289,8 @@ def preparar(revisao: str, saida: Path, *, repo: Path = REPO, dist: Path = DIST_
                    "python_versao": app["python_versao"], "anexos": anexos}
         (staging / "release.json").write_text(
             json.dumps(release, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        linhas = [f"{sha_arquivo(p)}  {p.name}" for p in sorted(staging.iterdir())]
+        linhas = [f"{sha_arquivo(p)}  {p.name}" for p in sorted(staging.iterdir())
+                  if p.name != NOTAS_ARQUIVO]
         (staging / "SHA256SUMS.txt").write_text("\n".join(linhas) + "\n", encoding="utf-8")
         staging.rename(saida)
     finally:

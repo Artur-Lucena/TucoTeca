@@ -73,9 +73,11 @@ module.exports = {
       : [],
   },
   nsis: {
-    oneClick: false,
+    // um clique: instala para o usuário (sem admin, sem telas) e abre o app;
+    // atualizar é abrir o instalador novo por cima
+    oneClick: true,
     perMachine: false,
-    allowToChangeInstallationDirectory: true,
+    runAfterFinish: true,
     // a coleção fica em Documentos\TucoTeca, fora da pasta do app; mesmo assim
     // nunca apagar dados do usuário ao desinstalar
     deleteAppDataOnUninstall: false,

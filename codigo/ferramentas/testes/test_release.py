@@ -97,7 +97,7 @@ def teste_release_gera_anexos_coerentes():
     # checksums cobrem todos os outros anexos e batem
     somas = dict(reversed(linha.split("  ", 1)) for linha in
                  (saida / "SHA256SUMS.txt").read_text(encoding="utf-8").splitlines())
-    afirmar(set(somas) == esperados - {"SHA256SUMS.txt"}, somas)
+    afirmar(set(somas) == esperados - {"SHA256SUMS.txt", "NOTAS-RELEASE.md"}, somas)
     for nome, sha in somas.items():
         afirmar(hashlib.sha256((saida / nome).read_bytes()).hexdigest() == sha, nome)
     release = json.loads((saida / "release.json").read_text(encoding="utf-8"))
@@ -105,7 +105,8 @@ def teste_release_gera_anexos_coerentes():
     afirmar(release["python_versao"] == "3.14.7", release)
     notas = (saida / "NOTAS-RELEASE.md").read_text(encoding="utf-8")
     afirmar("Instalador." in notas and "antigo" not in notas, notas)
-    afirmar("SmartScreen" in notas and "Atenção" not in notas, notas)
+    afirmar("Executar assim mesmo" in notas and "Atenção" not in notas, notas)
+    afirmar("NOTAS-RELEASE.md" not in json.loads((saida / "release.json").read_text(encoding="utf-8"))["anexos"])
     with zipfile.ZipFile(saida / "tucoteca-1.2.0-fontes.zip") as z:
         afirmar(json.loads(z.read("MANIFESTO-FONTES.json"))["revisao_git"] == SHA)
         nomes = z.namelist()
@@ -163,7 +164,7 @@ def teste_release_com_dmgs_conferidas_no_mac():
     afirmar(release["instaladores"]["TucoTeca-1.2.0-mac-arm64.dmg"]["plataforma"] == "macos-arm64", release)
     afirmar("TucoTeca-1.2.0-mac-x64.dmg" in (saida / "SHA256SUMS.txt").read_text(encoding="utf-8"))
     notas = (saida / "NOTAS-RELEASE.md").read_text(encoding="utf-8")
-    afirmar("Apple Silicon" in notas and "xattr" in notas and "SmartScreen" in notas, notas)
+    afirmar("Apple Silicon" in notas and "Abrir Mesmo Assim" in notas and "Executar assim mesmo" in notas, notas)
     # .dmg trocada depois da conferência, ou conferência de outra revisão: recusa
     (mac / "TucoTeca-1.2.0-mac-x64.dmg").write_bytes(b"outra")
     afirmar("SHA-256" in _erro(REL.preparar, SHA, repo / "s1", repo=repo, dist=dist, conferir_git=False, mac=mac))
@@ -221,6 +222,9 @@ def teste_runtime_python_confere_hash_e_troca_pasta():
 def teste_runtime_python_mac_extrai_install_only():
     import io
     import tarfile
+    if not hasattr(tarfile, "data_filter"):
+        print("(Python sem o filtro seguro do tarfile: skip; o preparador recusa)")
+        return
     tmp = Path(tempfile.mkdtemp(prefix="suite-runtime-mac-"))
     pacote = tmp / "cpython-mac.tar.gz"
     with tarfile.open(pacote, "w:gz") as tar:

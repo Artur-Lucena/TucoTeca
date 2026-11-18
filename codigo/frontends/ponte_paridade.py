@@ -125,23 +125,23 @@ def metodos_paridade(trabalhos) -> dict:
                                               escopo="equalizacao")}
 
     def volume_ler(servico, params):
-        from bib_nucleo import volume as nucleo_volume
+        from bib_nucleo import volume
         # indisponível (ex.: fora do Windows) volta ok=false: a interface esconde o controle
-        return dict(nucleo_volume.ler_volume_pc())
+        return dict(volume.ler_volume_pc())
 
     def volume_definir(servico, params):
-        from bib_nucleo import volume as nucleo_volume
+        from bib_nucleo import volume as volume
         nivel = params.get("nivel")
         if isinstance(nivel, bool) or not isinstance(nivel, (int, float)):
             raise ValueError("nivel deve ser um número de 0 a 100")
-        r = dict(nucleo_volume.definir_volume_pc(nivel))
+        r = dict(volume.definir_volume_pc(nivel))
         if not r.get("ok"):
             raise ValueError(r.get("erro") or "Volume do PC indisponível.")
         return r
 
     def volume_mudo(servico, params):
-        from bib_nucleo import volume as nucleo_volume
-        r = dict(nucleo_volume.alternar_mudo_pc())
+        from bib_nucleo import volume as volume
+        r = dict(volume.alternar_mudo_pc())
         if not r.get("ok"):
             raise ValueError(r.get("erro") or "Volume do PC indisponível.")
         return r

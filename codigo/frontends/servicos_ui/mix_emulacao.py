@@ -3,7 +3,7 @@ jogo 3DS, mods/cheats/texturas/presets do Azahar (antes `qt_emulacao.py`)."""
 from __future__ import annotations
 
 from bib_nucleo import cheats as CHEATS
-from bib_nucleo import controles as nucleo_controles
+from bib_nucleo import controles
 from bib_nucleo import emuladores as EMU
 from bib_nucleo import texturas as TEXTURAS
 from bib_nucleo.base import traduzir_para_atual
@@ -178,27 +178,27 @@ class MixEmulacao:
     def controles_pads(self):
         """Pads detectados. Só leitura; sem pads é lista vazia, não erro."""
         try:
-            pads = nucleo_controles.listar_controles() or []
+            pads = controles.listar_controles() or []
         except Exception:
             pads = []
         return {"pads": [dict(p) for p in pads]}
 
     def controles_presets(self):
         try:
-            nomes = nucleo_controles.listar_presets_controle() or []
+            nomes = controles.listar_presets_controle() or []
         except Exception:
             nomes = []
         return {"presets": [str(n) for n in nomes]}
 
     def controles_tipos(self):
-        tipos = sorted(nucleo_controles.NOMES_TIPO)
-        return {"tipos": [{"tipo": t, "nome": nucleo_controles.NOMES_TIPO[t]} for t in tipos]}
+        tipos = sorted(controles.NOMES_TIPO)
+        return {"tipos": [{"tipo": t, "nome": controles.NOMES_TIPO[t]} for t in tipos]}
 
     def controle_fotografar(self, nome):
         nome = (nome or "").strip()
         if not nome:
             raise ValueError("Dê um nome ao preset.")
-        r = nucleo_controles.fotografar_perfil(nome)
+        r = controles.fotografar_perfil(nome)
         if not isinstance(r, dict) or not r.get("ok"):
             raise ValueError((r or {}).get("erro", "Não foi possível salvar o preset."))
         return r
@@ -207,24 +207,24 @@ class MixEmulacao:
         nome = (nome or "").strip()
         if not nome:
             raise ValueError("Escolha um preset para aplicar.")
-        r = nucleo_controles.aplicar_preset_controle(nome)
+        r = controles.aplicar_preset_controle(nome)
         if not isinstance(r, dict) or not r.get("ok"):
             raise ValueError((r or {}).get("erro", "Não foi possível aplicar o preset."))
         return r
 
     def controle_gerar(self, tipo):
         tipo = (tipo or "").strip()
-        if tipo not in nucleo_controles.NOMES_TIPO:
+        if tipo not in controles.NOMES_TIPO:
             raise ValueError("Escolha um tipo de controle.")
         guid, port, rot = "", 0, {}
         try:
-            det = nucleo_controles.detectar_sdl()
+            det = controles.detectar_sdl()
             if det:
                 guid, port = det[0].get("guid", ""), det[0].get("port", 0)
-            rot = nucleo_controles.nomes_sdl()
+            rot = controles.nomes_sdl()
         except Exception:
             pass
-        r = nucleo_controles.salvar_mapa_gerado(tipo, guid=guid, port=port,
+        r = controles.salvar_mapa_gerado(tipo, guid=guid, port=port,
                                     nome=f"{tipo}-hub", rotulos=rot)
         if not isinstance(r, dict) or not r.get("ok"):
             raise ValueError((r or {}).get("erro", "Não foi possível gerar o mapa."))
@@ -233,10 +233,10 @@ class MixEmulacao:
     def controle_estado(self):
         """Resumo ao vivo do pad 0. Hardware real em produção; testes simulam."""
         try:
-            est = nucleo_controles.ler_estado_xinput(0)
+            est = controles.ler_estado_xinput(0)
         except Exception as e:
             raise ValueError(f"Sem leitura do controle: {e}")
-        return {"resumo": nucleo_controles.resumir_estado(est)}
+        return {"resumo": controles.resumir_estado(est)}
 
 
 __all__ = ["MixEmulacao"]

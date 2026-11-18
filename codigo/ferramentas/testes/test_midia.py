@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
-from bib_nucleo import banco as nucleo_banco
+from bib_nucleo import banco
 from bib_nucleo.midia import banco as mb
 from bib_nucleo.midia import indexar
 from bib_nucleo.rede import cinemeta
@@ -57,14 +57,14 @@ def _pasta():
 
 def _banco():
     db = Path(tempfile.mkdtemp(prefix="suite-midia-db-")) / "hub.db"
-    nucleo_banco.get_db(db).close()
+    banco.get_db(db).close()
     return db
 
 
 def teste_indexar_casar_e_reindexar():
     from bib_nucleo.midia.casar import casar_pendentes
     raiz = _pasta()
-    con = nucleo_banco.get_db(_banco())
+    con = banco.get_db(_banco())
     try:
         for ruim in ("relativa/x", str(Path(raiz.anchor)), str(raiz / "nao-existe")):
             try:
@@ -99,7 +99,7 @@ def teste_indexar_casar_e_reindexar():
 
 
 def teste_progresso_limiar_e_marcar():
-    con = nucleo_banco.get_db(_banco())
+    con = banco.get_db(_banco())
     try:
         afirmar(mb.salvar_progresso(con, "tt0133093", 600, 7200)["assistido"] is False)
         afirmar(mb.salvar_progresso(con, "tt0133093", 6700, 7200)["assistido"] is True, "≥ 92 % é assistido")
@@ -123,7 +123,7 @@ def teste_legenda_srt_para_vtt():
 
 def teste_calendario_das_seguidas():
     from bib_nucleo.midia.calendario import calendario
-    con = nucleo_banco.get_db(_banco())
+    con = banco.get_db(_banco())
     try:
         mb.gravar_titulo(con, META_SERIE, seguindo=True)
         cal = calendario(con)
@@ -212,7 +212,7 @@ def teste_ponte_fluxo_completo():
 def teste_seguidas_so_a_cada_12h_e_sem_rede():
     db = _banco()
     chamar, esperar = _ponte(db)
-    con = nucleo_banco.get_db(db)
+    con = banco.get_db(db)
     mb.gravar_titulo(con, META_SERIE, seguindo=True)
     con.close()
     with patch.object(cinemeta, "meta", side_effect=_meta) as m:
