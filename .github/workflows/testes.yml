@@ -1,19 +1,27 @@
 name: Testes
-# Gatilho apenas manual: a matriz hospedada está desativada (billing da conta
-# do GitHub bloqueia jobs automáticos). Validação local: codigo/ferramentas/validar.py
+# Repositório público: a matriz roda em push/PR da main e das branches de
+# release, e à mão. Validação local equivalente: codigo/ferramentas/validar.py
 on:
+  push:
+    branches: [main, 'release/**']
+  pull_request:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      instalador:
-        description: 'Gerar o instalador Windows (sem Python embutido) e rodar o selftest empacotado'
-        type: boolean
-        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   stdlib:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-24.04]
+        # macos-latest = Apple Silicon; macos-15-intel = Mac Intel
+        os: [windows-latest, ubuntu-24.04, macos-latest, macos-15-intel]
         python: ['3.10', '3.14']
     runs-on: ${{ matrix.os }}
     env:
@@ -43,9 +51,11 @@ jobs:
         with:
           python-version: '3.14'
       - name: Ferramentas
-        run: python -m pip install pytest coverage ruff
+        run: python -m pip install pytest coverage ruff mypy
       - name: Lint
         run: ruff check codigo
+      - name: Tipos dos builders
+        run: mypy
       - name: Suíte com cobertura dos subprocessos
         run: python -B -m pytest --cobertura
       - name: Relatório de cobertura
@@ -56,7 +66,11 @@ jobs:
           path: .provas/cobertura/
 
   electron:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: codigo/frontends/electron
@@ -71,26 +85,95 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - name: Instalador (sem Python embutido)
-        if: inputs.instalador
-        env:
-          TUCOTECA_SEM_RUNTIME: '1'
-        run: npx electron-builder --win --config electron-builder.config.cjs
+
+  instalador-windows:
+    needs: electron
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
-        if: inputs.instalador
         with:
           python-version: '3.14'
-      - name: Selftest do app empacotado (coleção sintética)
-        if: inputs.instalador
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: codigo/frontends/electron/package-lock.json
+      - name: Python embutido (python.org, SHA-256 fixado)
+        run: python -B codigo/ferramentas/preparar_runtime_python.py --plataforma windows-x64
+      - name: Instalador
+        working-directory: codigo/frontends/electron
+        run: |
+          npm ci
+          npm run dist
+      - name: Selftest do app empacotado (coleção sintética, Python embutido)
         shell: pwsh
         run: |
-          python -B ../../ferramentas/semear_prova_electron.py --destino "$env:RUNNER_TEMP\home" --limpar
+          python -B codigo/ferramentas/semear_prova_electron.py --destino "$env:RUNNER_TEMP\home" --limpar
           $env:BIBLIOTECA_HOME = "$env:RUNNER_TEMP\home"
           $env:TUCOTECA_USERDATA = "$env:RUNNER_TEMP\userdata"
-          $env:TUCOTECA_PYTHON = (Get-Command python).Source
           $env:BIBLIOTECA_REDE = '0'
-          $p = Start-Process dist\win-unpacked\TucoTeca.exe -ArgumentList '--selftest' -PassThru -Wait
+          $p = Start-Process codigo\frontends\electron\dist\win-unpacked\TucoTeca.exe -ArgumentList '--selftest' -PassThru -Wait
           if ($p.ExitCode -ne 0) { exit $p.ExitCode }
+
+  app-mac:
+    needs: electron
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: codigo/frontends/electron/package-lock.json
+      - name: Python embutido (python-build-standalone, SHA-256 fixado)
+        run: |
+          python -B codigo/ferramentas/preparar_runtime_python.py --plataforma macos-arm64
+          python -B codigo/ferramentas/preparar_runtime_python.py --plataforma macos-x64
+      - name: .dmg (Apple Silicon e Intel)
+        working-directory: codigo/frontends/electron
+        run: |
+          npm ci
+          npm run dist:mac
+      - name: Conferência dos .app (núcleo, runtime, sem dados pessoais)
+        run: python -B codigo/ferramentas/preparar_release.py --revisao "$GITHUB_SHA" --conferir-mac
+      - name: Selftest do app Apple Silicon (coleção sintética, Python embutido)
+        run: |
+          python -B codigo/ferramentas/semear_prova_electron.py --destino "$RUNNER_TEMP/home" --limpar
+          BIBLIOTECA_HOME="$RUNNER_TEMP/home" TUCOTECA_USERDATA="$RUNNER_TEMP/userdata" BIBLIOTECA_REDE=0 \
+            codigo/frontends/electron/dist/mac-arm64/TucoTeca.app/Contents/MacOS/TucoTeca --selftest
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mac-dmgs
+          path: |
+            codigo/frontends/electron/dist/*.dmg
+            codigo/frontends/electron/dist/conferencia-mac.json
+          if-no-files-found: error
+
+  app-mac-intel:
+    needs: app-mac
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: actions/download-artifact@v7
+        with:
+          name: mac-dmgs
+          path: dmgs
+      - name: Selftest do app Intel a partir da .dmg (como o usuário instala)
+        run: |
+          python -B codigo/ferramentas/semear_prova_electron.py --destino "$RUNNER_TEMP/home" --limpar
+          dmg=$(ls dmgs/*-mac-x64.dmg)
+          hdiutil attach "$dmg" -nobrowse -mountpoint "$RUNNER_TEMP/vol"
+          cp -R "$RUNNER_TEMP/vol/TucoTeca.app" "$RUNNER_TEMP/"
+          hdiutil detach "$RUNNER_TEMP/vol"
+          BIBLIOTECA_HOME="$RUNNER_TEMP/home" TUCOTECA_USERDATA="$RUNNER_TEMP/userdata" BIBLIOTECA_REDE=0 \
+            "$RUNNER_TEMP/TucoTeca.app/Contents/MacOS/TucoTeca" --selftest
 
   segredos:
     runs-on: ubuntu-24.04
