@@ -350,7 +350,8 @@ if (!primeira) {
     .whenReady()
     .then(principal)
     .catch((erro) => falhar(String(erro), 1))
-  // macOS esta fora do escopo por enquanto: fechar a janela encerra o app.
+  // Também no macOS fechar a janela encerra o app: a ponte e o lock da coleção
+  // não ficam vivos sem janela (sem ícone "aberto" esquecido no Dock).
   app.on('window-all-closed', () => {
     void finalizar(0)
   })

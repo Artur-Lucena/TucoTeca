@@ -6,6 +6,7 @@ import {
   ClientePonte,
   Pendentes,
   SeparadorLinhas,
+  ambientePonte,
   descobrirPython,
   type FabricaProcesso,
 } from './ponte'
@@ -109,6 +110,35 @@ describe('descobrirPython', () => {
   it('outras plataformas usam python3', () => {
     const r = descobrirPython('/raiz', { env: {}, plataforma: 'linux', existe: () => true })
     expect(r).toEqual({ comando: 'python3', prefixo: [] })
+  })
+
+  it('macOS: runtime embutido da arquitetura do processo', () => {
+    const vistos: string[] = []
+    const existe = (caminho: string) => {
+      vistos.push(caminho.replaceAll('\\', '/'))
+      return caminho.includes('macos-arm64')
+    }
+    const r = descobrirPython('/app/tucoteca', { env: {}, plataforma: 'darwin', arquitetura: 'arm64', existe })
+    expect(r.comando.replaceAll('\\', '/')).toBe('/app/tucoteca/programa/macos-arm64/python/bin/python3')
+    const intel = descobrirPython('/app/tucoteca', { env: {}, plataforma: 'darwin', arquitetura: 'x64', existe })
+    expect(intel).toEqual({ comando: 'python3', prefixo: [] })
+    expect(vistos.at(-1)).toBe('/app/tucoteca/programa/macos-x64/python/bin/python3')
+  })
+})
+
+describe('ambientePonte', () => {
+  it('macOS: Homebrew entra no PATH (app aberto pelo Finder tem PATH mínimo)', () => {
+    const env = ambientePonte({ PATH: '/usr/bin:/bin' }, 'darwin')
+    expect(env.PATH).toBe('/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin')
+    expect(env.PYTHONIOENCODING).toBe('utf-8')
+    expect(ambientePonte({ PATH: '/opt/homebrew/bin:/usr/bin' }, 'darwin').PATH).toBe(
+      '/usr/local/bin:/opt/homebrew/bin:/usr/bin',
+    )
+  })
+
+  it('Windows e Linux: PATH intacto', () => {
+    expect(ambientePonte({ PATH: 'C:\\Windows' }, 'win32').PATH).toBe('C:\\Windows')
+    expect(ambientePonte({ PATH: '/usr/bin' }, 'linux').PATH).toBe('/usr/bin')
   })
 })
 

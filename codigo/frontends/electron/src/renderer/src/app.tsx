@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import type { ModuloDTO } from '../../shared/protocolo'
 import { combinacao, decidirAtalho } from './navegacao/atalhos'
+import { ehMac } from './plataforma'
 import { AvisoPonte } from './componentes/casca/AvisoPonte'
 import { Atividade } from './componentes/casca/Atividade'
 import { BarraLateral } from './componentes/casca/BarraLateral'
@@ -107,16 +108,18 @@ export function App() {
 
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent) => {
-      const comb = combinacao(evento)
+      const comb = combinacao(evento, ehMac())
+      const alvo = evento.target as HTMLElement | null
+      const emCampo =
+        alvo instanceof HTMLInputElement || alvo instanceof HTMLTextAreaElement || alvo instanceof HTMLSelectElement
       // Big Picture: setas do teclado/controle remoto andam pelo foco (fora de campos de texto)
       if (modoTv() && !paleta.aberta && SETAS[comb ?? ''] !== undefined) {
-        const alvo = evento.target as HTMLElement | null
-        if (!(alvo instanceof HTMLInputElement || alvo instanceof HTMLTextAreaElement || alvo instanceof HTMLSelectElement)) {
+        if (!emCampo) {
           if (moverFoco(SETAS[comb ?? ''])) evento.preventDefault()
           return
         }
       }
-      if (!paleta.aberta && (comb === 'Alt+Left' || comb === 'Alt+Right')) {
+      if (!paleta.aberta && !emCampo && (comb === 'Alt+Left' || comb === 'Alt+Right')) {
         evento.preventDefault()
         if (comb === 'Alt+Left') voltar()
         else avancar()

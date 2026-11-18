@@ -24,6 +24,7 @@ const api: ApiTucoteca = {
   reabrir: () => ipcRenderer.invoke('ponte:reabrir'),
   // densidade × escala de texto (Aparência); limites para nunca sumir com a interface
   definirZoom: (fator) => webFrame.setZoomFactor(Math.min(2, Math.max(0.5, Number(fator) || 1))),
+  plataforma: process.platform,
 }
 
 contextBridge.exposeInMainWorld('tucoteca', api)

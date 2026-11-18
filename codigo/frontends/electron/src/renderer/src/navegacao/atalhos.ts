@@ -33,16 +33,30 @@ function teclaNormalizada(key: string): string | null {
   return null
 }
 
-/** Monta a combinação no formato do validador do núcleo (ex.: `Ctrl+Shift+K`). */
-export function combinacao(evento: EventoTecla): string | null {
+/**
+ * Monta a combinação no formato do validador do núcleo (ex.: `Ctrl+Shift+K`).
+ * No Mac, ⌘ vale como Ctrl: os atalhos salvos (`Ctrl+K`) funcionam com ⌘K.
+ */
+export function combinacao(evento: EventoTecla, mac = false): string | null {
   const base = teclaNormalizada(evento.key)
   if (base === null) return null
   const partes: string[] = []
-  if (evento.ctrlKey) partes.push('Ctrl')
+  if (evento.ctrlKey || (mac && evento.metaKey)) partes.push('Ctrl')
   if (evento.altKey) partes.push('Alt')
   if (evento.shiftKey) partes.push('Shift')
-  if (evento.metaKey) partes.push('Meta')
+  if (evento.metaKey && !mac) partes.push('Meta')
   return [...partes, base].join('+')
+}
+
+const SIMBOLOS_MAC: Record<string, string> = { Ctrl: '⌘', Alt: '⌥', Shift: '⇧', Left: '←', Right: '→' }
+
+/** Como mostrar um atalho salvo: `Ctrl+K` no Windows, `⌘K` no Mac. */
+export function rotuloAtalho(comb: string, mac = false): string {
+  if (!mac) return comb
+  return comb
+    .split('+')
+    .map((parte) => SIMBOLOS_MAC[parte] ?? parte)
+    .join('')
 }
 
 type AcaoAtalho =

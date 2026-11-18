@@ -20,4 +20,6 @@ export interface ApiTucoteca {
   reabrir(): Promise<void>
   /** Zoom da janela (0,5–2), usado pela densidade e escala de texto. */
   definirZoom(fator: number): void
+  /** `process.platform` do app (o renderer sandboxed não tem `process`). */
+  plataforma: string
 }
