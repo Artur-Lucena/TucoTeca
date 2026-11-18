@@ -6,7 +6,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from bib_nucleo import banco as nucleo_banco
+from bib_nucleo import banco
 from executar import afirmar
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -45,8 +45,8 @@ def teste_diagnostico_banco_so_leitura():
     afirmar(DIAG.diagnosticar_banco(ausente)["estado"] == "ausente")
     afirmar(not ausente.exists(), "diagnóstico criou coleção vazia")
     db = tmp / "b.db"
-    con = nucleo_banco.get_db(db)
-    nucleo_banco.criar_jogo(con, {"titulo": "Teste"})
+    con = banco.get_db(db)
+    banco.criar_jogo(con, {"titulo": "Teste"})
     con.close()
     antes = db.read_bytes()
     resultado = DIAG.diagnosticar_banco(db)

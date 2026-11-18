@@ -1,8 +1,7 @@
 """Scans e pacotes via ServicoBiblioteca: preview, importacao e pacotes."""
 from __future__ import annotations
 
-from bib_nucleo import pacotes as nucleo_pacotes
-from bib_nucleo import scans
+from bib_nucleo import pacotes, scans
 from bib_nucleo.rede import repacks
 
 
@@ -52,10 +51,10 @@ class MixScans:
 
     def importar_colecao(self, caminho, restaurar_saves=False):
         with self._escrita:
-            return nucleo_pacotes.importar_pacote(caminho, self.db_path, restaurar_saves)
+            return pacotes.importar_pacote(caminho, self.db_path, restaurar_saves)
 
     def preparar_pacote(self, arquivo):
-        nucleo_pacotes.fazer_backup(self.db_path)
+        pacotes.fazer_backup(self.db_path)
         r = repacks.preparar_pacote(arquivo)
         if not r.get("ok"):
             raise ValueError(r.get("erro", "Não foi possível preparar o pacote."))

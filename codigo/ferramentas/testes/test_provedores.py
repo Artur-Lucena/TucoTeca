@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
-from bib_nucleo import banco as nucleo_banco
+from bib_nucleo import banco
 from executar import afirmar
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64
@@ -24,8 +24,8 @@ APPDETAILS = {"620": {"success": True, "data": {
 
 def _banco(titulo="Portal 2", **extra):
     db = Path(tempfile.mkdtemp(prefix="suite-meta-")) / "hub.db"
-    con = nucleo_banco.get_db(db)
-    jogo = nucleo_banco.criar_jogo(con, {"titulo": titulo, "executable_path": "", **extra})
+    con = banco.get_db(db)
+    jogo = banco.criar_jogo(con, {"titulo": titulo, "executable_path": "", **extra})
     con.commit()
     uuid = con.execute("SELECT uuid FROM jogos WHERE id=?", (jogo["id"],)).fetchone()[0]
     return db, con, jogo["id"], uuid

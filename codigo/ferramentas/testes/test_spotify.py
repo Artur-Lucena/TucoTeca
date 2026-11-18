@@ -11,8 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from bib_nucleo import baixar as nucleo_baixar
-from bib_nucleo import banco, base, online, spotify
-from bib_nucleo import musicas as nucleo_musicas
+from bib_nucleo import banco, base, musicas, online, spotify
 from executar import afirmar
 from servicos_ui import ServicoBiblioteca
 
@@ -224,7 +223,7 @@ def teste_pipeline_spotify_importa_no_hub_cancela_e_retoma_com_dedup():
     with patch.object(nucleo_baixar, "localizar_ytdlp", return_value="fake-ytdlp"), \
             patch.object(nucleo_baixar, "baixar_faixa", side_effect=baixar), \
             patch.object(nucleo_baixar, "localizar_ffmpeg", return_value=""), \
-            patch.object(nucleo_musicas, "baixar_capa_album", return_value={"ok": False}):
+            patch.object(musicas, "baixar_capa_album", return_value={"ok": False}):
         r = servico.baixar_musicas(parar)
         afirmar(r["novas"] == 1 and r["cancelado"], r)
         snap = servico.snapshot()
@@ -266,6 +265,6 @@ def teste_conversao_atomica_falha_preserva_staging_e_retoma_sem_ytdlp():
     with patch.object(nucleo_baixar, "localizar_ytdlp", return_value=""), \
             patch.object(nucleo_baixar, "baixar_faixa", side_effect=AssertionError("rebaixou áudio completo")), \
             patch.object(nucleo_baixar, "localizar_ffmpeg", return_value=""), \
-            patch.object(nucleo_musicas, "baixar_capa_album", return_value={"ok": False}):
+            patch.object(musicas, "baixar_capa_album", return_value={"ok": False}):
         r = servico.baixar_musicas(threading.Event())
     afirmar(r["novas"] == 1 and len(servico.snapshot()["musicas"]) == 1, r)

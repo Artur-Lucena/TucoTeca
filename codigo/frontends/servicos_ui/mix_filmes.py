@@ -5,8 +5,7 @@ import json
 import time
 from contextlib import closing
 
-from bib_nucleo import apps_externos, base
-from bib_nucleo import banco as nucleo_banco
+from bib_nucleo import apps_externos, banco, base
 from bib_nucleo.midia import banco as mb
 
 INTERVALO_SEGUIDAS = 12 * 3600
@@ -54,10 +53,10 @@ class MixFilmes:
 
     def _midia(self, operacao, escrever=False):
         if escrever:
-            with self._escrita, closing(nucleo_banco.get_db(self.db_path)) as con:
+            with self._escrita, closing(banco.get_db(self.db_path)) as con:
                 mb.garantir_tabelas_midia(con)
                 return operacao(con)
-        with closing(nucleo_banco.get_db(self.db_path)) as con:
+        with closing(banco.get_db(self.db_path)) as con:
             mb.garantir_tabelas_midia(con)
             return operacao(con)
 

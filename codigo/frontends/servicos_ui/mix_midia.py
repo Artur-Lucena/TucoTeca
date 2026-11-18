@@ -4,10 +4,18 @@ from __future__ import annotations
 from contextlib import closing
 from pathlib import Path
 
-from bib_nucleo import apps_externos, banco, base, capas, online, pacotes, spotify
-from bib_nucleo import baixar as nucleo_baixar
-from bib_nucleo import musicas as nucleo_musicas
-from bib_nucleo import videos as nucleo_videos
+from bib_nucleo import (
+    apps_externos,
+    baixar,
+    banco,
+    base,
+    capas,
+    musicas,
+    online,
+    pacotes,
+    spotify,
+    videos,
+)
 from bib_nucleo.rede import videos_youtube
 
 
@@ -59,10 +67,10 @@ class MixMidia:
 
     def instalar_audio(self):
         resultados = []
-        if not nucleo_baixar.ffmpeg_pronto():
-            resultados.append(nucleo_baixar.instalar_ffmpeg())
-        if not nucleo_baixar.ytdlp_pronto():
-            resultados.append(nucleo_baixar.instalar_ytdlp())
+        if not baixar.ffmpeg_pronto():
+            resultados.append(baixar.instalar_ffmpeg())
+        if not baixar.ytdlp_pronto():
+            resultados.append(baixar.instalar_ytdlp())
         erros = [r.get("erro", "Falha na instalação.") for r in resultados if not r.get("ok")]
         return {"ok": not erros, "erros": erros}
 
@@ -74,7 +82,7 @@ class MixMidia:
             fila = [d for d in banco.listar_downloads(con) if d["estado"] in ("pendente", "falha", "baixando", "baixado")]
             def staging_pronto(d):
                 return d["estado"] == "falha" and bool(d.get("video_id")) and Path(d.get("musica_path") or "").is_file()
-            if any(d["estado"] != "baixado" and not staging_pronto(d) for d in fila) and not nucleo_baixar.localizar_ytdlp():
+            if any(d["estado"] != "baixado" and not staging_pronto(d) for d in fila) and not baixar.localizar_ytdlp():
                 raise ValueError("Instale yt-dlp em Dependências de áudio antes de baixar a fila.")
             metas = online.ler_json(base.DADOS_DIR / "spotify/faixas.json", {})
             publicas = online.ler_json(base.DADOS_DIR / "musicas-online/faixas.json", {})
@@ -92,11 +100,11 @@ class MixMidia:
                 if retomar_conversao:
                     banco.marcar_download(con, d["id"], "baixado", video_id=d["video_id"], musica_path=d["musica_path"])
                 if d["estado"] != "baixado" and not retomar_conversao:
-                    baixou = nucleo_baixar.baixar_faixa(con, d["id"], progresso=pct)
+                    baixou = baixar.baixar_faixa(con, d["id"], progresso=pct)
                     if not baixou.get("ok"):
                         erros.append(f'{d["titulo"]}: {baixou.get("erro")}')
                         continue
-                r = nucleo_baixar.converter_faixa(con, d["id"], capa_auto=False)
+                r = baixar.converter_faixa(con, d["id"], capa_auto=False)
                 if not r.get("ok"):
                     erros.append(f'{d["titulo"]}: {r.get("erro")}')
                     continue
@@ -109,7 +117,7 @@ class MixMidia:
                             raw, ext, _ = online.baixar_imagem(meta["capa_url"])
                             banco.salvar_capa_musica_bytes(con, row["id"], "spotify-album" + ext, raw)
                         else:
-                            nucleo_musicas.baixar_capa_album(con, row["id"])
+                            musicas.baixar_capa_album(con, row["id"])
                     except (ValueError, OSError):
                         pass
         return {"novas": novas, "erros": erros, "cancelado": cancelar.is_set()}
@@ -129,11 +137,11 @@ class MixMidia:
             return banco.listar_videos(con, q)
 
     def importar_videos(self, pasta):
-        return self.alterar(lambda con: nucleo_videos.importar_videos(con, pasta))
+        return self.alterar(lambda con: videos.importar_videos(con, pasta))
 
     def importar_musicas(self, pasta):
         # Capas remotas não são buscadas implicitamente nesta importação local.
-        return self.alterar(lambda con: nucleo_musicas.importar_musicas(con, pasta, capa_auto=False))
+        return self.alterar(lambda con: musicas.importar_musicas(con, pasta, capa_auto=False))
 
     def aplicar_eq_musica(self, caminho, preset="bass"):
         from bib_nucleo.musicas import ler_tags, sha_arquivo

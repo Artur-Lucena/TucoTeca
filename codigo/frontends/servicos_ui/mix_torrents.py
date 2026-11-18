@@ -4,8 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from bib_nucleo import scans
-from bib_nucleo.rede import repacks as nucleo_repacks
-from bib_nucleo.rede import torrents
+from bib_nucleo.rede import repacks, torrents
 
 
 class MixTorrents:
@@ -19,8 +18,8 @@ class MixTorrents:
             raise ValueError("O arquivo/pasta não está mais no disco.")
 
         def trabalho(con):
-            if not nucleo_repacks.dentro_do_destino(alvo):
-                org = nucleo_repacks.organizar_no_destino(alvo)
+            if not repacks.dentro_do_destino(alvo):
+                org = repacks.organizar_no_destino(alvo)
                 if not org.get("ok"):
                     raise ValueError(org.get("erro", "Não foi possível organizar o download."))
                 alvo_local = Path(org["path"])
@@ -30,7 +29,7 @@ class MixTorrents:
                 from bib_nucleo.rede.repacks import ARQUIVO_EXTS
                 if alvo_local.suffix.lower() not in ARQUIVO_EXTS:
                     raise ValueError("Formato não suportado para importar.")
-                res = nucleo_repacks.importar_repack(con, str(alvo_local))
+                res = repacks.importar_repack(con, str(alvo_local))
                 if res.get("precisa_instalar"):
                     return {"ok": True, "titulo": res.get("titulo"),
                             "avisos": ["instalador baixado: rode o setup e importe a pasta."]}

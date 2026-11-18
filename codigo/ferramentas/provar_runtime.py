@@ -49,9 +49,8 @@ def esperar(trabalho, pronto, timeout=25):
 
 
 def provar_qbit():
-    from bib_nucleo import qbit as Q
-    from bib_nucleo import qbit as nucleo_qbit
-    inicio = nucleo_qbit.qbit_iniciar()
+    from bib_nucleo import qbit
+    inicio = qbit.qbit_iniciar()
     if not inicio["ok"]:
         raise RuntimeError(inicio["erro"])
     handle = None
@@ -66,7 +65,7 @@ def provar_qbit():
         k.CloseHandle.argtypes = [wintypes.HANDLE]
         handle = k.OpenProcess(0x100001, False, inicio["pid"])
     try:
-        ver = esperar(lambda: Q.qbit_request("app/version"), lambda s: s.startswith("v"))
+        ver = esperar(lambda: qbit.qbit_request("app/version"), lambda s: s.startswith("v"))
         raw = b"offline-proof" * 1024
         nome = b"offline-proof.bin"
         info = {b"name": nome, b"length": len(raw), b"piece length": 16384,
@@ -76,20 +75,20 @@ def provar_qbit():
         (dest / nome.decode()).write_bytes(raw)
         arq = dest.parent / "offline-proof.torrent"
         arq.write_bytes(_benc({b"info": info}))
-        adicionar = nucleo_qbit.qbit_iniciar(str(arq))
+        adicionar = qbit.qbit_iniciar(str(arq))
         if not adicionar["ok"]:
             raise RuntimeError(adicionar["erro"])
-        r = esperar(nucleo_qbit.qbit_listar, lambda r: any(t["hash"] == h and t["completo"] for t in r["torrents"]))
+        r = esperar(qbit.qbit_listar, lambda r: any(t["hash"] == h and t["completo"] for t in r["torrents"]))
         t = next(t for t in r["torrents"] if t["hash"] == h)
         assert t["pct"] == 100 and Path(t["save_path"]) == dest / nome.decode(), t
-        assert nucleo_qbit.qbit_controlar(h, "pausar")["ok"]
-        esperar(nucleo_qbit.qbit_listar, lambda r: any(t["hash"] == h and t["estado"] == "stoppedUP" for t in r["torrents"]))
-        assert nucleo_qbit.qbit_controlar(h, "retomar")["ok"]
-        esperar(nucleo_qbit.qbit_listar, lambda r: any(t["hash"] == h and t["estado"] != "stoppedUP" for t in r["torrents"]))
+        assert qbit.qbit_controlar(h, "pausar")["ok"]
+        esperar(qbit.qbit_listar, lambda r: any(t["hash"] == h and t["estado"] == "stoppedUP" for t in r["torrents"]))
+        assert qbit.qbit_controlar(h, "retomar")["ok"]
+        esperar(qbit.qbit_listar, lambda r: any(t["hash"] == h and t["estado"] != "stoppedUP" for t in r["torrents"]))
         return {"versao": ver, "pct": t["pct"], "pausa_retomada": True, "destino": "perfil temporário"}
     finally:
         try:
-            Q.qbit_request("app/shutdown", {})
+            qbit.qbit_request("app/shutdown", {})
         except Exception:
             pass
         if handle:
@@ -198,9 +197,9 @@ def main():
         provar_rede(args)
         return
     if args.configurar_offline:
-        from bib_nucleo import qbit as Q
+        from bib_nucleo import qbit
         # Só o perfil explicitamente passado pelo builder, nunca o perfil do PC.
-        cfg = Q.qbit_preparar_perfil()
+        cfg = qbit.qbit_preparar_perfil()
         texto = cfg.read_text(encoding="utf-8")
         texto = texto.replace("[BitTorrent]\n", "[BitTorrent]\nSession\\DHTEnabled=false\nSession\\LSDEnabled=false\nSession\\PeXEnabled=false\n")
         cfg.write_text(texto, encoding="utf-8")

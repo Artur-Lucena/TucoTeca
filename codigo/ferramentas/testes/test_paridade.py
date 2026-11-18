@@ -162,12 +162,12 @@ def _prov_falso(chamadas, tag_remota="v2"):
 
 
 def teste_emuladores_status_sem_rede_e_consulta_explicita():
-    from bib_nucleo import emuladores as nucleo_emuladores
+    from bib_nucleo import emuladores
     tmp = Path(tempfile.mkdtemp(prefix="paridade-emus-"))
     ponte = Ponte(ServicoBiblioteca(tmp / "b.db"))
     chamadas = []
     falsos = {"azahar": _prov_falso(chamadas), "desmume": _prov_falso(chamadas)}
-    with patch.object(nucleo_emuladores, "provedores", lambda: falsos):
+    with patch.object(emuladores, "provedores", lambda: falsos):
         status = _ok(ponte, "emulacao.status")
         afirmar(len(status["itens"]) == 2 and "release_info" not in chamadas, (status, chamadas))
         consulta = _ok(ponte, "emulacao.consultar", {"chave": "azahar"})
@@ -176,21 +176,21 @@ def teste_emuladores_status_sem_rede_e_consulta_explicita():
 
 
 def teste_controles_listar_fotografar_aplicar_gerar_estado():
-    from bib_nucleo import controles as nucleo_controles
+    from bib_nucleo import controles
     tmp = Path(tempfile.mkdtemp(prefix="paridade-pads-"))
     ponte = Ponte(ServicoBiblioteca(tmp / "b.db"))
     salvos = ["Padrão"]
-    with patch.object(nucleo_controles, "listar_controles", lambda: [{"nome": "Xbox", "familia": "xbox360"}]), \
-            patch.object(nucleo_controles, "listar_presets_controle", lambda: list(salvos)), \
-            patch.object(nucleo_controles, "fotografar_perfil",
+    with patch.object(controles, "listar_controles", lambda: [{"nome": "Xbox", "familia": "xbox360"}]), \
+            patch.object(controles, "listar_presets_controle", lambda: list(salvos)), \
+            patch.object(controles, "fotografar_perfil",
                          lambda n: salvos.append(n) or {"ok": True, "preset": n}), \
-            patch.object(nucleo_controles, "aplicar_preset_controle", lambda n: {"ok": True, "chaves": 12}), \
-            patch.object(nucleo_controles, "detectar_sdl", lambda: []), \
-            patch.object(nucleo_controles, "nomes_sdl", lambda: {}), \
-            patch.object(nucleo_controles, "salvar_mapa_gerado",
+            patch.object(controles, "aplicar_preset_controle", lambda n: {"ok": True, "chaves": 12}), \
+            patch.object(controles, "detectar_sdl", lambda: []), \
+            patch.object(controles, "nomes_sdl", lambda: {}), \
+            patch.object(controles, "salvar_mapa_gerado",
                          lambda tipo, **kw: salvos.append(kw["nome"]) or {"ok": True}), \
-            patch.object(nucleo_controles, "ler_estado_xinput", lambda slot: {"slot": slot}), \
-            patch.object(nucleo_controles, "resumir_estado", lambda est: f"A slot={est['slot']}"):
+            patch.object(controles, "ler_estado_xinput", lambda slot: {"slot": slot}), \
+            patch.object(controles, "resumir_estado", lambda est: f"A slot={est['slot']}"):
         lista = _ok(ponte, "controles.listar")
         afirmar(lista["pads"][0]["nome"] == "Xbox" and lista["presets"] == ["Padrão"], lista)
         afirmar(any(t["tipo"] == "xbox360" for t in lista["tipos"]), lista)
@@ -305,16 +305,16 @@ def teste_manutencao_plano_so_le_e_sanear_religar_respeitam_trava():
 
 
 def teste_jogar_elevado_pede_uac_simulado():
-    from bib_nucleo import emuladores as nucleo_emuladores
+    from bib_nucleo import emuladores as emuladores
     tmp = Path(tempfile.mkdtemp(prefix="paridade-uac-"))
     servico = ServicoBiblioteca(tmp / "b.db")
     ponte = Ponte(servico)
     gid = servico.salvar_jogo(0, {"titulo": "Jogo", "executable_path": "C:/x/jogo.exe"})["id"]
     pedidos = []
-    with patch.object(nucleo_emuladores, "preparar_lancamento", lambda jogo: {"aviso": ""}), \
-            patch.object(nucleo_emuladores, "executar_jogo_dict",
+    with patch.object(emuladores, "preparar_lancamento", lambda jogo: {"aviso": ""}), \
+            patch.object(emuladores, "executar_jogo_dict",
                          lambda jogo, elevar=False: pedidos.append(elevar) or {"ok": True, "modo": "runas-uac"}), \
-            patch.object(nucleo_emuladores, "iniciar_sessao_manual", lambda gid, titulo: None):
+            patch.object(emuladores, "iniciar_sessao_manual", lambda gid, titulo: None):
         r = _ok(ponte, "jogo.jogar_elevado", {"id": gid})
     afirmar(r["ok"] is True and r["modo"] == "runas-uac" and pedidos == [True], (r, pedidos))
 
@@ -365,7 +365,7 @@ def teste_torrents_listar_marca_fora_do_destino():
 
 
 def teste_backup_manual_e_sessoes_abertas_pela_ponte():
-    from bib_nucleo import emuladores as nucleo_emuladores
+    from bib_nucleo import emuladores as emuladores
     tmp = Path(tempfile.mkdtemp(prefix="paridade-sessoes-"))
     servico = ServicoBiblioteca(tmp / "b.db")
     ponte = Ponte(servico)
@@ -374,7 +374,7 @@ def teste_backup_manual_e_sessoes_abertas_pela_ponte():
     r = _ok(ponte, "colecao.backup")
     afirmar(r["ok"] and r["db"].startswith("biblioteca-") and len(servico.backups()) == antes + 1, r)
 
-    marcador = nucleo_emuladores.iniciar_sessao_manual(gid, "Jogo UAC")
+    marcador = emuladores.iniciar_sessao_manual(gid, "Jogo UAC")
     afirmar(marcador["ok"], marcador)
     abertas = _ok(ponte, "sessoes.listar")
     afirmar([s["titulo"] for s in abertas] == ["Jogo UAC"] and abertas[0]["gid"] == gid, abertas)
