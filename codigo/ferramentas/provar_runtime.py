@@ -4,8 +4,9 @@
         qBittorrent isolado: API, torrent local, pausa/retomada.
     py -3.14 -B codigo/ferramentas/provar_runtime.py rede --saida PASTA [...]
         provedores oficiais (LRCLIB, LibRetro, SponsorBlock e, se pedido,
-        yt-dlp/FFmpeg, catálogos e um vídeo público curto). Não baixa jogos nem
-        exige credenciais; falha externa é relatada, não vira sucesso.
+        yt-dlp/FFmpeg, catálogos, Steam/Cinemeta/HowLongToBeat com
+        --provedores e um vídeo público curto). Não baixa jogos nem exige
+        credenciais; falha externa é relatada, não vira sucesso.
 """
 from __future__ import annotations
 
@@ -163,6 +164,46 @@ def provar_rede(args):
                         raise ValueError("; ".join(str(e) for e in r["erros"]))
                     return {"itens": len(r.get("itens") or []), "baixou_jogos": False}
                 testar(nome, consultar)
+        if args.provedores:
+            # provedores sem chave do usuário (SteamGridDB e RetroAchievements pedem a dele)
+            from bib_nucleo.rede import cinemeta, metadados
+            from bib_nucleo.rede.provedores import hltb, steam
+
+            def exigir(valor, oque):
+                if not valor:
+                    raise ValueError(f"{oque} veio vazio")
+                return valor
+
+            def steam_app():
+                info = exigir(steam.appdetails("367520"), "appdetails")
+                return {"nome": info.get("name"), "generos": len(info.get("genres") or [])}
+
+            def steam_canon():
+                appid, nome = metadados.canonizar_steam("Hollow Knight")
+                return {"appid": exigir(appid, "appid"), "nome": nome}
+
+            def steam_preco():
+                return {"367520": exigir(metadados.precos_steam(["367520"]).get("367520"), "preço")}
+
+            def cine_busca():
+                achados = exigir(cinemeta.buscar("movie", "The Matrix"), "busca")
+                return {"itens": len(achados), "primeiro": achados[0].get("name") or achados[0].get("nome")}
+
+            def cine_meta():
+                m = exigir(cinemeta.meta("movie", "tt0133093"), "meta")
+                return {"nome": m.get("name") or m.get("nome"), "ano": m.get("year") or m.get("ano")}
+
+            def cine_catalogo():
+                return {"series": len(exigir(cinemeta.catalogo("series"), "catálogo"))}
+
+            def hltb_horas():
+                return exigir(hltb.buscar({"titulo": "Hollow Knight"}, {}), "resultado")
+
+            for nome, f in (("steam-appdetails", steam_app), ("steam-canonizar", steam_canon),
+                            ("steam-precos", steam_preco), ("cinemeta-busca", cine_busca),
+                            ("cinemeta-meta", cine_meta), ("cinemeta-catalogo", cine_catalogo),
+                            ("howlongtobeat", hltb_horas)):
+                testar(nome, f)
         if args.youtube:
             con = get_db(DEFAULT_DB)
             try:
@@ -189,6 +230,8 @@ def main():
     pr.add_argument("--instalar-audio", action="store_true")
     pr.add_argument("--youtube", action="store_true")
     pr.add_argument("--catalogos", action="store_true")
+    pr.add_argument("--provedores", action="store_true",
+                    help="Steam, Cinemeta e HowLongToBeat de verdade (sem chave)")
     pr.add_argument("--somente-youtube", action="store_true")
     pr.add_argument("--video-teste", default="jNQXAC9IVRw",
                     help="ID de vídeo público curto; default: Me at the zoo (19 s)")

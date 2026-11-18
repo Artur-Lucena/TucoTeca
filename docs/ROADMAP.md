@@ -31,10 +31,16 @@ controle e Big Picture), 1.3.x (primeiro instalador Electron), 1.0.x e 1.2.0.
 
 ## Pendências de validação
 
-Provadas só por simulação, respostas falsas ou em ambiente de desenvolvimento:
+Provado ao vivo em 18/11/2026 (`provar_runtime.py rede --provedores
+--catalogos`, coleção temporária): Steam (detalhes, nome canônico e preço em
+BRL), Cinemeta (busca, ficha e catálogo), SteamRIP e FitGirl (busca), LRCLIB,
+LibRetro e SponsorBlock.
 
-- Provedores e catálogos de verdade: Steam, SteamGridDB, RetroAchievements,
-  HowLongToBeat (API não oficial) e Cinemeta.
+Ainda só por simulação, respostas falsas ou em ambiente de desenvolvimento:
+
+- HowLongToBeat: a API não oficial recusou a consulta ao vivo (o site mudou);
+  segue desligado por padrão e a página do jogo pede as horas à mão.
+- SteamGridDB e RetroAchievements de verdade (exigem a chave do usuário).
 - Reprodução real de vídeo no player interno (retomada e legendas na tela).
 - Controle físico (mapeamento padrão Xbox/PlayStation),
   UAC real ("Abrir como administrador"), equalização com FFmpeg instalado e
