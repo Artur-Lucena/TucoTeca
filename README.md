@@ -4,31 +4,20 @@ Hub local para sua coleção de jogos, músicas e vídeos. Sem conta, sem nuvem.
 
 ## Instalação
 
-### Windows 10/11 (64 bits)
-1. Baixe `TucoTeca-Setup-<versão>-x64.exe` na release mais recente em
-   https://github.com/Artur-Lucena/TucoTeca/releases (confira o SHA-256 em
-   `SHA256SUMS.txt`).
-2. Execute o instalador (instala só para o seu usuário, sem admin). O
-   instalador não é assinado: se o SmartScreen avisar, clique em
-   "Mais informações" → "Executar assim mesmo".
-3. Abra o TucoTeca pelo Menu Iniciar ou pela Área de Trabalho.
+Baixe o arquivo do seu sistema na [última release](https://github.com/Artur-Lucena/TucoTeca/releases/latest):
 
-A coleção fica em `Documentos\TucoTeca` (ou na pasta de `BIBLIOTECA_HOME`)
-e não é apagada ao atualizar ou desinstalar.
+- **Windows 10/11:** `TucoTeca-Setup-<versão>-x64.exe` — abra e pronto: ele
+  instala para o seu usuário e abre o TucoTeca. Se o Windows avisar que
+  protegeu o computador: *Mais informações → Executar assim mesmo*.
+- **macOS 13 ou mais novo:** `…-mac-arm64.dmg` (Apple Silicon) ou
+  `…-mac-x64.dmg` (Intel) — abra e arraste o TucoTeca para *Aplicativos*. Na
+  primeira vez, botão direito no app → *Abrir* (no macOS 15+: *Ajustes do
+  Sistema → Privacidade e Segurança → Abrir Mesmo Assim*).
+- **Linux:** pelos fontes (abaixo).
 
-### macOS 13 Ventura ou mais novo (Apple Silicon ou Intel)
-1. Baixe a imagem do seu Mac na mesma página: `TucoTeca-<versão>-mac-arm64.dmg`
-   (M1, M2, M3…) ou `TucoTeca-<versão>-mac-x64.dmg` (Intel).
-2. Abra a `.dmg` e arraste o TucoTeca para **Aplicativos**.
-3. Na primeira vez, clique com o botão direito no app → **Abrir** → **Abrir**
-   (o app não é notarizado pela Apple). Se o macOS disser que ele "está
-   danificado": `xattr -dr com.apple.quarantine /Applications/TucoTeca.app`.
-
-A coleção fica em `Documentos/TucoTeca`. FFmpeg, yt-dlp e 7-Zip (opcionais)
-vêm do Homebrew: `brew install ffmpeg yt-dlp sevenzip`.
-
-### Linux
-Sem instalador: rode pelos fontes (abaixo), com `python3` 3.10+ no PATH.
+A coleção fica em *Documentos/TucoTeca* e continua lá ao atualizar (é só
+instalar a versão nova por cima) ou desinstalar. FFmpeg, yt-dlp e 7-Zip são
+opcionais; no Mac, `brew install ffmpeg yt-dlp sevenzip`.
 
 ## Executar pelos fontes (desenvolvimento)
 ```
