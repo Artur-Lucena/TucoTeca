@@ -3,7 +3,8 @@
 O desktop do TucoTeca é um app **Electron** com renderer **Preact +
 TypeScript**; o motor continua em Python. Domínio (SQLite, emulação, áudio,
 integrações) fica em `bib_nucleo` / `servicos_ui`; o Electron só apresenta.
-Entrega: instalador Windows (NSIS). Linux/macOS usam a TUI pelos fontes.
+Entrega: instalador Windows (NSIS) e `.dmg` para macOS (Apple Silicon e
+Intel). Linux roda pelos fontes.
 
 ```text
 ┌────────────────────────── Electron (Node) ────────────────────────────┐
@@ -78,9 +79,17 @@ valendo como apelidos de rota, inclusive nos atalhos pessoais.
 ## Comportamentos transversais
 
 - **Rotas por hash** (`estado/rota.ts`): voltar/avançar pelos botões do
-  cabeçalho, `Alt+←/→` e botões laterais do mouse.
+  cabeçalho, `Alt+←/→` (`⌥←/→` no Mac; dentro de um campo de texto a tecla
+  fica com o campo) e botões laterais do mouse.
 - **Paleta** `Ctrl+K`/`Ctrl+F` (busca global), atalhos pessoais `Ctrl+1..8`,
-  `F11` tela cheia.
+  `F11` tela cheia. No Mac, ⌘ vale como Ctrl (os mesmos atalhos salvos
+  funcionam como ⌘K, ⌘1…) e a interface mostra `⌘K`; tela cheia é ⌃⌘F.
+- **macOS**: menu do app no topo (Sobre, Ocultar, Sair), **Editar** (sem ele
+  ⌘C/⌘V/⌘A não funcionam em campos), Exibir, Janela e Ajuda. Fechar a janela
+  encerra o app (a ponte e o lock da coleção não ficam vivos sem janela).
+  "Abrir como administrador" e o MPC-HC não aparecem; a ponte recebe
+  `/opt/homebrew/bin` e `/usr/local/bin` no PATH (app aberto pelo Finder
+  herda um PATH mínimo) e é encerrada com o grupo de processos dela.
 - **Controle** (Gamepad API, mapeamento padrão): direcional/analógico movem o
   foco pela tela (`navegacao/foco.ts`, navegação espacial), A ativa, B fecha o
   diálogo aberto ou volta, LB/RB trocam de aba (ou de seção), Start abre a
@@ -115,6 +124,8 @@ valendo como apelidos de rota, inclusive nos atalhos pessoais.
   Range); o main valida cada caminho contra a pasta da coleção e, para mídia,
   também contra as pastas de Filmes e Séries escolhidas pelo usuário (lidas do
   núcleo; raiz de disco, caminho relativo e `..` são recusados; fora → 403).
+  No Windows e no macOS a comparação ignora maiúsculas; no macOS também a
+  forma Unicode (o APFS devolve nomes em NFD).
 - Rede só por ação do usuário (buscar dados, abrir Catálogo/Descobrir,
   varrer pastas). Exceção aprovada: o Calendário renova as séries seguidas ao
   ser aberto, no máximo a cada 12 h. Tudo respeita `BIBLIOTECA_REDE=0`.
@@ -144,17 +155,21 @@ Provas de tela usam `--remote-debugging-port` e CDP sobre o app empacotado.
 | Variável | Uso |
 |---|---|
 | `TUCOTECA_RAIZ` | raiz dos fontes Python (checkout: 3 níveis acima do `appPath`; instalado: `resources/tucoteca`) |
-| `BIBLIOTECA_HOME` | pasta da coleção (checkout: a raiz; instalado: `Documentos\TucoTeca`, preservada ao atualizar/desinstalar) |
-| `TUCOTECA_PYTHON` | intérprete explícito; ordem: env → `programa/windows-x64/python/python.exe` → `py -3.14` / `python3` |
+| `BIBLIOTECA_HOME` | pasta da coleção (checkout: a raiz; instalado: `Documentos/TucoTeca`, preservada ao atualizar/desinstalar) |
+| `TUCOTECA_PYTHON` | intérprete explícito; ordem: env → `programa/windows-x64/python/python.exe` ou `programa/macos-<arm64\|x64>/python/bin/python3` → `py -3.14` / `python3` |
 | `TUCOTECA_USERDATA` | userData do Electron fora do padrão (provas) |
 
 ## App instalado
 
-`npm run dist` gera `dist/TucoTeca-Setup-<versão>-x64.exe` (NSIS por usuário,
-sem admin) com `electron-builder.config.cjs`: núcleo Python, ponte e Python
-embutido em `resources/tucoteca/`. A ponte roda com `windowsHide` (sem
-console). Build, prova e anexos: `docs/RELEASES.md`. Sem assinatura de código
-(decisão do usuário).
+`npm run dist` (Windows) gera `dist/TucoTeca-Setup-<versão>-x64.exe` (NSIS por
+usuário, sem admin); `npm run dist:mac` (num Mac) gera
+`dist/TucoTeca-<versão>-mac-<arm64|x64>.dmg`, uma por arquitetura cujo Python
+estiver em `programa/`. Os dois levam núcleo Python, ponte e o Python da
+plataforma em `resources/tucoteca/` (`electron-builder.config.cjs`). A ponte
+roda com `windowsHide` (sem console) no Windows. Build, prova e anexos:
+`docs/RELEASES.md`. Sem assinatura de código no Windows nem notarização no
+macOS (assinatura ad-hoc; decisão do usuário): na 1ª vez, botão direito →
+Abrir.
 
 ## Limites conhecidos
 
@@ -166,6 +181,8 @@ console). Build, prova e anexos: `docs/RELEASES.md`. Sem assinatura de código
 - HowLongToBeat usa uma API não oficial (desligado por padrão).
 - Controle físico, UAC real, FFmpeg instalado e atualização real de emulador
   foram provados por simulação; a validação no hardware do usuário segue
-  pendente (ver `ROADMAP.md`).
+  pendente (ver `ROADMAP.md`). No macOS, o CI prova suíte, build e selftest
+  do app (Apple Silicon e Intel); Gatekeeper com quarentena, controle e
+  emuladores reais pedem um Mac de verdade.
 - O volume do player é do renderer (HTMLAudio); o volume do PC usa Core Audio
   e só aparece no Windows.

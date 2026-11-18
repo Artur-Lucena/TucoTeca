@@ -16,18 +16,29 @@ Hub local para sua coleção de jogos, músicas e vídeos. Sem conta, sem nuvem.
 A coleção fica em `Documentos\TucoTeca` (ou na pasta de `BIBLIOTECA_HOME`)
 e não é apagada ao atualizar ou desinstalar.
 
-### Linux e macOS (TUI no terminal)
-1. Tenha Python 3.10+.
-2. Baixe os fontes (`tucoteca-<versão>-fontes.zip`) e extraia.
-3. No terminal, execute `./tucoteca.sh` (no macOS, na 1ª vez: `chmod +x tucoteca.sh`).
+### macOS 13 Ventura ou mais novo (Apple Silicon ou Intel)
+1. Baixe a imagem do seu Mac na mesma página: `TucoTeca-<versão>-mac-arm64.dmg`
+   (M1, M2, M3…) ou `TucoTeca-<versão>-mac-x64.dmg` (Intel).
+2. Abra a `.dmg` e arraste o TucoTeca para **Aplicativos**.
+3. Na primeira vez, clique com o botão direito no app → **Abrir** → **Abrir**
+   (o app não é notarizado pela Apple). Se o macOS disser que ele "está
+   danificado": `xattr -dr com.apple.quarantine /Applications/TucoTeca.app`.
+
+A coleção fica em `Documentos/TucoTeca`. FFmpeg, yt-dlp e 7-Zip (opcionais)
+vêm do Homebrew: `brew install ffmpeg yt-dlp sevenzip`.
+
+### Linux
+Sem instalador: rode pelos fontes (abaixo), com `python3` 3.10+ no PATH.
 
 ## Executar pelos fontes (desenvolvimento)
 ```
 npm --prefix codigo/frontends/electron ci
 npm --prefix codigo/frontends/electron run build
-TucoTeca.bat
+TucoTeca.bat                              # Windows
+python3 codigo/ferramentas/abrir_hub.py   # macOS/Linux
 ```
-Requer Python 3.14 (`py -3.14`) e Node 24.
+Requer Python 3.14 (`py -3.14` no Windows; no Mac/Linux, o `python3` que
+abre o `abrir_hub.py` é o mesmo que a ponte usa) e Node 24.
 
 ## Documentação
 - [Arquitetura](docs/ARQUITETURA.md) — mapa de pastas, módulos, dados e fluxos.

@@ -1,14 +1,22 @@
 # Roadmap — TucoTeca
 
-Estado: **1.4.7 publicada** (17/11/2026) — revisão geral: código repetido
-fundido, módulos sem uso fora, Vídeos no player comum e raiz do projeto com 8
-arquivos. Antes, a 1.4.6 reagrupou a interface por seção. A 1.4.5 trouxe
-o hub em três pilares: Jogos à la
-Hydra (navegação nova, biblioteca lateral, página do jogo com provedores,
-coleções, catálogo da loja Steam, importação de lojas instaladas), Filmes e
-Séries à la Stremio com os arquivos do usuário e o catálogo Cinemeta, e
-Músicas; navegação por controle e Big Picture. Antes: 1.3.1 (revisão da 1.3.0),
-1.3.0 (primeiro instalador Electron), 1.0.x e 1.2.0.
+Estado: **2.0 — estável.** O app desktop é a única interface, no Windows e
+no macOS (Apple Silicon e Intel); a TUI e a fachada `bib_core` saíram. A
+linha 2.0.x recebe só correções; recurso novo vira 2.1. Antes: 1.4.7
+(revisão geral e raiz enxuta), 1.4.6 (interface por seção), 1.4.5 (hub em
+três pilares: Jogos à la Hydra, Filmes e Séries com Cinemeta e Músicas;
+controle e Big Picture), 1.3.x (primeiro instalador Electron), 1.0.x e 1.2.0.
+
+## 2.0 (entregue)
+
+1. ~~TUI curses e fachada `bib_core` removidas; código que só a TUI usava fora.~~
+2. ~~App desktop no macOS: `.dmg` por arquitetura com Python embutido,
+   menu e atalhos do Mac (⌘), caminhos sem diferença de caixa/Unicode,
+   Steam/Hydra/DeSmuME nas pastas do Mac, jogos `.app`.~~
+3. ~~Versão do esquema no banco: um app mais velho recusa a coleção que um
+   mais novo já migrou (a mesma coleção pode ir do Windows ao Mac).~~
+4. ~~CI público: suíte em Windows, Linux e macOS; `.dmg` e instalador gerados
+   e testados (selftest do app empacotado) a cada push.~~
 
 ## 1.4 (entregue)
 
@@ -32,12 +40,16 @@ Provadas só por simulação, respostas falsas ou em ambiente de desenvolvimento
   UAC real ("Abrir como administrador"), equalização com FFmpeg instalado e
   atualização real de emulador.
 - Instalar e abrir o instalador numa máquina Windows limpa.
+- macOS num Mac de verdade: abrir a `.dmg` baixada (Gatekeeper com
+  quarentena), controle, emuladores (Azahar/DeSmuME `.app`), vídeo e música.
+  O CI prova suíte, build e selftest do app nas duas arquiteturas.
 
-## Depois da 1.4
+## Depois da 2.0
 
 - Validadores restantes da ponte para `ponte_params` e `estado/formato.ts` nos
   cartões antigos.
 - "Adicionar à coleção" pelo menu de contexto dos cartões (hoje na página do jogo).
-- Assinatura de código do instalador (hoje decisão: sem assinatura).
-- Desktop Electron para macOS/Linux (hoje só TUI).
+- Assinatura de código do instalador e notarização no macOS (hoje decisão:
+  sem; exigem certificados pagos).
+- Pacote para Linux (AppImage); hoje o Linux roda pelos fontes.
 - Atualização automática (hoje desligada: `publish: null`).

@@ -3,6 +3,56 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2.0.0] - 2026-11-18
+
+O TucoTeca fica estável: o app desktop é a única interface e agora também
+roda no macOS, em Macs Apple Silicon e Intel. A linha 2.0.x recebe só
+correções.
+
+### Adicionado
+
+- App para macOS 13 Ventura ou mais novo: uma `.dmg` por arquitetura, com o
+  Python embutido (não depende do Python do sistema). A coleção fica em `Documentos/TucoTeca`.
+- No Mac: menu do app, menu Editar (⌘C/⌘V/⌘A em todos os campos), Janela e
+  Ajuda; ⌘ vale como Ctrl nos atalhos (⌘K abre a busca, ⌘1… as seções) e a
+  interface mostra os símbolos do Mac; tela cheia com ⌃⌘F.
+- No Mac: Steam, Hydra e DeSmuME são procurados nas pastas do macOS, as
+  raízes padrão de jogos e ROMs usam o volume do Mac e jogos cadastrados como
+  `.app` abrem (com as horas contadas).
+- A coleção grava a versão do esquema: uma versão mais velha do app recusa,
+  com aviso claro, um banco que uma mais nova já migrou — a mesma coleção
+  pode passar do Windows para o Mac e voltar.
+- CI público: a suíte roda em Windows, Linux e macOS (Apple Silicon e Intel)
+  e cada push gera e testa o instalador Windows e as `.dmg`.
+
+### Alterado
+
+- Ferramentas do Homebrew (FFmpeg, yt-dlp, 7-Zip) são achadas mesmo com o
+  app aberto pelo Finder ou pelo Dock.
+- Pastas de mídia no Mac não diferenciam maiúsculas nem forma Unicode de
+  acentos, como o próprio macOS.
+- `Alt+←/→` dentro de um campo de texto fica com o campo (no Mac, ⌥←/→ anda
+  por palavra) em vez de voltar/avançar a tela.
+- Ao fechar, o app encerra a ponte junto com o que ela abriu (FFmpeg,
+  yt-dlp), também no Mac e no Linux.
+
+### Removido
+
+- A TUI de terminal (`tucoteca.sh`) e o player de terminal; Linux roda o app
+  desktop pelos fontes.
+- Busca de jogos na Steam pela TUI, download direto de hosts do SteamRIP
+  (Gofile, MegaDB, FileDitch) e detalhes de posts do SteamRIP/FitGirl: a busca
+  nos catálogos devolve o link, que abre no navegador.
+
+### Interno
+
+- A fachada `bib_core` saiu: o código importa o módulo dono de cada função
+  (`from bib_nucleo import banco`), e os testes fazem patch nele.
+- `preparar_runtime_python.py --plataforma windows-x64|macos-arm64|macos-x64`
+  (python.org no Windows, python-build-standalone no Mac, SHA-256 fixados);
+  `gerar_icone.py` também escreve `icon.icns`; `preparar_release.py` confere
+  os `.app` no Mac (`--conferir-mac`) e junta as `.dmg` (`--mac`).
+
 ## [1.4.7] - 2026-11-17
 
 Revisão geral: menos arquivos, menos código repetido e a raiz do projeto

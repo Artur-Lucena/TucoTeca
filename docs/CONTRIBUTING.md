@@ -17,17 +17,20 @@ npm --prefix codigo/frontends/electron run dev      # janela com hot reload
 npm --prefix codigo/frontends/electron test
 ```
 
-No Linux/macOS os mesmos scripts usam `python3`. Uma coleção descartável (a
-variável aponta para a pasta-mãe de `dados/`, não para o banco):
+No macOS/Linux os mesmos scripts usam `python3` (3.10+; no Mac, o do
+Homebrew ou o do python.org — o `/usr/bin/python3` da Apple é 3.9). Uma
+coleção descartável (a variável aponta para a pasta-mãe de `dados/`, não
+para o banco):
 
 ```sh
 export BIBLIOTECA_HOME="$(mktemp -d)"
-python3 codigo/frontends/app_tui.py --selftest
-python3 codigo/ferramentas/testes/executar.py --modulo test_linux_portabilidade
+python3 codigo/ferramentas/testes/executar.py --modulo test_mac
+npm --prefix codigo/frontends/electron run build
+python3 codigo/ferramentas/abrir_hub.py      # a ponte usa este mesmo python3
 ```
 
-`--selftest` usa tela simulada e também roda no Windows sem curses. A TUI
-interativa abre com `./tucoteca.sh`.
+Gerar as `.dmg` localmente (num Mac): `preparar_runtime_python.py
+--plataforma macos-arm64` (e/ou `macos-x64`) e `npm run dist:mac`.
 
 ## Pontos de entrada para mudanças
 
@@ -35,16 +38,16 @@ interativa abre com `./tucoteca.sh`.
 - Importação/dedup/ROMs/lojas instaladas: `codigo/bib_nucleo/scans/`.
 - Lançamento/presets/mods: `codigo/bib_nucleo/emuladores/`.
 - Filmes e Séries: `codigo/bib_nucleo/midia/`.
-- Coleção portátil: `pacotes.py`. Áudio/download: `musicas.py`, `baixar.py`,
-  `player.py`. Volume do Windows: `volume.py`.
+- Coleção portátil: `pacotes.py`. Áudio/download: `musicas.py`, `baixar.py`.
+  Volume do Windows: `volume.py`.
 - Rede (sempre sob `BIBLIOTECA_REDE`): `codigo/bib_nucleo/rede/`; provedores de
   dados de jogo em `rede/provedores/` (como acrescentar: [INTEGRACOES](INTEGRACOES.md)).
 - Desktop Electron: `electron/` (main, preload, renderer Preact) fala com
   `ponte.py`, que expõe os casos de uso de `servicos_ui/` (mixins por
   domínio). Método novo: implementar no serviço, registrar na ponte, cobrir
   em `test_ponte.py` e chamar no renderer ([DESKTOP_ELECTRON](DESKTOP_ELECTRON.md)).
-- Terminal Linux/macOS: `app_tui.py` + mixins `tui_*.py`.
-- Instalador: `electron/electron-builder.config.cjs` (o que entra em `resources/tucoteca`).
+- Instaladores: `electron/electron-builder.config.cjs` (o que entra em
+  `resources/tucoteca`; NSIS no Windows, `.dmg` por arquitetura no macOS).
 
 O mapa completo está em [ARQUITETURA](ARQUITETURA.md).
 
@@ -53,16 +56,17 @@ O mapa completo está em [ARQUITETURA](ARQUITETURA.md).
 - Python stdlib no núcleo; dependências opcionais são importadas na
   fronteira da funcionalidade. Imports Win32 somente em ramos Windows.
 - Português nos nomes/mensagens; imports stdlib antes dos locais.
-- `__all__` explicita APIs públicas. `bib_core` é a fachada de compatibilidade
-  (TUI e testes); código novo importa os módulos de origem.
+- `__all__` explicita APIs públicas. Importe o módulo dono
+  (`from bib_nucleo import banco`) e chame pelo atributo (`banco.get_db`): o
+  `patch.object(banco, ...)` dos testes continua valendo.
+- Diferença de SO: `sys.platform`/`eh_mac()` no núcleo; `ehMac()`
+  (`renderer/src/plataforma.ts`) no renderer. Funções de caminho do main
+  recebem a plataforma para os testes cobrirem Windows e macOS em qualquer SO.
 - Caminhos locais são configuráveis por ambiente. `dados/` nunca é fonte.
 - Alteração de coleção começa com backup; substituição de arquivos finais usa
   publicação atômica (`arquivos.py`).
 - SQLite: conexão própria por worker; fechar em `finally`/`closing`.
 - Renderer só fala por IPC (`window.tucoteca`); nada de Node/`file://` no renderer.
-- MCI: preparar/hash/converter fora da UI, abrir/play/status/close na thread
-  dona do dispositivo; caminho longo usa cópia em cache curto, nunca move o
-  original.
 - `.gitattributes`: `.py/.sh/.command/.md` em LF; `.bat` em CRLF.
 
 ## Testar a alteração

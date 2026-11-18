@@ -6,26 +6,25 @@
 flowchart TD
   Electron[electron / main + preload + renderer Preact] --> Ponte[ponte.py / NDJSON em stdin/stdout]
   Ponte --> Services[servicos_ui / casos de uso]
-  Services --> Compat[bib_core / APIs públicas]
-  TUI[app_tui.py / curses] --> Compat
-  Compat --> DB[banco / SQLite]
-  Compat --> Scan[scans / arquivos e manifestos]
-  Compat --> Emu[emuladores / providers e processos]
-  Compat --> Music[musicas + baixar + player]
-  Compat --> System[volume + controles / adaptadores do SO]
-  Compat --> Network[rede / adaptadores remotos explícitos]
+  Services --> DB[banco / SQLite]
+  Services --> Scan[scans / arquivos e manifestos]
+  Services --> Emu[emuladores / providers e processos]
+  Services --> Music[musicas + baixar]
+  Services --> System[volume + controles / adaptadores do SO]
+  Services --> Network[rede / adaptadores remotos explícitos]
   Services --> Personal[saves / perfis / estatísticas / arquivos]
   DB --> Dados[dados / estado do usuário]
-  Builder[electron-builder + preparar_runtime_python] --> Dist[instalador NSIS]
+  Builder[electron-builder + preparar_runtime_python] --> Dist[instalador NSIS + .dmg macOS]
 ```
 
-Os frontends usam a mesma persistência. As regras ficam no núcleo; o desktop
-Electron só apresenta (fala com o núcleo pela ponte) e a TUI conduz menus. A fachada `bib_core` reexporta
-APIs para preservar consumidores antigos. Os módulos possuem alguns imports
-locais deliberados para desfazer ciclos entre banco, scanners e providers.
-O desktop é o app Electron (Windows; detalhes em
-[DESKTOP_ELECTRON.md](DESKTOP_ELECTRON.md)); a TUI curses atende Linux/macOS
-pelos fontes. O Qt Quick e o modo clássico Tk foram removidos.
+As regras ficam no núcleo; o desktop Electron só apresenta (fala com o
+núcleo pela ponte). Os casos de uso importam direto o módulo dono de cada
+função (`from bib_nucleo import banco`; a fachada `bib_core` saiu na 2.0).
+Os módulos possuem alguns imports locais deliberados para desfazer ciclos
+entre banco, scanners e providers. O app Electron é a única interface, no
+Windows e no macOS (detalhes em [DESKTOP_ELECTRON.md](DESKTOP_ELECTRON.md));
+Linux roda pelos fontes. Qt Quick, o modo clássico Tk e a TUI curses foram
+removidos.
 
 ## Árvore comentada
 
@@ -36,8 +35,7 @@ Tucoteca/
 ├── AGENTS.md                         regras de trabalho (pessoas e agentes)
 ├── pyproject.toml                    projeto Python, Ruff, pytest e mypy
 ├── TucoTeca.bat                      Windows pelos fontes (o usuário final usa o instalador)
-├── tucoteca.sh                       TUI no Linux/macOS (pelos fontes)
-├── .github/workflows/                matriz de testes (manual)
+├── .github/workflows/                CI: suíte em Windows/Linux/macOS, .dmg e instalador
 ├── docs/
 │   ├── ARQUITETURA.md                 este mapa
 │   ├── DESKTOP_ELECTRON.md            telas, ponte, controle, segurança, provas
@@ -51,13 +49,12 @@ Tucoteca/
 │   └── exemplos/provedor_modelo.py    template de provedor de rede
 ├── codigo/
 │   ├── VERSION                       versão atual (também no app instalado)
-│   ├── bib_core.py                   fachada de compatibilidade
 │   ├── bib_nucleo/                   núcleo e domínios pessoais
 │   │   └── rede/                     adaptadores com BIBLIOTECA_REDE
-│   ├── frontends/                    ponte, casos de uso, Electron e TUI
+│   ├── frontends/                    ponte, casos de uso e Electron
 │   │   └── electron/                 app desktop (main/preload/renderer)
 │   ├── ferramentas/                  diagnóstico, entrega e builders
-│   │   ├── preparar_release.py        anexos da release (instalador + fontes)
+│   │   ├── preparar_release.py        anexos da release (instaladores + fontes)
 │   │   └── testes/                   casos e runner em sandbox
 │   └── historico/                    arquivo local, ignorado
 ├── programa/                         runtime instalado localmente, ignorado
@@ -97,9 +94,8 @@ não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 | `controles.py` | detecção de gamepads, formatos de binds e presets `[Controls]` |
 | `musicas.py` | ID3/fallback, arquivos de áudio, capas de álbum e path portátil |
 | `baixar.py` | Exportify, yt-dlp/FFmpeg, staging, conversão e fila persistente |
-| `player.py` | playlist/transporte e backends MCI/afplay/players Linux |
 | `volume.py` | volume geral Windows Core Audio; COM com vida limitada |
-| `rede/fontes.py` | catálogos SteamRip/FitGirl, seleção de hosts e downloads |
+| `rede/fontes.py` | busca nos catálogos SteamRip/FitGirl e wishlist da Steam (só título e link; abrir/baixar é com o usuário) |
 | `rede/metadados.py` / `rede/binarios.py` | Steam de referência e instalação verificada de ferramentas |
 | `rede/letras.py` / `rede/capas_libretro.py` / `rede/sponsorblock.py` | LRCLIB/LRC, capas e segmentos opt-in |
 | `rede/provedores/` | Steam, SteamGridDB, RetroAchievements e HowLongToBeat para a página do jogo: cache com validade, ritmo por host, HTML vira texto, arte em `dados/artes/<uuid>/` |
@@ -128,12 +124,11 @@ não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 | `frontends/servicos_ui/` (pacote) | Casos de uso do desktop em mixins por domínio, `resumo_sistema`, `busca_global`, registro de módulos |
 | `frontends/electron/` | Desktop: processo principal (protocolos `tucoteca-img`/`tucoteca-media`, menu, ponte), preload isolado e renderer Preact; `electron-builder.config.cjs` gera o instalador |
 | `frontends/electron/src/renderer/src/` | `vistas/` (uma pasta por seção com mais de uma tela: `jogos/`, `midia/`, `configuracoes/`), `componentes/` (`casca/` da janela, `jogo/`, `midia/`, `musica/`, `config/`, `ui/` genérica), `estado/` (lógica pura testada, rotas em `rota.ts`), `navegacao/` (teclado, controle e foco espacial) e `estilo/` (CSS por área) |
-| `frontends/app_tui.py` + `tui_*.py` | TUI em mixins por domínio (entry point e `tui.curses` patchável preservados) |
 | `ferramentas/abrir_hub.py` | Prepara ambiente/runtime do checkout ou do app instalado (usado pela ponte) |
 | `ferramentas/build_utils.py` | SHA-256 de arquivo e download verificado (cache + `.part` atômico) |
 | `ferramentas/diagnosticar.py` | sintaxe/exports/dependências/pastas/SQLite somente-leitura |
 | `ferramentas/empacotar_fontes.py` | entrega da árvore atual (Python + Electron) + SHA-256, sem coleção |
-| `ferramentas/preparar_runtime_python.py` | Python embeddable oficial, SHA-256 fixado, para `programa/windows-x64/python` |
+| `ferramentas/preparar_runtime_python.py` | Python embutido com SHA-256 fixado: embeddable oficial em `programa/windows-x64/python`, python-build-standalone em `programa/macos-<arm64\|x64>/python` |
 | `ferramentas/gerar_icone.py` | ícone do app (`resources/icon.ico`), reproduzível, só stdlib |
 | `ferramentas/preparar_release.py` | confere git/versões/instalador/runtime e gera fontes, notas, `release.json` e `SHA256SUMS` |
 | `ferramentas/semear_prova_electron.py` | coleção sintética para selftest do app (nunca a coleção real) |
@@ -169,7 +164,6 @@ dados/
   mods/azahar/            biblioteca de packs normalizados
   musicas/               áudio final
   baixados/              staging da fila
-  cache-wav/             PCM derivado para player Windows
   saves/                 dados centralizados/prefixo Wine
   screenshots/           galeria por uuid do jogo
   saves-config.json      origens de saves configuradas pelo usuário
@@ -197,9 +191,9 @@ Repacks: arquivo → staging extraído → exe confirmado → catálogo. O archi
 original permanece se a importação falhar. O programa não executa setups
 durante a extração.
 
-Desejo → fonte: SteamRip escolhe o primeiro host compatível disponível;
-importação confirmada marca o desejo como obtido, sem apagar o histórico.
-FitGirl abre a página, não executa instaladores. Steam não é destino de
+Desejo → fonte: a busca no SteamRip/FitGirl só devolve o link do post, que
+abre no navegador; importação confirmada marca o desejo como obtido, sem
+apagar o histórico. Nada executa instaladores. Steam não é destino de
 lançamento nem sincroniza conquistas/overlay.
 
 ### Áudio
@@ -223,8 +217,7 @@ São contratos distintos: consumidores devem usar suas chaves exatas.
 - SQLite tem conexão própria no worker.
 - Rede, hashing e conversão são trabalhos de fundo.
 - A ponte atende pedidos NDJSON; trabalhos longos viram jobs (`trabalhos.listar`/`cancelar`) com progresso, sem bloquear o renderer.
-- O player MCI (TUI) separa preparação de abertura/controle; aliases são
-  locais à thread. O desktop toca mídia no renderer (`tucoteca-media://`).
+- O desktop toca mídia no renderer (`tucoteca-media://`).
 - Tokens invalidam preparações antigas; Stop/fechar não deixam resultado
   atrasado iniciar ou interromper outra faixa.
 - Erro de status é desconhecido, não fim. Auto-avançar exige fim confirmado.
@@ -257,7 +250,6 @@ duplicatas e escapes, com limites de tamanho/arquivos e backup pré-sobrescrita.
 | `BIBLIOTECA_MUSICA_DIR` | origem de áudio local/Harmoni |
 | `BIBLIOTECA_YTDLP/FFMPEG` | ferramentas externas |
 | `BIBLIOTECA_CAPA_MUSICA_AUTO` | auto-capa; `0` desliga |
-| `BIBLIOTECA_STEAMRIP_HOSTS` | preferência de hosts |
 | `BIBLIOTECA_QBIT_DIR` | caminho explícito de `BT_backup/` do qBittorrent |
 | `BIBLIOTECA_QBITTORRENT` | executável explícito do cliente |
 | `BIBLIOTECA_QBIT_PROFILE` | raiz de perfis qBittorrent do Hub |
@@ -279,15 +271,14 @@ consome `cfg`; o helper `_env` atende chamadas legadas.
 ## Testes e evolução
 
 Casos cobrem persistência, identidade, scanners, overlays, rollback,
-downloads simulados, ponte, TUI, áudio e volume;
+downloads simulados, ponte, áudio, volume e as diferenças de macOS;
 o renderer/main do Electron têm testes vitest próprios. `executar.py` cria sandbox,
 descobre `teste_*` e informa os pulos e falhas por ambiente.
 `testes/conftest.py` coleta por AST e executa os mesmos casos em processos separados;
 `pytest --cobertura` agrega cobertura dos subprocessos. Provas nativas e
 smokes remotos são separados dos casos herméticos e não usam jogos reais.
 
-Os maiores pontos de acoplamento continuam `app_tui.py`
-e `scans/` (`emuladores` foi fatiado na F1 do O2 em
+O maior ponto de acoplamento continua `scans/` (`emuladores` foi fatiado na F1 do O2 em
 `emuladores/{azahar,desmume,provedores,presets,mods,lancamento,_comum}` e
 `banco.py` em `banco/{_infra,jogos,catalogo}`; contratos e `__all__`
 preservados). A decomposição futura deve seguir domínios
