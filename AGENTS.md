@@ -15,7 +15,8 @@ entram no Git.
 - Sem elevação UAC, execução de jogos, downloads reais ou escrita fora da área
   de desenvolvimento durante testes. Use subprocessos/rede simulados.
 - Segredos recusados devem ser atualizados pelo usuário no Hub, nunca no chat.
-- Repositório e releases continuam privados. Não anexar provas/dados locais.
+- Repositório e releases são públicos: nunca anexar provas, dados locais,
+  capas comerciais ou dados pessoais (e-mail, caminhos, nomes) a commits.
 - Steam é catálogo/wishlist/referência, não launcher nem sync de conquistas.
 - Rede só por ação do usuário. Exceções aprovadas: o Calendário de Filmes e
   Séries renova as séries seguidas ao abrir a aba (no máximo a cada 12 h) e o
