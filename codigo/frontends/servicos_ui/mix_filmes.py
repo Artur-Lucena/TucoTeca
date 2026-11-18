@@ -5,14 +5,15 @@ import json
 import time
 from contextlib import closing
 
-import bib_core as core
+from bib_nucleo import apps_externos, base
+from bib_nucleo import banco as nucleo_banco
 from bib_nucleo.midia import banco as mb
 
 INTERVALO_SEGUIDAS = 12 * 3600
 
 
 def pasta_posters():
-    return core.DADOS_DIR / "posters"
+    return base.DADOS_DIR / "posters"
 
 
 def poster_dto(imdb, remoto) -> str:
@@ -53,10 +54,10 @@ class MixFilmes:
 
     def _midia(self, operacao, escrever=False):
         if escrever:
-            with self._escrita, closing(core.get_db(self.db_path)) as con:
+            with self._escrita, closing(nucleo_banco.get_db(self.db_path)) as con:
                 mb.garantir_tabelas_midia(con)
                 return operacao(con)
-        with closing(core.get_db(self.db_path)) as con:
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
             mb.garantir_tabelas_midia(con)
             return operacao(con)
 
@@ -305,7 +306,7 @@ class MixFilmes:
         """Renova episódios das séries seguidas; ao abrir o Calendário, no máximo a cada 12 h."""
         from bib_nucleo.arquivos import gravar_json, ler_json
         from bib_nucleo.rede import cinemeta, rede_ativa
-        marca = core.DADOS_DIR / "midia-seguidas.json"
+        marca = base.DADOS_DIR / "midia-seguidas.json"
         ultima = ler_json(marca, {}) if marca.is_file() else {}
         if not rede_ativa():
             return {"atualizado": False, "motivo": "sem rede"}
@@ -354,7 +355,7 @@ class MixFilmes:
 
     def midia_externo(self, arquivo_id, reprodutor="auto"):
         caminho = self._midia(lambda con: self._arquivo(con, arquivo_id))["caminho"]
-        r = core.reproduzir_video(caminho, reprodutor)
+        r = apps_externos.reproduzir_video(caminho, reprodutor)
         if not r.get("ok"):
             raise ValueError(r.get("erro", "Não foi possível abrir o vídeo."))
         return {"reprodutor": r.get("reprodutor", "")}

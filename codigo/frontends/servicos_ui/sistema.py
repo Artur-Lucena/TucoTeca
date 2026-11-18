@@ -5,13 +5,13 @@ SQLite; o frontend escolhe a thread e apresenta erros.
 """
 from __future__ import annotations
 
-import bib_core as core
+from bib_nucleo import banco, base, emuladores, pacotes
 
 
 def capa_url(nome):
     if not nome:
         return ""
-    alvo = core.caminho_capa(nome)
+    alvo = banco.caminho_capa(nome)
     return alvo.resolve().as_uri() if alvo is not None and alvo.is_file() else ""
 
 
@@ -26,18 +26,18 @@ def resumo_sistema(jogos, musicas, desejos, downloads=None):
                        key=lambda j: float(j.get("horas") or 0), reverse=True)
         recentes = [*recentes, *extra][:4]
     try:
-        pendentes = len(core.listar_sessoes_pendentes())
+        pendentes = len(emuladores.listar_sessoes_pendentes())
     except Exception:
         pendentes = 0
     try:
-        idade = core.idade_ultimo_backup_dias()
+        idade = pacotes.idade_ultimo_backup_dias()
         backup = "sem backup" if idade is None else (
             "backup hoje" if idade < 1 else f"backup há {int(idade)}d")
         backup_estado = "ausente" if idade is None else "antigo" if idade >= 7 else "recente"
     except Exception:
         idade, backup, backup_estado = None, "backup indisponível", "indisponivel"
     try:
-        uso = shutil.disk_usage(core.HOME_DIR)
+        uso = shutil.disk_usage(base.HOME_DIR)
         livre_gb = round(uso.free / 1024 ** 3, 1)
         total_gb = round(uso.total / 1024 ** 3)
     except Exception:
@@ -55,11 +55,11 @@ def saude_colecao(jogos, limite=8):
     ids_pendentes = []
     for j in jogos:
         try:
-            exe = core.diagnosticar_exe(j)["estado"]
+            exe = emuladores.diagnosticar_exe(j)["estado"]
         except Exception:
             exe = "?"
         try:
-            rom = core.diagnosticar_rom(j)["estado"]
+            rom = emuladores.diagnosticar_rom(j)["estado"]
         except Exception:
             rom = "?"
         motivos = []

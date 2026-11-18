@@ -3,7 +3,7 @@ import os
 import tempfile
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import banco, scans
 from executar import afirmar
 
 
@@ -36,11 +36,11 @@ def teste_exe_existe_via_traduzido():
         print("(sem tradução: skip)")
         return
     tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    con = core.get_db(tmp / "t.db")
+    con = banco.get_db(tmp / "t.db")
     try:
-        core.criar_jogo(con, {"titulo": "LX Trad", "executable_path": outro,
+        banco.criar_jogo(con, {"titulo": "LX Trad", "executable_path": outro,
                               "status": "backlog"})
-        jogos = core.listar_jogos(con, q="LX Trad")
+        jogos = banco.listar_jogos(con, q="LX Trad")
     finally:
         con.close()
     afirmar(len(jogos) == 1 and jogos[0]["exe_existe"], jogos)
@@ -85,9 +85,9 @@ def teste_capa_rom_via_launch_sem_rom_path():
     banner[0x340:0x440] = "Capa LX".encode("utf-16-le")[:0x100].ljust(0x100, b"\x00")
     rom = tmp / "capa.nds"
     rom.write_bytes(bytes(head).ljust(0x4000, b"\x00") + bytes(banner))
-    con = core.get_db(tmp / "t.db")
+    con = banco.get_db(tmp / "t.db")
     try:
-        res = core.importar_lista(con, [{"titulo": "LX ROM", "executable_path": "EMU",
+        res = scans.importar_lista(con, [{"titulo": "LX ROM", "executable_path": "EMU",
                                          "launch_options": str(rom),
                                          "origem": "rom-nds", "status": "backlog"}])
     finally:
@@ -122,289 +122,6 @@ def teste_lock_nao_apaga_de_outro():
     afirmar(r.get("ok"), r)
     base.liberar_lock()
     afirmar(not lp.is_file(), "não liberou lock próprio")
-
-
-def _tui_fake(db, teclas, cols=150):
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path("codigo/frontends").resolve()))
-    import app_tui as tui
-
-    class Scr:
-        def __init__(self):
-            self.cells = {}
-            self.teclas = list(teclas)
-        def getmaxyx(self):
-            return (24, cols)
-        def addnstr(self, y, x, s, n, a=0):
-            pass
-        def erase(self):
-            pass
-        def refresh(self):
-            pass
-        def getch(self):
-            return self.teclas.pop(0) if self.teclas else ord("q")
-
-    class FakeCurses:
-        COLOR_CYAN = COLOR_BLACK = COLOR_GREEN = COLOR_RED = 1
-        COLOR_YELLOW = COLOR_MAGENTA = COLOR_WHITE = 1
-        KEY_DOWN = 258
-        KEY_UP = 259
-        KEY_ENTER = 343
-        KEY_PPAGE = 339
-        KEY_NPAGE = 338
-        A_BOLD = 1
-        A_DIM = 0
-        def curs_set(self, *a):
-            pass
-        def echo(self, *a):
-            pass
-        def noecho(self, *a):
-            pass
-        def has_colors(self):
-            return False
-        def color_pair(self, n):
-            return 0
-
-    tui.curses = FakeCurses()
-    return tui.Tui(Scr(), db)
-
-
-def teste_menu_fila_volta():
-    import tempfile
-    from pathlib import Path
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    con = core.get_db(db)
-    try:
-        core.enfileirar_downloads(con, [{"titulo": "Cotidiano",
-                                         "artista": "Chico Buarque",
-                                         "uri": "spotify:track:1"}])
-    finally:
-        con.close()
-    app = _tui_fake(db, [10, ord("j"), ord("j"), ord("j"), ord("j"), 10])
-    con = app._con()
-    try:
-        app.menu_fila(con)
-    finally:
-        con.close()
-    afirmar("pendente" in app.msg, app.msg)
-
-
-def teste_menu_interno_transporte():
-    import tempfile
-    from pathlib import Path
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    app = _tui_fake(db, [27])
-
-    class FB:
-        def __init__(self, vive=10**9):
-            self.vive = vive
-            self.n = 0
-            self.off = True
-        def open(self, p):
-            self.n = 0
-            self.off = True
-            return {"ok": True}
-        def play(self):
-            self.off = False
-            return {"ok": True}
-        def pause(self):
-            self.off = True
-            return {"ok": True}
-        def resume(self):
-            self.off = False
-            return {"ok": True}
-        def stop(self):
-            self.off = True
-        def vivo(self):
-            if self.off:
-                return False
-            self.n += 1
-            return self.n <= self.vive
-        def pos_ms(self):
-            return 0
-        def dur_ms(self):
-            return 1
-        def close(self):
-            self.off = True
-
-    app.player = core.Player(FB())
-    itens = [{"musica_path": "a.mp3", "titulo": "A", "artista": "X"},
-             {"musica_path": "b.mp3", "titulo": "B", "artista": "Y"}]
-    r = app._tocar_interno(itens, 0)
-    afirmar(r.get("ok") and app.player.estado == "tocando", (r, app.player.estado))
-    r = app._alternar_interno()
-    afirmar(r.get("ok") and app.player.estado == "pausado", (r, app.player.estado))
-    r = app._proxima_interno()
-    afirmar(r.get("ok") and r.get("titulo") == "Y — B", r)
-    app._parar_interno()
-    afirmar(app.player.estado == "parado", app.player.estado)
-    # faixa que acaba sozinha avança sem travar
-    app.player = core.Player(FB(vive=0))
-    app._tocar_interno(itens, 0)
-    afirmar(app.player.terminou(), "devia ter terminado")
-    app._vigiar_player()
-    afirmar(app.player.atual()["titulo"] == "Y — B", app.player.atual())
-    afirmar("Seguindo" in app.msg, app.msg)
-
-
-def teste_menu_fitgirl_cancela_e_abre():
-    import tempfile
-    from pathlib import Path
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    app = _tui_fake(db, [27])
-    app.menu_fitgirl()
-    afirmar(app.msg == "", app.msg)
-    import webbrowser
-    velho = webbrowser.open
-    webbrowser.open = lambda url: True
-    try:
-        app = _tui_fake(db, [ord("x")])
-        app.perguntar = lambda *a, **k: "x"
-        import bib_core as core
-        velho_buscar = core.buscar_fitgirl
-        core.buscar_fitgirl = lambda *a, **k: {"itens": [], "erros": []}
-        try:
-            app.menu_fitgirl()
-        finally:
-            core.buscar_fitgirl = velho_buscar
-        afirmar(app.msg == "Nada encontrado.", app.msg)
-    finally:
-        webbrowser.open = velho
-
-
-def teste_menu_steamrip_cancela():
-    import tempfile
-    from pathlib import Path
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    app = _tui_fake(db, [27])
-    app.menu_steamrip()
-    afirmar(app.msg == "", app.msg)
-
-
-def teste_menu_principal_abre_e_cancela():
-    import tempfile
-    from pathlib import Path
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    app = _tui_fake(db, [27, ord("q")])
-    afirmar(app.menu_principal() is False, "ESC deveria voltar à lista")
-
-
-def teste_menu_principal_sair():
-    import tempfile
-    from pathlib import Path
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    teclas = [ord("j")] * 11 + [10]
-    app = _tui_fake(db, teclas)
-    afirmar(app.menu_principal() is True, "navegar até Sair + Enter deveria pedir saída")
-
-
-def teste_menu_jogo_volta():
-    import tempfile
-    from pathlib import Path
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    con = core.get_db(db)
-    try:
-        core.criar_jogo(con, {"titulo": "LX Menu", "executable_path": "",
-                              "status": "backlog"})
-    finally:
-        con.close()
-    app = _tui_fake(db, [10, ord("q")])
-    cur_antes = app.cur
-    app.menu_jogo()
-    afirmar(app.cur == cur_antes, "Voltar não deveria mudar a seleção")
-
-
-def teste_menu_controles_volta():
-    import tempfile
-    from pathlib import Path
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    app = _tui_fake(db, [27])
-    app.menu_controles()
-    afirmar(app.msg == "" or isinstance(app.msg, str), app.msg)
-
-
-def teste_desenhar_tela_principal():
-    """Regressão: desenhar() desenhava NameError (filtro) e a tela ia em branco."""
-    import sys
-    import tempfile
-    from pathlib import Path
-    sys.path.insert(0, str(Path("codigo/frontends").resolve()))
-    import app_tui as tui
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    con = core.get_db(db)
-    try:
-        core.criar_jogo(con, {"titulo": "LX Tela", "executable_path": "",
-                              "status": "backlog"})
-    finally:
-        con.close()
-
-    class ScrRec:
-        def __init__(self):
-            self.cells = {}
-        def getmaxyx(self):
-            return (24, 150)
-        def addnstr(self, y, x, s, n, a=0):
-            self.cells[(y, x)] = s[:n]
-        def erase(self):
-            self.cells.clear()
-        def refresh(self):
-            pass
-        def getch(self):
-            return ord("q")
-
-    _tui_fake(db, [])  # instala FakeCurses no módulo app_tui
-    scr = ScrRec()
-    app = tui.Tui(scr, db)
-    app.desenhar()
-    texto = "\n".join(v for _, v in sorted(scr.cells.items()))
-    afirmar("TucoTeca" in texto, texto[:200])
-    afirmar("busca=" in texto and "prov=" in texto, texto[:300])
-    afirmar("LX Tela" in texto, texto[:500])
-
-
-def teste_escolher_rola_lista_longa():
-    import tempfile
-    from pathlib import Path
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    ops = [f"opcao-{i:02d}" for i in range(50)]
-    app = _tui_fake(db, [ord("j")] * 45 + [10])
-    afirmar(app.escolher("T", ops) == 45, "rolagem quebrou o índice")
-    app = _tui_fake(db, [ord("j")] * 60 + [10])
-    afirmar(app.escolher("T", ops) == 49, "teto da rolagem")
-    app = _tui_fake(db, [27])
-    afirmar(app.escolher("T", ops) is None, "ESC deveria cancelar")
-
-
-def teste_escolher_terminal_estreito():
-    import tempfile
-    from pathlib import Path
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    ops = ["x" * 200, "curta"]
-    app = _tui_fake(db, [10], cols=30)
-    afirmar(app.escolher("T", ops) == 0, "largura estreita quebrou")
-
-
-def teste_menu_filtros_cicla_status():
-    import tempfile
-    from pathlib import Path
-    tmp = Path(tempfile.mkdtemp(prefix="suite-lx-"))
-    db = tmp / "m.db"
-    app = _tui_fake(db, [10, ord("q")])
-    si_antes = app.si
-    app.menu_filtros()
-    afirmar(app.si == (si_antes + 1) % len(app.statuses), app.si)
 
 
 def teste_resolver_exe_fantasma_cai_no_provider():
@@ -456,6 +173,6 @@ def teste_dedup_cross_os_mesmo_jogo():
     win = str(base.WIN_ROOT).rstrip("\\")
     lin = str(base.LINUX_ROOT).rstrip("/")
     sep_w, sep_l = "\\", "/"
-    a = core.chave_dedup("Jogo X", win + sep_w + "Games" + sep_w + "Jogo" + sep_w + "jogo.exe", "")
-    b = core.chave_dedup("jogo x", lin + sep_l + "Games" + sep_l + "Jogo" + sep_l + "jogo.exe", "")
+    a = banco.chave_dedup("Jogo X", win + sep_w + "Games" + sep_w + "Jogo" + sep_w + "jogo.exe", "")
+    b = banco.chave_dedup("jogo x", lin + sep_l + "Games" + sep_l + "Jogo" + sep_l + "jogo.exe", "")
     afirmar(a == b, (a, b))

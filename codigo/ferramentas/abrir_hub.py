@@ -11,6 +11,9 @@ REPO = Path(__file__).resolve().parents[2]
 
 def preparar():
     os.environ.setdefault("BIBLIOTECA_HOME", str(REPO))
+    if sys.platform != "win32":
+        # a ponte usa este mesmo Python (no Mac, o python3 do PATH costuma ser o 3.9 da Apple)
+        os.environ.setdefault("TUCOTECA_PYTHON", sys.executable)
     runtime = REPO / "programa/windows-x64"
     arq = runtime / "manifesto-runtime.json"
     if arq.is_file():

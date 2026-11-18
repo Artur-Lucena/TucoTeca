@@ -10,8 +10,9 @@ import wave
 from pathlib import Path
 from unittest.mock import patch
 
-import bib_core as core
-from bib_nucleo import online, spotify
+from bib_nucleo import baixar as nucleo_baixar
+from bib_nucleo import banco, base, online, spotify
+from bib_nucleo import musicas as nucleo_musicas
 from executar import afirmar
 from servicos_ui import ServicoBiblioteca
 
@@ -85,7 +86,7 @@ def teste_spotify_refresh_paginacao_cache_preserva_catalogo():
     with patch.object(online, "requisitar_json", side_effect=ValueError("offline")):
         r = cliente.consultar("salvas")
         afirmar(r["cache"] and len(r["itens"]) == 1 and "preservado" in r["aviso"])
-    metas = online.ler_json(core.DADOS_DIR / "spotify/faixas.json")
+    metas = online.ler_json(base.DADOS_DIR / "spotify/faixas.json")
     afirmar("spotify:track:" + "a" * 22 in metas and "access_token" not in repr(metas))
     try:
         cliente.consultar("salvas", pagina="https://example.com/roubar-token")
@@ -207,23 +208,23 @@ def teste_pipeline_spotify_importa_no_hub_cancela_e_retoma_com_dedup():
 
     def baixar(con, did, progresso=None):
         chamadas.append(did)
-        arq = core.BAIXAR_DIR / (str(did) + ".wav")
+        arq = base.BAIXAR_DIR / (str(did) + ".wav")
         arq.parent.mkdir(parents=True, exist_ok=True)
         with wave.open(str(arq), "wb") as w:
             w.setnchannels(1)
             w.setsampwidth(2)
             w.setframerate(8000)
             w.writeframes(bytes([did % 255, 0]) * 800)
-        core.marcar_download(con, did, "baixado", video_id="teste", musica_path=str(arq))
+        banco.marcar_download(con, did, "baixado", video_id="teste", musica_path=str(arq))
         if progresso:
             progresso(did, 100)
         parar.set()
         return {"ok": True}
 
-    with patch.object(core, "localizar_ytdlp", return_value="fake-ytdlp"), \
-            patch.object(core, "baixar_faixa", side_effect=baixar), \
-            patch.object(core.baixar, "localizar_ffmpeg", return_value=""), \
-            patch.object(core, "baixar_capa_album", return_value={"ok": False}):
+    with patch.object(nucleo_baixar, "localizar_ytdlp", return_value="fake-ytdlp"), \
+            patch.object(nucleo_baixar, "baixar_faixa", side_effect=baixar), \
+            patch.object(nucleo_baixar, "localizar_ffmpeg", return_value=""), \
+            patch.object(nucleo_musicas, "baixar_capa_album", return_value={"ok": False}):
         r = servico.baixar_musicas(parar)
         afirmar(r["novas"] == 1 and r["cancelado"], r)
         snap = servico.snapshot()
@@ -241,30 +242,30 @@ def teste_conversao_atomica_falha_preserva_staging_e_retoma_sem_ytdlp():
     db = Path(tempfile.mkdtemp()) / "colecao.db"
     servico = ServicoBiblioteca(db)
     servico.enfileirar_musicas([{"titulo": "Falha de conversão", "artista": "Teste"}])
-    con = core.get_db(db)
+    con = banco.get_db(db)
     try:
-        did = core.listar_downloads(con)[0]["id"]
-        staging = core.BAIXAR_DIR / "audio.wav"
+        did = banco.listar_downloads(con)[0]["id"]
+        staging = base.BAIXAR_DIR / "audio.wav"
         staging.parent.mkdir(parents=True, exist_ok=True)
         with wave.open(str(staging), "wb") as w:
             w.setnchannels(1)
             w.setsampwidth(2)
             w.setframerate(8000)
             w.writeframes(b"\x00\x00" * 800)
-        core.marcar_download(con, did, "baixado", video_id="teste", musica_path=str(staging))
+        banco.marcar_download(con, did, "baixado", video_id="teste", musica_path=str(staging))
         def falhar(cmd, **_kwargs):
             Path(cmd[-1]).write_bytes(b"mp3-incompleto")
             return subprocess.CompletedProcess(cmd, 1, "", "conversão interrompida")
-        with patch.object(core.baixar, "localizar_ffmpeg", return_value="fake-ffmpeg"), \
-                patch.object(core.baixar.subprocess, "run", side_effect=falhar):
-            r = core.converter_faixa(con, did, capa_auto=False)
-        afirmar(not r["ok"] and staging.is_file() and not list(core.MUSICAS_DIR.glob("*.mp3")), r)
-        afirmar(core.listar_downloads(con)[0]["estado"] == "falha")
+        with patch.object(nucleo_baixar, "localizar_ffmpeg", return_value="fake-ffmpeg"), \
+                patch.object(nucleo_baixar.subprocess, "run", side_effect=falhar):
+            r = nucleo_baixar.converter_faixa(con, did, capa_auto=False)
+        afirmar(not r["ok"] and staging.is_file() and not list(base.MUSICAS_DIR.glob("*.mp3")), r)
+        afirmar(banco.listar_downloads(con)[0]["estado"] == "falha")
     finally:
         con.close()
-    with patch.object(core, "localizar_ytdlp", return_value=""), \
-            patch.object(core, "baixar_faixa", side_effect=AssertionError("rebaixou áudio completo")), \
-            patch.object(core.baixar, "localizar_ffmpeg", return_value=""), \
-            patch.object(core, "baixar_capa_album", return_value={"ok": False}):
+    with patch.object(nucleo_baixar, "localizar_ytdlp", return_value=""), \
+            patch.object(nucleo_baixar, "baixar_faixa", side_effect=AssertionError("rebaixou áudio completo")), \
+            patch.object(nucleo_baixar, "localizar_ffmpeg", return_value=""), \
+            patch.object(nucleo_musicas, "baixar_capa_album", return_value={"ok": False}):
         r = servico.baixar_musicas(threading.Event())
     afirmar(r["novas"] == 1 and len(servico.snapshot()["musicas"]) == 1, r)

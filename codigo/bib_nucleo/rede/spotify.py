@@ -20,8 +20,6 @@ REDIRECT_URI = "http://127.0.0.1:43827/callback"
 SCOPES = "playlist-read-private playlist-read-collaborative user-library-read"
 API = "https://api.spotify.com/v1/"
 CLIENT_ID_RE = re.compile(r"[A-Za-z0-9]{32}")
-MODOS_USUARIO = ("playlists", "salvas")
-MODOS_PUBLICOS = ("busca", "faixa", "album", "playlist")
 
 
 def normalizar_faixa(item):

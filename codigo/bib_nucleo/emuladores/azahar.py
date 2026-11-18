@@ -71,22 +71,6 @@ def azahar_user_dir(exe: str = "") -> str:
     return str(base) if base.is_dir() else ""
 
 
-def azahar_status() -> dict:
-    """Saúde do Azahar sem abrir nada: instalado, user dir, configurado, chaves."""
-    exe = default_emu_3ds()
-    st = {"instalado": bool(exe), "exe": exe, "user_dir": "",
-          "configurado": False, "chaves": False,
-          "versao_local": azahar_versao_local()}
-    if not exe:
-        return st
-    ud = azahar_user_dir(exe)
-    st["user_dir"] = ud
-    if ud:
-        st["configurado"] = (Path(ud) / "config" / "qt-config.ini").is_file()
-        st["chaves"] = (Path(ud) / "sysdata" / "aes_keys.txt").is_file()
-    return st
-
-
 # --------------------------------------------------------------------------
 # Gerenciador do Azahar: verifica, baixa, confere sha256 e instala sozinho
 # --------------------------------------------------------------------------
@@ -191,5 +175,5 @@ def azahar_tem_chaves() -> bool:
 __all__ = ["AZAHAR_API_LATEST", "AZAHAR_VERSAO_ARQ", "_asset_azahar_ok",
            "_emu_dir", "azahar_config_atual", "azahar_dir_override",
            "azahar_flags", "azahar_instalar", "azahar_mods_dir",
-           "azahar_release_info", "azahar_status", "azahar_tem_chaves",
+           "azahar_release_info", "azahar_tem_chaves",
            "azahar_user_dir", "azahar_versao_local", "default_emu_3ds"]

@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import bib_core as core
+from bib_nucleo import banco
 from executar import afirmar
 
 CODIGO = Path(__file__).resolve().parents[2]
@@ -18,14 +18,13 @@ NUCLEO = CODIGO / "bib_nucleo"
 
 
 def _fontes_nucleo():
-    return sorted((NUCLEO).rglob("*.py")) + [CODIGO / "bib_core.py"]
+    return sorted((NUCLEO).rglob("*.py"))
 
 
 def teste_compat_nucleo_sem_qt_obrigatorio():
     for arq in _fontes_nucleo():
         texto = arq.read_text(encoding="utf-8")
         afirmar("PySide6" not in texto and "PyQt" not in texto, arq)
-    afirmar("bib_core" in sys.modules or True)
     import bib_nucleo.banco as banco
     import bib_nucleo.base as base
     import bib_nucleo.everything as ev
@@ -35,7 +34,7 @@ def teste_compat_nucleo_sem_qt_obrigatorio():
 
 
 def teste_compat_imports_de_so_condicionais():
-    alvos = ["controles.py", "base.py", "player.py", "volume.py",
+    alvos = ["controles.py", "base.py", "volume.py",
              "scans/__init__.py", "scans/lojas.py", "scans/disco.py",
              "scans/roms.py", "scans/analise.py", "scans/metadados.py",
              "scans/importacao.py"]
@@ -58,39 +57,22 @@ def teste_compat_imports_de_so_condicionais():
             afirmar("os.name" in texto or "sys.platform" in texto, f"{nome}: sem guarda de SO")
     # Prova viva de importação no Linux atual (sem Qt, sem Win32).
     import bib_nucleo.controles as CT
-    import bib_nucleo.player as PL
     import bib_nucleo.volume as VO
     afirmar(callable(CT.ler_estados_xinput) or True)
-    afirmar(hasattr(PL, "__all__") and hasattr(VO, "__all__"))
+    afirmar(hasattr(VO, "__all__"))
 
 
-def teste_compat_aliases_legados():
+def teste_compat_pasta_jogos_e_fontes_preguicosas():
     from bib_nucleo.rede import repacks as RP
     with patch.dict(os.environ, {"BIBLIOTECA_JOGOS_DIR": str(Path(tempfile.mkdtemp()) / "novo"),
                                  "BIBLIOTECA_PIRATAS": str(Path(tempfile.mkdtemp()) / "legado")}):
         afirmar(RP.pasta_jogos().name == "novo", "env nova deve vencer a legada")
-        afirmar(RP.pasta_piratas() == RP.pasta_jogos(), "alias legado divergiu")
-    with patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("BIBLIOTECA_JOGOS_DIR", None)
-        os.environ.pop("BIBLIOTECA_PIRATAS", None)
-        # Sem override, o padrão novo é usado; o alias acompanha.
-        from bib_nucleo import base
-        with patch.object(base, "LINUX_ROOT", tempfile.mkdtemp(prefix="a2-compat-")), \
-                patch.object(base, "MAC_ROOT", tempfile.mkdtemp(prefix="a2-compat-")), \
-                patch.object(RP, "_raiz_padrao_jogos", return_value=Path(tempfile.mkdtemp(prefix="a2-compat-"))):
-            afirmar(RP.pasta_piratas() == RP.pasta_jogos())
     dentro = str(RP.pasta_jogos() / "Jogo")
-    afirmar(RP.dentro_de_piratas(dentro) == RP.dentro_do_destino(dentro))
-    afirmar(RP.organizar_em_piratas.__doc__ and RP.pasta_piratas.__doc__)
-    # Fachada preserva os aliases para consumidores antigos.
-    for nome in ("pasta_jogos", "pasta_piratas", "dentro_do_destino", "dentro_de_piratas",
-                 "organizar_no_destino", "organizar_em_piratas"):
-        afirmar(nome in core.__all__, nome)
+    afirmar(RP.dentro_do_destino(dentro))
     # bib_nucleo.fontes continua resolvível via import preguiçoso.
     import bib_nucleo
     from bib_nucleo.rede import fontes as direto
     afirmar(bib_nucleo.fontes is direto)
-
 
 def teste_compat_banco_migra_sem_reescrever():
     tmp = Path(tempfile.mkdtemp(prefix="a2-compat-db-"))
@@ -108,31 +90,31 @@ def teste_compat_banco_migra_sem_reescrever():
                 ("Legado", "/jogo/exe", "--opt", 2.5, 8))
     con.commit()
     con.close()
-    con = core.get_db(leg)
+    con = banco.get_db(leg)
     try:
         cols = {r["name"] for r in con.execute("PRAGMA table_info(jogos)").fetchall()}
         for esperada in ("exe_mac", "azahar_mods", "azahar_mods_off", "uuid", "etiquetas", "save_path"):
             afirmar(esperada in cols, sorted(cols))
-        jogos = core.listar_jogos(con, q="Legado")
+        jogos = banco.listar_jogos(con, q="Legado")
         afirmar(len(jogos) == 1, jogos)
         afirmar(jogos[0]["horas"] == 2.5 and jogos[0]["nota"] == 8, jogos[0])
         afirmar(jogos[0].get("uuid"), "migração v5 não preencheu uuid")
         afirmar(con.execute("PRAGMA integrity_check").fetchone()[0] == "ok")
         antes = con.execute("SELECT COUNT(*) FROM jogos").fetchone()[0]
         con.close()
-        con = core.get_db(leg)
+        con = banco.get_db(leg)
         depois = con.execute("SELECT COUNT(*) FROM jogos").fetchone()[0]
         afirmar(antes == depois == 1, (antes, depois))
-        afirmar("exe_mac" in core.CAMPOS_EDITAVEIS and "azahar_mods" in core.CAMPOS_EDITAVEIS)
-        afirmar(set(core.STATUS_VALIDOS) == {"backlog", "jogando", "zerado", "pausado", "abandonado"})
+        afirmar("exe_mac" in banco.CAMPOS_EDITAVEIS and "azahar_mods" in banco.CAMPOS_EDITAVEIS)
+        afirmar(set(banco.STATUS_VALIDOS) == {"backlog", "jogando", "zerado", "pausado", "abandonado"})
     finally:
         con.close()
 
 
 def teste_banco_pacote_reexporta_o_contrato():
-    """Fachada do pacote banco: os 58 nomes do contrato, privados p/ patch e fatias."""
+    """Fachada do pacote banco: os 56 nomes do contrato, privados p/ patch e fatias."""
     from bib_nucleo import banco as B
-    afirmar(len(B.__all__) == 57, len(B.__all__))
+    afirmar(len(B.__all__) == 56, len(B.__all__))
     faltando = [n for n in B.__all__ if not hasattr(B, n)]
     afirmar(not faltando, faltando)
     # privados fora do contrato, mas reexportados de propósito (monkeypatch dos testes)

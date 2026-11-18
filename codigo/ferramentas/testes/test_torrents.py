@@ -3,7 +3,6 @@ import os
 import tempfile
 from pathlib import Path
 
-import bib_core as core
 from bib_nucleo import torrents as TT
 from executar import afirmar
 
@@ -81,9 +80,6 @@ def teste_torrents_sem_backup_e_lixo():
     afirmar(TT.formatar_tamanho(1177) == "1,1 KB", TT.formatar_tamanho(1177))
     afirmar(TT.formatar_tamanho(3 * 1048576) == "3,0 MB",
             TT.formatar_tamanho(3 * 1048576))
-    afirmar("listar_torrents" in core.__all__
-            and "encontrar_torrents" in core.__all__
-            and "formatar_tamanho" in core.__all__)
 
 
 def teste_torrents_resume_versoes_e_pre_alocacao():

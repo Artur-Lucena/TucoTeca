@@ -19,7 +19,7 @@ IGNORADAS = {"__pycache__", ".cache", ".build", "historico", ".git", ".provas",
              # artefatos do app Electron (dependências e builds), não fontes
              "node_modules", "out", "dist"}
 RAIZ_ARQUIVOS = {"README.md", "LICENSE", ".gitignore", ".gitattributes", "AGENTS.md",
-                 "pyproject.toml", "TucoTeca.bat", "tucoteca.sh"}
+                 "pyproject.toml", "TucoTeca.bat"}
 EXTENSOES = {"codigo": {".py",
                         # interface Electron (main/preload/renderer, config e ícone)
                         ".ts", ".tsx", ".css", ".html", ".json", ".cjs", ".ico"},
@@ -62,7 +62,7 @@ def empacotar_fontes(destino: Path, repo: Path = REPO, revisao: str | None = Non
     if revisao is not None and (len(revisao) != 40 or any(c not in "0123456789abcdef" for c in revisao)):
         raise ValueError("A revisão deve ser o SHA Git completo (40 caracteres hexadecimais).")
     arquivos = listar_fontes(repo)
-    if not (repo / "codigo/bib_core.py").is_file():
+    if not (repo / "codigo/bib_nucleo/__init__.py").is_file():
         raise ValueError("pasta não contém os fontes da TucoTeca")
     destino.parent.mkdir(parents=True, exist_ok=True)
     # Empacotar não deve executar módulos da árvore de entrada.

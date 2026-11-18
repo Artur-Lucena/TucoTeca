@@ -49,9 +49,9 @@ def esperar(trabalho, pronto, timeout=25):
 
 
 def provar_qbit():
-    import bib_core as core
     from bib_nucleo import qbit as Q
-    inicio = core.qbit_iniciar()
+    from bib_nucleo import qbit as nucleo_qbit
+    inicio = nucleo_qbit.qbit_iniciar()
     if not inicio["ok"]:
         raise RuntimeError(inicio["erro"])
     handle = None
@@ -76,16 +76,16 @@ def provar_qbit():
         (dest / nome.decode()).write_bytes(raw)
         arq = dest.parent / "offline-proof.torrent"
         arq.write_bytes(_benc({b"info": info}))
-        adicionar = core.qbit_iniciar(str(arq))
+        adicionar = nucleo_qbit.qbit_iniciar(str(arq))
         if not adicionar["ok"]:
             raise RuntimeError(adicionar["erro"])
-        r = esperar(core.qbit_listar, lambda r: any(t["hash"] == h and t["completo"] for t in r["torrents"]))
+        r = esperar(nucleo_qbit.qbit_listar, lambda r: any(t["hash"] == h and t["completo"] for t in r["torrents"]))
         t = next(t for t in r["torrents"] if t["hash"] == h)
         assert t["pct"] == 100 and Path(t["save_path"]) == dest / nome.decode(), t
-        assert core.qbit_controlar(h, "pausar")["ok"]
-        esperar(core.qbit_listar, lambda r: any(t["hash"] == h and t["estado"] == "stoppedUP" for t in r["torrents"]))
-        assert core.qbit_controlar(h, "retomar")["ok"]
-        esperar(core.qbit_listar, lambda r: any(t["hash"] == h and t["estado"] != "stoppedUP" for t in r["torrents"]))
+        assert nucleo_qbit.qbit_controlar(h, "pausar")["ok"]
+        esperar(nucleo_qbit.qbit_listar, lambda r: any(t["hash"] == h and t["estado"] == "stoppedUP" for t in r["torrents"]))
+        assert nucleo_qbit.qbit_controlar(h, "retomar")["ok"]
+        esperar(nucleo_qbit.qbit_listar, lambda r: any(t["hash"] == h and t["estado"] != "stoppedUP" for t in r["torrents"]))
         return {"versao": ver, "pct": t["pct"], "pausa_retomada": True, "destino": "perfil temporário"}
     finally:
         try:

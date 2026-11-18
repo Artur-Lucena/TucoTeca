@@ -96,7 +96,7 @@ def raiz_runtime() -> Path:
 def runtime_portatil() -> bool:
     raiz = raiz_runtime()
     return (raiz / MANIFESTO_RUNTIME).is_file() or (
-        (raiz / "app/bib_core.py").is_file() and (raiz / "python/python.exe").is_file())
+        (raiz / "app/bib_nucleo/__init__.py").is_file() and (raiz / "python/python.exe").is_file())
 
 
 def pasta_ferramentas() -> Path:

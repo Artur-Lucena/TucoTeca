@@ -5,11 +5,11 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import bib_core as core
 from bib_nucleo import apps_externos as EI
 from bib_nucleo import apps_externos as EQ
 from bib_nucleo import apps_externos as RV
-from bib_nucleo import online, spotify
+from bib_nucleo import banco, base, online, scans, spotify
+from bib_nucleo import videos as nucleo_videos
 from bib_nucleo import videos_youtube as YT
 from executar import afirmar
 
@@ -121,10 +121,10 @@ def teste_equalizadores_status_estrutura():
 # -- reprodutores de vídeo (VLC/MPV/MPC-HC) ----------------------------------
 
 def teste_video_base_dirs_e_exts():
-    afirmar(".mp4" in core.VIDEO_EXTS and ".mkv" in core.VIDEO_EXTS)
-    core.garantir_dirs()
-    afirmar(core.VIDEOS_DIR.is_dir() and core.VIDEOS_DIR.parent == core.DADOS_DIR)
-    afirmar("videos" in core.scans.SKIP_DIRS)
+    afirmar(".mp4" in base.VIDEO_EXTS and ".mkv" in base.VIDEO_EXTS)
+    base.garantir_dirs()
+    afirmar(base.VIDEOS_DIR.is_dir() and base.VIDEOS_DIR.parent == base.DADOS_DIR)
+    afirmar("videos" in scans.SKIP_DIRS)
 
 
 def teste_reprodutores_validacoes():
@@ -164,23 +164,23 @@ def teste_videos_import_dedup_e_crud():
     (src / "filme-b.mp4").write_bytes(b"video-igual" * 100)
     (src / "outro.mkv").write_bytes(b"video-outro" * 100)
     db = Path(tmp) / "v.db"
-    con = core.get_db(db)
+    con = banco.get_db(db)
     try:
-        r = core.importar_videos(con, str(src))
+        r = nucleo_videos.importar_videos(con, str(src))
         afirmar(r["novos"] == 2 and r["ignorados"] == 1, r)
-        lista = core.listar_videos(con)
+        lista = banco.listar_videos(con)
         afirmar(len(lista) == 2, lista)
-        afirmar(core.listar_videos(con, "outro")[0]["titulo"] == "outro")
+        afirmar(banco.listar_videos(con, "outro")[0]["titulo"] == "outro")
         try:
-            core.criar_video(con, {"titulo": ""})
+            banco.criar_video(con, {"titulo": ""})
         except ValueError:
             pass
         else:
             raise AssertionError("criou vídeo sem título")
-        core.excluir_video(con, lista[0]["id"])
-        afirmar(len(core.listar_videos(con)) == 1)
+        banco.excluir_video(con, lista[0]["id"])
+        afirmar(len(banco.listar_videos(con)) == 1)
         try:
-            core.excluir_video(con, 999999)
+            banco.excluir_video(con, 999999)
         except LookupError:
             pass
         else:
@@ -239,7 +239,7 @@ def teste_youtube_buscar_run_mockado():
 
 def teste_youtube_baixar_sem_ytdlp_e_id_invalido():
     tmp = tempfile.mkdtemp()
-    con = core.get_db(Path(tmp) / "y.db")
+    con = banco.get_db(Path(tmp) / "y.db")
     try:
         with patch.object(YT, "_ytdlp", return_value=""):
             r = YT.baixar_video_youtube(con, "dQw4w9WgXcQ")
@@ -252,7 +252,7 @@ def teste_youtube_baixar_sem_ytdlp_e_id_invalido():
 
 def teste_youtube_baixar_run_mockado():
     tmp = tempfile.mkdtemp()
-    con = core.get_db(Path(tmp) / "y2.db")
+    con = banco.get_db(Path(tmp) / "y2.db")
     vid = "dQw4w9WgXcQ"
 
     class FakeProc:
@@ -271,7 +271,7 @@ def teste_youtube_baixar_run_mockado():
                 patch.object(YT.subprocess, "Popen", side_effect=lambda cmd, **_kw: FakeProc(cmd)):
             r = YT.baixar_video_youtube(con, vid)
         afirmar(r["ok"] and r["video_id"] == vid and Path(r["path"]).is_file(), r)
-        lista = core.listar_videos(con)
+        lista = banco.listar_videos(con)
         afirmar(len(lista) == 1 and lista[0]["origem"] == "youtube", lista)
     finally:
         con.close()

@@ -368,8 +368,23 @@ def ler_revisoes(con: sqlite3.Connection) -> dict[str, int]:
     return {r[0]: int(r[1]) for r in con.execute("SELECT categoria, n FROM revisoes")}
 
 
+# Versão do esquema gravada no banco (`PRAGMA user_version`). A mesma coleção
+# pode passar entre Windows e Mac; um app mais velho não abre um banco que um
+# mais novo já migrou (recusa clara em vez de gravar sem as colunas novas).
+ESQUEMA_VERSAO = 1
+
+
+class BancoMaisNovoErro(RuntimeError):
+    """O banco foi gravado por uma versão mais nova do TucoTeca."""
+
+
 def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     con.row_factory = sqlite3.Row
+    gravada = int(con.execute("PRAGMA user_version").fetchone()[0])
+    if gravada > ESQUEMA_VERSAO:
+        raise BancoMaisNovoErro(
+            f"A coleção em {db_path} é de uma versão mais nova do TucoTeca "
+            f"(esquema {gravada}; este app conhece até {ESQUEMA_VERSAO}). Atualize o app.")
     # DELETE (não WAL): sem sidecars -wal/-shm, portátil no NTFS compartilhado.
     con.execute("PRAGMA journal_mode=DELETE;")
     existe = con.execute("SELECT 1 FROM sqlite_master WHERE name='jogos'").fetchone()
@@ -403,6 +418,8 @@ def _inicializar_db(con: sqlite3.Connection, db_path: Path) -> None:
     _garantir_revisoes(con)
     from bib_nucleo.banco.meta import garantir_tabela_meta
     garantir_tabela_meta(con)
+    if gravada < ESQUEMA_VERSAO:
+        con.execute(f"PRAGMA user_version = {ESQUEMA_VERSAO}")
     con.commit()
 
 SCHEMA_VIDEOS = """

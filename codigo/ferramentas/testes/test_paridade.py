@@ -162,12 +162,12 @@ def _prov_falso(chamadas, tag_remota="v2"):
 
 
 def teste_emuladores_status_sem_rede_e_consulta_explicita():
-    import bib_core as core
+    from bib_nucleo import emuladores as nucleo_emuladores
     tmp = Path(tempfile.mkdtemp(prefix="paridade-emus-"))
     ponte = Ponte(ServicoBiblioteca(tmp / "b.db"))
     chamadas = []
     falsos = {"azahar": _prov_falso(chamadas), "desmume": _prov_falso(chamadas)}
-    with patch.object(core, "provedores", lambda: falsos):
+    with patch.object(nucleo_emuladores, "provedores", lambda: falsos):
         status = _ok(ponte, "emulacao.status")
         afirmar(len(status["itens"]) == 2 and "release_info" not in chamadas, (status, chamadas))
         consulta = _ok(ponte, "emulacao.consultar", {"chave": "azahar"})
@@ -176,21 +176,21 @@ def teste_emuladores_status_sem_rede_e_consulta_explicita():
 
 
 def teste_controles_listar_fotografar_aplicar_gerar_estado():
-    import bib_core as core
+    from bib_nucleo import controles as nucleo_controles
     tmp = Path(tempfile.mkdtemp(prefix="paridade-pads-"))
     ponte = Ponte(ServicoBiblioteca(tmp / "b.db"))
     salvos = ["Padrão"]
-    with patch.object(core, "listar_controles", lambda: [{"nome": "Xbox", "familia": "xbox360"}]), \
-            patch.object(core, "listar_presets_controle", lambda: list(salvos)), \
-            patch.object(core, "fotografar_perfil",
+    with patch.object(nucleo_controles, "listar_controles", lambda: [{"nome": "Xbox", "familia": "xbox360"}]), \
+            patch.object(nucleo_controles, "listar_presets_controle", lambda: list(salvos)), \
+            patch.object(nucleo_controles, "fotografar_perfil",
                          lambda n: salvos.append(n) or {"ok": True, "preset": n}), \
-            patch.object(core, "aplicar_preset_controle", lambda n: {"ok": True, "chaves": 12}), \
-            patch.object(core, "detectar_sdl", lambda: []), \
-            patch.object(core, "nomes_sdl", lambda: {}), \
-            patch.object(core, "salvar_mapa_gerado",
+            patch.object(nucleo_controles, "aplicar_preset_controle", lambda n: {"ok": True, "chaves": 12}), \
+            patch.object(nucleo_controles, "detectar_sdl", lambda: []), \
+            patch.object(nucleo_controles, "nomes_sdl", lambda: {}), \
+            patch.object(nucleo_controles, "salvar_mapa_gerado",
                          lambda tipo, **kw: salvos.append(kw["nome"]) or {"ok": True}), \
-            patch.object(core, "ler_estado_xinput", lambda slot: {"slot": slot}), \
-            patch.object(core, "resumir_estado", lambda est: f"A slot={est['slot']}"):
+            patch.object(nucleo_controles, "ler_estado_xinput", lambda slot: {"slot": slot}), \
+            patch.object(nucleo_controles, "resumir_estado", lambda est: f"A slot={est['slot']}"):
         lista = _ok(ponte, "controles.listar")
         afirmar(lista["pads"][0]["nome"] == "Xbox" and lista["presets"] == ["Padrão"], lista)
         afirmar(any(t["tipo"] == "xbox360" for t in lista["tipos"]), lista)
@@ -208,11 +208,11 @@ def teste_controles_listar_fotografar_aplicar_gerar_estado():
 
 
 def teste_equalizacao_vira_trabalho_e_valida_preset():
-    import bib_core as core
+    from bib_nucleo import baixar
     tmp = Path(tempfile.mkdtemp(prefix="paridade-eq-"))
     servico = ServicoBiblioteca(tmp / "b.db")
     ponte = Ponte(servico)
-    with patch.object(core, "ffmpeg_pronto", lambda: False):
+    with patch.object(baixar, "ffmpeg_pronto", lambda: False):
         lista = _ok(ponte, "musicas.eq_presets")
     afirmar("bass" in lista["presets"] and lista["ffmpeg"] is False, lista)
     afirmar("preset" in _erro(ponte, "musicas.eq", {"caminho": "C:/m/a.mp3", "preset": "turbo"}))
@@ -225,7 +225,7 @@ def teste_equalizacao_vira_trabalho_e_valida_preset():
 
 
 def teste_volume_do_pc_le_define_e_indisponivel_nao_quebra():
-    import bib_core as core
+    from bib_nucleo import volume
     tmp = Path(tempfile.mkdtemp(prefix="paridade-vol-"))
     ponte = Ponte(ServicoBiblioteca(tmp / "b.db"))
     estado = {"nivel": 40, "mudo": False}
@@ -238,15 +238,15 @@ def teste_volume_do_pc_le_define_e_indisponivel_nao_quebra():
         estado["mudo"] = not estado["mudo"]
         return {"ok": True, **estado}
 
-    with patch.object(core, "ler_volume_pc", lambda: {"ok": True, **estado}), \
-            patch.object(core, "definir_volume_pc", definir), \
-            patch.object(core, "alternar_mudo_pc", mudo):
+    with patch.object(volume, "ler_volume_pc", lambda: {"ok": True, **estado}), \
+            patch.object(volume, "definir_volume_pc", definir), \
+            patch.object(volume, "alternar_mudo_pc", mudo):
         afirmar(_ok(ponte, "sistema.volume")["nivel"] == 40)
         afirmar(_ok(ponte, "sistema.volume_definir", {"nivel": 75})["nivel"] == 75)
         afirmar(_ok(ponte, "sistema.volume_mudo")["mudo"] is True)
         afirmar("nivel" in _erro(ponte, "sistema.volume_definir", {"nivel": "alto"}))
-    with patch.object(core, "ler_volume_pc", lambda: {"ok": False, "erro": "sem Core Audio"}), \
-            patch.object(core, "definir_volume_pc", lambda n, mudo=None: {"ok": False, "erro": "sem Core Audio"}):
+    with patch.object(volume, "ler_volume_pc", lambda: {"ok": False, "erro": "sem Core Audio"}), \
+            patch.object(volume, "definir_volume_pc", lambda n, mudo=None: {"ok": False, "erro": "sem Core Audio"}):
         afirmar(_ok(ponte, "sistema.volume")["ok"] is False)
         afirmar("Core Audio" in _erro(ponte, "sistema.volume_definir", {"nivel": 10}))
 
@@ -305,16 +305,16 @@ def teste_manutencao_plano_so_le_e_sanear_religar_respeitam_trava():
 
 
 def teste_jogar_elevado_pede_uac_simulado():
-    import bib_core as core
+    from bib_nucleo import emuladores as nucleo_emuladores
     tmp = Path(tempfile.mkdtemp(prefix="paridade-uac-"))
     servico = ServicoBiblioteca(tmp / "b.db")
     ponte = Ponte(servico)
     gid = servico.salvar_jogo(0, {"titulo": "Jogo", "executable_path": "C:/x/jogo.exe"})["id"]
     pedidos = []
-    with patch.object(core, "preparar_lancamento", lambda jogo: {"aviso": ""}), \
-            patch.object(core, "executar_jogo_dict",
+    with patch.object(nucleo_emuladores, "preparar_lancamento", lambda jogo: {"aviso": ""}), \
+            patch.object(nucleo_emuladores, "executar_jogo_dict",
                          lambda jogo, elevar=False: pedidos.append(elevar) or {"ok": True, "modo": "runas-uac"}), \
-            patch.object(core, "iniciar_sessao_manual", lambda gid, titulo: None):
+            patch.object(nucleo_emuladores, "iniciar_sessao_manual", lambda gid, titulo: None):
         r = _ok(ponte, "jogo.jogar_elevado", {"id": gid})
     afirmar(r["ok"] is True and r["modo"] == "runas-uac" and pedidos == [True], (r, pedidos))
 
@@ -365,7 +365,7 @@ def teste_torrents_listar_marca_fora_do_destino():
 
 
 def teste_backup_manual_e_sessoes_abertas_pela_ponte():
-    import bib_core as core
+    from bib_nucleo import emuladores as nucleo_emuladores
     tmp = Path(tempfile.mkdtemp(prefix="paridade-sessoes-"))
     servico = ServicoBiblioteca(tmp / "b.db")
     ponte = Ponte(servico)
@@ -374,7 +374,7 @@ def teste_backup_manual_e_sessoes_abertas_pela_ponte():
     r = _ok(ponte, "colecao.backup")
     afirmar(r["ok"] and r["db"].startswith("biblioteca-") and len(servico.backups()) == antes + 1, r)
 
-    marcador = core.iniciar_sessao_manual(gid, "Jogo UAC")
+    marcador = nucleo_emuladores.iniciar_sessao_manual(gid, "Jogo UAC")
     afirmar(marcador["ok"], marcador)
     abertas = _ok(ponte, "sessoes.listar")
     afirmar([s["titulo"] for s in abertas] == ["Jogo UAC"] and abertas[0]["gid"] == gid, abertas)

@@ -3,7 +3,6 @@ import os
 import sys
 from unittest.mock import patch
 
-import bib_core as core
 from bib_nucleo import volume as VOL
 from executar import afirmar
 
@@ -59,7 +58,6 @@ def teste_volume_pc_ajuste_limites_e_mudo():
         afirmar(VOL.definir_volume_pc(-1)["nivel"] == 0)
         afirmar(VOL.definir_volume_pc(200)["nivel"] == 100)
     afirmar(ep.entradas == ep.saidas, "operação deve liberar o endpoint")
-    afirmar("ajustar_volume_pc" in core.__all__)
 
 
 def teste_volume_pc_invalido_e_falhas():

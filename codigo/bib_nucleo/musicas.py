@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Selfhost de áudio: importa do Harmoni p/ `dados/musicas/` e toca no player.
+"""Selfhost de áudio: importa pastas de música (ex.: Harmoni) p/ `dados/musicas/`.
 
-Fonte: pasta `music/` do Harmoni (mp3 com ID3) + `tracks.json` opcional.
-Sem rede, stdlib só, darwin-safe (sem checagem MZ/ELF em áudio; play por
-ação explícita via player do SO, nunca no recarregar/desenhar).
+Fonte: pasta com mp3/ID3 + `tracks.json` opcional do Harmoni. Sem rede na
+importação, stdlib só, darwin-safe (sem checagem MZ/ELF em áudio). Quem toca
+é o player do app desktop.
 """
 from __future__ import annotations
 
@@ -13,8 +13,6 @@ import json
 import os
 import shutil
 import sqlite3
-import subprocess
-import sys
 from pathlib import Path
 
 from bib_nucleo.versao import user_agent
@@ -22,43 +20,6 @@ from bib_nucleo.versao import user_agent
 CAPA_MUSICA_ENV = "BIBLIOTECA_CAPA_MUSICA_AUTO"
 
 _TXT_FRAME = {"TIT2": "titulo", "TPE1": "artista", "TALB": "album"}
-
-
-def harmoni_dir() -> Path | None:
-    """Pasta `music/` do Harmoni (env `BIBLIOTECA_MUSICA_DIR` ou padrão Win)."""
-    env = os.environ.get("BIBLIOTECA_MUSICA_DIR")
-    if env and Path(env).is_dir():
-        return Path(env)
-    if os.name == "nt":
-        cand = (Path(os.environ.get("USERPROFILE", "")) / "Downloads"
-                / "Harmoni-Windows" / "music")
-        if cand.is_dir():
-            return cand
-    return None
-
-
-def sugestao_harmoni_dir() -> str:
-    """Caminho provável do `music/` do Harmoni, exista ou não (p/ diálogo).
-
-    `harmoni_dir()` só devolve o que existe; este sugere onde procurar
-    (guia de onboarding quando a pasta ainda não foi baixada).
-    """
-    env = (os.environ.get("BIBLIOTECA_MUSICA_DIR") or "").strip()
-    if env:
-        return env
-    if os.name == "nt":
-        base = Path(os.environ.get("USERPROFILE", ""))
-        if str(base).strip():
-            return str(base / "Downloads" / "Harmoni-Windows" / "music")
-    return ""
-
-
-def texto_musica(m: dict | None) -> str:
-    """Rótulo único da faixa (`Artista — Título` ou só `Título`). GUI+TUI."""
-    m = m or {}
-    tit = str(m.get("titulo") or "").strip()
-    art = str(m.get("artista") or "").strip()
-    return f"{art} — {tit}" if art else tit
 
 
 def _syncsafe(b: bytes) -> int:
@@ -267,31 +228,6 @@ def importar_musicas(con: sqlite3.Connection,
             "capas": capas}
 
 
-def tocar_musica(caminho: str) -> dict:
-    """Abre no player padrão do SO. Só sob ação explícita (nunca em teste).
-
-    Fallback: banco compartilhado entre SOs guarda path absoluto da máquina
-    que importou; se o arquivo sumiu, tenta `MUSICAS_DIR/<nome>` (a pasta
-    `dados/` é a mesma em Win/Linux/Mac).
-
-    Lê base.MUSICAS_DIR ao vivo (import dentro da função, como
-    importar_musicas) p/ acompanhar override de ambiente/patch.
-    """
-    p = resolver_musica(caminho)
-    if not p:
-        return {"ok": False, "erro": "arquivo não encontrado."}
-    try:
-        if os.name == "nt":
-            os.startfile(p)  # noqa: S606
-        elif sys.platform == "darwin":
-            subprocess.Popen(["open", p])
-        else:
-            subprocess.Popen(["xdg-open", p])
-    except OSError as e:
-        return {"ok": False, "erro": f"falha ao abrir: {e}"}
-    return {"ok": True, "path": p}
-
-
 def resolver_musica(caminho: str) -> str:
     """Arquivo local/traduzido ou basename em dados/musicas; só leitura."""
     from bib_nucleo.base import MUSICAS_DIR, nome_arquivo_portatil, traduzir_para_atual
@@ -359,7 +295,7 @@ def baixar_capa_album(con: sqlite3.Connection, mid: int,
 
 
 def baixar_capas_faltantes(con: sqlite3.Connection, limite: int = 200) -> dict:
-    """Arte p/ todas as faixas sem capa (botões GUI/TUI). Nunca levanta rede."""
+    """Arte p/ todas as faixas sem capa. Nunca levanta rede."""
     from bib_nucleo import banco as B
     novas = pendentes = 0
     erros: list[str] = []
@@ -382,7 +318,7 @@ def baixar_capas_faltantes(con: sqlite3.Connection, limite: int = 200) -> dict:
     return {"novas": novas, "pendentes": pendentes, "erros": erros}
 
 
-__all__ = ['harmoni_dir', 'sugestao_harmoni_dir', 'texto_musica',
+__all__ = [
            'capa_musica_auto', 'capa_album_url', 'baixar_capa_album',
            'baixar_capas_faltantes', 'ler_tags', 'sha_arquivo', 'varrer_pasta',
-           'importar_musicas', 'tocar_musica', 'resolver_musica']
+           'importar_musicas', 'resolver_musica']

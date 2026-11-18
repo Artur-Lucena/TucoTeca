@@ -102,16 +102,16 @@ def metodos_paridade(trabalhos) -> dict:
 
     # -- música: equalização (FFmpeg gera faixa nova) e volume do PC --------
     def musicas_eq_presets(servico, params):
-        import bib_core as core
-        return {"presets": sorted(core.PRESETS_EQ), "ffmpeg": bool(core.ffmpeg_pronto())}
+        from bib_nucleo import apps_externos, baixar
+        return {"presets": sorted(apps_externos.PRESETS_EQ), "ffmpeg": bool(baixar.ffmpeg_pronto())}
 
     def musicas_eq(servico, params):
         """Renderiza a faixa com o preset numa cópia nova (trabalho: pode passar de 30 s)."""
-        import bib_core as core
+        from bib_nucleo import apps_externos
         caminho = texto(params, "caminho")
         preset = texto(params, "preset")
-        if preset not in core.PRESETS_EQ:
-            raise ValueError(f"preset deve ser um de: {', '.join(sorted(core.PRESETS_EQ))}")
+        if preset not in apps_externos.PRESETS_EQ:
+            raise ValueError(f"preset deve ser um de: {', '.join(sorted(apps_externos.PRESETS_EQ))}")
 
         def tarefa(progresso, cancelado):
             progresso(5)
@@ -125,23 +125,23 @@ def metodos_paridade(trabalhos) -> dict:
                                               escopo="equalizacao")}
 
     def volume_ler(servico, params):
-        import bib_core as core
+        from bib_nucleo import volume as nucleo_volume
         # indisponível (ex.: fora do Windows) volta ok=false: a interface esconde o controle
-        return dict(core.ler_volume_pc())
+        return dict(nucleo_volume.ler_volume_pc())
 
     def volume_definir(servico, params):
-        import bib_core as core
+        from bib_nucleo import volume as nucleo_volume
         nivel = params.get("nivel")
         if isinstance(nivel, bool) or not isinstance(nivel, (int, float)):
             raise ValueError("nivel deve ser um número de 0 a 100")
-        r = dict(core.definir_volume_pc(nivel))
+        r = dict(nucleo_volume.definir_volume_pc(nivel))
         if not r.get("ok"):
             raise ValueError(r.get("erro") or "Volume do PC indisponível.")
         return r
 
     def volume_mudo(servico, params):
-        import bib_core as core
-        r = dict(core.alternar_mudo_pc())
+        from bib_nucleo import volume as nucleo_volume
+        r = dict(nucleo_volume.alternar_mudo_pc())
         if not r.get("ok"):
             raise ValueError(r.get("erro") or "Volume do PC indisponível.")
         return r
@@ -167,14 +167,14 @@ def metodos_paridade(trabalhos) -> dict:
 
     # -- ferramentas de mídia externas (editores, equalizadores, players) ----
     def ferramentas_listar(servico, params):
-        import bib_core as core
+        from bib_nucleo import apps_externos
 
         def lista(status):
             return [{"chave": chave, **{k: v for k, v in dict(info).items() if k != "exe"}}
                     for chave, info in status().items()]
-        return {"imagens": lista(core.status_editores),
-                "equalizadores": lista(core.status_equalizadores),
-                "videos": lista(core.status_reprodutores)}
+        return {"imagens": lista(apps_externos.status_editores),
+                "equalizadores": lista(apps_externos.status_equalizadores),
+                "videos": lista(apps_externos.status_reprodutores)}
 
     # -- importar por arrastar e soltar: prévia → seleção → importação -------
     def jogos_prever(servico, params):

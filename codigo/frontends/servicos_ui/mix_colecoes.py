@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from contextlib import closing
 
-import bib_core as core
+from bib_nucleo import banco as nucleo_banco
+from bib_nucleo import scans
 from bib_nucleo.banco import colecoes as banco_colecoes
 
 
@@ -11,9 +12,9 @@ class MixColecoes:
     # -- coleções -------------------------------------------------------------
     def _com_banco(self, operacao, escrever=False):
         if escrever:
-            with self._escrita, closing(core.get_db(self.db_path)) as con:
+            with self._escrita, closing(nucleo_banco.get_db(self.db_path)) as con:
                 return operacao(con)
-        with closing(core.get_db(self.db_path)) as con:
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
             return operacao(con)
 
     def colecoes(self):
@@ -42,7 +43,7 @@ class MixColecoes:
     # -- loja Steam (rede; ação do usuário) -------------------------------------
     def _donos(self):
         """appid → id do jogo na biblioteca (pela loja de origem ou pelo App ID dos metadados)."""
-        with closing(core.get_db(self.db_path)) as con:
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
             donos = {str(r[0]): int(r[1]) for r in con.execute(
                 "SELECT object_id, id FROM jogos WHERE shop='steam' AND object_id <> ''")}
             try:
@@ -51,7 +52,7 @@ class MixColecoes:
                     "WHERE m.steam_appid <> ''") if str(r[0]) not in donos})
             except Exception:
                 pass  # banco sem metadados ainda
-            desejos = {str(d.get("appid")) for d in core.listar_desejos(con)}
+            desejos = {str(d.get("appid")) for d in nucleo_banco.listar_desejos(con)}
         return donos, desejos
 
     def _marcar(self, cartoes):
@@ -80,15 +81,15 @@ class MixColecoes:
         return self._marcar([loja_steam.pagina(appid)])[0]
 
     def loja_desejar(self, appid, titulo):
-        r = self.alterar(lambda con: core.adicionar_desejo(con, appid, titulo))
+        r = self.alterar(lambda con: nucleo_banco.adicionar_desejo(con, appid, titulo))
         return {"ok": True, "resultado": r}
 
     # -- lojas instaladas no PC (só leitura do disco) ---------------------------
     def prever_lojas(self):
         """Jogos instalados em Steam/Epic/GOG/Hydra/Riot/Windows que ainda não estão na biblioteca."""
         from bib_nucleo.banco.jogos import chave_dedup
-        itens, info = core.ler_do_disco()
-        with closing(core.get_db(self.db_path)) as con:
+        itens, info = scans.ler_do_disco()
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
             vistos = {chave_dedup(r[0], r[1], r[2])[1:] for r in con.execute(
                 "SELECT titulo, executable_path, launch_options FROM jogos")}
         novos = [dict(i) for i in itens

@@ -107,16 +107,16 @@ def teste_roots_nds_reais():
 
 
 def teste_capa_falha_vira_aviso():
-    import bib_core as core
+    from bib_nucleo import banco
     tmp = Path(tempfile.mkdtemp(prefix="suite-nc-"))
     (tmp / "vazia.nds").write_bytes(b"0")
-    con = core.get_db(tmp / "t.db")
+    con = banco.get_db(tmp / "t.db")
     try:
-        res = core.importar_lista(con, [{"titulo": "Sem Icone", "executable_path": "",
+        res = scans.importar_lista(con, [{"titulo": "Sem Icone", "executable_path": "",
                                          "status": "backlog", "origem": "rom-nds",
                                          "rom_path": str(tmp / "vazia.nds")}])
         afirmar(res["novos"] == 1, res)
         afirmar(any("Sem Icone" in a for a in res["avisos"]), res)
-        afirmar("Sem Icone" in core.resumo_importacao(res), res)
+        afirmar("Sem Icone" in scans.resumo_importacao(res), res)
     finally:
         con.close()

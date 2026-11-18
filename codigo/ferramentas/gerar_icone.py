@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Gera o ícone do app (resources/icon.ico) só com a stdlib.
+"""Gera os ícones do app (resources/icon.ico e icon.icns) só com a stdlib.
 
 Desenho: quadrado arredondado com degradê roxo→azul e um "T" claro.
 O ICO embute PNGs (16, 24, 32, 48, 64, 128, 256), formato aceito pelo
-Windows Vista+ e pelo electron-builder. Reproduzível: mesma saída a cada
-execução, então o binário versionado pode ser conferido regerando.
+Windows Vista+ e pelo electron-builder. O ICNS (macOS) embute PNGs de 32 a
+1024 com a margem da grade de ícones do macOS (o desenho ocupa ~80%).
+Reproduzível: mesma saída a cada execução, então os binários versionados
+podem ser conferidos regerando.
 
     py -3.14 -B codigo/ferramentas/gerar_icone.py
 """
@@ -18,6 +20,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 DESTINO = REPO / "codigo/frontends/electron/resources"
 TAMANHOS = (16, 24, 32, 48, 64, 128, 256)
+# tipo ICNS → lado do PNG (ic11..ic14 são as versões @2x de 16..256)
+ICNS_TIPOS = (("ic11", 32), ("ic12", 64), ("ic07", 128), ("ic08", 256),
+              ("ic13", 256), ("ic09", 512), ("ic14", 512), ("ic10", 1024))
+MARGEM_MAC = 100 / 1024  # grade do macOS: 824 px de desenho num ícone de 1024
 TOPO = (124, 58, 237)    # roxo
 BASE = (37, 99, 235)     # azul
 LETRA = (248, 250, 252)
@@ -46,7 +52,12 @@ def _pixel(x: float, y: float) -> tuple[int, int, int, int]:
     return (r, g, b, 255)
 
 
-def renderizar(lado: int, amostras: int = 4) -> bytes:
+def _pixel_mac(x: float, y: float) -> tuple[int, int, int, int]:
+    escala = 1 - 2 * MARGEM_MAC
+    return _pixel((x - MARGEM_MAC) / escala, (y - MARGEM_MAC) / escala)
+
+
+def renderizar(lado: int, amostras: int = 4, pixel=_pixel) -> bytes:
     """RGBA linha a linha, com supersampling para bordas suaves."""
     linhas = bytearray()
     n = amostras * amostras
@@ -56,8 +67,8 @@ def renderizar(lado: int, amostras: int = 4) -> bytes:
             soma = [0, 0, 0, 0]
             for sy in range(amostras):
                 for sx in range(amostras):
-                    r, g, b, a = _pixel((px + (sx + 0.5) / amostras) / lado,
-                                        (py + (sy + 0.5) / amostras) / lado)
+                    r, g, b, a = pixel((px + (sx + 0.5) / amostras) / lado,
+                                       (py + (sy + 0.5) / amostras) / lado)
                     soma[0] += r * a
                     soma[1] += g * a
                     soma[2] += b * a
@@ -71,13 +82,14 @@ def renderizar(lado: int, amostras: int = 4) -> bytes:
     return bytes(linhas)
 
 
-def png(lado: int) -> bytes:
+def png(lado: int, pixel=_pixel) -> bytes:
     def bloco(tipo: bytes, dados: bytes) -> bytes:
         return (struct.pack(">I", len(dados)) + tipo + dados
                 + struct.pack(">I", zlib.crc32(tipo + dados) & 0xFFFFFFFF))
     cabecalho = struct.pack(">IIBBBBB", lado, lado, 8, 6, 0, 0, 0)
     return (b"\x89PNG\r\n\x1a\n" + bloco(b"IHDR", cabecalho)
-            + bloco(b"IDAT", zlib.compress(renderizar(lado), 9)) + bloco(b"IEND", b""))
+            + bloco(b"IDAT", zlib.compress(renderizar(lado, 2 if lado >= 512 else 4, pixel), 9))
+            + bloco(b"IEND", b""))
 
 
 def ico(imagens: dict[int, bytes]) -> bytes:
@@ -92,12 +104,19 @@ def ico(imagens: dict[int, bytes]) -> bytes:
     return cabecalho + diretorio + corpo
 
 
+def icns(imagens: dict[int, bytes]) -> bytes:
+    corpo = b"".join(tipo.encode("ascii") + struct.pack(">I", 8 + len(imagens[lado])) + imagens[lado]
+                     for tipo, lado in ICNS_TIPOS)
+    return b"icns" + struct.pack(">I", 8 + len(corpo)) + corpo
+
+
 def gerar(destino: Path = DESTINO) -> list[Path]:
     destino.mkdir(parents=True, exist_ok=True)
-    imagens = {lado: png(lado) for lado in TAMANHOS}
     saida = destino / "icon.ico"
-    saida.write_bytes(ico(imagens))
-    return [saida]
+    saida.write_bytes(ico({lado: png(lado) for lado in TAMANHOS}))
+    mac = destino / "icon.icns"
+    mac.write_bytes(icns({lado: png(lado, _pixel_mac) for lado in {lado for _, lado in ICNS_TIPOS}}))
+    return [saida, mac]
 
 
 def main(argv=None) -> int:

@@ -4,7 +4,8 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import banco as nucleo_banco
+from bib_nucleo import scans as nucleo_scans
 from executar import afirmar
 
 
@@ -44,7 +45,7 @@ def teste_repack_pacote_hub_preservado():
     with zipfile.ZipFile(arq, "w") as zh:
         zh.writestr("biblioteca.json", json.dumps({"jogos": []}))
     afirmar(RP.eh_pacote_hub(arq))
-    ana = core.analisar_arquivo(str(arq))
+    ana = nucleo_scans.analisar_arquivo(str(arq))
     afirmar(ana["tipo"] == "pacote", ana)
 
 
@@ -168,7 +169,7 @@ def teste_repack_import_ponta_a_ponta():
     tmp = Path(tempfile.mkdtemp(prefix="suite-rp-"))
     arq = _repack_zip(tmp)
     dest_root = tmp / "piratas"
-    con = core.get_db(tmp / "r.db")
+    con = nucleo_banco.get_db(tmp / "r.db")
     try:
         r = RP.importar_repack(con, arq, destino_raiz=dest_root)
         afirmar(r.get("ok"), r)
@@ -179,7 +180,7 @@ def teste_repack_import_ponta_a_ponta():
         quar = Path(r["pasta"]) / ".hub-lixo" / "setup_coolgame.exe"
         afirmar(quar.is_file(), "setup devia ir p/ quarentena, não sumir")
         afirmar(r["capa_pendente"] is True, r)
-        jogos = core.listar_jogos(con, q="Cool Game")
+        jogos = nucleo_banco.listar_jogos(con, q="Cool Game")
         afirmar(len(jogos) == 1 and jogos[0]["origem"] == "repack", jogos)
         arq2 = _repack_zip(tmp, "outro.zip")
         r2 = RP.importar_repack(con, arq2, destino_raiz=dest_root)
@@ -195,7 +196,7 @@ def teste_repack_capa_automatica_padrao():
     from bib_nucleo import scans as S
     tmp = Path(tempfile.mkdtemp(prefix="suite-rp-"))
     arq = _repack_zip(tmp, "auto.zip")
-    con = core.get_db(tmp / "a.db")
+    con = nucleo_banco.get_db(tmp / "a.db")
     orig_appid, orig_capa = S._appid_steam_por_titulo, S._capa_steam
     orig_salvar = B.salvar_capa_bytes
     S._appid_steam_por_titulo = lambda t, timeout=15: "123"
@@ -209,7 +210,7 @@ def teste_repack_capa_automatica_padrao():
         S._appid_steam_por_titulo, S._capa_steam = orig_appid, orig_capa
         B.salvar_capa_bytes = orig_salvar
         con.close()
-    con = core.get_db(tmp / "b.db")
+    con = nucleo_banco.get_db(tmp / "b.db")
     S._appid_steam_por_titulo = lambda t, timeout=15: (_ for _ in ()).throw(
         OSError("rede-x"))
     try:
@@ -295,13 +296,13 @@ def teste_repack_7z_ausente_orienta():
     try:
         r = RP.extrair_arquivo(arq, tmp / "out")
         afirmar(not r.get("ok") and "BIBLIOTECA_7Z" in r["erro"], r)
-        ana = core.analisar_arquivo(str(arq))
+        ana = nucleo_scans.analisar_arquivo(str(arq))
         afirmar(ana["tipo"] == "arquivo-jogo", ana)
         iso = tmp / "jogo.iso"
         iso.write_bytes(b"ISO")
-        ana = core.analisar_arquivo(str(iso))
+        ana = nucleo_scans.analisar_arquivo(str(iso))
         afirmar(ana["tipo"] == "arquivo-jogo", ana)
-        ana = core.analisar_arquivo(str(tmp / "sumiu.rar"))
+        ana = nucleo_scans.analisar_arquivo(str(tmp / "sumiu.rar"))
         afirmar(ana["tipo"] == "desconhecido", ana)
     finally:
         if velho is None:
@@ -339,7 +340,6 @@ def teste_sanear_pasta_acha_e_limpa():
     afirmar((so_setup / "setup_jogo.exe").is_file(), "setup sumiu!")
     res = RP.sanear_pasta(tmp / "sumiu")
     afirmar(not res.get("ok"), res)
-    afirmar("sanear_pasta" in core.__all__)
 
 
 def teste_sanear_preserva_instaladores_e_redist_distinto():
@@ -427,7 +427,7 @@ def teste_repack_nome_canonico_e_capa():
         def __exit__(self, *a):
             return False
 
-    con = core.get_db(tmp / "c.db")
+    con = nucleo_banco.get_db(tmp / "c.db")
     orig_open, orig_capa = urllib.request.urlopen, S._capa_steam
     orig_appid = S._appid_steam_por_titulo
     orig_salvar_b, orig_salvar_s = B.salvar_capa_bytes, S.salvar_capa_bytes
@@ -469,7 +469,7 @@ def teste_pacotes_lista_prepara_importa_sem_apagar_archive():
     (setup / "setup.exe").write_bytes(b"MZ-setup")
     (destino / "outro.rar").write_bytes(b"Rar!")
     (destino / "assets").mkdir()
-    con = core.get_db(tmp / "p.db")
+    con = nucleo_banco.get_db(tmp / "p.db")
     try:
         with patch.dict(os.environ, {"BIBLIOTECA_JOGOS_DIR": str(destino)}), \
                 patch.object(RP, "ferramenta_7z", return_value=None), \
@@ -515,14 +515,14 @@ def teste_importar_pasta_escolhida_preserva_dados_e_capa():
         alvo.parent.mkdir(parents=True, exist_ok=True)
         alvo.write_bytes(data)
     (pasta / "setup.exe").write_bytes(b"installer")
-    con = core.get_db(tmp / "p.db")
+    con = nucleo_banco.get_db(tmp / "p.db")
     try:
         with patch.object(S, "canonizar_steam", return_value=("123", "Jogo canônico")), \
                 patch.object(RP, "_capa_automatica", return_value=True) as capa:
             imp = RP.importar_pasta(con, pasta, str(exe))
             afirmar(imp["ok"] and imp["novos"] == 1 and imp["capa_auto"], imp)
             afirmar(not imp["capa_pendente"] and "capa Steam" in " ".join(imp["avisos"]), imp)
-            jogos = core.listar_jogos(con)
+            jogos = nucleo_banco.listar_jogos(con)
             afirmar(len(jogos) == 1 and jogos[0]["titulo"] == "Jogo canônico", jogos)
             afirmar(jogos[0]["object_id"] == "123" and capa.call_args.args[1] == jogos[0]["id"])
         afirmar(exe.read_bytes().startswith(b"MZ"))
@@ -546,7 +546,7 @@ def teste_importar_pasta_exe_externo_e_falha_preservam_instaladores():
     instalado = tmp / "instalado/Jogo.exe"
     instalado.parent.mkdir()
     instalado.write_bytes(b"MZ-game")
-    con = core.get_db(tmp / "p.db")
+    con = nucleo_banco.get_db(tmp / "p.db")
     try:
         imp = RP.importar_pasta(con, pasta)
         afirmar(not imp["ok"] and imp["precisa_instalar"], imp)
@@ -617,4 +617,3 @@ def teste_repack_pasta_jogos_env_legado_e_migracao():
             afirmar(RP.pasta_jogos() == base / "Piratas", "pasta antiga existente é mantida")
             (base / "Meus Jogos Locais").mkdir()
             afirmar(RP.pasta_jogos() == base / "Meus Jogos Locais", "pasta nova existente vence")
-            afirmar(RP.pasta_piratas() == RP.pasta_jogos(), "alias legado aponta para a mesma pasta")

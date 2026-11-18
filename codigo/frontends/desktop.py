@@ -1,8 +1,7 @@
 """Frontend desktop pelo checkout: abre a interface Electron.
 
-Usuário final usa o instalador (TucoTeca-Setup-*.exe); este módulo serve o
-checkout de desenvolvimento (TucoTeca.bat / abrir_hub.py). A TUI curses
-(app_tui.py) continua disponível para Linux/macOS.
+Usuário final usa o instalador (Windows) ou o .dmg (macOS); este módulo serve
+o checkout de desenvolvimento (TucoTeca.bat / abrir_hub.py) em qualquer SO.
 """
 from __future__ import annotations
 

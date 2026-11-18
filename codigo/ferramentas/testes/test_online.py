@@ -4,8 +4,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import bib_core as core
-from bib_nucleo import capas, online
+from bib_nucleo import banco, base, capas, online
 from executar import afirmar
 
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1sAAAAASUVORK5CYII=")
@@ -110,16 +109,16 @@ def teste_imagem_cache_rejeita_html_e_capas_album_preservam_aspecto():
         else:
             raise AssertionError("publicou HTML como capa")
     db = Path(tempfile.mkdtemp()) / "mus.db"
-    con = core.get_db(db)
+    con = banco.get_db(db)
     try:
-        m = core.criar_musica(con, {"titulo": "Faixa", "musica_sha": "a" * 64})
-        r = core.salvar_capa_musica_bytes(con, m["id"], "album.png", PNG)
+        m = banco.criar_musica(con, {"titulo": "Faixa", "musica_sha": "a" * 64})
+        r = banco.salvar_capa_musica_bytes(con, m["id"], "album.png", PNG)
         afirmar(r["ok"], r)
         try:
             from PIL import Image
         except ImportError:
             return
-        with Image.open(core.CAPAS_DIR / r["capa"]) as img:
+        with Image.open(base.CAPAS_DIR / r["capa"]) as img:
             afirmar(img.width == img.height, "capa de álbum ganhou moldura retrato de jogo")
     finally:
         con.close()

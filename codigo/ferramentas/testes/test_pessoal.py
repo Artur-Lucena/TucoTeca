@@ -10,11 +10,11 @@ from executar import afirmar
 
 
 def _base():
-    import bib_core as core
+    from bib_nucleo import banco
     from servicos_ui import ServicoBiblioteca
     raiz = Path(tempfile.mkdtemp())
-    con = core.get_db(raiz / "b.db")
-    jogo = core.criar_jogo(con, {"titulo": "Aventura", "favorito": True})
+    con = banco.get_db(raiz / "b.db")
+    jogo = banco.criar_jogo(con, {"titulo": "Aventura", "favorito": True})
     con.close()
     return raiz, jogo, ServicoBiblioteca(raiz / "b.db")
 
@@ -226,7 +226,7 @@ def teste_modo_aviao_bloqueia_entradas_remotas_sem_chamar_transporte():
                 afirmar("BIBLIOTECA_REDE" in str(e), e)
             else:
                 raise AssertionError("ação remota não recusou modo avião")
-        afirmar(not fontes.abrir_url("https://steamrip.com/")["ok"])
+        afirmar(fontes.buscar_steamrip("x")["erros"])
         afirmar(scans.canonizar_steam("Teste") == ("", ""))
         afirmar(musicas.capa_album_url("A", "B", "C") == "")
         for consultar in (emuladores.azahar_release_info, emuladores.desmume_release_info):
@@ -244,10 +244,10 @@ def teste_sessao_manual_idempotente_se_apagar_marcador_falhar():
     afirmar(r["ok"] and r["somado"] == 2.5 and marcador.is_file(), r)
     repetido = S.encerrar_sessao_manual(str(marcador), 2.5, db_path=svc.db_path)
     afirmar(repetido["ok"] and repetido["somado"] == 0 and not marcador.exists(), repetido)
-    import bib_core as core
-    con = core.get_db(svc.db_path)
+    from bib_nucleo import banco
+    con = banco.get_db(svc.db_path)
     try:
-        afirmar(core.listar_jogos(con)[0]["horas"] == 2.5)
+        afirmar(banco.listar_jogos(con)[0]["horas"] == 2.5)
         afirmar(estatisticas.resumo_ano(con)["total_horas"] == 2.5)
     finally:
         con.close()

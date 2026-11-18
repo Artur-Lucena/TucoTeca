@@ -111,34 +111,6 @@ def qbit_preparar_perfil() -> Path:
     return cfg
 
 
-def qbit_adicionar(url: str) -> dict:
-    """Adiciona magnet/URL ao qBittorrent do Hub, sempre com destino Meus Jogos Locais/.
-
-    Nunca entrega ao cliente do SO (era assim que jogos caíam fora de Meus Jogos Locais).
-    Exige o cliente do Hub ligado (Downloads → Iniciar cliente).
-    """
-    url = (url or "").strip()
-    if not url.startswith("magnet:?") and not url.startswith("https://"):
-        return {"ok": False, "erro": "Link de torrent inválido."}
-    try:
-        if not qbit_api_url():
-            return {"ok": False,
-                    "erro": "Inicie o qBittorrent do Hub primeiro (Downloads → Iniciar cliente)."}
-    except ValueError as e:
-        return {"ok": False, "erro": str(e)}
-    from bib_nucleo.rede.repacks import pasta_jogos
-    destino = pasta_jogos().resolve()
-    try:
-        destino.mkdir(parents=True, exist_ok=True)
-        resposta = qbit_request("torrents/add", {"urls": url, "savepath": str(destino),
-                                                 "autoTMM": "false", "category": "tucoteca", "tags": "tucoteca"})
-        if resposta.strip() not in ("", "Ok."):
-            raise ValueError("O cliente recusou o torrent: " + resposta[:120])
-    except Exception as e:
-        return {"ok": False, "erro": f"qBittorrent do Hub: {e}"}
-    return {"ok": True, "destino": str(destino)}
-
-
 def qbit_iniciar(url: str = "") -> dict:
     """Inicia/encaminha ao perfil do Hub; não modifica o perfil do sistema."""
     exe = localizar_ferramenta("qbittorrent")
@@ -202,5 +174,4 @@ def qbit_controlar(hash_torrent: str, acao: str) -> dict:
 
 
 __all__ = ["perfil_qbit", "qbit_config_path", "qbit_backup_local", "qbit_porta",
-           "qbit_api_url", "qbit_iniciar", "qbit_listar", "qbit_controlar", "qbit_preparar_perfil",
-           "qbit_adicionar", "migrar_save_path"]
+           "qbit_api_url", "qbit_iniciar", "qbit_listar", "qbit_controlar", "qbit_preparar_perfil", "migrar_save_path"]

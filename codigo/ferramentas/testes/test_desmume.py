@@ -3,8 +3,10 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-import bib_core as core
 from bib_nucleo import emuladores as EMU
+from bib_nucleo import emuladores as nucleo_emuladores
+from bib_nucleo import scans
+from bib_nucleo.emuladores import provedores
 from executar import afirmar
 
 
@@ -24,7 +26,7 @@ def _rom_nds(d, nome="Jogo Teste.nds", titulo="JOGO TESTE", code=b"ATCE",
 
 
 def teste_spec_desmume():
-    provs = core.provedores()
+    provs = provedores()
     afirmar(set(provs) == {"azahar", "desmume"}, set(provs))
     dm = provs["desmume"]
     afirmar(dm["origem"] == "rom-nds" and dm["origens"] == ("rom-nds",), dm)
@@ -38,7 +40,7 @@ def teste_spec_desmume():
 def teste_analisar_nds():
     tmp = Path(tempfile.mkdtemp(prefix="suite-dm-"))
     rom = _rom_nds(tmp)
-    ana = core.analisar_arquivo(str(rom))
+    ana = scans.analisar_arquivo(str(rom))
     afirmar(ana["tipo"] == "rom" and ana["provedor"] == "desmume", ana)
     afirmar(ana["item"]["origem"] == "rom-nds", ana["item"])
     afirmar(ana["item"]["titulo"] == "Test Game EN", ana["item"])
@@ -49,7 +51,7 @@ def teste_scan_nds():
     tmp = Path(tempfile.mkdtemp(prefix="suite-ds-"))
     _rom_nds(tmp, "a.nds", nome_en="Alfa")
     _rom_nds(tmp, "b.nds", nome_en="Beta", code=b"BJPJ")
-    achados, info = core.scan_roms([str(tmp)], emu_exe="EMU", retornar_info=True,
+    achados, info = scans.scan_roms([str(tmp)], emu_exe="EMU", retornar_info=True,
                                    prov_chave="desmume")
     afirmar(len(achados) == 2, achados)
     afirmar(all(a["origem"] == "rom-nds" and a["executable_path"] == "EMU" for a in achados))
@@ -60,17 +62,17 @@ def teste_fundir_nds_separa_variantes():
     a = {"titulo": "Z", "executable_path": "e", "origem": "rom-nds",
          "rom_path": "/r/a.nds", "shop": "", "object_id": "", "horas": 0.0}
     b = dict(a, rom_path="/r/b.nds")
-    r = core.fundir_duplicados([a, b])
+    r = scans.fundir_duplicados([a, b])
     afirmar(len(r) == 2, r)
     c = dict(a, rom_path="/r/a.nds")
-    r = core.fundir_duplicados([a, c])
+    r = scans.fundir_duplicados([a, c])
     afirmar(len(r) == 1, r)
 
 
 def teste_preparar_nds_sem_aviso_cripto():
     tmp = Path(tempfile.mkdtemp(prefix="suite-dp-"))
     rom = _rom_nds(tmp)
-    r = core.preparar_lancamento({"origem": "rom-nds", "launch_options": str(rom),
+    r = nucleo_emuladores.preparar_lancamento({"origem": "rom-nds", "launch_options": str(rom),
                                   "azahar_preset": "inexistente"})
     afirmar(r["preset_aplicado"] is None and r["aviso"] is not None
             and "aes_keys" not in (r["aviso"] or ""), r)
@@ -104,7 +106,7 @@ def teste_instalar_desmume_fake():
 def teste_preview_pasta_inclui_nds():
     tmp = Path(tempfile.mkdtemp(prefix="suite-dq-"))
     _rom_nds(tmp, "z.nds", nome_en="Zeta NDS")
-    _roots, itens, info = core.preview_pasta([str(tmp)])
+    _roots, itens, info = scans.preview_pasta([str(tmp)])
     achou = [i for i in itens if i.get("origem") == "rom-nds"]
     afirmar(len(achou) == 1 and achou[0]["titulo"] == "Zeta NDS", achados_str(itens))
     afirmar("emu_nds" in info, info)
@@ -113,48 +115,14 @@ def teste_preview_pasta_inclui_nds():
 def teste_score_rom_nds_igual_3ds():
     tmp = Path(tempfile.mkdtemp(prefix="suite-dw-"))
     rom = _rom_nds(tmp, "s.nds", nome_en="Score")
-    a = core.pontuar({"titulo": "S", "executable_path": "e", "shop": "",
+    a = scans.pontuar({"titulo": "S", "executable_path": "e", "shop": "",
                       "object_id": "", "horas": 0.0, "origem": "rom-nds",
                       "rom_path": str(rom), "tem_metadados": True})
-    b = core.pontuar({"titulo": "S", "executable_path": "e", "shop": "",
+    b = scans.pontuar({"titulo": "S", "executable_path": "e", "shop": "",
                       "object_id": "", "horas": 0.0, "origem": "rom-3ds",
                       "rom_path": str(rom), "tem_metadados": True})
     afirmar(a["score"] == b["score"] == 0.6, (a["score"], b["score"]))
     afirmar("ROM existe neste SO" in a["motivos"], a["motivos"])
-
-
-def teste_tui_mostra_nds():
-    import app_tui as tui
-
-    class FakeScr:
-        def getmaxyx(self):
-            return (24, 80)
-
-        def addnstr(self, *a):
-            pass
-
-        def erase(self):
-            pass
-
-        def refresh(self):
-            pass
-
-        def getch(self):
-            return ord("q")
-
-    class FakeCurses:
-        COLOR_CYAN = COLOR_BLACK = COLOR_GREEN = COLOR_RED = 1
-
-        def curs_set(self, *a):
-            pass
-
-        def has_colors(self):
-            return False
-
-    tui.curses = FakeCurses()
-    tmp = Path(tempfile.mkdtemp(prefix="suite-dt-"))
-    t = tui.Tui(FakeScr(), tmp / "u.db")
-    t.desenhar()  # não pode levantar (status NDS incluso)
 
 
 def achados_str(itens):

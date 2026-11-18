@@ -736,7 +736,7 @@ def xinput_para_sdl(bit: int) -> int | None:
 
 
 def resumir_estado(estado: dict | None) -> str:
-    """Uma linha legível do estado (viewer TUI/GUI)."""
+    """Uma linha legível do estado do controle."""
     if not estado:
         return "—"
     partes = [XINPUT_NOMES.get(b, f"b{b}") for b in sorted(estado["botoes"])]

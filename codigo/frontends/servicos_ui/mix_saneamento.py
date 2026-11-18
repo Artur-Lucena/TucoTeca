@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import pacotes
+from bib_nucleo.rede import repacks
 
 
 class MixSaneamento:
@@ -58,15 +59,15 @@ class MixSaneamento:
         return r
 
     def organizar_download(self, caminho):
-        core.fazer_backup(self.db_path)
-        r = core.organizar_no_destino(caminho)
+        pacotes.fazer_backup(self.db_path)
+        r = repacks.organizar_no_destino(caminho)
         if not r.get("ok"):
             raise ValueError(r.get("erro", "Não foi possível organizar."))
         return r
 
     def fora_do_destino(self, caminho):
         try:
-            return bool(caminho) and not core.dentro_do_destino(caminho)
+            return bool(caminho) and not repacks.dentro_do_destino(caminho)
         except (OSError, ValueError):
             return False
 

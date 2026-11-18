@@ -5,8 +5,8 @@ import threading
 from contextlib import closing
 from pathlib import Path
 
-import bib_core as core
-from bib_nucleo import conquistas, spotify
+from bib_nucleo import banco as nucleo_banco
+from bib_nucleo import base, conquistas, emuladores, pacotes, spotify
 
 from .integracoes import integracoes_padrao
 from .sistema import busca_global, capa_url, resumo_sistema, saude_colecao
@@ -23,24 +23,24 @@ class MixNucleo:
 
     def snapshot(self, partes=None):
         """Coleção para o desktop. `partes` limita as listas devolvidas (o
-        `sistema` vem sempre); sem `partes`, tudo — como a TUI e os testes usam."""
+        `sistema` vem sempre); sem `partes`, tudo — como os testes usam."""
         from bib_nucleo.preferencias_pessoais import aplicar_perfil
         pedidas = set(self.PARTES if partes is None else partes)
         saida = {}
-        with closing(core.get_db(self.db_path)) as con:
-            jogos = aplicar_perfil(core.listar_jogos(con))
-            musicas = core.listar_musicas(con)
-            desejos = core.listar_desejos(con)
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
+            jogos = aplicar_perfil(nucleo_banco.listar_jogos(con))
+            musicas = nucleo_banco.listar_musicas(con)
+            desejos = nucleo_banco.listar_desejos(con)
             if "fila_musicas" in pedidas:
-                saida["fila_musicas"] = core.listar_downloads(con)
+                saida["fila_musicas"] = nucleo_banco.listar_downloads(con)
             if "videos" in pedidas:
-                saida["videos"] = core.listar_videos(con)
+                saida["videos"] = nucleo_banco.listar_videos(con)
             if "colecoes" in pedidas:
                 from bib_nucleo.banco.colecoes import listar_colecoes
                 saida["colecoes"] = listar_colecoes(con)
         if "jogos" in pedidas:
             for j in jogos:
-                j.update(capa_url=capa_url(j.get("capa")), plataforma=core.plataforma_jogo(j))
+                j.update(capa_url=capa_url(j.get("capa")), plataforma=nucleo_banco.plataforma_jogo(j))
             saida["jogos"] = jogos
         if "musicas" in pedidas:
             for m in musicas:
@@ -51,27 +51,27 @@ class MixNucleo:
         sistema = resumo_sistema(jogos, musicas, desejos)
         for r in sistema["recentes"]:
             r.setdefault("capa_url", capa_url(r.get("capa")))
-            r.setdefault("plataforma", core.plataforma_jogo(r))
+            r.setdefault("plataforma", nucleo_banco.plataforma_jogo(r))
         saida["sistema"] = sistema
         return saida
 
     def revisao(self):
         """Contadores por categoria (triggers do banco): mudou → recarregar."""
         from bib_nucleo.banco._infra import ler_revisoes
-        with closing(core.get_db(self.db_path)) as con:
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
             return ler_revisoes(con)
 
     def jogo(self, gid):
-        with closing(core.get_db(self.db_path)) as con:
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
             row = con.execute("SELECT * FROM jogos WHERE id=?", (int(gid),)).fetchone()
             if row is None:
                 raise LookupError("O jogo não está mais na biblioteca.")
-            return core.row_to_dict(row)
+            return nucleo_banco.row_to_dict(row)
 
     def alterar(self, operacao):
         with self._escrita:
-            core.fazer_backup(self.db_path)
-            with closing(core.get_db(self.db_path)) as con:
+            pacotes.fazer_backup(self.db_path)
+            with closing(nucleo_banco.get_db(self.db_path)) as con:
                 return operacao(con)
 
     def salvar_jogo(self, gid, dados, sincronizar=False):
@@ -80,8 +80,8 @@ class MixNucleo:
         dados = {k: v for k, v in (dados or {}).items() if k in permitido}
         if "nota" in dados and (dados["nota"] == "" or dados["nota"] is None):
             dados["nota"] = None
-        resultado = self.alterar(lambda con: core.atualizar_jogo(con, gid, dados) if gid
-                                 else core.criar_jogo(con, dados))
+        resultado = self.alterar(lambda con: nucleo_banco.atualizar_jogo(con, gid, dados) if gid
+                                 else nucleo_banco.criar_jogo(con, dados))
         if sincronizar and not gid:
             novo_id = resultado.get("id") if isinstance(resultado, dict) else None
             if novo_id:
@@ -96,7 +96,7 @@ class MixNucleo:
             return self.jogo(ident)
         if categoria != "musicas":
             raise ValueError("Categoria de capas inválida.")
-        with closing(core.get_db(self.db_path)) as con:
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
             row = con.execute("SELECT * FROM musicas WHERE id=?", (int(ident),)).fetchone()
         if row is None:
             raise LookupError("Música não encontrada.")
@@ -105,12 +105,12 @@ class MixNucleo:
     def salvar_observacoes(self, gid, texto):
         """Notas/diário do jogo (campo `observacoes`, sem migração)."""
         texto = str(texto or "")[:4000]
-        return self.alterar(lambda con: core.atualizar_jogo(con, gid, {"observacoes": texto}))
+        return self.alterar(lambda con: nucleo_banco.atualizar_jogo(con, gid, {"observacoes": texto}))
 
     def excluir(self, categoria, ident):
-        funcoes = {"jogos": core.excluir_jogo, "desejos": core.remover_desejo,
-                   "musicas": core.excluir_musica,
-                   "videos": core.excluir_video}
+        funcoes = {"jogos": nucleo_banco.excluir_jogo, "desejos": nucleo_banco.remover_desejo,
+                   "musicas": nucleo_banco.excluir_musica,
+                   "videos": nucleo_banco.excluir_video}
         if categoria not in funcoes:
             raise ValueError("Esta categoria não permite exclusão pela biblioteca.")
         if categoria == "musicas":
@@ -145,12 +145,12 @@ class MixNucleo:
             return {"ok": True}
 
     def saude(self):
-        with closing(core.get_db(self.db_path)) as con:
-            jogos = core.listar_jogos(con)
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
+            jogos = nucleo_banco.listar_jogos(con)
         return saude_colecao(jogos)
 
     def backups(self, manter=10):
-        arqs = sorted(core.BACKUP_DIR.glob("biblioteca-*.db"),
+        arqs = sorted(base.BACKUP_DIR.glob("biblioteca-*.db"),
                       key=lambda p: p.name, reverse=True)[:manter]
         return [{"nome": p.name, "bytes": p.stat().st_size if p.is_file() else 0}
                 for p in arqs]
@@ -158,18 +158,18 @@ class MixNucleo:
     def fazer_backup_agora(self):
         """Backup manual da coleção (SQLite + JSON), com a mesma poda do automático."""
         with self._escrita:
-            r = core.fazer_backup(self.db_path)
+            r = pacotes.fazer_backup(self.db_path)
         return {"ok": True, "db": Path(r["db"]).name, "jogos": r.get("jogos", 0)}
 
     def sessoes(self):
         try:
-            return core.listar_sessoes_pendentes()
+            return emuladores.listar_sessoes_pendentes()
         except Exception:
             return []
 
     def log_cauda(self, linhas=30):
         try:
-            alvo = core.DADOS_DIR / "erros.log"
+            alvo = base.DADOS_DIR / "erros.log"
             texto = alvo.read_text(encoding="utf-8", errors="replace").splitlines()
             return "\n".join(texto[-linhas:]) if texto else "Sem erros registrados."
         except Exception as e:
@@ -180,18 +180,18 @@ class MixNucleo:
         from datetime import datetime
         from pathlib import Path
         destino = Path(pasta) / f"tucoteca-{datetime.now():%Y%m%d-%H%M%S-%f}.zip"
-        return core.exportar_pacote(destino, self.db_path)
+        return pacotes.exportar_pacote(destino, self.db_path)
 
     def estatisticas(self):
         from bib_nucleo.estatisticas import resumo_ano
         from bib_nucleo.preferencias_pessoais import ler_preferencias
-        with closing(core.get_db(self.db_path)) as con:
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
             return resumo_ano(con, perfil=ler_preferencias()["ativo"])
 
     def disco_jogo(self, gid):
         from bib_nucleo.estatisticas import tamanho_pasta
         jogo = self.jogo(gid)
-        exe = Path(core.traduzir_para_atual(jogo.get("executable_path", "")))
+        exe = Path(base.traduzir_para_atual(jogo.get("executable_path", "")))
         if not exe.is_file():
             raise ValueError("Executável local não encontrado.")
         return tamanho_pasta(exe.parent)
@@ -200,12 +200,12 @@ class MixNucleo:
         """Paleta: lê só as tabelas (sem capas, disco nem resumo) e põe capa
         apenas nos resultados."""
         from bib_nucleo.preferencias_pessoais import aplicar_perfil
-        with closing(core.get_db(self.db_path)) as con:
-            jogos = aplicar_perfil(core.listar_jogos(con))
-            musicas = core.listar_musicas(con)
-            desejos = core.listar_desejos(con)
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
+            jogos = aplicar_perfil(nucleo_banco.listar_jogos(con))
+            musicas = nucleo_banco.listar_musicas(con)
+            desejos = nucleo_banco.listar_desejos(con)
         for j in jogos:
-            j["plataforma"] = core.plataforma_jogo(j)
+            j["plataforma"] = nucleo_banco.plataforma_jogo(j)
         capas = {("jogo", j["id"]): j.get("capa") for j in jogos}
         capas.update({("musica", m["id"]): m.get("musica_capa") for m in musicas})
         itens = busca_global(jogos, musicas, desejos, [], str(termo or ""), int(limite))

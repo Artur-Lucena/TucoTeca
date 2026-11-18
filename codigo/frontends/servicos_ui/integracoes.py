@@ -31,8 +31,8 @@ import urllib.parse
 from dataclasses import asdict, dataclass
 from typing import Callable
 
-import bib_core as core
-from bib_nucleo import online
+from bib_nucleo import base, online
+from bib_nucleo.rede import fontes
 
 
 @dataclass(frozen=True)
@@ -79,7 +79,7 @@ def _capacidades_para(tipo: str, tem_url: bool = False) -> tuple[str, ...]:
 
 
 def _arquivo_personalizadas():
-    return core.DADOS_DIR / "integracoes-usuario.json"
+    return base.DADOS_DIR / "integracoes-usuario.json"
 
 
 def carregar_personalizadas() -> list[dict]:
@@ -163,9 +163,9 @@ def integracoes_padrao():
     registro = RegistroIntegracoes()
     for item in (
         Integracao("steamrip", "SteamRip", "Pesquise o catálogo e abra a página do jogo.",
-                   "catalogo", "SR", "#62d4ad", core.buscar_steamrip, capacidades=("busca",)),
+                   "catalogo", "SR", "#62d4ad", fontes.buscar_steamrip, capacidades=("busca",)),
         Integracao("fitgirl", "FitGirl", "Descubra títulos no catálogo conectado.",
-                   "catalogo", "FG", "#b5a0ff", core.buscar_fitgirl, capacidades=("busca",)),
+                   "catalogo", "FG", "#b5a0ff", fontes.buscar_fitgirl, capacidades=("busca",)),
         Integracao("azahar", "Azahar", "Emulação 3DS, presets, mods e texturas.",
                    "emulador", "3D", "#f0bb77", capacidades=("emulador", "config")),
         Integracao("desmume", "DeSmuME", "Sua coleção Nintendo DS, no mesmo lugar.",

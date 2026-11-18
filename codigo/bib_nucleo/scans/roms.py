@@ -7,7 +7,7 @@ import os
 import re
 from pathlib import Path
 
-from bib_nucleo.base import LINUX_ROOT, WIN_ROOT
+from bib_nucleo.base import LINUX_ROOT, MAC_ROOT, WIN_ROOT, eh_mac
 from bib_nucleo.emuladores import (
     default_emu_3ds,
     default_emu_nds,
@@ -28,7 +28,7 @@ def default_roms_roots() -> list[str]:
     if os.name == "nt":
         base = WIN_ROOT.rstrip("\\")
         return [f"{base}\\Games\\Roms", f"{base}\\Games\\Roms\\3DS"]
-    base = LINUX_ROOT.rstrip("/")
+    base = (MAC_ROOT if eh_mac() else LINUX_ROOT).rstrip("/")
     return [f"{base}/Games/Roms", f"{base}/Games/Roms/3DS"]
 
 
@@ -125,7 +125,7 @@ def default_roms_nds_roots() -> list[str]:
         base = WIN_ROOT.rstrip("\\")
         return [f"{base}\\Games\\Roms", f"{base}\\Games\\Roms\\NDS",
                 f"{base}\\Games\\Roms NDs"]
-    base = LINUX_ROOT.rstrip("/")
+    base = (MAC_ROOT if eh_mac() else LINUX_ROOT).rstrip("/")
     return [f"{base}/Games/Roms", f"{base}/Games/Roms/NDS", f"{base}/Games/Roms NDs"]
 
 

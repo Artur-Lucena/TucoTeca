@@ -6,7 +6,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import banco as nucleo_banco
 from executar import afirmar
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -17,7 +17,7 @@ import empacotar_fontes as FONTES
 def teste_pacote_fontes_exclui_dados_e_inclui_arvore_atual():
     tmp = Path(tempfile.mkdtemp(prefix="suite-fontes-"))
     repo = tmp / "repo"
-    for nome in ("codigo/bib_core.py", "codigo/bib_nucleo/volume.py", "codigo/frontends/desktop.py",
+    for nome in ("codigo/bib_nucleo/__init__.py", "codigo/bib_nucleo/volume.py", "codigo/frontends/desktop.py",
                  "docs/ARQUITETURA.md", "dados/biblioteca.db", "dist/antigo.zip",
                  "codigo/historico/antigo.py", "codigo/ferramentas/.cache/segredo.py",
                  "codigo/__pycache__/x.pyc"):
@@ -45,8 +45,8 @@ def teste_diagnostico_banco_so_leitura():
     afirmar(DIAG.diagnosticar_banco(ausente)["estado"] == "ausente")
     afirmar(not ausente.exists(), "diagnóstico criou coleção vazia")
     db = tmp / "b.db"
-    con = core.get_db(db)
-    core.criar_jogo(con, {"titulo": "Teste"})
+    con = nucleo_banco.get_db(db)
+    nucleo_banco.criar_jogo(con, {"titulo": "Teste"})
     con.close()
     antes = db.read_bytes()
     resultado = DIAG.diagnosticar_banco(db)

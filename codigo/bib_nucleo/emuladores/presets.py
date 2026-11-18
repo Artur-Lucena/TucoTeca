@@ -58,11 +58,6 @@ def backup_saves_emu(chave: str, manter: int = 10) -> dict:
     return {"ok": True, "arquivo": str(dest), "arquivos": n}
 
 
-def backup_saves_azahar(manter: int = 10) -> dict:
-    """Zipa sdmc/ + states/ do Azahar em backups/. Retorna dict (sempre)."""
-    return backup_saves_emu("azahar", manter)
-
-
 # --------------------------------------------------------------------------
 # Presets por jogo do Azahar (mescla no qt-config.ini antes de lançar)
 # --------------------------------------------------------------------------
@@ -161,6 +156,6 @@ def aplicar_preset(nome: str, chave: str = "azahar") -> dict:
     return {"ok": True, "preset": alvo.stem, "config": str(cfg)}
 
 
-__all__ = ["_alvo_preset", "aplicar_preset", "backup_saves_azahar",
+__all__ = ["_alvo_preset", "aplicar_preset",
            "backup_saves_emu", "config_atual_emu", "listar_presets",
            "presets_dir", "presets_prov_dir", "salvar_preset_de_atual"]
