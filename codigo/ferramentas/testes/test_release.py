@@ -30,7 +30,7 @@ def _repo_falso(versao="1.2.0", pyproject="1.2.0", changelog=True) -> Path:
         "README.md": "TucoTeca", "LICENSE": "MIT",
         # está na lista explícita E sai na varredura de docs/ (regressão de duplicata)
         "docs/CONTRIBUTING.md": "# Colaboração",
-        "codigo/bib_core.py": "# núcleo",
+        "codigo/bib_nucleo/__init__.py": "# núcleo",
     }
     for nome, conteudo in arquivos.items():
         caminho = repo / nome
@@ -57,6 +57,23 @@ def _dist_falso(repo: Path, versao="1.2.0", runtime=True, extra: str | None = No
         (recursos / extra).parent.mkdir(parents=True, exist_ok=True)
         (recursos / extra).write_bytes(b"x")
     (dist / f"TucoTeca-Setup-{versao}-x64.exe").write_bytes(b"MZ instalador")
+    return dist
+
+
+def _mac_falso(repo: Path, versao="1.2.0", archs=("arm64", "x64")) -> Path:
+    """dist do Mac: .app por arquitetura (como o electron-builder) e as .dmg."""
+    dist = Path(tempfile.mkdtemp(prefix="suite-dist-mac-"))
+    for arch in archs:
+        plataforma = f"macos-{arch}"
+        recursos = dist / REL.RECURSOS[plataforma]
+        for nome in REL.ESSENCIAIS_APP:
+            (recursos / nome).parent.mkdir(parents=True, exist_ok=True)
+            (recursos / nome).write_text(versao + "\n" if nome == "codigo/VERSION" else "#", encoding="utf-8")
+        py = recursos / "programa" / plataforma / "python"
+        (py / "bin").mkdir(parents=True)
+        (py / "bin/python3").write_bytes(b"\xcf\xfa\xed\xfe")
+        (py / "TUCOTECA-RUNTIME.json").write_text('{"versao": "3.14.10"}', encoding="utf-8")
+        (dist / REL.dmg_mac(versao, arch)).write_bytes(b"dmg " + arch.encode())
     return dist
 
 
@@ -132,6 +149,34 @@ def teste_release_recusa_estado_pessoal_e_runtime_ausente():
     afirmar("Atenção" in (Path(r["saida"]) / "NOTAS-RELEASE.md").read_text(encoding="utf-8"))
 
 
+def teste_release_com_dmgs_conferidas_no_mac():
+    repo = _repo_falso()
+    dist = _dist_falso(repo)
+    mac = _mac_falso(repo)
+    c = REL.conferir_mac(SHA, repo=repo, dist=mac)
+    afirmar(set(c["dmgs"]) == {"TucoTeca-1.2.0-mac-arm64.dmg", "TucoTeca-1.2.0-mac-x64.dmg"}, c)
+    afirmar(c["dmgs"]["TucoTeca-1.2.0-mac-x64.dmg"]["python_versao"] == "3.14.10", c)
+    saida = repo / "dist/release/v1.2.0"
+    r = REL.preparar(SHA, saida, repo=repo, dist=dist, conferir_git=False, mac=mac)
+    afirmar({"TucoTeca-1.2.0-mac-arm64.dmg", "TucoTeca-1.2.0-mac-x64.dmg"} <= set(r["anexos"]), r)
+    release = json.loads((saida / "release.json").read_text(encoding="utf-8"))
+    afirmar(release["instaladores"]["TucoTeca-1.2.0-mac-arm64.dmg"]["plataforma"] == "macos-arm64", release)
+    afirmar("TucoTeca-1.2.0-mac-x64.dmg" in (saida / "SHA256SUMS.txt").read_text(encoding="utf-8"))
+    notas = (saida / "NOTAS-RELEASE.md").read_text(encoding="utf-8")
+    afirmar("Apple Silicon" in notas and "xattr" in notas and "SmartScreen" in notas, notas)
+    # .dmg trocada depois da conferência, ou conferência de outra revisão: recusa
+    (mac / "TucoTeca-1.2.0-mac-x64.dmg").write_bytes(b"outra")
+    afirmar("SHA-256" in _erro(REL.preparar, SHA, repo / "s1", repo=repo, dist=dist, conferir_git=False, mac=mac))
+    mac2 = _mac_falso(repo)
+    REL.conferir_mac("b" * 40, repo=repo, dist=mac2)
+    afirmar("conferência do Mac" in _erro(REL.preparar, SHA, repo / "s3", repo=repo, dist=dist,
+                                         conferir_git=False, mac=mac2))
+    # Mac sem Python embutido no .app
+    mac3 = _mac_falso(repo, archs=("arm64",))
+    (mac3 / REL.RECURSOS["macos-arm64"] / "programa/macos-arm64/python/bin/python3").unlink()
+    afirmar("Python embutido" in _erro(REL.conferir_mac, SHA, repo=repo, dist=mac3))
+
+
 def teste_release_nao_sobrescreve_e_exige_sha_completo():
     repo = _repo_falso()
     dist = _dist_falso(repo)
@@ -173,6 +218,36 @@ def teste_runtime_python_confere_hash_e_troca_pasta():
     afirmar(not (inseguro.parent / "fora.txt").exists())
 
 
+def teste_runtime_python_mac_extrai_install_only():
+    import io
+    import tarfile
+    tmp = Path(tempfile.mkdtemp(prefix="suite-runtime-mac-"))
+    pacote = tmp / "cpython-mac.tar.gz"
+    with tarfile.open(pacote, "w:gz") as tar:
+        for nome, dados in (("python/bin/python3", b"#!bin"), ("python/lib/python3.14/os.py", b"# os")):
+            info = tarfile.TarInfo(nome)
+            info.size = len(dados)
+            info.mode = 0o755
+            tar.addfile(info, io.BytesIO(dados))
+    sha = hashlib.sha256(pacote.read_bytes()).hexdigest()
+    destino = tmp / "programa/macos-arm64/python"
+    r = RUNTIME.instalar(pacote, destino, sha256=sha, plataforma="macos-arm64")
+    afirmar(r["ok"] and (destino / "bin" / "python3").is_file(), r)
+    afirmar((destino / "lib/python3.14/os.py").is_file(), "lib não veio para a raiz do runtime")
+    marca = json.loads((destino / RUNTIME.MARCADOR).read_text(encoding="utf-8"))
+    afirmar(marca["plataforma"] == "macos-arm64" and marca["sha256_zip"] == sha, marca)
+    # pacote fora do formato install_only (sem a pasta python/) é recusado
+    torto = tmp / "torto.tar.gz"
+    with tarfile.open(torto, "w:gz") as tar:
+        info = tarfile.TarInfo("bin/python3")
+        info.size = 1
+        tar.addfile(info, io.BytesIO(b"x"))
+    afirmar("install_only" in _erro(RUNTIME.instalar, torto, tmp / "py", plataforma="macos-x64",
+                                    sha256=hashlib.sha256(torto.read_bytes()).hexdigest()))
+    afirmar(RUNTIME.PLATAFORMAS["macos-x64"]["url"].endswith("x86_64-apple-darwin-install_only.tar.gz"))
+    afirmar(all(len(p["sha256"]) == 64 for p in RUNTIME.PLATAFORMAS.values()))
+
+
 def teste_versoes_do_repositorio_coerentes():
     """O próprio checkout precisa passar no gate de versão do preparador."""
     versao = REL.ler_versao(REL.REPO)
@@ -181,14 +256,64 @@ def teste_versoes_do_repositorio_coerentes():
 
 def teste_icone_ico_valido_e_reproduzivel():
     destino = Path(tempfile.mkdtemp(prefix="suite-icone-"))
-    [ico] = ICONE.gerar(destino)
+    [ico] = ICONE.gerar(destino, mac=False)
+    # o .icns versionado: estrutura aqui, pixels mais abaixo (regerar o de 1024 px
+    # em Python puro passa de 2 min num runner lento)
+    cru = (REL.REPO / "codigo/frontends/electron/resources/icon.icns").read_bytes()
+    afirmar(cru[:4] == b"icns" and int.from_bytes(cru[4:8], "big") == len(cru), "cabeçalho ICNS")
+    tipos, pos = [], 8
+    while pos < len(cru):
+        tipos.append(cru[pos:pos + 4].decode("ascii"))
+        afirmar(cru[pos + 8:pos + 16] == b"\x89PNG\r\n\x1a\n", "entrada ICNS sem PNG")
+        pos += int.from_bytes(cru[pos + 4:pos + 8], "big")
+    afirmar(pos == len(cru) and tipos == [t for t, _ in ICONE.ICNS_TIPOS], tipos)
     dados = ico.read_bytes()
     afirmar(dados[:4] == b"\0\0\1\0", "cabeçalho ICO")
     afirmar(int.from_bytes(dados[4:6], "little") == len(ICONE.TAMANHOS))
     afirmar(b"\x89PNG" in dados)
-    afirmar(ICONE.gerar(destino)[0].read_bytes() == dados, "ícone não é reproduzível")
-    versionado = REL.REPO / "codigo/frontends/electron/resources/icon.ico"
-    afirmar(versionado.read_bytes() == dados, "icon.ico versionado difere do gerador")
+    afirmar(ICONE.gerar(destino, mac=False)[0].read_bytes() == dados, "ícone não é reproduzível")
+    # versionados: mesmos pixels do gerador (os bytes do PNG dependem do zlib do SO)
+    recursos = REL.REPO / "codigo/frontends/electron/resources"
+    pngs_ico = _pngs_ico((recursos / "icon.ico").read_bytes())
+    afirmar(sorted(pngs_ico) == sorted(ICONE.TAMANHOS), sorted(pngs_ico))
+    for lado in (16, 48, 256):
+        afirmar(pngs_ico[lado] == ICONE.renderizar(lado), f"icon.ico {lado}px difere do gerador")
+    pngs_icns = _pngs_icns((recursos / "icon.icns").read_bytes())
+    for tipo, lado in (("ic11", 32), ("ic07", 128)):
+        afirmar(pngs_icns[tipo] == ICONE.renderizar(lado, 4, ICONE._pixel_mac),
+                f"icon.icns {tipo} difere do gerador")
+
+
+def _pixels_png(png: bytes) -> bytes:
+    """Linhas cruas (filtro + RGBA) de um PNG de um bloco IDAT, como o gerador escreve."""
+    import zlib
+    pos, idat = 8, b""
+    while pos < len(png):
+        n = int.from_bytes(png[pos:pos + 4], "big")
+        if png[pos + 4:pos + 8] == b"IDAT":
+            idat += png[pos + 8:pos + 8 + n]
+        pos += 12 + n
+    return zlib.decompress(idat)
+
+
+def _pngs_ico(dados: bytes) -> dict:
+    n = int.from_bytes(dados[4:6], "little")
+    saida = {}
+    for i in range(n):
+        ent = dados[6 + 16 * i:22 + 16 * i]
+        lado = ent[0] or 256
+        tam, desl = int.from_bytes(ent[8:12], "little"), int.from_bytes(ent[12:16], "little")
+        saida[lado] = _pixels_png(dados[desl:desl + tam])
+    return saida
+
+
+def _pngs_icns(dados: bytes) -> dict:
+    saida, pos = {}, 8
+    while pos < len(dados):
+        n = int.from_bytes(dados[pos + 4:pos + 8], "big")
+        saida[dados[pos:pos + 4].decode("ascii")] = _pixels_png(dados[pos + 8:pos + n])
+        pos += n
+    return saida
 
 
 def teste_fontes_incluem_electron_sem_artefatos():

@@ -3,58 +3,59 @@ import tempfile
 import urllib.request
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import banco, base, pacotes
 from bib_nucleo import scans as SC
+from bib_nucleo import scans as nucleo_scans
 from executar import afirmar
 
 
 def _nova_db(nome="d.db"):
     tmp = Path(tempfile.mkdtemp(prefix="suite-d-"))
     db = tmp / nome
-    return core.get_db(db), tmp
+    return banco.get_db(db), tmp
 
 
 def teste_etiquetas_normaliza():
-    afirmar(core.normalizar_etiquetas("RPG, rpg;  Acao ") == "Acao, RPG")
-    afirmar(core.normalizar_etiquetas("") == "")
-    afirmar(core.normalizar_etiquetas(None) == "")
+    afirmar(banco.normalizar_etiquetas("RPG, rpg;  Acao ") == "Acao, RPG")
+    afirmar(banco.normalizar_etiquetas("") == "")
+    afirmar(banco.normalizar_etiquetas(None) == "")
     longa = "x" * 50
-    afirmar(len(core.normalizar_etiquetas(longa).split(", ")[0]) == 30)
+    afirmar(len(banco.normalizar_etiquetas(longa).split(", ")[0]) == 30)
     muitas = ", ".join(f"t{i}" for i in range(30))
-    afirmar(len(core.normalizar_etiquetas(muitas).split(", ")) == 20)
-    afirmar(core.etiquetas_de({"etiquetas": "b, A"}) == ["A", "b"])
-    afirmar(core.etiquetas_de({}) == [])
-    afirmar(core.plataforma_de_origem("rom-3ds") == "3DS")
-    afirmar(core.plataforma_de_origem("rom-nds") == "NDS")
-    afirmar(core.plataforma_de_origem("manual") == "PC")
+    afirmar(len(banco.normalizar_etiquetas(muitas).split(", ")) == 20)
+    afirmar(banco.etiquetas_de({"etiquetas": "b, A"}) == ["A", "b"])
+    afirmar(banco.etiquetas_de({}) == [])
+    afirmar(banco.plataforma_de_origem("rom-3ds") == "3DS")
+    afirmar(banco.plataforma_de_origem("rom-nds") == "NDS")
+    afirmar(banco.plataforma_de_origem("manual") == "PC")
 
 
 def teste_etiquetas_crud():
     con, _tmp = _nova_db()
     try:
-        g = core.criar_jogo(con, {"titulo": "E", "executable_path": "",
+        g = banco.criar_jogo(con, {"titulo": "E", "executable_path": "",
                                   "status": "backlog", "etiquetas": "rpg, Souls"})
         afirmar(g["etiquetas_lista"] == ["rpg", "Souls"], g)
-        c = core.atualizar_jogo(con, g["id"], {"nota": 7})  # sem etiquetas = preserva
+        c = banco.atualizar_jogo(con, g["id"], {"nota": 7})  # sem etiquetas = preserva
         afirmar(c["etiquetas"] == g["etiquetas"], (c, g))
-        assert core.listar_etiquetas(con)[0]["n"] == 1
+        assert banco.listar_etiquetas(con)[0]["n"] == 1
     finally:
         con.close()
 
 
 def teste_chave_dedup():
-    a = core.chave_dedup("Jogo", r"D:\Games\j.exe", "")
-    b = core.chave_dedup("jogo", "D:/Games/j.exe", "")
+    a = banco.chave_dedup("Jogo", r"D:\Games\j.exe", "")
+    b = banco.chave_dedup("jogo", "D:/Games/j.exe", "")
     afirmar(a == b, (a, b))
-    afirmar(a != core.chave_dedup("Outro", r"D:\Games\j.exe", ""))
+    afirmar(a != banco.chave_dedup("Outro", r"D:\Games\j.exe", ""))
 
 
 def teste_import_dedup_barra():
     con, _tmp = _nova_db()
     try:
-        r1 = core.importar_lista(con, [{"titulo": "J", "executable_path": r"D:\G\j.exe"}])
+        r1 = nucleo_scans.importar_lista(con, [{"titulo": "J", "executable_path": r"D:\G\j.exe"}])
         afirmar(r1["novos"] == 1, r1)
-        r2 = core.importar_lista(con, [{"titulo": "J", "executable_path": "D:/G/j.exe"}])
+        r2 = nucleo_scans.importar_lista(con, [{"titulo": "J", "executable_path": "D:/G/j.exe"}])
         afirmar(r2["novos"] == 0 and r2["total_no_banco"] == 1, r2)
     finally:
         con.close()
@@ -63,9 +64,9 @@ def teste_import_dedup_barra():
 def teste_import_mesmo_exe_outro_titulo():
     con, _tmp = _nova_db()
     try:
-        core.importar_lista(con, [{"titulo": "Hades II",
+        nucleo_scans.importar_lista(con, [{"titulo": "Hades II",
                                    "executable_path": r"D:\G\Hades2.exe"}])
-        r = core.importar_lista(con, [{"titulo": "Hades 2",
+        r = nucleo_scans.importar_lista(con, [{"titulo": "Hades 2",
                                        "executable_path": r"D:\G\Hades2.exe"}])
         afirmar(r["novos"] == 0 and r["total_no_banco"] == 1, r)
     finally:
@@ -75,10 +76,10 @@ def teste_import_mesmo_exe_outro_titulo():
 def teste_criar_duplicata_barra():
     con, _tmp = _nova_db()
     try:
-        core.criar_jogo(con, {"titulo": "J", "executable_path": r"D:\G\j.exe",
+        banco.criar_jogo(con, {"titulo": "J", "executable_path": r"D:\G\j.exe",
                               "status": "backlog"})
         try:
-            core.criar_jogo(con, {"titulo": "j", "executable_path": "D:/G/j.exe",
+            banco.criar_jogo(con, {"titulo": "j", "executable_path": "D:/G/j.exe",
                                   "status": "backlog"})
         except ValueError:
             return
@@ -121,28 +122,28 @@ def teste_capa_steam_falha_rede():
 
 
 def teste_lock_segunda_instancia():
-    r1 = core.adquirir_lock()
+    r1 = base.adquirir_lock()
     afirmar(r1.get("ok"), r1)
     try:
-        r2 = core.adquirir_lock()
+        r2 = base.adquirir_lock()
         afirmar(not r2.get("ok"), r2)
     finally:
-        core.liberar_lock()
-    r3 = core.adquirir_lock()
+        base.liberar_lock()
+    r3 = base.adquirir_lock()
     afirmar(r3.get("ok"), r3)
-    core.liberar_lock()
+    base.liberar_lock()
 
 
 def teste_backup_pre_import_e_selo():
     con, tmp = _nova_db()
     db = tmp / "d.db"
     con.close()
-    res = core.backup_pre_import(db)
+    res = pacotes.backup_pre_import(db)
     afirmar(res is None or "db" in res, res)
-    idade = core.idade_ultimo_backup_dias()
+    idade = pacotes.idade_ultimo_backup_dias()
     afirmar(idade is None or isinstance(idade, float), idade)
-    afirmar(core.selo_confianca({"confianca": 0.85}) == " · ◎0.85")
-    afirmar(core.selo_confianca({"confianca": 0}) == "")
+    afirmar(banco.selo_confianca({"confianca": 0.85}) == " · ◎0.85")
+    afirmar(banco.selo_confianca({"confianca": 0}) == "")
 
 
 def teste_lock_abertura_concorrente():
@@ -152,7 +153,7 @@ def teste_lock_abertura_concorrente():
 
     def adquirir():
         barreira.wait(5)
-        resultados.append(core.adquirir_lock())
+        resultados.append(base.adquirir_lock())
 
     threads = [threading.Thread(target=adquirir) for _ in range(8)]
     for th in threads:
@@ -162,7 +163,7 @@ def teste_lock_abertura_concorrente():
     try:
         afirmar(len(resultados) == 8 and sum(r["ok"] for r in resultados) == 1, resultados)
     finally:
-        core.liberar_lock()
+        base.liberar_lock()
 
 
 def teste_lock_vivo_nao_expira_e_json_invalido():
@@ -189,13 +190,13 @@ def teste_lock_vivo_nao_expira_e_json_invalido():
 def teste_save_path():
     con, _tmp = _nova_db()
     try:
-        g = core.criar_jogo(con, {"titulo": "S", "executable_path": "",
+        g = banco.criar_jogo(con, {"titulo": "S", "executable_path": "",
                                   "status": "backlog",
                                   "save_path": r"C:\Saves\Jogo"})
         afirmar(g["save_path"] == r"C:\Saves\Jogo", g)
-        c = core.atualizar_jogo(con, g["id"], {"nota": 5})  # preserva
+        c = banco.atualizar_jogo(con, g["id"], {"nota": 5})  # preserva
         afirmar(c["save_path"] == r"C:\Saves\Jogo", c)
-        c = core.atualizar_jogo(con, g["id"], {"save_path": ""})
+        c = banco.atualizar_jogo(con, g["id"], {"save_path": ""})
         afirmar(c["save_path"] == "", c)
     finally:
         con.close()

@@ -64,11 +64,6 @@ def pasta_jogos() -> Path:
     return nova
 
 
-def pasta_piratas() -> Path:
-    """Alias legado de `pasta_jogos()`."""
-    return pasta_jogos()
-
-
 def dentro_do_destino(caminho: str | os.PathLike) -> bool:
     """O caminho já está sob a pasta de jogos (critério padrão de todo download)?"""
     try:
@@ -77,11 +72,6 @@ def dentro_do_destino(caminho: str | os.PathLike) -> bool:
         return alvo == base or base in alvo.parents
     except OSError:
         return False
-
-
-def dentro_de_piratas(caminho: str | os.PathLike) -> bool:
-    """Alias legado de `dentro_do_destino()`."""
-    return dentro_do_destino(caminho)
 
 
 def organizar_no_destino(caminho: str | os.PathLike) -> dict:
@@ -113,10 +103,6 @@ def organizar_no_destino(caminho: str | os.PathLike) -> dict:
     return {"ok": True, "path": str(dest), "movido": True,
             "aviso": "Reaponte o torrent no cliente original (ele perdeu o rastro)."}
 
-
-def organizar_em_piratas(caminho: str | os.PathLike) -> dict:
-    """Alias legado de `organizar_no_destino()`."""
-    return organizar_no_destino(caminho)
 
 def ferramenta_7z() -> Path | None:
     """7z p/ rar/7z/iso (override `BIBLIOTECA_7Z`; None = sem extrator)."""
@@ -629,7 +615,7 @@ def listar_pacotes_piratas(con: sqlite3.Connection | None = None) -> list[dict]:
     `estado`: compactado | pronta | instalar | falta-7z | sem_exe | importado.
     Pacotes cujo exe já está na coleção (ou sem exe de verdade) saem da lista.
     """
-    base = pasta_piratas()
+    base = pasta_jogos()
     if not base.is_dir():
         return []
     from bib_nucleo import banco as B
@@ -710,7 +696,7 @@ def preparar_pacote(arquivo: str | os.PathLike,
     if src.suffix.lower() not in ARQUIVO_EXTS:
         return {"ok": False,
                 "erro": f"extensão '{src.suffix}' não é pacote de jogo."}
-    raiz = Path(destino_raiz) if destino_raiz else pasta_piratas()
+    raiz = Path(destino_raiz) if destino_raiz else pasta_jogos()
     dest = raiz / (slugify(src.stem) or "jogo")
     reaproveitou = dest.is_dir()
     if not reaproveitou:
@@ -782,8 +768,7 @@ def _capa_automatica(con: sqlite3.Connection, gid: int, titulo: str) -> bool:
         return False
 
 
-__all__ = ['ARQUIVO_EXTS', 'pasta_jogos', 'pasta_piratas', 'dentro_do_destino',
-           'dentro_de_piratas', 'organizar_no_destino', 'organizar_em_piratas',
+__all__ = ['ARQUIVO_EXTS', 'pasta_jogos', 'dentro_do_destino', 'organizar_no_destino',
            'ferramenta_7z', 'eh_pacote_hub',
            'extrair_arquivo', 'organizar_extraido', 'achar_exe',
            'sanear_pasta', 'importar_repack', 'importar_pasta',

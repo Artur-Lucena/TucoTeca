@@ -15,6 +15,7 @@ import {
   type OrdemJogo,
 } from '../../estado/jogos'
 import { teclaDaLista } from '../../navegacao/setas'
+import { ehMac } from '../../plataforma'
 
 const ROTULO_FILTRO: Record<FiltroJogo, string> = {
   todos: 'Todos',
@@ -226,7 +227,7 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
         >
           + Importar pasta
         </button>
-        <button type="button" class="acao" onClick={() => void lerLojas()} disabled={lendoLojas !== null} title="Steam, Epic, GOG, Hydra, Riot e programas do Windows">
+        <button type="button" class="acao" onClick={() => void lerLojas()} disabled={lendoLojas !== null} title={ehMac() ? 'Steam, Hydra e pastas de jogos deste Mac' : 'Steam, Epic, GOG, Hydra, Riot e programas do Windows'}>
           {lendoLojas !== null ? 'Lendo lojas…' : 'Importar de lojas instaladas'}
         </button>
         <p>{resumoDe(lista.length, total, filtro, ordem, busca)}</p>

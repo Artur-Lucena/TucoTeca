@@ -1,11 +1,11 @@
-"""Mods Azahar: campo v9, title ID, import, junction, aplicar e menu TUI."""
+"""Mods Azahar: campo v9, title ID, import, junction e aplicar."""
 import os
 import sqlite3
 import tempfile
 import zipfile
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import banco
 from executar import afirmar
 
 TID = "0004000000055D00"
@@ -41,23 +41,23 @@ def _mod_zip(tmp, nome="pack.zip", raiz="Pack", nu=False):
 
 
 def teste_normalizar_mods():
-    afirmar(core.normalizar_mods(None) == "[]")
-    afirmar(core.normalizar_mods([]) == "[]")
-    afirmar(core.normalizar_mods(["A", "a ", "", "B"]) == '["A", "B"]')
-    afirmar(core.normalizar_mods('["X", "Y"]') == '["X", "Y"]')
-    afirmar(core.normalizar_mods("Solo") == '["Solo"]')
-    afirmar(core.mods_de({"azahar_mods": '["M1"]'}) == ["M1"])
-    afirmar(core.mods_de({"azahar_mods": ["M2"]}) == ["M2"])
-    afirmar(core.mods_de({}) == [])
-    afirmar(core.mods_de({"azahar_mods": "[invalido"}) == [])
+    afirmar(banco.normalizar_mods(None) == "[]")
+    afirmar(banco.normalizar_mods([]) == "[]")
+    afirmar(banco.normalizar_mods(["A", "a ", "", "B"]) == '["A", "B"]')
+    afirmar(banco.normalizar_mods('["X", "Y"]') == '["X", "Y"]')
+    afirmar(banco.normalizar_mods("Solo") == '["Solo"]')
+    afirmar(banco.mods_de({"azahar_mods": '["M1"]'}) == ["M1"])
+    afirmar(banco.mods_de({"azahar_mods": ["M2"]}) == ["M2"])
+    afirmar(banco.mods_de({}) == [])
+    afirmar(banco.mods_de({"azahar_mods": "[invalido"}) == [])
     try:
-        core.normalizar_mods("[invalido")
+        banco.normalizar_mods("[invalido")
         afirmar(False, "devia levantar")
     except ValueError:
         pass
-    afirmar(core.normalizar_mods(["a/b", "c\\d"]) == "[]")
+    afirmar(banco.normalizar_mods(["a/b", "c\\d"]) == "[]")
     muitos = [f"m{i}" for i in range(30)]
-    afirmar(len(core.mods_de({"azahar_mods": core.normalizar_mods(muitos)})) == 20)
+    afirmar(len(banco.mods_de({"azahar_mods": banco.normalizar_mods(muitos)})) == 20)
 
 
 def teste_migracao_v9_e_crud():
@@ -74,17 +74,17 @@ def teste_migracao_v9_e_crud():
                 " UNIQUE(titulo, executable_path))")
     con.commit()
     con.close()
-    con = core.get_db(leg)
+    con = banco.get_db(leg)
     try:
         cols = {r["name"] for r in con.execute("PRAGMA table_info(jogos)").fetchall()}
         afirmar("azahar_mods" in cols, sorted(cols))
-        afirmar("azahar_mods" in core.CAMPOS_EDITAVEIS, core.CAMPOS_EDITAVEIS)
-        g = core.criar_jogo(con, {"titulo": "M", "executable_path": "",
+        afirmar("azahar_mods" in banco.CAMPOS_EDITAVEIS, banco.CAMPOS_EDITAVEIS)
+        g = banco.criar_jogo(con, {"titulo": "M", "executable_path": "",
                                   "azahar_mods": ["A", "B"], "status": "backlog"})
         afirmar(g["mods_lista"] == ["A", "B"], g)
-        c = core.atualizar_jogo(con, g["id"], {"nota": 5})
+        c = banco.atualizar_jogo(con, g["id"], {"nota": 5})
         afirmar(c["mods_lista"] == ["A", "B"], c)
-        c = core.atualizar_jogo(con, g["id"], {"azahar_mods": []})
+        c = banco.atualizar_jogo(con, g["id"], {"azahar_mods": []})
         afirmar(c["mods_lista"] == [], c)
     finally:
         con.close()
@@ -201,17 +201,17 @@ def teste_aplicar_mods_ida_e_volta():
     res5 = EMU.aplicar_mods({**jogo, "azahar_mods_off": 1})
     dest = Path(EMU.azahar_mods_dir()) / TID / "M1"
     afirmar(res5["aplicados"] == [] and not dest.exists(), res5)
-    con = core.get_db(tmp / "v10.db")
+    con = banco.get_db(tmp / "v10.db")
     try:
         cols = {r["name"] for r in con.execute("PRAGMA table_info(jogos)").fetchall()}
         afirmar("azahar_mods_off" in cols, sorted(cols))
-        g = core.criar_jogo(con, {"titulo": "O", "executable_path": "",
+        g = banco.criar_jogo(con, {"titulo": "O", "executable_path": "",
                                   "azahar_mods": ["M1"], "azahar_mods_off": 1,
                                   "status": "backlog"})
         afirmar(g["mods_off"] is True and g["mods_lista"] == ["M1"], g)
-        c = core.atualizar_jogo(con, g["id"], {"nota": 3})
+        c = banco.atualizar_jogo(con, g["id"], {"nota": 3})
         afirmar(c["mods_off"] is True, c)
-        c = core.atualizar_jogo(con, g["id"], {"azahar_mods_off": 0})
+        c = banco.atualizar_jogo(con, g["id"], {"azahar_mods_off": 0})
         afirmar(c["mods_off"] is False, c)
     finally:
         con.close()
@@ -258,120 +258,6 @@ def teste_aplicar_mods_overlay_ordem():
     afirmar((pasta / "romfs" / "a" / "0" / "1").read_bytes() == b"do-B",
             "último mod deveria vencer")
     afirmar((pasta / "code.ips").read_bytes() == b"PATCH-B")
-
-
-def _tui_fake(db, teclas, cols=150):
-    import sys
-    sys.path.insert(0, str(Path("codigo/frontends").resolve()))
-    import app_tui as tui
-
-    class Scr:
-        def __init__(self):
-            self.teclas = list(teclas)
-        def getmaxyx(self):
-            return (24, cols)
-        def addnstr(self, y, x, s, n, a=0):
-            pass
-        def erase(self):
-            pass
-        def refresh(self):
-            pass
-        def getch(self):
-            return self.teclas.pop(0) if self.teclas else ord("q")
-
-    class FakeCurses:
-        COLOR_CYAN = COLOR_BLACK = COLOR_GREEN = COLOR_RED = 1
-        COLOR_YELLOW = COLOR_MAGENTA = COLOR_WHITE = 1
-        KEY_DOWN = 258
-        KEY_UP = 259
-        KEY_ENTER = 343
-        KEY_PPAGE = 339
-        KEY_NPAGE = 338
-        A_BOLD = 1
-        A_DIM = 0
-        def curs_set(self, *a):
-            pass
-        def has_colors(self):
-            return False
-        def color_pair(self, n):
-            return 0
-
-    tui.curses = FakeCurses()
-    return tui.Tui(Scr(), db)
-
-
-def teste_tui_menu_mods_alterna():
-    from bib_nucleo import emuladores as EMU
-    tmp = Path(tempfile.mkdtemp(prefix="suite-mods-"))
-    rom = _rom_fake(tmp)
-    _mod_dir(tmp, "TM")
-    r = EMU.importar_mod(str(tmp / "TM"), TID, "TM")
-    afirmar(r.get("ok"), r)
-    db = tmp / "m.db"
-    con = core.get_db(db)
-    try:
-        core.criar_jogo(con, {"titulo": "J Mod", "executable_path": "",
-                              "launch_options": str(rom),
-                              "origem": "rom-3ds", "status": "backlog"})
-    finally:
-        con.close()
-    app = _tui_fake(db, [ord("j"), 10, 27])
-    con = core.get_db(db)
-    try:
-        j = core.listar_jogos(con, q="J Mod")[0]
-    finally:
-        con.close()
-    app.menu_mods(j)
-    con = core.get_db(db)
-    try:
-        mods = core.listar_jogos(con, q="J Mod")[0]["mods_lista"]
-    finally:
-        con.close()
-    afirmar(mods == ["TM"], mods)
-
-
-def teste_tui_menu_mods_chave():
-    from bib_nucleo import emuladores as EMU
-    tmp = Path(tempfile.mkdtemp(prefix="suite-mods-"))
-    rom = _rom_fake(tmp)
-    _mod_dir(tmp, "TK")
-    r = EMU.importar_mod(str(tmp / "TK"), TID, "TK")
-    afirmar(r.get("ok"), r)
-    db = tmp / "m.db"
-    con = core.get_db(db)
-    try:
-        core.criar_jogo(con, {"titulo": "J Chave", "executable_path": "",
-                              "launch_options": str(rom),
-                              "origem": "rom-3ds", "status": "backlog",
-                              "azahar_mods": ["TK"]})
-        j = core.listar_jogos(con, q="J Chave")[0]
-    finally:
-        con.close()
-    app = _tui_fake(db, [10, 27])  # alterna a chave + volta
-    app.menu_mods(j)
-    con = core.get_db(db)
-    try:
-        row = core.listar_jogos(con, q="J Chave")[0]
-    finally:
-        con.close()
-    afirmar(row["mods_off"] is True and row["mods_lista"] == ["TK"], row)
-    res = EMU.aplicar_mods(dict(row, launch_options=str(rom)))
-    afirmar(res["aplicados"] == [], res)
-
-
-def teste_tui_menu_mods_sem_tid():
-    tmp = Path(tempfile.mkdtemp(prefix="suite-mods-"))
-    db = tmp / "m.db"
-    con = core.get_db(db)
-    try:
-        core.criar_jogo(con, {"titulo": "PC", "executable_path": "x",
-                              "status": "backlog"})
-        j = core.listar_jogos(con, q="PC")[0]
-    finally:
-        con.close()
-    app = _tui_fake(db, [])
-    app.menu_mods(j)
-    afirmar("title ID" in (app.msg or ""), app.msg)
 
 
 def teste_mod_cache_e_colisao_com_arquivo_local():

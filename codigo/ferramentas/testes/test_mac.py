@@ -5,7 +5,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import banco, scans
 from bib_nucleo import emuladores as EMU
 from executar import afirmar
 
@@ -57,6 +57,19 @@ def teste_traduzir_para_atual_cobre_mac():
 
 def teste_resolver_exe_mac_como_fallback():
     base, mac = _mac()
+    if base.eh_mac():
+        # no Mac o exe_mac é o nativo; o fallback é um exe_linux traduzido
+        real = Path(mac) / "Games" / "linux-fallback.bin"
+        real.write_bytes(b"BIN")
+        gravado = base.mac_para_linux(str(real))
+        afirmar(gravado != str(real), (gravado, str(real)))
+        exe, origem = base.resolver_exe({"executable_path": "", "exe_win": "",
+                                         "exe_linux": gravado, "exe_mac": ""})
+        afirmar(Path(exe) == real and origem == "exe_linux", (exe, origem, str(real)))
+        exe2, origem2 = base.resolver_exe({"executable_path": "", "exe_win": "",
+                                           "exe_linux": gravado, "exe_mac": str(real)})
+        afirmar(Path(exe2) == real and origem2 == "exe_mac", (exe2, origem2))
+        return
     raiz = base.WIN_ROOT if os.name == "nt" else base.LINUX_ROOT
     # no Windows, fallback de outro SO só vale se for executável Win
     # (.AppImage/binário Mac existe no disco mas nunca abre aqui)
@@ -111,30 +124,30 @@ def teste_exe_mac_crud_e_migracao_v8():
                 " UNIQUE(titulo, executable_path))")
     con.commit()
     con.close()
-    con = core.get_db(leg)
+    con = banco.get_db(leg)
     try:
         cols = {r["name"] for r in con.execute("PRAGMA table_info(jogos)").fetchall()}
         afirmar("exe_mac" in cols, sorted(cols))
-        g = core.criar_jogo(con, {"titulo": "M", "executable_path": "",
+        g = banco.criar_jogo(con, {"titulo": "M", "executable_path": "",
                                   "exe_mac": "/Volumes/Games/Games/m",
                                   "status": "backlog"})
         afirmar(g["exe_mac"] == "/Volumes/Games/Games/m", g)
-        c = core.atualizar_jogo(con, g["id"], {"nota": 7})  # preserva
+        c = banco.atualizar_jogo(con, g["id"], {"nota": 7})  # preserva
         afirmar(c["exe_mac"] == "/Volumes/Games/Games/m", c)
-        afirmar("exe_mac" in core.CAMPOS_EDITAVEIS, core.CAMPOS_EDITAVEIS)
+        afirmar("exe_mac" in banco.CAMPOS_EDITAVEIS, banco.CAMPOS_EDITAVEIS)
     finally:
         con.close()
 
 
 def teste_importar_lista_leva_exe_mac():
     tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
-    con = core.get_db(tmp / "t.db")
+    con = banco.get_db(tmp / "t.db")
     try:
-        res = core.importar_lista(con, [{"titulo": "Mac Game", "executable_path": "",
+        res = scans.importar_lista(con, [{"titulo": "Mac Game", "executable_path": "",
                                          "exe_mac": "/Volumes/Games/Games/m",
                                          "origem": "manual"}])
         afirmar(res.get("novos") == 1, res)
-        jogos = core.listar_jogos(con, q="Mac Game")
+        jogos = banco.listar_jogos(con, q="Mac Game")
         afirmar(len(jogos) == 1 and jogos[0]["exe_mac"] == "/Volumes/Games/Games/m", jogos)
     finally:
         con.close()
@@ -296,34 +309,6 @@ def teste_links_darwin_internos_e_vetos():
         pass
 
 
-def teste_tocar_musica_cai_no_dados_local():
-    from bib_nucleo import base as B
-    from bib_nucleo import musicas as MUS
-    tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
-    casa = tmp / "dados" / "musicas"
-    casa.mkdir(parents=True)
-    (casa / "x.mp3").write_bytes(b"ID3fake")
-    chamadas = []
-    velho_pop, velho_dir = MUS.subprocess.Popen, B.MUSICAS_DIR
-    MUS.subprocess.Popen = lambda *a, **k: chamadas.append(a) or object()
-    B.MUSICAS_DIR = casa  # tocar_musica lê base.MUSICAS_DIR ao vivo
-    tinha_start = hasattr(os, "startfile")
-    if tinha_start:
-        velho_start = os.startfile
-        os.startfile = lambda p: chamadas.append(p)
-    try:
-        r = MUS.tocar_musica(str(tmp / "outra-maquina" / "x.mp3"))
-        afirmar(r.get("ok") and r.get("path") == str(casa / "x.mp3"), r)
-        afirmar(chamadas, "não chamou o player?")
-        r2 = MUS.tocar_musica(str(tmp / "sumiu.mp3"))
-        afirmar(not r2.get("ok"), r2)
-    finally:
-        MUS.subprocess.Popen = velho_pop
-        B.MUSICAS_DIR = velho_dir
-        if tinha_start:
-            os.startfile = velho_start
-
-
 def teste_asset_matchers_por_so():
     velha = sys.platform
     try:
@@ -406,3 +391,94 @@ def teste_zip_mac_rejeita_link_externo_antes_de_ativar():
         afirmar(False, "aceitou link externo")
     except ValueError as e:
         afirmar("link externo" in str(e), e)
+
+
+def teste_raizes_padrao_no_mac_usam_mac_root():
+    if os.name == "nt":
+        print("(só posix: skip)")
+        return
+    from unittest.mock import patch
+
+    from bib_nucleo.scans import disco, roms
+    vol = "/Volumes/HD"
+    with patch.object(disco, "MAC_ROOT", vol), patch.object(disco, "eh_mac", lambda: True), \
+            patch.object(roms, "MAC_ROOT", vol), patch.object(roms, "eh_mac", lambda: True), \
+            patch.dict(os.environ, {}, clear=False):
+        for var in ("BIBLIOTECA_SCAN_ROOTS", "BIBLIOTECA_ROMS_ROOTS", "BIBLIOTECA_ROMS_NDS_ROOTS"):
+            os.environ.pop(var, None)
+        jogos = disco.default_scan_roots()
+        r3ds = roms.default_roms_roots()
+        rnds = roms.default_roms_nds_roots()
+    afirmar(jogos[:2] == [f"{vol}/Games", f"{vol}/SteamLibrary"], jogos)
+    afirmar(r3ds == [f"{vol}/Games/Roms", f"{vol}/Games/Roms/3DS"], r3ds)
+    afirmar(rnds[0] == f"{vol}/Games/Roms" and len(rnds) == 3, rnds)
+
+
+def teste_lojas_conhecem_pastas_do_mac():
+    from bib_nucleo.scans import lojas
+    suporte = Path.home() / "Library" / "Application Support"
+    cands = lojas.hydra_db_candidates()
+    afirmar(suporte / "hydralauncher" / "hydra-db" in cands, cands)
+    afirmar(suporte / "hydra" / "hydra-db" in cands, cands)
+
+
+def teste_binario_do_app():
+    from bib_nucleo.emuladores._comum import binario_do_app
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
+    app = _app_fake(tmp, "DeSmuME.app", "DeSmuME")
+    afirmar(binario_do_app(app) == str(app / "Contents" / "MacOS" / "DeSmuME"))
+    afirmar(binario_do_app(tmp / "Nada.app") == "")
+
+
+def teste_lancar_bundle_app_no_mac_roda_binario_interno():
+    if os.name == "nt":
+        print("(só posix: skip)")
+        return
+    import subprocess
+    from unittest.mock import patch
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mac-"))
+    app = _app_fake(tmp, "Jogo.app", "Jogo")
+    binario = app / "Contents" / "MacOS" / "Jogo"
+    binario.chmod(0o755)
+    chamadas = []
+
+    class Proc:
+        pid = 4242
+    anterior = sys.platform
+    try:
+        sys.platform = "darwin"
+        with patch.object(subprocess, "Popen", lambda cmd, **kw: chamadas.append((cmd, kw)) or Proc()):
+            res, proc = EMU._lancar(str(app))
+    finally:
+        sys.platform = anterior
+    afirmar(res.get("ok") and res.get("modo") == "popen-mac", res)
+    afirmar(chamadas and chamadas[0][0][0] == str(binario), chamadas)
+    afirmar(chamadas[0][1].get("cwd") == str(binario.parent), chamadas)
+    vazio = tmp / "Vazio.app"
+    (vazio / "Contents" / "MacOS").mkdir(parents=True)
+    try:
+        sys.platform = "darwin"
+        res, _ = EMU._lancar(str(vazio))
+    finally:
+        sys.platform = anterior
+    afirmar(not res.get("ok") and "Contents/MacOS" in res.get("erro", ""), res)
+
+
+def teste_banco_grava_versao_e_recusa_banco_mais_novo():
+    from bib_nucleo.banco import _infra
+    tmp = Path(tempfile.mkdtemp(prefix="suite-mac-db-"))
+    con = banco.get_db(tmp / "b.db")
+    try:
+        afirmar(con.execute("PRAGMA user_version").fetchone()[0] == _infra.ESQUEMA_VERSAO)
+    finally:
+        con.close()
+    novo = tmp / "novo.db"
+    cru = sqlite3.connect(str(novo))
+    cru.execute(f"PRAGMA user_version = {_infra.ESQUEMA_VERSAO + 1}")
+    cru.commit()
+    cru.close()
+    try:
+        banco.get_db(novo)
+        afirmar(False, "abriu um banco de versão mais nova")
+    except _infra.BancoMaisNovoErro as erro:
+        afirmar("versão mais nova" in str(erro), erro)

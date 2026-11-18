@@ -1,13 +1,15 @@
 """Scans e pacotes via ServicoBiblioteca: preview, importacao e pacotes."""
 from __future__ import annotations
 
-import bib_core as core
+from bib_nucleo import pacotes as nucleo_pacotes
+from bib_nucleo import scans
+from bib_nucleo.rede import repacks
 
 
 class MixScans:
     def importar_jogos(self, pasta):
-        roots, itens, info = core.preview_scan([pasta])
-        return self.alterar(lambda con: core.importar_lista(con, itens))
+        roots, itens, info = scans.preview_scan([pasta])
+        return self.alterar(lambda con: scans.importar_lista(con, itens))
 
     def prever_pasta(self, pasta):
         """Preview só-leitura de pasta (PC + ROMs). Sem backup, sem escrita."""
@@ -16,7 +18,7 @@ class MixScans:
             return {"ok": False, "raizes": [], "itens": [], "info": {},
                     "erro": "Escolha uma pasta para varrer."}
         try:
-            raizes, itens, info = core.preview_pasta([pasta])
+            raizes, itens, info = scans.preview_pasta([pasta])
         except Exception as e:
             return {"ok": False, "raizes": [], "itens": [], "info": {},
                     "erro": f"falha na varredura: {e}"}
@@ -31,7 +33,7 @@ class MixScans:
             return {"ok": False, "tipo": "desconhecido", "item": None,
                     "provedor": None, "detalhe": "caminho vazio.", "aviso": None}
         try:
-            ana = core.analisar_arquivo(caminho)
+            ana = scans.analisar_arquivo(caminho)
         except Exception as e:
             return {"ok": False, "tipo": "desconhecido", "item": None,
                     "provedor": None, "detalhe": f"falha na análise: {e}",
@@ -46,28 +48,28 @@ class MixScans:
                if isinstance(it, dict) and (it.get("titulo") or it.get("executable_path"))]
         if not sel:
             raise ValueError("Nada selecionado para importar.")
-        return self.alterar(lambda con: core.importar_lista(con, sel))
+        return self.alterar(lambda con: scans.importar_lista(con, sel))
 
     def importar_colecao(self, caminho, restaurar_saves=False):
         with self._escrita:
-            return core.importar_pacote(caminho, self.db_path, restaurar_saves)
+            return nucleo_pacotes.importar_pacote(caminho, self.db_path, restaurar_saves)
 
     def preparar_pacote(self, arquivo):
-        core.fazer_backup(self.db_path)
-        r = core.preparar_pacote(arquivo)
+        nucleo_pacotes.fazer_backup(self.db_path)
+        r = repacks.preparar_pacote(arquivo)
         if not r.get("ok"):
             raise ValueError(r.get("erro", "Não foi possível preparar o pacote."))
         return r
 
     def abrir_instalador_pacote(self, exe):
-        r = core.abrir_instalador(exe)
+        r = repacks.abrir_instalador(exe)
         if not r.get("ok"):
             raise ValueError(r.get("erro", "Não foi possível abrir o instalador."))
         return r
 
     def importar_pacote(self, pasta, exe=""):
         def importar(con):
-            r = core.importar_pasta(con, pasta, exe)
+            r = repacks.importar_pasta(con, pasta, exe)
             if not r.get("ok"):
                 raise ValueError(r.get("erro", "Não foi possível importar o pacote."))
             return r

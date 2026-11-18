@@ -6,6 +6,7 @@ import { EmptyState } from '../../componentes/ui'
 import { PlayerVideo } from '../../componentes/midia/PlayerVideo'
 import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { useSetasLista } from '../../navegacao/setas'
+import { ehMac } from '../../plataforma'
 
 interface Props {
   aoAvisar: AoAvisar
@@ -80,7 +81,7 @@ export function Videos({ aoAvisar, aoMudou }: Props) {
             value={reprodutor}
             onChange={(evento) => setReprodutor((evento.target as HTMLSelectElement).value)}
           >
-            {REPRODUTORES.map((nome) => (
+            {REPRODUTORES.filter((nome) => !(ehMac() && nome === 'mpchc')).map((nome) => (
               <option key={nome} value={nome}>
                 {nome}
               </option>

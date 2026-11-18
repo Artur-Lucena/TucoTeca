@@ -7,23 +7,65 @@ import type { EventoPonte, PedidoPonte, RespostaPonte } from '../shared/protocol
 interface DepsDescoberta {
   existe: (caminho: string) => boolean
   plataforma: NodeJS.Platform
+  arquitetura: string
   env: Record<string, string | undefined>
 }
 
-/** Ordem: TUCOTECA_PYTHON → runtime embutido do entregável → lançador do sistema. */
+/** Pasta de `programa/` com o runtime embutido desta plataforma (ou null). */
+export function pastaRuntime(plataforma: NodeJS.Platform, arquitetura: string): string | null {
+  if (plataforma === 'win32') return 'windows-x64'
+  if (plataforma === 'darwin') return arquitetura === 'arm64' ? 'macos-arm64' : 'macos-x64'
+  return null
+}
+
+/** Ordem: TUCOTECA_PYTHON → runtime embutido do entregável → Python do sistema. */
 export function descobrirPython(
   raiz: string,
   deps?: Partial<DepsDescoberta>,
 ): { comando: string; prefixo: string[] } {
-  const { existe = existsSync, plataforma = process.platform, env = process.env } = deps ?? {}
+  const {
+    existe = existsSync,
+    plataforma = process.platform,
+    arquitetura = process.arch,
+    env = process.env,
+  } = deps ?? {}
   const configurado = env.TUCOTECA_PYTHON?.trim()
   if (configurado) return { comando: configurado, prefixo: [] }
+  const pasta = pastaRuntime(plataforma, arquitetura)
   if (plataforma === 'win32') {
     const embutido = join(raiz, 'programa', 'windows-x64', 'python', 'python.exe')
     if (existe(embutido)) return { comando: embutido, prefixo: [] }
     return { comando: 'py', prefixo: ['-3.14'] }
   }
+  if (pasta) {
+    const embutido = join(raiz, 'programa', pasta, 'python', 'bin', 'python3')
+    if (existe(embutido)) return { comando: embutido, prefixo: [] }
+  }
+  // macOS: o python3 de /usr/bin é o 3.9 da Apple; o do Homebrew vem antes no PATH da ponte
   return { comando: 'python3', prefixo: [] }
+}
+
+/**
+ * Ambiente da ponte. App aberto pelo Finder/Dock herda um PATH mínimo
+ * (/usr/bin:/bin:...): sem o Homebrew nele, ffmpeg, yt-dlp e 7zz somem.
+ */
+export function ambientePonte(
+  base: Record<string, string | undefined>,
+  plataforma: NodeJS.Platform = process.platform,
+): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = {
+    ...base,
+    PYTHONDONTWRITEBYTECODE: '1',
+    PYTHONIOENCODING: 'utf-8',
+  }
+  if (plataforma === 'darwin') {
+    const partes = (env.PATH ?? '').split(':').filter(Boolean)
+    for (const extra of ['/usr/local/bin', '/opt/homebrew/bin']) {
+      if (!partes.includes(extra)) partes.unshift(extra)
+    }
+    env.PATH = partes.join(':')
+  }
+  return env
 }
 
 /** Acumula pedaços de stdout e devolve só linhas completas (NDJSON). */
@@ -139,10 +181,12 @@ export class ClientePonte {
     if (this.opcoes.ignorarLock) args.push('--ignorar-lock')
     const criar = this.deps.criarProcesso ?? spawn
     const processo = criar(comando, args, {
-      env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONIOENCODING: 'utf-8' },
+      env: ambientePonte(process.env),
       stdio: ['pipe', 'pipe', 'pipe'],
       // App GUI no Windows: sem isso o python.exe abre uma janela de console.
       windowsHide: true,
+      // macOS/Linux: grupo próprio, para encerrar a ponte junto com os filhos dela
+      detached: process.platform !== 'win32',
     })
     this.processo = processo
 
@@ -244,8 +288,14 @@ function matarProcesso(processo: ChildProcess): void {
     return
   }
   try {
-    processo.kill('SIGKILL')
+    // pid negativo = o grupo inteiro (ffmpeg/yt-dlp disparados pela ponte)
+    if (processo.pid) process.kill(-processo.pid, 'SIGKILL')
+    else processo.kill('SIGKILL')
   } catch {
-    // já morreu
+    try {
+      processo.kill('SIGKILL')
+    } catch {
+      // já morreu
+    }
   }
 }

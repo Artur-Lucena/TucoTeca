@@ -3,6 +3,7 @@ import { candidatosDeCapa, errosDeCapa, type CandidatoCapa } from '../../estado/
 import { STATUS_JOGOS, normalizarEtiquetas, validarHoras, validarNota, type JogoDaLista } from '../../estado/jogos'
 import { textoDeFalha } from '../../estado/notificacoes'
 import type { PaginaJogo } from '../../estado/paginaJogo'
+import { ehMac } from '../../plataforma'
 
 type Avisar = (texto: string, tom?: 'info' | 'atencao') => void
 
@@ -122,7 +123,7 @@ function DadosDoJogo({ id, jogo, aoMudou, aoAvisar }: { id: number; jogo: JogoDa
           </label>
           <label>
             Executável
-            <input value={form.executable_path} onInput={campo('executable_path')} placeholder="C:\\caminho\\jogo.exe" />
+            <input value={form.executable_path} onInput={campo('executable_path')} placeholder={ehMac() ? '/Applications/Jogo.app' : 'C:\\caminho\\jogo.exe'} />
           </label>
           <label>
             Argumentos

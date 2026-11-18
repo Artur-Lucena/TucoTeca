@@ -573,10 +573,6 @@ def adicionar_horas(con: sqlite3.Connection, gid: int, delta_h: float) -> dict:
     return {"ok": True, "somado": round(delta, 2), "total": total}
 
 
-def contar_por_origem(con: sqlite3.Connection) -> dict:
-    rows = con.execute("SELECT origem, COUNT(*) AS n FROM jogos GROUP BY origem").fetchall()
-    return {(r["origem"] or ""): r["n"] for r in rows}
-
 def selo_confianca(j: dict) -> str:
     """' · ◎0.85' se o jogo tem confiança de importação, senão ''."""
     try:

@@ -4,15 +4,14 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-import bib_core as core
-from bib_nucleo import emuladores
+from bib_nucleo import banco, emuladores, pacotes, scans
 from executar import afirmar
 
 
 def _nova_db(nome="t.db"):
     tmp = Path(tempfile.mkdtemp(prefix="suite-c-"))
     db = tmp / nome
-    return core.get_db(db), tmp
+    return banco.get_db(db), tmp
 
 
 def teste_uuid_backfill_legado():
@@ -30,7 +29,7 @@ def teste_uuid_backfill_legado():
     con.execute("INSERT INTO jogos (titulo) VALUES ('A'), ('B')")
     con.commit()
     con.close()
-    con = core.get_db(leg)
+    con = banco.get_db(leg)
     try:
         rows = con.execute("SELECT uuid FROM jogos ORDER BY id").fetchall()
         uuids = [r["uuid"] for r in rows]
@@ -45,12 +44,12 @@ def teste_uuid_backfill_legado():
 def teste_criar_e_atualizar_uuid():
     con, _tmp = _nova_db()
     try:
-        a = core.criar_jogo(con, {"titulo": "A", "executable_path": "", "status": "backlog"})
+        a = banco.criar_jogo(con, {"titulo": "A", "executable_path": "", "status": "backlog"})
         afirmar(len(a["uuid"]) == 32, a)
-        b = core.criar_jogo(con, {"titulo": "B", "executable_path": "", "status": "backlog",
+        b = banco.criar_jogo(con, {"titulo": "B", "executable_path": "", "status": "backlog",
                                   "uuid": "fixo123"})
         afirmar(b["uuid"] == "fixo123", b)
-        c = core.atualizar_jogo(con, a["id"], {"nota": 8})
+        c = banco.atualizar_jogo(con, a["id"], {"nota": 8})
         afirmar(c["uuid"] == a["uuid"], (a["uuid"], c["uuid"]))
     finally:
         con.close()
@@ -59,9 +58,9 @@ def teste_criar_e_atualizar_uuid():
 def teste_restore_por_uuid():
     con, _tmp = _nova_db()
     try:
-        g = core.criar_jogo(con, {"titulo": "R", "executable_path": "", "status": "jogando"})
+        g = banco.criar_jogo(con, {"titulo": "R", "executable_path": "", "status": "jogando"})
         uid = g["uuid"]
-        res = core.importar_lista(con, [{"uuid": uid, "titulo": "R TROCA?",
+        res = scans.importar_lista(con, [{"uuid": uid, "titulo": "R TROCA?",
                                          "executable_path": "/outro",
                                          "status": "zerado", "horas": 5.5,
                                          "ultima_execucao": "2026-01-01T00:00:00",
@@ -69,7 +68,7 @@ def teste_restore_por_uuid():
                                          "observacoes": "obs"}])
         afirmar(res["atualizados"] == 1 and res["novos"] == 0, res)
         row = con.execute("SELECT * FROM jogos WHERE uuid=?", (uid,)).fetchone()
-        d = core.row_to_dict(row)
+        d = banco.row_to_dict(row)
         afirmar(d["horas"] == 5.5 and d["ultima_execucao"] == "2026-01-01T00:00:00"
                 and d["status"] == "zerado" and d["nota"] == 9
                 and d["titulo"] == "R" and d["executable_path"] == "", d)
@@ -80,7 +79,7 @@ def teste_restore_por_uuid():
 def teste_relatorio_import():
     con, _tmp = _nova_db()
     try:
-        res = core.importar_lista(con, [{"titulo": "Ok", "executable_path": ""},
+        res = scans.importar_lista(con, [{"titulo": "Ok", "executable_path": ""},
                                         {"titulo": ""}, "lixo",
                                         {"titulo": "Ruim", "nota": "xx"}])
         afirmar(res["novos"] == 1 and res["ignorados"] == 3, res)
@@ -95,14 +94,14 @@ def teste_restore_preserva_metadados_e_save_path():
     try:
         dados = {"titulo": "Restaurar", "executable_path": "local.exe", "save_path": "saves/r",
                  "azahar_mods": ["M"], "azahar_mods_off": 1, "game_code": "CTR-X", "regiao": "Europa"}
-        res = core.importar_lista(con, [dados])
+        res = scans.importar_lista(con, [dados])
         afirmar(res["novos"] == 1, res)
-        jogo = core.listar_jogos(con)[0]
+        jogo = banco.listar_jogos(con)[0]
         afirmar(jogo["save_path"] == dados["save_path"], jogo)
-        core.atualizar_jogo(con, jogo["id"], {"save_path": "", "azahar_mods": [],
+        banco.atualizar_jogo(con, jogo["id"], {"save_path": "", "azahar_mods": [],
                                              "azahar_mods_off": 0, "game_code": "", "regiao": ""})
-        res = core.importar_lista(con, [{**dados, "uuid": jogo["uuid"], "executable_path": "remoto.exe"}])
-        novo = core.listar_jogos(con)[0]
+        res = scans.importar_lista(con, [{**dados, "uuid": jogo["uuid"], "executable_path": "remoto.exe"}])
+        novo = banco.listar_jogos(con)[0]
         afirmar(res["atualizados"] == 1 and novo["executable_path"] == "local.exe", res)
         afirmar(novo["save_path"] == "saves/r" and novo["mods_lista"] == ["M"] and novo["mods_off"], novo)
         afirmar(novo["game_code"] == "CTR-X" and novo["regiao"] == "Europa", novo)
@@ -113,14 +112,14 @@ def teste_restore_preserva_metadados_e_save_path():
 def teste_pacote_uuid_e_ultima():
     tmp = Path(tempfile.mkdtemp(prefix="suite-cp-"))
     db1 = tmp / "p1.db"
-    con = core.get_db(db1)
+    con = banco.get_db(db1)
     try:
-        g1 = core.criar_jogo(con, {"titulo": "MESMO", "executable_path": "a",
+        g1 = banco.criar_jogo(con, {"titulo": "MESMO", "executable_path": "a",
                                    "status": "jogando", "game_code": "C1"})
-        g2 = core.criar_jogo(con, {"titulo": "MESMO", "executable_path": "b",
+        g2 = banco.criar_jogo(con, {"titulo": "MESMO", "executable_path": "b",
                                    "status": "backlog", "game_code": "C2"})
-        core.salvar_capa_bytes(con, g1["id"], "um.png", b"PNG-UM")
-        core.salvar_capa_bytes(con, g2["id"], "dois.png", b"PNG-DOIS")
+        banco.salvar_capa_bytes(con, g1["id"], "um.png", b"PNG-UM")
+        banco.salvar_capa_bytes(con, g2["id"], "dois.png", b"PNG-DOIS")
         con.execute("UPDATE jogos SET ultima_execucao='2026-02-02T02:02:02', horas=3 WHERE id=?",
                     (g1["id"],))
         con.commit()
@@ -128,7 +127,7 @@ def teste_pacote_uuid_e_ultima():
     finally:
         con.close()
     zp = tmp / "pack.zip"
-    r = core.exportar_pacote(zp, db_path=db1, incluir_saves=False)
+    r = pacotes.exportar_pacote(zp, db_path=db1, incluir_saves=False)
     afirmar(r.get("ok"), r)
     with zipfile.ZipFile(zp) as z:
         import json
@@ -136,22 +135,22 @@ def teste_pacote_uuid_e_ultima():
     afirmar(set(man.values()) == {uid1,
             [u for u in man.values() if u != uid1][0]} and len(man) == 2, man)
     db2 = tmp / "p2.db"
-    res = core.importar_pacote(zp, db_path=db2, restaurar_saves=False)
+    res = pacotes.importar_pacote(zp, db_path=db2, restaurar_saves=False)
     afirmar(res.get("ok") and res["novos"] == 2 and res["capas"] == 2, res)
     for k in ("atualizados", "ignorados", "erros"):
         afirmar(k in res, res)
-    con = core.get_db(db2)
+    con = banco.get_db(db2)
     try:
         rows = con.execute("SELECT * FROM jogos ORDER BY id").fetchall()
         por_code = {dict(r)["game_code"]: dict(r) for r in rows}
-        c1 = core.caminho_capa(por_code["C1"]["capa"])
-        c2 = core.caminho_capa(por_code["C2"]["capa"])
+        c1 = banco.caminho_capa(por_code["C1"]["capa"])
+        c2 = banco.caminho_capa(por_code["C2"]["capa"])
         afirmar(c1 is not None and c1.read_bytes() == b"PNG-UM", por_code["C1"]["capa"])
         afirmar(c2 is not None and c2.read_bytes() == b"PNG-DOIS", por_code["C2"]["capa"])
         afirmar(por_code["C1"]["ultima_execucao"] == "2026-02-02T02:02:02"
                 and por_code["C1"]["horas"] == 3, por_code["C1"])
         # reimportar o mesmo pacote: atualiza, não duplica
-        res2 = core.importar_pacote(zp, db_path=db2, restaurar_saves=False)
+        res2 = pacotes.importar_pacote(zp, db_path=db2, restaurar_saves=False)
         afirmar(res2["novos"] == 0 and res2["atualizados"] == 2, res2)
     finally:
         con.close()
@@ -162,16 +161,16 @@ def teste_diagnosticar():
     Path(exe_real).write_bytes(b"x")
     base = {"executable_path": exe_real, "exe_win": "", "exe_linux": "",
             "wine_prefix": "", "launch_options": "", "origem": "manual"}
-    afirmar(core.diagnosticar_exe(dict(base))["estado"] == "ok")
-    afirmar(core.diagnosticar_exe({**base, "executable_path": ""})["estado"] == "sem-exe")
+    afirmar(emuladores.diagnosticar_exe(dict(base))["estado"] == "ok")
+    afirmar(emuladores.diagnosticar_exe({**base, "executable_path": ""})["estado"] == "sem-exe")
     rom_falso = {**base, "origem": "rom-3ds", "exe_win": "D:\\nao\\existe\\azahar.exe",
                  "executable_path": ""}
-    d = core.diagnosticar_exe(rom_falso)
-    if core.default_emu_3ds():
-        afirmar(d["estado"] == "trocou-emulador" and d["atual"] == core.default_emu_3ds(), d)
-    afirmar(core.diagnosticar_exe({**base, "executable_path": "D:\\falta.exe"})["estado"] == "ausente")
-    afirmar(core.diagnosticar_rom({**base, "launch_options": "--fullscreen"})["estado"] == "nao-rom")
-    afirmar(core.diagnosticar_rom({**base, "launch_options": exe_real})["estado"] == "nao-rom")
+    d = emuladores.diagnosticar_exe(rom_falso)
+    if emuladores.default_emu_3ds():
+        afirmar(d["estado"] == "trocou-emulador" and d["atual"] == emuladores.default_emu_3ds(), d)
+    afirmar(emuladores.diagnosticar_exe({**base, "executable_path": "D:\\falta.exe"})["estado"] == "ausente")
+    afirmar(emuladores.diagnosticar_rom({**base, "launch_options": "--fullscreen"})["estado"] == "nao-rom")
+    afirmar(emuladores.diagnosticar_rom({**base, "launch_options": exe_real})["estado"] == "nao-rom")
 
 
 def teste_procurar_rom():
@@ -180,76 +179,10 @@ def teste_procurar_rom():
     sub.mkdir()
     alvo = sub / "Meu Jogo.3ds"
     alvo.write_bytes(b"0")
-    r = core.procurar_rom("meu jogo.3DS", roots=[str(tmp)])
+    r = emuladores.procurar_rom("meu jogo.3DS", roots=[str(tmp)])
     afirmar(r == [str(alvo)], r)
-    afirmar(core.procurar_rom("falta.3ds", roots=[str(tmp)]) == [])
-    afirmar(core.procurar_rom("", roots=[str(tmp)]) == [])
-
-
-def teste_tui_relink():
-    import app_tui as tui
-
-    class FakeScr:
-        def getmaxyx(self):
-            return (24, 80)
-
-        def addnstr(self, *a):
-            pass
-
-        def erase(self):
-            pass
-
-        def refresh(self):
-            pass
-
-        def getch(self):
-            return ord("q")
-
-    class FakeCurses:
-        COLOR_CYAN = COLOR_BLACK = COLOR_GREEN = COLOR_RED = 1
-
-        def curs_set(self, *a):
-            pass
-
-        def has_colors(self):
-            return False
-
-    tui.curses = FakeCurses()
-    tmp = Path(tempfile.mkdtemp(prefix="suite-ct-"))
-    cand = tmp / "jogo.3ds"
-    cand.write_bytes(b"0")
-    db = tmp / "u.db"
-    t = tui.Tui(FakeScr(), db)
-    con = core.get_db(db)
-    try:
-        gid = core.criar_jogo(con, {"titulo": "RL", "executable_path": "",
-                                    "status": "backlog", "origem": "rom-3ds",
-                                    "launch_options": "D:\\sumiu\\jogo.3ds"})["id"]
-    finally:
-        con.close()
-    t.recarregar()
-    t.cur = 0
-    orig_proc, orig_lancar = emuladores.procurar_rom, emuladores._lancar_jogo_dict
-
-    class FP:
-        def wait(self):
-            return 0
-
-    emuladores.procurar_rom = lambda base, roots=None, max_resultados=20: [str(cand)]
-    emuladores._lancar_jogo_dict = lambda j, e=False: ({"ok": True, "modo": "fake"}, FP())
-    t.perguntar = lambda *a, **k: "j"
-    t.confirmar = lambda *a, **k: True
-    try:
-        t.jogar()
-        afirmar("Executando" in t.msg, t.msg)
-    finally:
-        emuladores.procurar_rom, emuladores._lancar_jogo_dict = orig_proc, orig_lancar
-    con = core.get_db(db)
-    try:
-        launch = con.execute("SELECT launch_options FROM jogos WHERE id=?", (gid,)).fetchone()["launch_options"]
-    finally:
-        con.close()
-    afirmar(launch == str(cand), launch)
+    afirmar(emuladores.procurar_rom("falta.3ds", roots=[str(tmp)]) == [])
+    afirmar(emuladores.procurar_rom("", roots=[str(tmp)]) == [])
 
 
 def teste_schema_jogos_vem_de_colunas_jogos():

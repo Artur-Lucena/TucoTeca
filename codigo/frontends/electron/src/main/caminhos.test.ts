@@ -24,6 +24,15 @@ describe('caminhoPermitido', () => {
     expect(caminhoPermitido('/home/tuco/hub', '/home/tuco/outra/a.png', { plataforma: 'linux' })).toBe(false)
   })
 
+  it('macOS: sem diferenciar caixa e com nomes em NFD (como o APFS devolve)', () => {
+    const home = '/Users/isa/Documents/TucoTeca'
+    expect(caminhoPermitido(home, '/users/isa/documents/tucoteca/capas/a.png', { plataforma: 'darwin' })).toBe(true)
+    expect(caminhoPermitido('/Users/isa/Músicas', '/Users/isa/Mu\u0301sicas/a.mp3', { plataforma: 'darwin' })).toBe(true)
+    expect(caminhoPermitido(home, '/Users/isa/Documents/TucoTeca2/a.png', { plataforma: 'darwin' })).toBe(false)
+    // Linux diferencia caixa
+    expect(caminhoPermitido('/home/tuco/hub', '/home/tuco/HUB/a.png', { plataforma: 'linux' })).toBe(false)
+  })
+
   it('vazio bloqueia', () => {
     expect(caminhoPermitido('', 'C:\\a.png')).toBe(false)
     expect(caminhoPermitido('C:\\hub', '')).toBe(false)

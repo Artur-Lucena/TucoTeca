@@ -43,9 +43,8 @@ Algumas integrações acessam serviços que têm termos próprios. Ao usá-las, 
 
 - A árvore atual **não contém** capas comerciais versionadas; as provas usam
   capas sintéticas geradas na hora.
-- O histórico remoto antigo continha capas comerciais e foi preservado durante
-  a reconciliação. Sua remoção da árvore atual não elimina os blobs dos commits
-  antigos; não foi feita nova reescrita ou force-push. O repositório é privado.
+- O repositório é público desde 18/11/2026. Antes disso o histórico foi
+  reescrito para tirar as capas comerciais que commits antigos carregavam.
 - Capas, letras, trailers e metadados obtidos de terceiros pertencem aos seus
   respectivos titulares e são usados apenas para exibição na sua biblioteca
   pessoal.
@@ -55,7 +54,8 @@ Algumas integrações acessam serviços que têm termos próprios. Ao usá-las, 
 
 ## Escopo de uso
 
-- O projeto é **pessoal**, para Tuco/Isa, sem release pública automatizada.
+- O projeto é **pessoal**, para Tuco/Isa; o código e as releases são públicos,
+  sem garantia de suporte.
 - O instalador contém componentes de código aberto (Electron, Python
   embutido); suas licenças acompanham cada componente.
 - Este aviso pode ser atualizado a qualquer momento; a versão vigente é a do

@@ -10,7 +10,7 @@ import threading
 import time
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import banco, base
 from executar import afirmar
 from ponte import Ponte, iniciar
 
@@ -91,9 +91,9 @@ def teste_snapshot_real_em_home_temporario():
     from servicos_ui import ServicoBiblioteca
     tmp = Path(tempfile.mkdtemp(prefix="suite-ponte-"))
     db = tmp / "hub.db"
-    con = core.get_db(db)
+    con = banco.get_db(db)
     try:
-        core.criar_jogo(con, {"titulo": "Jogo da Ponte", "executable_path": ""})
+        banco.criar_jogo(con, {"titulo": "Jogo da Ponte", "executable_path": ""})
     finally:
         con.close()
     ponte = Ponte(ServicoBiblioteca(db))
@@ -118,14 +118,14 @@ def teste_revisao_sobe_so_na_categoria_alterada():
     from servicos_ui import ServicoBiblioteca
     tmp = Path(tempfile.mkdtemp(prefix="suite-revisao-"))
     db = tmp / "hub.db"
-    core.get_db(db).close()
+    banco.get_db(db).close()
     ponte = Ponte(ServicoBiblioteca(db))
     antes = _chamar(ponte, {"id": 1, "metodo": "nucleo.revisao"})["resultado"]
     afirmar({"jogos", "musicas", "desejos", "videos", "downloads"} <= set(antes), antes)
-    con = core.get_db(db)
+    con = banco.get_db(db)
     try:
-        jogo = core.criar_jogo(con, {"titulo": "Revisado", "executable_path": ""})
-        core.atualizar_jogo(con, jogo["id"], {"nota": 9})
+        jogo = banco.criar_jogo(con, {"titulo": "Revisado", "executable_path": ""})
+        banco.atualizar_jogo(con, jogo["id"], {"nota": 9})
         con.commit()
     finally:
         con.close()
@@ -139,9 +139,9 @@ def teste_snapshot_parcial_e_busca_leve():
     from servicos_ui import ServicoBiblioteca
     tmp = Path(tempfile.mkdtemp(prefix="suite-parcial-"))
     db = tmp / "hub.db"
-    con = core.get_db(db)
+    con = banco.get_db(db)
     try:
-        core.criar_jogo(con, {"titulo": "Hollow Knight", "executable_path": ""})
+        banco.criar_jogo(con, {"titulo": "Hollow Knight", "executable_path": ""})
         con.commit()
     finally:
         con.close()
@@ -161,7 +161,7 @@ def teste_snapshot_parcial_e_busca_leve():
 
 
 def teste_bloqueio_de_lock_na_partida():
-    trava = core.adquirir_lock()
+    trava = base.adquirir_lock()
     afirmar(trava.get("ok") is True, trava)
     try:
         saida = io.StringIO()
@@ -171,7 +171,7 @@ def teste_bloqueio_de_lock_na_partida():
         afirmar(evento["evento"] == "bloqueio", evento)
         afirmar("aberta" in evento["dados"]["erro"], evento)
     finally:
-        core.liberar_lock()
+        base.liberar_lock()
 
 
 def teste_iniciar_serve_com_factory():
@@ -207,9 +207,9 @@ def teste_buscar_real_acha_jogo_sem_acento():
     from servicos_ui import ServicoBiblioteca
     tmp = Path(tempfile.mkdtemp(prefix="suite-busca-"))
     db = tmp / "hub.db"
-    con = core.get_db(db)
+    con = banco.get_db(db)
     try:
-        core.criar_jogo(con, {"titulo": "Pokémon X", "executable_path": ""})
+        banco.criar_jogo(con, {"titulo": "Pokémon X", "executable_path": ""})
     finally:
         con.close()
     ponte = Ponte(ServicoBiblioteca(db))
@@ -267,7 +267,7 @@ def teste_preferencias_via_ponte_e_nome_invalido():
 
 def _semear_banco(db: Path) -> None:
     """Garante o schema antes das mutações dirigidas pela ponte (F2)."""
-    con = core.get_db(db)
+    con = banco.get_db(db)
     con.close()
 
 
@@ -290,9 +290,9 @@ def teste_ponte_saude_e_jogo_ler():
     tmp = Path(tempfile.mkdtemp(prefix="suite-saude-"))
     db = tmp / "hub.db"
     _semear_banco(db)
-    con = core.get_db(db)
+    con = banco.get_db(db)
     try:
-        criado = core.criar_jogo(con, {"titulo": "Jogo Sondado", "executable_path": ""})
+        criado = banco.criar_jogo(con, {"titulo": "Jogo Sondado", "executable_path": ""})
     finally:
         con.close()
     ponte = Ponte(ServicoBiblioteca(db))
@@ -711,7 +711,7 @@ def teste_ponte_musicas_importar_real_copia_wav():
         w.setframerate(8000)
         w.writeframes(b"\x00\x00" * 800)
     db = tmp / "hub.db"
-    core.get_db(db).close()
+    banco.get_db(db).close()
 
     saida = io.StringIO()
     ponte = Ponte(ServicoBiblioteca(db))
@@ -994,8 +994,8 @@ def teste_ponte_videos_local_sem_arquivo():
     db = tmp / "hub.db"
     _semear_banco(db)
     # semeia um vídeo com path inexistente
-    with closing(core.get_db(db)) as con:
-        core.criar_video(con, {"titulo": "Video Teste", "canal": "Canal",
+    with closing(banco.get_db(db)) as con:
+        banco.criar_video(con, {"titulo": "Video Teste", "canal": "Canal",
                                "duracao_s": 120, "video_path": str(tmp / "nao-existe.mp4")})
     ponte = Ponte(ServicoBiblioteca(db))
     snap = _chamar(ponte, {"id": 230, "metodo": "nucleo.snapshot"})["resultado"]

@@ -3,6 +3,7 @@ import { lerDiagnostico, type Diagnostico, type LeituraDiagnostico } from '../..
 import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { confirmar } from '../ui/Confirmacao'
 import { bytes } from '../../estado/formato'
+import { ehMac } from '../../plataforma'
 
 interface Props {
   id: number
@@ -90,9 +91,11 @@ export function PainelManutencaoJogo({ id, bloqueado, aoMudou, aoAvisar }: Props
         <button type="button" class="acao" onClick={() => void medirDisco()}>
           Espaço em disco
         </button>
-        <button type="button" class="acao" disabled={bloqueado} onClick={() => void elevado()}>
-          Abrir como administrador
-        </button>
+        {!ehMac() && (
+          <button type="button" class="acao" disabled={bloqueado} onClick={() => void elevado()}>
+            Abrir como administrador
+          </button>
+        )}
         {disco !== '' && <span class="sub">{disco}</span>}
       </div>
       {leitura !== null && (
@@ -137,7 +140,13 @@ export function PainelManutencaoJogo({ id, bloqueado, aoMudou, aoAvisar }: Props
           })}
         </>
       )}
-      {bloqueado && <p class="sub">Feche o jogo aberto para religar arquivos ou abrir como administrador.</p>}
+      {bloqueado && (
+        <p class="sub">
+          {ehMac()
+            ? 'Feche o jogo aberto para religar arquivos.'
+            : 'Feche o jogo aberto para religar arquivos ou abrir como administrador.'}
+        </p>
+      )}
     </div>
   )
 }

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from contextlib import closing
 
-import bib_core as core
+from bib_nucleo import banco, config
 
 
 class MixDesejos:
@@ -21,18 +21,18 @@ class MixDesejos:
     def _aplicar_wishlist(self, leitura, origem):
         if not leitura.get("itens"):
             raise ValueError((leitura.get("erros") or ["Nenhum jogo encontrado na wishlist."])[0])
-        r = self.alterar(lambda con: core.sincronizar_desejos(con, leitura["itens"]))
+        r = self.alterar(lambda con: banco.sincronizar_desejos(con, leitura["itens"]))
         aviso = f"Wishlist ({origem}): {r['novos']} novos, {r['atualizados']} atualizados, {r['removidos']} removidos."
         return {"ok": True, "erros": [], "avisos": [aviso, *leitura.get("erros", [])]}
 
     def adicionar_desejo(self, appid, titulo):
-        return self.alterar(lambda con: core.adicionar_desejo(con, appid, titulo))
+        return self.alterar(lambda con: banco.adicionar_desejo(con, appid, titulo))
 
     def precos_desejos(self, regiao=""):
         """Preço dos desejos ainda não obtidos (cache local; consulta sob demanda)."""
         from bib_nucleo.rede import metadados
-        regiao = (regiao or core.cfg.preco_regiao or "br")
-        with closing(core.get_db(self.db_path)) as con:
+        regiao = (regiao or config.cfg.preco_regiao or "br")
+        with closing(banco.get_db(self.db_path)) as con:
             appids = [r["appid"] for r in con.execute(
                 "SELECT appid FROM desejos WHERE obtido_em IS NULL").fetchall()]
         return metadados.precos_steam(appids, regiao)

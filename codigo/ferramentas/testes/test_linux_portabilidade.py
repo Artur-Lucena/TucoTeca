@@ -13,11 +13,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import bib_core as core
 from bib_nucleo import apps_externos as EI
 from bib_nucleo import apps_externos as EQ
 from bib_nucleo import apps_externos as RV
-from bib_nucleo import baixar, base, emuladores, player, processos
+from bib_nucleo import baixar, banco, base, emuladores, processos
 from bib_nucleo import ferramentas as F
 from bib_nucleo import videos as VI
 from bib_nucleo import videos_youtube as YT
@@ -181,41 +180,6 @@ class _Proc:
         return self.rc
 
 
-def teste_linux_player_pause_idempotente_e_posicao():
-    arq = _nativo(tempfile.mkdtemp(), "áudio com espaço.wav")
-    proc = _Proc()
-    sinais = SimpleNamespace(SIGSTOP=19, SIGCONT=18)
-    b = player._ProcessoBackend()
-    with patch.object(b, "_bin", return_value="fake-player"), \
-            patch.object(player.subprocess, "Popen", return_value=proc), \
-            patch.object(player, "_signal", sinais), \
-            patch.object(player.time, "monotonic", side_effect=[10, 12, 22, 30]):
-        afirmar(b.open(str(arq))["ok"] and b.play()["ok"])
-        afirmar(proc.eventos == [], "play inicial enviou sinal de retomada")
-        afirmar(b.pause()["ok"] and b.pause()["ok"])
-        afirmar(b.pos_ms() == 2000)
-        afirmar(b.resume()["ok"] and b.pos_ms() == 10000)
-    afirmar(proc.eventos == [("sinal", 19), ("sinal", 18)], proc.eventos)
-
-
-def teste_linux_player_parado_retoma_antes_terminate_e_recolhe_kill():
-    proc = _Proc()
-    b = player._ProcessoBackend()
-    b.proc, b._pausado_em, b._aberto = proc, 12, "musica.wav"
-    original_wait = proc.wait
-    def wait(timeout=None):
-        if "kill" not in proc.eventos:
-            proc.eventos.append("wait")
-            raise subprocess.TimeoutExpired("player", timeout)
-        return original_wait(timeout)
-    proc.wait = wait
-    with patch.object(player, "_signal", SimpleNamespace(SIGCONT=18)):
-        b.stop()
-    afirmar(proc.eventos == [("sinal", 18), "terminate", "wait", "kill", "wait"], proc.eventos)
-    afirmar(b.proc is None and b.pos_ms() is None)
-    b.stop()  # idempotente após encerrar
-
-
 def teste_processos_fundo_windows_sem_console_linux_mantem_grupo():
     for plataforma in ("nt", "posix"):
         proc = _Proc(io.StringIO("[download] 42%\n"))
@@ -343,44 +307,17 @@ def teste_linux_traducao_exe_windows_e_prioridade_linux():
         afirmar(Path(exe) == linux_exe and origem == "exe_linux", (exe, origem))
 
 
-def teste_tui_selftest_sem_curses_libera_lock():
-    import contextlib
-
-    import app_tui as tui
-    db = Path(tempfile.mkdtemp()) / "tui.db"
-    con = core.get_db(db)
-    core.criar_jogo(con, {"titulo": "Jogo de teste"})
-    con.close()
-    saida = io.StringIO()
-    with patch.object(tui, "curses", None), contextlib.redirect_stdout(saida):
-        afirmar(tui.main(["--selftest", "--db", str(db)]) == 0)
-    afirmar("1 jogo(s)" in saida.getvalue() and not core.lock_path().exists())
-
-
-def teste_tui_menu_vazio_e_terminal_fechado_nao_gira():
-    import app_tui as tui
-    app = object.__new__(tui.Tui)
-    afirmar(app.escolher("Vazio", []) is None)
-    class Scr:
-        def getmaxyx(self): return 24, 80
-        def addnstr(self, *_a): pass
-        def refresh(self): pass
-        def getch(self): raise OSError("terminal fechado")
-    app.stdscr, app.cor, app.abold = Scr(), {"mut": 0, "head": 0, "acc": 0, "txt": 0}, 0
-    afirmar(app.escolher("Teste", ["Uma"]) is None)
-
-
 def teste_download_audio_timeout_preserva_arquivo_e_marca_falha():
-    con = core.get_db(Path(tempfile.mkdtemp()) / "audio.db")
+    con = banco.get_db(Path(tempfile.mkdtemp()) / "audio.db")
     try:
-        core.enfileirar_downloads(con, [{"titulo": "Áudio"}])
-        did = core.listar_downloads(con)[0]["id"]
+        banco.enfileirar_downloads(con, [{"titulo": "Áudio"}])
+        did = banco.listar_downloads(con)[0]["id"]
         arq = _nativo(base.BAIXAR_DIR, "concluido.m4a")
         with patch.object(baixar, "casar_video", return_value={"video_id": "abc123", "video_titulo": "Áudio"}), \
                 patch.object(processos, "executar_com_progresso", side_effect=subprocess.TimeoutExpired("yt-dlp", 1800)):
             r = baixar.baixar_faixa(con, did, ytdlp="fake")
         afirmar(not r["ok"] and arq.is_file(), r)
-        afirmar(core.listar_downloads(con)[0]["estado"] == "falha")
+        afirmar(banco.listar_downloads(con)[0]["estado"] == "falha")
     finally:
         con.close()
 
@@ -391,7 +328,7 @@ def _meta():
 
 def teste_youtube_falha_recolhe_fragmentos_e_preserva_arquivo_anterior():
     vid = "dQw4w9WgXcQ"
-    con = core.get_db(Path(tempfile.mkdtemp()) / "video.db")
+    con = banco.get_db(Path(tempfile.mkdtemp()) / "video.db")
     antigo = _nativo(base.VIDEOS_DIR, vid + ".mp4")
     antes = antigo.read_bytes()
     def pop(cmd, **kw):
@@ -405,20 +342,20 @@ def teste_youtube_falha_recolhe_fragmentos_e_preserva_arquivo_anterior():
             r = YT.baixar_video_youtube(con, vid)
         afirmar(not r["ok"] and "rede interrompida" in r["erro"], r)
         afirmar(antigo.read_bytes() == antes and list(base.VIDEOS_DIR.iterdir()) == [antigo])
-        afirmar(core.listar_videos(con) == [])
+        afirmar(banco.listar_videos(con) == [])
     finally:
         con.close()
 
 
 def teste_youtube_falha_de_banco_recolhe_video_publicado():
-    con = core.get_db(Path(tempfile.mkdtemp()) / "video.db")
+    con = banco.get_db(Path(tempfile.mkdtemp()) / "video.db")
     def pop(cmd, **kw):
         Path(cmd[cmd.index("-o") + 1]).write_bytes(b"mp4-completo")
         return _Proc()
     try:
         with patch.object(YT, "_ytdlp", return_value="fake"), patch.object(YT, "info_video_youtube", return_value=_meta()), \
                 patch.object(processos.subprocess, "Popen", side_effect=pop), \
-                patch.object(core.banco, "criar_video", side_effect=sqlite3.OperationalError("disco cheio")):
+                patch.object(banco, "criar_video", side_effect=sqlite3.OperationalError("disco cheio")):
             r = YT.baixar_video_youtube(con, "dQw4w9WgXcQ")
         afirmar(not r["ok"] and "disco cheio" in r["erro"], r)
         afirmar(not list(base.VIDEOS_DIR.iterdir()))
@@ -429,13 +366,13 @@ def teste_youtube_falha_de_banco_recolhe_video_publicado():
 def teste_video_origem_mudou_na_copia_nao_publica():
     tmp = Path(tempfile.mkdtemp())
     src = _nativo(tmp / "origem", "filme.mp4")
-    con = core.get_db(tmp / "v.db")
+    con = banco.get_db(tmp / "v.db")
     def copiar(orig, dest): Path(dest).write_bytes(b"arquivo mudou")
     try:
         with patch.object(VI.shutil, "copy2", side_effect=copiar):
             r = VI.importar_videos(con, src.parent)
         afirmar(r["novos"] == 0 and r["ignorados"] == 1 and r["erros"], r)
-        afirmar(core.listar_videos(con) == [] and not list(base.VIDEOS_DIR.iterdir()))
+        afirmar(banco.listar_videos(con) == [] and not list(base.VIDEOS_DIR.iterdir()))
     finally:
         con.close()
 
@@ -462,13 +399,13 @@ def teste_carga_videos_mil_arquivos_dedup_e_reimportacao():
     origem.mkdir()
     for i in range(1000):
         (origem / f"Vídeo São João {i}.MKV").write_bytes((i % 128).to_bytes(2, "little") * 512)
-    con = core.get_db(tmp / "carga.db")
+    con = banco.get_db(tmp / "carga.db")
     try:
         r = VI.importar_videos(con, origem)
         afirmar(r["novos"] == 128 and r["ignorados"] == 872 and not r["erros"], r)
         r2 = VI.importar_videos(con, origem)
         afirmar(r2["novos"] == 0 and r2["ignorados"] == 1000 and not r2["erros"], r2)
-        lista = core.listar_videos(con)
+        lista = banco.listar_videos(con)
         afirmar(len(lista) == len(list(base.VIDEOS_DIR.iterdir())) == 128)
         afirmar(all(VI.sha_arquivo_video(Path(v["video_path"])) == v["video_sha"] for v in lista))
         afirmar(con.execute("PRAGMA integrity_check").fetchone()[0] == "ok")

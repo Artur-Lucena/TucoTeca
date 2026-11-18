@@ -96,11 +96,5 @@ def provedor_por_extensao(ext: str) -> dict | None:
     return None
 
 
-def jogos_do_provedor(jogos: list[dict], chave: str) -> list[dict]:
-    """Só os jogos que o provider consegue rodar (p/ filtro da UI)."""
-    return [j for j in (jogos or [])
-            if (provedor_por_origem(j.get("origem") or "") or {}).get("chave") == chave]
-
-
-__all__ = ["_aplicar_preset", "_prov_azahar", "_prov_desmume", "jogos_do_provedor", "provedor_por_extensao", "provedor_por_origem",
+__all__ = ["_aplicar_preset", "_prov_azahar", "_prov_desmume", "provedor_por_extensao", "provedor_por_origem",
            "provedores"]

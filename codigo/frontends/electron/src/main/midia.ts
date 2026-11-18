@@ -1,5 +1,5 @@
-import { extname, isAbsolute, parse, resolve } from 'node:path'
-import { caminhoDoPathname, caminhoPermitido } from './caminhos'
+import { extname } from 'node:path'
+import { caminhoDoPathname, caminhoPermitido, caminhosDe } from './caminhos'
 
 /** Recorte pedido para o handler de mídia (200 inteiro; 206 faixa; 416 recusa). */
 interface FaixaPedido {
@@ -51,20 +51,24 @@ export function faixaRange(cabecalho: string | null | undefined, tamanho: number
 }
 
 /** Pasta de Filmes e Séries aceitável: absoluta e que não seja a raiz de um disco. */
-export function raizMidiaAceita(raiz: string): boolean {
-  if (typeof raiz !== 'string' || raiz.trim() === '' || !isAbsolute(raiz)) return false
-  const r = resolve(raiz)
-  const raizDisco = parse(r).root
+export function raizMidiaAceita(raiz: string, plataforma: NodeJS.Platform = process.platform): boolean {
+  const p = caminhosDe(plataforma)
+  if (typeof raiz !== 'string' || raiz.trim() === '' || !p.isAbsolute(raiz)) return false
+  const r = p.resolve(raiz)
+  const raizDisco = p.parse(r).root
   return r.replace(/[\\/]+$/, '') !== raizDisco.replace(/[\\/]+$/, '')
 }
 
 /** Pastas de mídia da resposta de `midia.pastas` (e afins), só as aceitáveis. */
-export function raizesDaResposta(resultado: unknown): string[] {
+export function raizesDaResposta(
+  resultado: unknown,
+  plataforma: NodeJS.Platform = process.platform,
+): string[] {
   const pastas = (resultado as { pastas?: unknown } | null)?.pastas
   if (!Array.isArray(pastas)) return []
   return pastas
     .map((p) => (p !== null && typeof p === 'object' ? String((p as { caminho?: unknown }).caminho ?? '') : ''))
-    .filter(raizMidiaAceita)
+    .filter((raiz) => raizMidiaAceita(raiz, plataforma))
 }
 
 /**
@@ -88,6 +92,6 @@ export function caminhoDaUrlMidia(
   }
   const dentro =
     caminhoPermitido(home, alvo, { plataforma }) ||
-    raizes.some((raiz) => raizMidiaAceita(raiz) && caminhoPermitido(raiz, alvo, { plataforma }))
+    raizes.some((raiz) => raizMidiaAceita(raiz, plataforma) && caminhoPermitido(raiz, alvo, { plataforma }))
   return dentro ? alvo : null
 }

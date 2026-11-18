@@ -1,28 +1,43 @@
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { join, posix, resolve, win32 } from 'node:path'
 
 interface OpcoesCaminho {
   plataforma?: NodeJS.Platform
 }
 
+/** Módulo de caminhos da plataforma pedida (nos testes, outra que não a do processo). */
+export function caminhosDe(plataforma: NodeJS.Platform = process.platform): typeof posix {
+  return plataforma === 'win32' ? win32 : posix
+}
+
+/**
+ * Forma de comparação: Windows e macOS (APFS/HFS+ padrão) não diferenciam
+ * maiúsculas; o macOS também guarda nomes em NFD, então tudo vira NFC.
+ */
+export function chaveCaminho(caminho: string, plataforma: NodeJS.Platform = process.platform): string {
+  const p = caminhosDe(plataforma).resolve(caminho)
+  if (plataforma === 'win32') return p.toLowerCase()
+  if (plataforma === 'darwin') return p.normalize('NFC').toLowerCase()
+  return p
+}
+
 /** `pathname` de uma URL local → caminho do SO (`/C:/x` vira `C:/x` no Windows). */
 export function caminhoDoPathname(pathname: string, plataforma: NodeJS.Platform = process.platform): string {
   const alvo = decodeURIComponent(pathname)
-  return plataforma === 'win32' && /^\/[A-Za-z]:/.test(alvo) ? alvo.slice(1) : alvo
+  if (plataforma === 'win32') return /^\/[A-Za-z]:/.test(alvo) ? alvo.slice(1) : alvo
+  // mediaUrl escapa o caminho inteiro: `/%2FUsers/x` decodifica para `//Users/x`
+  return alvo.replace(/^\/{2,}/, '/')
 }
 
 /** Só deixa servir arquivos dentro da pasta da coleção (nem caminho vazio). */
 export function caminhoPermitido(home: string, alvo: string, opcoes?: OpcoesCaminho): boolean {
   if (!home || !alvo) return false
   const plataforma = opcoes?.plataforma ?? process.platform
-  const normalizar = (caminho: string) => {
-    const resolvido = resolve(caminho)
-    return plataforma === 'win32' ? resolvido.toLowerCase() : resolvido
-  }
-  const base = normalizar(home)
-  const destino = normalizar(alvo)
+  const p = caminhosDe(plataforma)
+  const base = chaveCaminho(home, plataforma)
+  const destino = chaveCaminho(alvo, plataforma)
   if (base === destino) return true
-  const relativo = relative(base, destino)
-  return relativo !== '' && !relativo.startsWith('..') && !isAbsolute(relativo)
+  const relativo = p.relative(base, destino)
+  return relativo !== '' && !relativo.startsWith('..') && !p.isAbsolute(relativo)
 }
 
 interface EntradaRaizHome {

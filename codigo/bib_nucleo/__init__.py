@@ -2,7 +2,7 @@
 
 As integrações de rede/download ficam em `bib_nucleo.rede`. Para manter
 consumidores antigos funcionando, os nomes históricos (`bib_nucleo.fontes`,
-`from bib_nucleo import online`, `import bib_core` etc.) continuam
+`from bib_nucleo import online` etc.) continuam
 resolvíveis via import preguiçoso abaixo — sem custo de inicialização e sem
 ciclos de importação. Código novo deve importar `bib_nucleo.rede.<módulo>`.
 """

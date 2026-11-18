@@ -5,38 +5,39 @@ import math
 from contextlib import closing
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import banco as nucleo_banco
+from bib_nucleo import base, emuladores, pacotes
 from bib_nucleo.arquivos import gravar_atomico
 
 
 class MixSessoes:
     def iniciar_jogo(self, gid, ao_fim):
         jogo = self.jogo(gid)
-        if core.diagnosticar_rom(jogo)["estado"] == "rom-ausente":
+        if emuladores.diagnosticar_rom(jogo)["estado"] == "rom-ausente":
             raise ValueError("ROM não encontrada. Atualize o caminho em Editar jogo.")
-        preparo = core.preparar_lancamento(jogo)
-        resultado = core.executar_monitorado(jogo, ao_fim=ao_fim)
+        preparo = emuladores.preparar_lancamento(jogo)
+        resultado = emuladores.executar_monitorado(jogo, ao_fim=ao_fim)
         if not resultado.get("ok"):
             raise ValueError(resultado.get("erro", "Não foi possível iniciar o jogo."))
-        with closing(core.get_db(self.db_path)) as con:
-            core.marcar_execucao(con, gid)
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
+            nucleo_banco.marcar_execucao(con, gid)
         resultado["aviso"] = preparo.get("aviso", "")
         return resultado
 
     def iniciar_jogo_elevado(self, gid):
         """Relança o jogo com elevação explícita (UAC). Confirmação é da UI."""
         jogo = self.jogo(gid)
-        preparo = core.preparar_lancamento(jogo)
-        r = core.executar_jogo_dict(jogo, elevar=True)
+        preparo = emuladores.preparar_lancamento(jogo)
+        r = emuladores.executar_jogo_dict(jogo, elevar=True)
         if not r.get("ok"):
             raise ValueError(r.get("erro", "Não foi possível iniciar com elevação."))
-        with closing(core.get_db(self.db_path)) as con:
-            core.marcar_execucao(con, gid)
+        with closing(nucleo_banco.get_db(self.db_path)) as con:
+            nucleo_banco.marcar_execucao(con, gid)
         try:
-            core.iniciar_sessao_manual(gid, jogo.get("titulo") or "")
+            emuladores.iniciar_sessao_manual(gid, jogo.get("titulo") or "")
         except Exception as e:
             # sessão manual é rastreamento auxiliar; não falha o lançamento
-            core.log_erro("jogar-uac", f"sessão manual não abriu: {e}")
+            base.log_erro("jogar-uac", f"sessão manual não abriu: {e}")
         return {"ok": True, "modo": r.get("modo", "runas-uac"),
                 "aviso": preparo.get("aviso", "")}
 
@@ -50,7 +51,7 @@ class MixSessoes:
             def gravar(con):
                 jogo = self.jogo(gid)
                 registrar(con, jogo, horas, ler_preferencias()["ativo"], commit=False)
-                r = core.adicionar_horas(con, gid, horas)
+                r = nucleo_banco.adicionar_horas(con, gid, horas)
                 if not r.get("ok"):
                     con.rollback()
                 return r
@@ -65,17 +66,17 @@ class MixSessoes:
             sessao = next((s for s in self.sessoes() if s.get("_arquivo") == arquivo), None)
             if sessao is None:
                 raise ValueError("Esta sessão já foi encerrada ou não está mais disponível.")
-            core.fazer_backup(self.db_path)
+            pacotes.fazer_backup(self.db_path)
             marcador = Path(sessao["_arquivo"])
-            gravar_atomico(core.BACKUP_DIR / "sessoes" / marcador.name, marcador.read_bytes())
-            r = core.encerrar_sessao_manual(str(marcador), horas, db_path=self.db_path)
+            gravar_atomico(base.BACKUP_DIR / "sessoes" / marcador.name, marcador.read_bytes())
+            r = emuladores.encerrar_sessao_manual(str(marcador), horas, db_path=self.db_path)
             return r
 
     def diagnosticar_jogo(self, gid):
         """Diagnóstico só-leitura de exe/ROM: estado, caminho e candidatos."""
         jogo = self.jogo(gid)
         return {"gid": gid, "titulo": jogo.get("titulo") or "",
-                "exe": core.diagnosticar_exe(jogo), "rom": core.diagnosticar_rom(jogo),
+                "exe": emuladores.diagnosticar_exe(jogo), "rom": emuladores.diagnosticar_rom(jogo),
                 "jogo": jogo}
 
     _RELIGAR_CAMPOS = ("launch_options", "executable_path", "exe_win", "exe_linux")
@@ -88,17 +89,17 @@ class MixSessoes:
             raise ValueError("Campo inválido para religar.")
         if not caminho:
             raise ValueError("Informe o novo caminho.")
-        return self.alterar(lambda con: core.atualizar_jogo(con, gid, {campo: caminho}))
+        return self.alterar(lambda con: nucleo_banco.atualizar_jogo(con, gid, {campo: caminho}))
 
     def backup_pos_sessao(self, gid):
         from bib_nucleo import saves
         with self._escrita:
-            banco = core.fazer_backup(self.db_path)
+            banco = pacotes.fazer_backup(self.db_path)
             jogo = self.jogo(gid)
             r = saves.snapshot_saves(jogo)
-            prov = core.provedor_por_origem(jogo.get("origem", ""))
+            prov = emuladores.provedor_por_origem(jogo.get("origem", ""))
             if not r.get("arquivos") and prov:
-                r = core.backup_saves_emu(prov["chave"])
+                r = emuladores.backup_saves_emu(prov["chave"])
             return {"ok": r.get("ok", True), "banco": banco, "saves": r,
                     "erro": r.get("erro", ""), "avisos": [r["aviso"]] if r.get("aviso") else []}
 
@@ -120,7 +121,7 @@ class MixSessoes:
             return restaurar_snapshot(self.jogo(gid), caminho)
 
     def salvar_mods_jogo(self, gid, ativos, off):
-        return self.alterar(lambda con: core.atualizar_jogo(
+        return self.alterar(lambda con: nucleo_banco.atualizar_jogo(
             con, gid, {"azahar_mods": list(ativos), "azahar_mods_off": 1 if off else 0}))
 
 

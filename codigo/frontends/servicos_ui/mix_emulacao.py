@@ -2,8 +2,8 @@
 jogo 3DS, mods/cheats/texturas/presets do Azahar (antes `qt_emulacao.py`)."""
 from __future__ import annotations
 
-import bib_core as core
 from bib_nucleo import cheats as CHEATS
+from bib_nucleo import controles as nucleo_controles
 from bib_nucleo import emuladores as EMU
 from bib_nucleo import texturas as TEXTURAS
 from bib_nucleo.base import traduzir_para_atual
@@ -129,7 +129,7 @@ class MixEmulacao:
         O remoto só aparece depois de emu_consultar (rede explícita).
         """
         itens = []
-        for chave, prov in core.provedores().items():
+        for chave, prov in EMU.provedores().items():
             if chave not in self._EMU_CHAVES:
                 continue
             try:
@@ -147,7 +147,7 @@ class MixEmulacao:
         emu_atualizar, depois de confirmação expressa na UI.
         """
         chave = (chave or "").strip()
-        prov = core.provedores().get(chave)
+        prov = EMU.provedores().get(chave)
         if prov is None:
             raise ValueError("Emulador desconhecido.")
         info = prov["release_info"]()
@@ -165,7 +165,7 @@ class MixEmulacao:
     def emu_atualizar(self, chave, info):
         """Baixa e instala o release já consultado. Rede + escrita, com confirmação da UI."""
         chave = (chave or "").strip()
-        prov = core.provedores().get(chave)
+        prov = EMU.provedores().get(chave)
         if prov is None:
             raise ValueError("Emulador desconhecido.")
         if not isinstance(info, dict) or not info.get("tag"):
@@ -178,27 +178,27 @@ class MixEmulacao:
     def controles_pads(self):
         """Pads detectados. Só leitura; sem pads é lista vazia, não erro."""
         try:
-            pads = core.listar_controles() or []
+            pads = nucleo_controles.listar_controles() or []
         except Exception:
             pads = []
         return {"pads": [dict(p) for p in pads]}
 
     def controles_presets(self):
         try:
-            nomes = core.listar_presets_controle() or []
+            nomes = nucleo_controles.listar_presets_controle() or []
         except Exception:
             nomes = []
         return {"presets": [str(n) for n in nomes]}
 
     def controles_tipos(self):
-        tipos = sorted(core.NOMES_TIPO)
-        return {"tipos": [{"tipo": t, "nome": core.NOMES_TIPO[t]} for t in tipos]}
+        tipos = sorted(nucleo_controles.NOMES_TIPO)
+        return {"tipos": [{"tipo": t, "nome": nucleo_controles.NOMES_TIPO[t]} for t in tipos]}
 
     def controle_fotografar(self, nome):
         nome = (nome or "").strip()
         if not nome:
             raise ValueError("Dê um nome ao preset.")
-        r = core.fotografar_perfil(nome)
+        r = nucleo_controles.fotografar_perfil(nome)
         if not isinstance(r, dict) or not r.get("ok"):
             raise ValueError((r or {}).get("erro", "Não foi possível salvar o preset."))
         return r
@@ -207,24 +207,24 @@ class MixEmulacao:
         nome = (nome or "").strip()
         if not nome:
             raise ValueError("Escolha um preset para aplicar.")
-        r = core.aplicar_preset_controle(nome)
+        r = nucleo_controles.aplicar_preset_controle(nome)
         if not isinstance(r, dict) or not r.get("ok"):
             raise ValueError((r or {}).get("erro", "Não foi possível aplicar o preset."))
         return r
 
     def controle_gerar(self, tipo):
         tipo = (tipo or "").strip()
-        if tipo not in core.NOMES_TIPO:
+        if tipo not in nucleo_controles.NOMES_TIPO:
             raise ValueError("Escolha um tipo de controle.")
         guid, port, rot = "", 0, {}
         try:
-            det = core.detectar_sdl()
+            det = nucleo_controles.detectar_sdl()
             if det:
                 guid, port = det[0].get("guid", ""), det[0].get("port", 0)
-            rot = core.nomes_sdl()
+            rot = nucleo_controles.nomes_sdl()
         except Exception:
             pass
-        r = core.salvar_mapa_gerado(tipo, guid=guid, port=port,
+        r = nucleo_controles.salvar_mapa_gerado(tipo, guid=guid, port=port,
                                     nome=f"{tipo}-hub", rotulos=rot)
         if not isinstance(r, dict) or not r.get("ok"):
             raise ValueError((r or {}).get("erro", "Não foi possível gerar o mapa."))
@@ -233,10 +233,10 @@ class MixEmulacao:
     def controle_estado(self):
         """Resumo ao vivo do pad 0. Hardware real em produção; testes simulam."""
         try:
-            est = core.ler_estado_xinput(0)
+            est = nucleo_controles.ler_estado_xinput(0)
         except Exception as e:
             raise ValueError(f"Sem leitura do controle: {e}")
-        return {"resumo": core.resumir_estado(est)}
+        return {"resumo": nucleo_controles.resumir_estado(est)}
 
 
 __all__ = ["MixEmulacao"]

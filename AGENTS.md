@@ -15,7 +15,8 @@ entram no Git.
 - Sem elevação UAC, execução de jogos, downloads reais ou escrita fora da área
   de desenvolvimento durante testes. Use subprocessos/rede simulados.
 - Segredos recusados devem ser atualizados pelo usuário no Hub, nunca no chat.
-- Repositório e releases continuam privados. Não anexar provas/dados locais.
+- Repositório e releases são públicos: nunca anexar provas, dados locais,
+  capas comerciais ou dados pessoais (e-mail, caminhos, nomes) a commits.
 - Steam é catálogo/wishlist/referência, não launcher nem sync de conquistas.
 - Rede só por ação do usuário. Exceções aprovadas: o Calendário de Filmes e
   Séries renova as séries seguidas ao abrir a aba (no máximo a cada 12 h) e o
@@ -28,17 +29,24 @@ entram no Git.
 
 ## Código e validação
 
-- Núcleo Python stdlib; o desktop é o app Electron (`codigo/frontends/electron`,
-  ponte NDJSON em `ponte.py`). A TUI curses atende Linux/macOS. Não
-  reintroduzir tkinter, Qt/PySide6 nem um "modo clássico".
-- Raiz enxuta: só README, LICENSE, AGENTS.md, pyproject.toml, `.git*`, um
-  lançador por SO (`TucoTeca.bat`, `tucoteca.sh`) e as pastas `.github`,
-  `codigo`, `docs`. Os aliases `BibliotecaHub.*` foram removidos na 1.4.7.
+- Núcleo Python stdlib; a única interface é o app Electron
+  (`codigo/frontends/electron`, ponte NDJSON em `ponte.py`), no Windows e no
+  macOS (Intel e Apple Silicon). A TUI saiu na 2.0. Não reintroduzir
+  tkinter, Qt/PySide6, curses nem um "modo clássico".
+- Código importa o módulo dono (`from bib_nucleo import banco`); a fachada
+  `bib_core` saiu na 2.0. Nos testes, `patch.object` mira esse módulo.
+- Diferenças de SO ficam atrás de `sys.platform`/`eh_mac()` no núcleo e de
+  `window.tucoteca.plataforma` (`ehMac()`) no renderer; testes de caminho
+  passam a plataforma explicitamente (rodam em Windows e macOS no CI).
+- Raiz enxuta: só README, LICENSE, AGENTS.md, pyproject.toml, `.git*`,
+  `TucoTeca.bat` e as pastas `.github`, `codigo`, `docs`.
 - Não reescrever o domínio para implementar a paridade visual.
 - Testes: `py -3.14 -B codigo/ferramentas/testes/executar.py [--modulo <modulo>]`.
   Suíte completa: sem argumentos. Pytest/cobertura quando disponíveis.
   Electron: `npm --prefix codigo/frontends/electron run typecheck` e `npm test`.
-  Gates juntos: `py -3.14 -B codigo/ferramentas/validar.py`.
+  Gates juntos: `py -3.14 -B codigo/ferramentas/validar.py`. O CI
+  (`.github/workflows/testes.yml`) roda a suíte em Windows, Linux e macOS e
+  gera/testa as `.dmg`; prova de Mac é o CI ou um Mac real, nunca simulação.
 - Lint: `ruff check codigo` (venv própria em `.provas/venv-ruff` se
   o Python global não tiver) e `git diff --check`.
 - Provas e caches ficam em `.provas/`.

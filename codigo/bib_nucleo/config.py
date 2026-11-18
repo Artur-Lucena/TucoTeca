@@ -4,7 +4,7 @@
 
 Fonte única para as variáveis BIBLIOTECA_* (e HYDRA_DB_PATH), com
 tipos, defaults documentados e parsing dos formatos históricos (`;` para
-listas de caminhos, `,` para hosts, `0/false/no/off` para desligar).
+listas de caminhos, `0/false/no/off` para desligar).
 
 O núcleo permanece stdlib: nada aqui importa pacotes externos. `.env` não é
 lido automaticamente — use variáveis de ambiente ou um launcher que exporte
@@ -63,13 +63,6 @@ def _paths(v) -> tuple[Path, ...]:
     if not t:
         return ()
     return tuple(p for p in (_path(part) for part in t.split(";")) if p)
-
-
-def _hosts(v) -> tuple[str, ...]:
-    t = _txt(v)
-    if not t:
-        return ()
-    return tuple(h.strip() for h in t.split(",") if h.strip())
 
 
 def _str_ou_none(v) -> str | None:
@@ -149,7 +142,6 @@ class Config:
     everything_instancia: str | None = None
     rede: bool = True
     steam_id: str | None = None
-    steamrip_hosts: tuple[str, ...] = ()
     preco_regiao: str = "br"
     hydra_db_path: Path | None = None
 
@@ -176,8 +168,6 @@ class Config:
                 valores[campo] = padroes[campo] if not t else t
             elif campo in _CAMPOS_STR_OU_NONE:
                 valores[campo] = _str_ou_none(bruto)
-            elif campo == "steamrip_hosts":
-                valores[campo] = _hosts(bruto)
             else:  # pragma: no cover - campo novo sem categoria declarada
                 raise RuntimeError(f"campo sem parser: {campo}")
         return cls(**valores)
@@ -215,8 +205,7 @@ def _env(name: str, default: str = "") -> str:
     if isinstance(valor, bool):
         return "1" if valor else "0"
     if isinstance(valor, (tuple, list)):
-        separador = "," if name.upper() == "STEAMRIP_HOSTS" else ";"
-        return separador.join(str(x) for x in valor)
+        return ";".join(str(x) for x in valor)
     return str(valor)
 
 

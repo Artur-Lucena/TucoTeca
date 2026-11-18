@@ -3,7 +3,6 @@ import os
 import tempfile
 from pathlib import Path
 
-import bib_core as core  # noqa: F401  (garante import do núcleo no sandbox)
 from executar import afirmar
 
 TID = "000400000011C400"

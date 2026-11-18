@@ -71,25 +71,6 @@ def _dados_exportacao(con: sqlite3.Connection) -> dict:
             "jogos_meta": exportar_meta(con)}
 
 
-def exportar_json(destino, db_path=None) -> dict:
-    """Exporta biblioteca limpa (sem derivados) para .json."""
-    destino = Path(destino)
-    if destino.suffix.lower() != ".json":
-        destino = destino.with_suffix(".json")
-    if str(destino.parent):
-        destino.parent.mkdir(parents=True, exist_ok=True)
-    con = get_db(Path(db_path) if db_path else DEFAULT_DB)
-    try:
-        dados = _dados_exportacao(con)
-    finally:
-        con.close()
-    try:
-        gravar_atomico(destino, json.dumps(dados, ensure_ascii=False, indent=2).encode("utf-8"))
-    except OSError as e:
-        return {"ok": False, "erro": f"falha ao gravar: {e}"}
-    return {"ok": True, "destino": str(destino), "jogos": len(dados["jogos"])}
-
-
 def _saves_para_pacote() -> list[tuple[str, Path]]:
     """[(membro_no_zip, caminho)] dos saves de todos os providers instalados.
 
@@ -584,4 +565,4 @@ def idade_ultimo_backup_dias() -> float | None:
         return None
 
 
-__all__ = ['PACOTE_ESQUEMA', 'PACOTE_INFO', 'PACOTE_JSON', 'PACOTE_MANIFESTO', 'exportar_json', 'exportar_pacote', 'importar_pacote', 'fazer_backup', 'backup_pre_import', 'idade_ultimo_backup_dias']
+__all__ = ['PACOTE_ESQUEMA', 'PACOTE_INFO', 'PACOTE_JSON', 'PACOTE_MANIFESTO', 'exportar_pacote', 'importar_pacote', 'fazer_backup', 'backup_pre_import', 'idade_ultimo_backup_dias']

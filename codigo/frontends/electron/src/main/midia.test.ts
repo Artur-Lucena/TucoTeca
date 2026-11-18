@@ -101,15 +101,30 @@ describe('pastas de Filmes e Séries', () => {
   })
 
   it('raiz aceita: absoluta e não-raiz de disco', () => {
-    expect(raizMidiaAceita('D:\\Filmes')).toBe(true)
-    expect(raizMidiaAceita('D:\\')).toBe(false)
-    expect(raizMidiaAceita('D:')).toBe(false)
-    expect(raizMidiaAceita('relativa/pasta')).toBe(false)
-    expect(raizMidiaAceita('')).toBe(false)
+    expect(raizMidiaAceita('D:\\Filmes', 'win32')).toBe(true)
+    expect(raizMidiaAceita('D:\\', 'win32')).toBe(false)
+    expect(raizMidiaAceita('D:', 'win32')).toBe(false)
+    expect(raizMidiaAceita('relativa/pasta', 'win32')).toBe(false)
+    expect(raizMidiaAceita('', 'win32')).toBe(false)
+    expect(raizMidiaAceita('/Volumes/HD/Filmes', 'darwin')).toBe(true)
+    expect(raizMidiaAceita('/', 'darwin')).toBe(false)
+    expect(raizMidiaAceita('D:\\Filmes', 'darwin')).toBe(false)
+  })
+
+  it('macOS: pasta escolhida vale sem diferenciar caixa nem forma Unicode', () => {
+    const pasta = '/Users/isa/Movies/Séries'
+    const nfd = '/users/isa/movies/se\u0301ries/Ep 1.mkv'
+    expect(caminhoDaUrlMidia('/Users/isa/Documents/TucoTeca', url(nfd), 'darwin', [pasta])).toBe(nfd)
+    expect(caminhoDaUrlMidia('/Users/isa/Documents/TucoTeca', url('/Users/isa/Movies/Outra/x.mkv'), 'darwin', [pasta])).toBeNull()
   })
 
   it('lê as raízes da resposta do núcleo e descarta as ruins', () => {
-    expect(raizesDaResposta({ pastas: [{ caminho: 'D:\\Filmes' }, { caminho: 'C:\\' }, { x: 1 }, null] })).toEqual(['D:\\Filmes'])
+    expect(
+      raizesDaResposta({ pastas: [{ caminho: 'D:\\Filmes' }, { caminho: 'C:\\' }, { x: 1 }, null] }, 'win32'),
+    ).toEqual(['D:\\Filmes'])
+    expect(raizesDaResposta({ pastas: [{ caminho: '/Volumes/HD/Filmes' }, { caminho: '/' }] }, 'darwin')).toEqual([
+      '/Volumes/HD/Filmes',
+    ])
     expect(raizesDaResposta(null)).toEqual([])
     expect(raizesDaResposta({ pastas: 'x' })).toEqual([])
   })

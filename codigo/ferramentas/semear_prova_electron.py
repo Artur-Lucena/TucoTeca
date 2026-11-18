@@ -119,33 +119,33 @@ def main(argv=None) -> int:
         if caminho not in sys.path:
             sys.path.insert(0, caminho)
 
-    import bib_core as core
+    from bib_nucleo import banco, base
 
-    core.garantir_dirs()
-    con = core.get_db(core.DEFAULT_DB)
+    base.garantir_dirs()
+    con = banco.get_db(base.DEFAULT_DB)
     try:
         for titulo, horas, ultima in JOGOS:
             probe = titulo == JOGO_DE_PROVA and _executavel_de_prova()
-            jogo = core.criar_jogo(con, {
+            jogo = banco.criar_jogo(con, {
                 "titulo": titulo,
                 "executable_path": _executavel_de_prova() if probe else "",
                 "launch_options": LAUNCH_PROVA if probe else ""})
             if horas:
-                core.adicionar_horas(con, jogo["id"], horas)
+                banco.adicionar_horas(con, jogo["id"], horas)
             nome_capa = f"semente-{jogo['id']}.png"
-            _png(core.CAPAS_DIR / nome_capa, 300, 400, titulo)
+            _png(base.CAPAS_DIR / nome_capa, 300, 400, titulo)
             con.execute("UPDATE jogos SET capa=? WHERE id=?", (nome_capa, jogo["id"]))
             if ultima:
                 con.execute("UPDATE jogos SET ultima_execucao=? WHERE id=?",
                             (ultima, jogo["id"]))
         con.commit()
         for indice, (titulo, artista, album, freq) in enumerate(MUSICAS, start=1):
-            wav = core.MUSICAS_DIR / f"semente-p1-{indice:04d}.wav"
+            wav = base.MUSICAS_DIR / f"semente-p1-{indice:04d}.wav"
             sha = _wav(wav, freq)
-            core.criar_musica(con, {"titulo": titulo, "artista": artista, "album": album,
+            banco.criar_musica(con, {"titulo": titulo, "artista": artista, "album": album,
                                     "musica_path": str(wav), "musica_sha": sha})
         for titulo, appid in DESEJOS:
-            core.adicionar_desejo(con, appid, titulo)
+            banco.adicionar_desejo(con, appid, titulo)
     finally:
         con.close()
 

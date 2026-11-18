@@ -6,7 +6,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import banco
 from executar import afirmar
 
 
@@ -51,7 +51,7 @@ def teste_musica_import_dedup_crud():
     src.mkdir()
     _mp3(src, "A - B.mp3")
     _mp3(src, "C - D.mp3", titulo="Dee", artista="Cee", album="")
-    con = core.get_db(tmp / "m.db")
+    con = banco.get_db(tmp / "m.db")
     try:
         cols = {r["name"] for r in con.execute("PRAGMA table_info(musicas)").fetchall()}
         afirmar({"titulo", "musica_sha", "musica_path", "musica_capa"} <= cols,
@@ -60,21 +60,21 @@ def teste_musica_import_dedup_crud():
         afirmar(r == {"novos": 2, "ignorados": 0, "erros": [], "capas": 0}, r)
         r = MUS.importar_musicas(con, src, capa_auto=False)
         afirmar(r["novos"] == 0 and r["ignorados"] == 2, r)
-        lst = core.listar_musicas(con)
+        lst = banco.listar_musicas(con)
         afirmar(len(lst) == 2, lst)
-        afirmar(core.listar_musicas(con, q="cee")[0]["titulo"] == "Dee")
-        mid = core.listar_musicas(con, q="bee")[0]["id"]
-        alvo = Path(core.listar_musicas(con, q="bee")[0]["musica_path"])
+        afirmar(banco.listar_musicas(con, q="cee")[0]["titulo"] == "Dee")
+        mid = banco.listar_musicas(con, q="bee")[0]["id"]
+        alvo = Path(banco.listar_musicas(con, q="bee")[0]["musica_path"])
         afirmar(alvo.is_file(), alvo)
-        core.excluir_musica(con, mid)
-        afirmar(not alvo.exists() and len(core.listar_musicas(con)) == 1)
+        banco.excluir_musica(con, mid)
+        afirmar(not alvo.exists() and len(banco.listar_musicas(con)) == 1)
         try:
-            core.criar_musica(con, {"titulo": "", "musica_sha": "x"})
+            banco.criar_musica(con, {"titulo": "", "musica_sha": "x"})
             afirmar(False, "devia levantar")
         except ValueError:
             pass
         try:
-            core.excluir_musica(con, 9999)
+            banco.excluir_musica(con, 9999)
             afirmar(False, "devia levantar")
         except LookupError:
             pass
@@ -116,7 +116,7 @@ def teste_musica_tracks_json_e_migracao_v12():
                 " UNIQUE(titulo, executable_path, launch_options))")
     con.commit()
     con.close()
-    con = core.get_db(leg)
+    con = banco.get_db(leg)
     try:
         cols = {r["name"] for r in con.execute("PRAGMA table_info(musicas)").fetchall()}
         afirmar("musica_sha" in cols, sorted(cols))
@@ -124,20 +124,6 @@ def teste_musica_tracks_json_e_migracao_v12():
         afirmar(njogos == 0, njogos)
     finally:
         con.close()
-
-
-def teste_musica_helpers_texto_e_sugestao():
-    from bib_nucleo import musicas as MUS
-    afirmar(MUS.texto_musica({"titulo": "Bee", "artista": "Aaa"}) == "Aaa — Bee")
-    afirmar(MUS.texto_musica({"titulo": "Solo", "artista": ""}) == "Solo")
-    afirmar(MUS.texto_musica({}) == "")
-    afirmar(MUS.harmoni_dir() is None)  # sandbox sem music/ (onboarding)
-    s = MUS.sugestao_harmoni_dir()
-    afirmar(isinstance(s, str), s)
-    if os.name == "nt":
-        afirmar(s.endswith("music"), s)
-    else:
-        afirmar(s == "", s)
 
 
 def teste_musica_tracks_json_invalido():
@@ -160,7 +146,7 @@ def teste_pacote_v4_musicas():
     src = tmp / "src"
     src.mkdir()
     _mp3(src, "A - B.mp3")
-    con = core.get_db(tmp / "m.db")
+    con = banco.get_db(tmp / "m.db")
     try:
         MUS.importar_musicas(con, src, capa_auto=False)
     finally:
@@ -170,13 +156,13 @@ def teste_pacote_v4_musicas():
     afirmar(r.get("ok"), r)
     nomes = [i.filename for i in zipfile.ZipFile(dest).infolist()]
     afirmar(any(n.startswith("musicas/") for n in nomes), nomes)
-    con2 = core.get_db(tmp / "m2.db")
+    con2 = banco.get_db(tmp / "m2.db")
     con2.close()
     r = PAC.importar_pacote(dest, db_path=tmp / "m2.db")
     afirmar(r.get("ok") and r.get("musicas", 0) == 1, r)
-    con2 = core.get_db(tmp / "m2.db")
+    con2 = banco.get_db(tmp / "m2.db")
     try:
-        lst = core.listar_musicas(con2)
+        lst = banco.listar_musicas(con2)
         afirmar(len(lst) == 1 and lst[0]["titulo"] == "Bee", lst)
         afirmar(Path(lst[0]["musica_path"]).is_file(), lst)
     finally:
@@ -184,7 +170,6 @@ def teste_pacote_v4_musicas():
 
 
 def teste_musica_capa_auto_env():
-    import os
 
     from bib_nucleo import musicas as MUS
     afirmar(MUS.capa_musica_auto() is True)
@@ -235,16 +220,16 @@ def teste_musica_capa_busca_e_baixa_mock():
     src = tmp / "src"
     src.mkdir()
     _mp3(src, "A - B.mp3")
-    con = core.get_db(tmp / "m.db")
+    con = banco.get_db(tmp / "m.db")
     busca = json.dumps({"results": [
         {"artworkUrl100": "https://example.com/a/100x100bb.jpg"}]}).encode()
     velho, chamadas = _urlopen_mockado([busca, b"JPG" * 800, busca])
     try:
         MUS.importar_musicas(con, src, capa_auto=False)
-        mid = core.listar_musicas(con)[0]["id"]
+        mid = banco.listar_musicas(con)[0]["id"]
         r = MUS.baixar_capa_album(con, mid)
         afirmar(r.get("ok") and r.get("capa", "").endswith(".jpg"), r)
-        row = core.listar_musicas(con)[0]
+        row = banco.listar_musicas(con)[0]
         afirmar(row["musica_capa"] == r["capa"], row)
         from bib_nucleo.base import CAPAS_DIR
         afirmar((CAPAS_DIR / r["capa"]).is_file(), r)
@@ -270,12 +255,12 @@ def teste_musica_capa_rede_falha():
     src = tmp / "src"
     src.mkdir()
     _mp3(src, "A - B.mp3")
-    con = core.get_db(tmp / "m.db")
+    con = banco.get_db(tmp / "m.db")
     velho, _ch = _urlopen_mockado([urllib.request.URLError("offline"),
                                    urllib.request.URLError("offline")])
     try:
         MUS.importar_musicas(con, src, capa_auto=False)
-        mid = core.listar_musicas(con)[0]["id"]
+        mid = banco.listar_musicas(con)[0]["id"]
         r = MUS.baixar_capa_album(con, mid)
         afirmar(not r.get("ok") and r.get("capa_pendente"), r)
         r = MUS.baixar_capas_faltantes(con)
@@ -299,11 +284,11 @@ def teste_musica_capa_v15_legado():
     con.execute("INSERT INTO musicas (titulo, musica_sha) VALUES ('Velha', 's')")
     con.commit()
     con.close()
-    con = core.get_db(leg)
+    con = banco.get_db(leg)
     try:
         cols = {r["name"] for r in con.execute("PRAGMA table_info(musicas)").fetchall()}
         afirmar("musica_capa" in cols, sorted(cols))
-        lst = core.listar_musicas(con)
+        lst = banco.listar_musicas(con)
         afirmar(len(lst) == 1 and lst[0]["titulo"] == "Velha", lst)
     finally:
         con.close()
@@ -316,15 +301,15 @@ def teste_musica_capa_salvar_e_pacote():
     src = tmp / "src"
     src.mkdir()
     _mp3(src, "A - B.mp3")
-    con = core.get_db(tmp / "m.db")
+    con = banco.get_db(tmp / "m.db")
     try:
         MUS.importar_musicas(con, src, capa_auto=False)
-        mid = core.listar_musicas(con)[0]["id"]
-        r = core.salvar_capa_musica_bytes(con, mid, "arte.jpg", b"J" * 2048)
+        mid = banco.listar_musicas(con)[0]["id"]
+        r = banco.salvar_capa_musica_bytes(con, mid, "arte.jpg", b"J" * 2048)
         afirmar(r.get("ok") and r["capa"].startswith(f"mus-{mid}-"), r)
-        r = core.salvar_capa_musica_bytes(con, 9999, "a.jpg", b"J" * 2048)
+        r = banco.salvar_capa_musica_bytes(con, 9999, "a.jpg", b"J" * 2048)
         afirmar(not r.get("ok"), r)
-        r = core.salvar_capa_musica_bytes(con, mid, "a.txt", b"J" * 2048)
+        r = banco.salvar_capa_musica_bytes(con, mid, "a.txt", b"J" * 2048)
         afirmar(not r.get("ok"), r)
     finally:
         con.close()
@@ -335,9 +320,9 @@ def teste_musica_capa_salvar_e_pacote():
     afirmar(any(n.startswith("capas/mus-") for n in nomes), nomes)
     r = PAC.importar_pacote(dest, db_path=tmp / "m2.db")
     afirmar(r.get("ok") and r.get("musicas", 0) == 1, r)
-    con2 = core.get_db(tmp / "m2.db")
+    con2 = banco.get_db(tmp / "m2.db")
     try:
-        lst = core.listar_musicas(con2)
+        lst = banco.listar_musicas(con2)
         afirmar(len(lst) == 1 and lst[0]["musica_capa"].startswith("mus-"), lst)
         from bib_nucleo.base import CAPAS_DIR
         afirmar((CAPAS_DIR / lst[0]["musica_capa"]).is_file(), lst)
@@ -353,23 +338,23 @@ def teste_pacote_audio_sha_e_capa_em_reimportacao():
     src.mkdir()
     _mp3(src)
     db = tmp / "origem.db"
-    con = core.get_db(db)
+    con = banco.get_db(db)
     MUS.importar_musicas(con, src, capa_auto=False)
-    m = core.listar_musicas(con)[0]
-    core.salvar_capa_musica_bytes(con, m["id"], "arte.jpg", b"J" * 2048)
+    m = banco.listar_musicas(con)[0]
+    banco.salvar_capa_musica_bytes(con, m["id"], "arte.jpg", b"J" * 2048)
     con.close()
     pacote = tmp / "ok.zip"
     PAC.exportar_pacote(pacote, db_path=db, incluir_saves=False)
     destino = tmp / "destino.db"
     afirmar(PAC.importar_pacote(pacote, db_path=destino)["ok"])
-    con = core.get_db(destino)
-    salvo = core.listar_musicas(con)[0]
+    con = banco.get_db(destino)
+    salvo = banco.listar_musicas(con)[0]
     con.execute("UPDATE musicas SET musica_capa='' WHERE id=?", (salvo["id"],))
     con.commit()
     con.close()
     res = PAC.importar_pacote(pacote, db_path=destino)
-    con = core.get_db(destino)
-    afirmar(core.listar_musicas(con)[0]["musica_capa"], res)
+    con = banco.get_db(destino)
+    afirmar(banco.listar_musicas(con)[0]["musica_capa"], res)
     con.close()
     # Pacote com áudio adulterado e hash antigo, numa casa sem arquivo existente.
     from unittest.mock import patch

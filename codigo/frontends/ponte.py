@@ -956,10 +956,10 @@ def iniciar(argv=None, entrada=None, saida=None, servico_factory=None) -> int:
     if servico_factory is not None:  # testes em processo, sem lock nem disco real
         Ponte(servico_factory()).servir(entrada or sys.stdin, saida or sys.stdout)
         return 0
-    import bib_core as core
+    from bib_nucleo import base
     from servicos_ui import ServicoBiblioteca
-    core.garantir_dirs()
-    trava = core.adquirir_lock(ignorar=args.ignorar_lock)
+    base.garantir_dirs()
+    trava = base.adquirir_lock(ignorar=args.ignorar_lock)
     if not trava.get("ok"):
         evento = {"evento": "bloqueio",
                   "dados": {"erro": trava.get("erro", "TucoTeca já está aberto.")}}
@@ -968,11 +968,11 @@ def iniciar(argv=None, entrada=None, saida=None, servico_factory=None) -> int:
         destino.flush()
         return 2
     try:
-        db = Path(args.db) if args.db else Path(core.DEFAULT_DB)
+        db = Path(args.db) if args.db else Path(base.DEFAULT_DB)
         Ponte(ServicoBiblioteca(db)).servir(entrada or sys.stdin, saida or sys.stdout)
         return 0
     finally:
-        core.liberar_lock()
+        base.liberar_lock()
 
 
 if __name__ == "__main__":

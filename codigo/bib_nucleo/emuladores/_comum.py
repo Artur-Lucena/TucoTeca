@@ -6,33 +6,43 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def _app_macos(pasta: Path) -> str:
-    """Binário dentro de *.app (macOS): bundle -> Contents/MacOS/<bin>.
+def binario_do_app(app: Path) -> str:
+    """Executável de um bundle *.app (macOS): Contents/MacOS/<bin>, ou "".
 
     Ordem: nome exato do .app > prefixo do nome > maior arquivo (helpers
-    tipo *-room nunca vencem um binário da família). Qualquer emulador
-    (Azahar, DeSmuME) resolve pelo mesmo caminho.
+    tipo *-room nunca vencem um binário da família).
     """
+    try:
+        macos = Path(app) / "Contents" / "MacOS"
+        if not macos.is_dir():
+            return ""
+        bins = [b for b in macos.iterdir() if b.is_file()]
+        if not bins:
+            return ""
+        alvo = Path(app).stem.lower()
+        exatos = [b for b in bins if b.name.lower() == alvo]
+        if exatos:
+            return str(exatos[0])
+        familia = [b for b in bins if b.name.lower().startswith(alvo)]
+        cands = familia or bins
+        try:
+            return str(max(cands, key=lambda b: b.stat().st_size))
+        except OSError:
+            return str(cands[0])
+    except OSError:
+        return ""
+
+
+def _app_macos(pasta: Path) -> str:
+    """Binário do primeiro *.app da pasta. Qualquer emulador (Azahar,
+    DeSmuME) resolve pelo mesmo caminho."""
     try:
         if not pasta.is_dir():
             return ""
         for app in sorted(pasta.glob("*.app")):
-            macos = app / "Contents" / "MacOS"
-            if not macos.is_dir():
-                continue
-            bins = [b for b in macos.iterdir() if b.is_file()]
-            if not bins:
-                continue
-            alvo = app.stem.lower()
-            exatos = [b for b in bins if b.name.lower() == alvo]
-            if exatos:
-                return str(exatos[0])
-            familia = [b for b in bins if b.name.lower().startswith(alvo)]
-            cands = familia or bins
-            try:
-                return str(max(cands, key=lambda b: b.stat().st_size))
-            except OSError:
-                return str(cands[0])
+            binario = binario_do_app(app)
+            if binario:
+                return binario
         return ""
     except OSError:
         return ""

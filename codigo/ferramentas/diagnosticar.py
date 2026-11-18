@@ -72,14 +72,17 @@ def diagnosticar_banco(db: Path) -> dict:
 
 def diagnosticar(repo: Path = REPO, db: Path | None = None) -> dict:
     sys.path.insert(0, str(repo / "codigo"))
-    import bib_core as core
+    from bib_nucleo import baixar, base, emuladores, scans
+    from bib_nucleo import banco as _banco
+    from bib_nucleo.rede import repacks
     fonte = resumo_fontes(repo)
-    ausentes = [n for n in core.__all__ if not hasattr(core, n)]
+    ausentes = [f"{m.__name__}.{n}" for m in (_banco, baixar, base, emuladores, scans)
+                for n in getattr(m, "__all__", ()) if not hasattr(m, n)]
     deps = {"pillow_opcional": importlib.util.find_spec("PIL") is not None,
-            "ffmpeg": bool(core.ffmpeg_pronto()), "yt-dlp": bool(core.ytdlp_pronto()),
-            "7z": core.ferramenta_7z() is not None,
-            "azahar": bool(core.default_emu_3ds()), "desmume": bool(core.default_emu_nds())}
-    banco = diagnosticar_banco(db if db is not None else core.DEFAULT_DB)
+            "ffmpeg": bool(baixar.ffmpeg_pronto()), "yt-dlp": bool(baixar.ytdlp_pronto()),
+            "7z": repacks.ferramenta_7z() is not None,
+            "azahar": bool(emuladores.default_emu_3ds()), "desmume": bool(emuladores.default_emu_nds())}
+    banco = diagnosticar_banco(db if db is not None else base.DEFAULT_DB)
     return {"ok": not fonte["erros_sintaxe"] and not ausentes and banco["estado"] != "erro",
             "python": sys.version.split()[0], "plataforma": sys.platform,
             "somente_leitura": True, "fontes": fonte, "exports_ausentes": ausentes,

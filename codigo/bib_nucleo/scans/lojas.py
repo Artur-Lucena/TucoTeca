@@ -84,6 +84,9 @@ def hydra_db_candidates() -> list[Path]:
         cands.append(Path(appdata) / "hydralauncher" / "hydra-db")
         cands.append(Path(appdata) / "hydra" / "hydra-db")
     home = Path.home()
+    suporte = home / "Library" / "Application Support"  # macOS
+    cands.append(suporte / "hydralauncher" / "hydra-db")
+    cands.append(suporte / "hydra" / "hydra-db")
     cands.append(home / ".config" / "hydralauncher" / "hydra-db")
     cands.append(home / ".config" / "hydra" / "hydra-db")
     cands.append(home / ".var" / "app" / "io.github.hydralauncher.hydra" / "config" / "hydralauncher" / "hydra-db")
@@ -152,7 +155,8 @@ def _steamapps_dirs() -> list[Path]:
         cands += [pf86 / "Steam/steamapps", pf / "Steam/steamapps"]
     else:
         h = Path.home()
-        cands += [h / ".local/share/Steam/steamapps", h / ".steam/steam/steamapps"]
+        cands += [h / ".local/share/Steam/steamapps", h / ".steam/steam/steamapps",
+                  h / "Library/Application Support/Steam/steamapps"]
     for r in default_scan_roots():
         cands.append(Path(r) / "steamapps")
         cands.append(Path(r))  # a raiz pode SER o steamapps

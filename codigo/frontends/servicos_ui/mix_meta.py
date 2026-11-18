@@ -4,7 +4,7 @@ from __future__ import annotations
 from contextlib import closing
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import banco
 from bib_nucleo.banco import meta as banco_meta
 
 from .sistema import capa_url
@@ -31,11 +31,11 @@ def _publico(meta: dict) -> dict:
 
 class MixMeta:
     def _meta_de(self, uuid):
-        with closing(core.get_db(self.db_path)) as con:
+        with closing(banco.get_db(self.db_path)) as con:
             return banco_meta.ler_meta(con, uuid)
 
     def _gravar_meta(self, uuid, novos, **opcoes):
-        with self._escrita, closing(core.get_db(self.db_path)) as con:
+        with self._escrita, closing(banco.get_db(self.db_path)) as con:
             return banco_meta.gravar_meta(con, uuid, novos, **opcoes)
 
     def pagina_jogo(self, gid):
@@ -43,7 +43,7 @@ class MixMeta:
         from bib_nucleo.preferencias_pessoais import aplicar_perfil
         from bib_nucleo.rede import provedores
         jogo = aplicar_perfil([self.jogo(gid)])[0]
-        jogo.update(capa_url=capa_url(jogo.get("capa")), plataforma=core.plataforma_jogo(jogo))
+        jogo.update(capa_url=capa_url(jogo.get("capa")), plataforma=banco.plataforma_jogo(jogo))
         meta = self._meta_de(jogo.get("uuid") or "")
         return {"jogo": jogo, "meta": _publico(meta), "provedores": provedores.estado(),
                 "enriquecido": bool(meta.get("fontes"))}
@@ -76,7 +76,7 @@ class MixMeta:
         from bib_nucleo.rede import exigir_rede
         exigir_rede("Buscar dados dos jogos")
         cancelado = cancelado or (lambda: False)
-        with closing(core.get_db(self.db_path)) as con:
+        with closing(banco.get_db(self.db_path)) as con:
             pendentes = banco_meta.uuids_sem_meta(con)
         com_dados = sem_dados = 0
         for i, (gid, _uuid) in enumerate(pendentes):
@@ -97,7 +97,7 @@ class MixMeta:
 
     def salvar_meta(self, gid, campos):
         jogo = self.jogo(gid)
-        with self._escrita, closing(core.get_db(self.db_path)) as con:
+        with self._escrita, closing(banco.get_db(self.db_path)) as con:
             return _publico(banco_meta.salvar_edicao(con, jogo.get("uuid") or "", campos))
 
     def buscar_artes(self, gid, tipo):

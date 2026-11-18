@@ -4,8 +4,11 @@ from __future__ import annotations
 from contextlib import closing
 from pathlib import Path
 
-import bib_core as core
-from bib_nucleo import capas, online, spotify
+from bib_nucleo import apps_externos, banco, base, capas, online, pacotes, spotify
+from bib_nucleo import baixar as nucleo_baixar
+from bib_nucleo import musicas as nucleo_musicas
+from bib_nucleo import videos as nucleo_videos
+from bib_nucleo.rede import videos_youtube
 
 
 class MixMidia:
@@ -21,8 +24,8 @@ class MixMidia:
         from bib_nucleo.rede import capas_libretro
         jogo = self.jogo(gid)
         r = capas_libretro.buscar_capa_libretro(
-            jogo.get("plataforma") or core.plataforma_jogo(jogo), jogo.get("titulo"))
-        return self.alterar(lambda con: core.salvar_capa_bytes(
+            jogo.get("plataforma") or banco.plataforma_jogo(jogo), jogo.get("titulo"))
+        return self.alterar(lambda con: banco.salvar_capa_bytes(
             con, gid, f"libretro-{gid}{r['ext']}", r["raw"]))
 
     def buscar_musicas_online(self, termo, fonte="todas", atualizar=False):
@@ -47,34 +50,34 @@ class MixMidia:
         return letras.buscar_letras(artista, titulo, album, duracao_s)
 
     def enfileirar_musicas(self, itens):
-        metas = online.ler_json(core.DADOS_DIR / "musicas-online/faixas.json", {})
+        metas = online.ler_json(base.DADOS_DIR / "musicas-online/faixas.json", {})
         metas = metas if isinstance(metas, dict) else {}
         metas.update({i["uri"]: i for i in itens if i.get("uri") and i.get("capa_url")})
         if metas:
-            online.gravar_json(core.DADOS_DIR / "musicas-online/faixas.json", metas)
-        return self.alterar(lambda con: core.enfileirar_downloads(con, itens))
+            online.gravar_json(base.DADOS_DIR / "musicas-online/faixas.json", metas)
+        return self.alterar(lambda con: banco.enfileirar_downloads(con, itens))
 
     def instalar_audio(self):
         resultados = []
-        if not core.ffmpeg_pronto():
-            resultados.append(core.instalar_ffmpeg())
-        if not core.ytdlp_pronto():
-            resultados.append(core.instalar_ytdlp())
+        if not nucleo_baixar.ffmpeg_pronto():
+            resultados.append(nucleo_baixar.instalar_ffmpeg())
+        if not nucleo_baixar.ytdlp_pronto():
+            resultados.append(nucleo_baixar.instalar_ytdlp())
         erros = [r.get("erro", "Falha na instalação.") for r in resultados if not r.get("ok")]
         return {"ok": not erros, "erros": erros}
 
     def baixar_musicas(self, cancelar, progresso=None):
-        core.fazer_backup(self.db_path)
+        pacotes.fazer_backup(self.db_path)
         novas = 0
         erros = []
-        with closing(core.get_db(self.db_path)) as con:
-            fila = [d for d in core.listar_downloads(con) if d["estado"] in ("pendente", "falha", "baixando", "baixado")]
+        with closing(banco.get_db(self.db_path)) as con:
+            fila = [d for d in banco.listar_downloads(con) if d["estado"] in ("pendente", "falha", "baixando", "baixado")]
             def staging_pronto(d):
                 return d["estado"] == "falha" and bool(d.get("video_id")) and Path(d.get("musica_path") or "").is_file()
-            if any(d["estado"] != "baixado" and not staging_pronto(d) for d in fila) and not core.localizar_ytdlp():
+            if any(d["estado"] != "baixado" and not staging_pronto(d) for d in fila) and not nucleo_baixar.localizar_ytdlp():
                 raise ValueError("Instale yt-dlp em Dependências de áudio antes de baixar a fila.")
-            metas = online.ler_json(core.DADOS_DIR / "spotify/faixas.json", {})
-            publicas = online.ler_json(core.DADOS_DIR / "musicas-online/faixas.json", {})
+            metas = online.ler_json(base.DADOS_DIR / "spotify/faixas.json", {})
+            publicas = online.ler_json(base.DADOS_DIR / "musicas-online/faixas.json", {})
             metas = {**(metas if isinstance(metas, dict) else {}),
                      **(publicas if isinstance(publicas, dict) else {})}
             for n, d in enumerate(fila):
@@ -87,13 +90,13 @@ class MixMidia:
                 pct(d["id"], 0)
                 retomar_conversao = staging_pronto(d)
                 if retomar_conversao:
-                    core.marcar_download(con, d["id"], "baixado", video_id=d["video_id"], musica_path=d["musica_path"])
+                    banco.marcar_download(con, d["id"], "baixado", video_id=d["video_id"], musica_path=d["musica_path"])
                 if d["estado"] != "baixado" and not retomar_conversao:
-                    baixou = core.baixar_faixa(con, d["id"], progresso=pct)
+                    baixou = nucleo_baixar.baixar_faixa(con, d["id"], progresso=pct)
                     if not baixou.get("ok"):
                         erros.append(f'{d["titulo"]}: {baixou.get("erro")}')
                         continue
-                r = core.converter_faixa(con, d["id"], capa_auto=False)
+                r = nucleo_baixar.converter_faixa(con, d["id"], capa_auto=False)
                 if not r.get("ok"):
                     erros.append(f'{d["titulo"]}: {r.get("erro")}')
                     continue
@@ -104,9 +107,9 @@ class MixMidia:
                     try:
                         if online.url_https(meta.get("capa_url") or ""):
                             raw, ext, _ = online.baixar_imagem(meta["capa_url"])
-                            core.salvar_capa_musica_bytes(con, row["id"], "spotify-album" + ext, raw)
+                            banco.salvar_capa_musica_bytes(con, row["id"], "spotify-album" + ext, raw)
                         else:
-                            core.baixar_capa_album(con, row["id"])
+                            nucleo_musicas.baixar_capa_album(con, row["id"])
                     except (ValueError, OSError):
                         pass
         return {"novas": novas, "erros": erros, "cancelado": cancelar.is_set()}
@@ -114,64 +117,64 @@ class MixMidia:
     def buscar_videos_online(self, termo, limite=10, atualizar=False):
         from bib_nucleo.rede import exigir_rede
         exigir_rede("Buscar vídeos no YouTube")
-        return core.buscar_youtube(termo, limite=limite, atualizar=atualizar)
+        return videos_youtube.buscar_youtube(termo, limite=limite, atualizar=atualizar)
 
     def baixar_video_online(self, video_id, progresso=None):
-        core.fazer_backup(self.db_path)
-        with closing(core.get_db(self.db_path)) as con:
-            return core.baixar_video_youtube(con, video_id, progresso=progresso)
+        pacotes.fazer_backup(self.db_path)
+        with closing(banco.get_db(self.db_path)) as con:
+            return videos_youtube.baixar_video_youtube(con, video_id, progresso=progresso)
 
     def listar_videos(self, q=""):
-        with closing(core.get_db(self.db_path)) as con:
-            return core.listar_videos(con, q)
+        with closing(banco.get_db(self.db_path)) as con:
+            return banco.listar_videos(con, q)
 
     def importar_videos(self, pasta):
-        return self.alterar(lambda con: core.importar_videos(con, pasta))
+        return self.alterar(lambda con: nucleo_videos.importar_videos(con, pasta))
 
     def importar_musicas(self, pasta):
         # Capas remotas não são buscadas implicitamente nesta importação local.
-        return self.alterar(lambda con: core.importar_musicas(con, pasta, capa_auto=False))
+        return self.alterar(lambda con: nucleo_musicas.importar_musicas(con, pasta, capa_auto=False))
 
     def aplicar_eq_musica(self, caminho, preset="bass"):
         from bib_nucleo.musicas import ler_tags, sha_arquivo
         with self._escrita:
-            core.fazer_backup(self.db_path)
-            r = core.aplicar_eq(caminho, preset)
+            pacotes.fazer_backup(self.db_path)
+            r = apps_externos.aplicar_eq(caminho, preset)
             if not r.get("ok"):
                 raise ValueError(r.get("erro", "Falha na equalização."))
             tags = ler_tags(caminho)
-            with closing(core.get_db(self.db_path)) as con:
-                core.criar_musica(con, {**tags, "titulo": tags["titulo"] + " [EQ: " + preset + "]",
+            with closing(banco.get_db(self.db_path)) as con:
+                banco.criar_musica(con, {**tags, "titulo": tags["titulo"] + " [EQ: " + preset + "]",
                                        "musica_path": r["path"], "musica_sha": sha_arquivo(Path(r["path"])),
                                        "origem": "equalizacao"})
             return r
 
     def reproduzir_video(self, ident, reprodutor="auto"):
-        with closing(core.get_db(self.db_path)) as con:
+        with closing(banco.get_db(self.db_path)) as con:
             row = con.execute("SELECT video_path FROM videos WHERE id=?", (int(ident),)).fetchone()
         if row is None:
             raise LookupError("Vídeo não encontrado na videoteca.")
-        r = core.reproduzir_video(row["video_path"], reprodutor)
+        r = apps_externos.reproduzir_video(row["video_path"], reprodutor)
         if not r.get("ok"):
             raise ValueError(r.get("erro", "Não foi possível abrir o vídeo."))
         return r
 
     def abrir_ferramenta_midia(self, tipo, nome, caminho=""):
         import subprocess
-        grupos = {"imagens": (core.PROVEDORES_IMAGEM, core.localizar_editor),
-                  "equalizadores": (core.PROVEDORES_EQUALIZADOR, core.localizar_equalizador),
-                  "videos": (core.PROVEDORES_VIDEO, core.localizar_reprodutor)}
+        grupos = {"imagens": (apps_externos.PROVEDORES_IMAGEM, apps_externos.localizar_editor),
+                  "equalizadores": (apps_externos.PROVEDORES_EQUALIZADOR, apps_externos.localizar_equalizador),
+                  "videos": (apps_externos.PROVEDORES_VIDEO, apps_externos.localizar_reprodutor)}
         if tipo not in grupos or nome not in grupos[tipo][0]:
             raise ValueError("Ferramenta de mídia inválida.")
         exe = grupos[tipo][1](nome)
         if not exe:
             raise ValueError("Ferramenta não instalada; informe o executável no ambiente/runtime ou abra o site oficial.")
         if caminho and tipo == "imagens":
-            r = core.abrir_no_editor(nome, caminho)
+            r = apps_externos.abrir_no_editor(nome, caminho)
         elif caminho and tipo == "videos":
-            r = core.reproduzir_video(caminho, nome)
+            r = apps_externos.reproduzir_video(caminho, nome)
         elif caminho and nome == "audacity":
-            r = core.abrir_no_editor_audio(nome, caminho)
+            r = apps_externos.abrir_no_editor_audio(nome, caminho)
         else:
             subprocess.Popen([exe])
             r = {"ok": True}
@@ -180,18 +183,18 @@ class MixMidia:
         return r
 
     def baixar_mp3(self, video, progresso=None):
-        return self.alterar(lambda con: core.baixar_audio_youtube(con, video, progresso))
+        return self.alterar(lambda con: videos_youtube.baixar_audio_youtube(con, video, progresso))
 
     def video_local(self, ident):
         from bib_nucleo.apps_externos import resolver_video
-        with closing(core.get_db(self.db_path)) as con:
+        with closing(banco.get_db(self.db_path)) as con:
             row = con.execute("SELECT * FROM videos WHERE id=?", (int(ident),)).fetchone()
         if row is None:
             raise ValueError("Vídeo não encontrado.")
         path = resolver_video(row["video_path"])
         if not path:
             raise ValueError("Arquivo de vídeo ausente.")
-        posicoes = online.ler_json(core.DADOS_DIR / "videos-posicoes.json", {})
+        posicoes = online.ler_json(base.DADOS_DIR / "videos-posicoes.json", {})
         posicoes = posicoes if isinstance(posicoes, dict) else {}
         try:
             posicao = max(0, int(posicoes.get(row["video_sha"], 0)))
@@ -205,7 +208,7 @@ class MixMidia:
         if not re.fullmatch(r"[0-9a-f]{64}", sha):
             return
         with self._escrita:
-            alvo = core.DADOS_DIR / "videos-posicoes.json"
+            alvo = base.DADOS_DIR / "videos-posicoes.json"
             posicoes = online.ler_json(alvo, {})
             posicoes = posicoes if isinstance(posicoes, dict) else {}
             posicoes[sha] = max(0, int(posicao))

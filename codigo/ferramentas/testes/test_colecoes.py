@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
-import bib_core as core
+from bib_nucleo import banco, pacotes, scans
 from bib_nucleo.rede import online
 from executar import afirmar
 from ponte import Ponte, Trabalhos
@@ -14,8 +14,8 @@ from servicos_ui import ServicoBiblioteca
 
 def _banco(*titulos):
     db = Path(tempfile.mkdtemp(prefix="suite-col-")) / "hub.db"
-    con = core.get_db(db)
-    ids = [core.criar_jogo(con, {"titulo": t, "executable_path": f"C:/jogos/{t}.exe"})["id"] for t in titulos]
+    con = banco.get_db(db)
+    ids = [banco.criar_jogo(con, {"titulo": t, "executable_path": f"C:/jogos/{t}.exe"})["id"] for t in titulos]
     con.commit()
     return db, con, ids
 
@@ -89,13 +89,13 @@ def teste_pacote_leva_colecoes_e_metadados():
     meta.salvar_edicao(con, uuid, {"desenvolvedora": "Supergiant"})
     con.close()
     pacote = db.parent / "colecao.zip"
-    r = core.exportar_pacote(pacote, db, incluir_saves=False)
+    r = pacotes.exportar_pacote(pacote, db, incluir_saves=False)
     afirmar(r.get("ok"), r)
     novo = db.parent / "novo" / "hub.db"
     novo.parent.mkdir()
-    r = core.importar_pacote(pacote, novo)
+    r = pacotes.importar_pacote(pacote, novo)
     afirmar(r.get("ok") and r.get("colecoes") == 1 and r.get("jogos_meta") == 1, r)
-    con = core.get_db(novo)
+    con = banco.get_db(novo)
     try:
         afirmar(C.listar_colecoes(con) == [{"id": 1, "nome": "Zerados", "uuids": [uuid]}], C.listar_colecoes(con))
         m = meta.ler_meta(con, uuid)
@@ -161,7 +161,7 @@ def teste_lojas_instaladas_so_mostra_novos():
     achados = [{"titulo": "Hades", "executable_path": "C:\\jogos\\Hades.exe", "launch_options": ""},
                {"titulo": "Celeste", "executable_path": "D:/Epic/Celeste/Celeste.exe", "launch_options": ""}]
     info = {"fontes": [{"fonte": "Epic", "ok": True, "n": 2, "detalhe": ""}]}
-    with patch.object(core, "ler_do_disco", return_value=(achados, info)):
+    with patch.object(scans, "ler_do_disco", return_value=(achados, info)):
         t = chamar("jogos.lojas_prever")["resultado"]["trabalho"]
         fim = None
         for _ in range(200):

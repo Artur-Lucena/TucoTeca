@@ -141,6 +141,14 @@ def _lancar(executable_path: str, wine_prefix: str = "", launch_options: str = "
         else:
             ext = p.suffix.lower()
             nome_so = "Mac" if _E.eh_mac() else "Linux"
+            if _E.eh_mac() and ext == ".app" and p.is_dir():
+                # bundle: roda o binário de dentro (processo rastreável, conta horas)
+                from bib_nucleo.emuladores._comum import binario_do_app
+                interno = binario_do_app(p)
+                if not interno:
+                    return {"ok": False, "erro": f"App sem executável em Contents/MacOS: {exe}"}, None
+                p, ext = Path(interno), ""
+                cwd = str(p.parent)
             if ext in (".lnk", ".url") or p.is_dir():
                 return {"ok": False,
                         "erro": f"Atalho/pasta Windows não executa no {nome_so}: {exe}"}, None

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { acaoDoAtalho, combinacao, decidirAtalho } from './atalhos'
+import { acaoDoAtalho, combinacao, decidirAtalho, rotuloAtalho } from './atalhos'
 
 const tecla = (
   key: string,
@@ -14,6 +14,10 @@ describe('combinacao', () => {
     expect(combinacao(tecla(' ', { ctrlKey: true }))).toBe('Ctrl+Space')
     expect(combinacao(tecla('F11'))).toBe('F11')
     expect(combinacao(tecla('PageDown'))).toBe('PgDown')
+    // ⌘ do Mac vale como Ctrl; fora do Mac ele é Meta
+    expect(combinacao(tecla('k', { metaKey: true }), true)).toBe('Ctrl+K')
+    expect(combinacao(tecla('k', { metaKey: true, shiftKey: true }), true)).toBe('Ctrl+Shift+K')
+    expect(combinacao(tecla('k', { metaKey: true }))).toBe('Meta+K')
   })
 
   it('devolve null para tecla desconhecida', () => {
@@ -64,5 +68,14 @@ describe('decidirAtalho', () => {
     expect(decidirAtalho(true, 'Ctrl+F', atalhos, 'jogos')).toEqual({ tipo: 'fechar' })
     expect(decidirAtalho(true, 'Ctrl+2', atalhos, 'jogos')).toBeNull()
     expect(decidirAtalho(true, null, atalhos, 'jogos')).toBeNull()
+  })
+})
+
+describe('rotuloAtalho', () => {
+  it('Mac mostra símbolos; Windows mostra o atalho salvo', () => {
+    expect(rotuloAtalho('Ctrl+K', true)).toBe('⌘K')
+    expect(rotuloAtalho('Ctrl+Shift+F', true)).toBe('⌘⇧F')
+    expect(rotuloAtalho('Alt+Left', true)).toBe('⌥←')
+    expect(rotuloAtalho('Ctrl+K')).toBe('Ctrl+K')
   })
 })

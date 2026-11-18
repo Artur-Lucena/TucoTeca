@@ -2,7 +2,7 @@
 import tempfile
 from pathlib import Path
 
-import bib_core as core
+from bib_nucleo import banco
 from executar import afirmar
 
 CAB = ("Track URI,ISRC,Track Name,Album Name,Artist Name(s),Release Date,"
@@ -44,7 +44,7 @@ def teste_baixar_parser_e_primeiro_artista():
 def teste_baixar_fila_dedup_e_estados():
     from bib_nucleo import baixar as BX
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
-    con = core.get_db(tmp / "b.db")
+    con = banco.get_db(tmp / "b.db")
     try:
         cols = {r["name"] for r in con.execute("PRAGMA table_info(downloads)").fetchall()}
         afirmar({"titulo", "uri", "estado", "video_id"} <= cols, sorted(cols))
@@ -54,44 +54,44 @@ def teste_baixar_fila_dedup_e_estados():
             'spotify:track:9,x,"COTIDIANO","Outro","CHICO BUARQUE",1971,1,1\n',
         ])
         r = BX.ler_csv_exportify(p)
-        q = core.enfileirar_downloads(con, r["itens"])
+        q = banco.enfileirar_downloads(con, r["itens"])
         afirmar(q == {"novos": 1, "ignorados": 2, "erros": []}, (r, q))
-        q = core.enfileirar_downloads(con, [{"titulo": "", "artista": "X"}])
+        q = banco.enfileirar_downloads(con, [{"titulo": "", "artista": "X"}])
         afirmar(q["novos"] == 0 and q["ignorados"] == 1, q)
         # faixa que o Hub já tem não entra na fila
-        core.criar_musica(con, {"titulo": "Cotidiano", "artista": "Chico Buarque",
+        banco.criar_musica(con, {"titulo": "Cotidiano", "artista": "Chico Buarque",
                                 "musica_sha": "s" * 64})
-        q = core.enfileirar_downloads(
+        q = banco.enfileirar_downloads(
             con, [{"titulo": "Cotidiano", "artista": "Chico Buarque",
                    "uri": "spotify:track:7"}])
         afirmar(q["novos"] == 0 and q["ignorados"] == 1, q)
-        pand = core.listar_downloads(con, estado="pendente")
+        pand = banco.listar_downloads(con, estado="pendente")
         afirmar(len(pand) == 1, pand)
         did = pand[0]["id"]
-        d = core.marcar_download(con, did, "baixando", video_id="abc123")
+        d = banco.marcar_download(con, did, "baixando", video_id="abc123")
         afirmar(d["estado"] == "baixando" and d["video_id"] == "abc123", d)
-        d = core.marcar_download(con, did, "pronta", musica_sha="s" * 63 + "0")
+        d = banco.marcar_download(con, did, "pronta", musica_sha="s" * 63 + "0")
         afirmar(d["estado"] == "pronta", d)
-        afirmar(core.listar_downloads(con, estado="pronta")[0]["id"] == did)
+        afirmar(banco.listar_downloads(con, estado="pronta")[0]["id"] == did)
         try:
-            core.marcar_download(con, did, "voando")
+            banco.marcar_download(con, did, "voando")
             afirmar(False, "devia levantar")
         except ValueError:
             pass
         try:
-            core.listar_downloads(con, estado="voando")
+            banco.listar_downloads(con, estado="voando")
             afirmar(False, "devia levantar")
         except ValueError:
             pass
         try:
-            core.marcar_download(con, 9999, "falha")
+            banco.marcar_download(con, 9999, "falha")
             afirmar(False, "devia levantar")
         except LookupError:
             pass
-        afirmar(core.limpar_downloads(con) == 1)
-        afirmar(core.listar_downloads(con) == [])
+        afirmar(banco.limpar_downloads(con) == 1)
+        afirmar(banco.listar_downloads(con) == [])
         try:
-            core.limpar_downloads(con, estados=("pendente", "voando"))
+            banco.limpar_downloads(con, estados=("pendente", "voando"))
             afirmar(False, "devia levantar")
         except ValueError:
             pass
@@ -101,13 +101,13 @@ def teste_baixar_fila_dedup_e_estados():
 
 def teste_baixar_v14_idempotente():
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
-    con = core.get_db(tmp / "b.db")
+    con = banco.get_db(tmp / "b.db")
     con.close()
-    con = core.get_db(tmp / "b.db")  # reabre: migração não duplica nem perde
+    con = banco.get_db(tmp / "b.db")  # reabre: migração não duplica nem perde
     try:
         cols = {r["name"] for r in con.execute("PRAGMA table_info(downloads)").fetchall()}
         afirmar("video_id" in cols, sorted(cols))
-        afirmar(core.listar_downloads(con) == [])
+        afirmar(banco.listar_downloads(con) == [])
     finally:
         con.close()
 
@@ -199,17 +199,17 @@ def teste_baixar_faixa_mock():
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
     stage = tmp / "stage"
     stage.mkdir()
-    con = core.get_db(tmp / "b.db")
+    con = banco.get_db(tmp / "b.db")
     velho_run, velho_pop = BX.subprocess.run, BX.subprocess.Popen
     try:
-        core.enfileirar_downloads(con, [{"titulo": "Cotidiano",
+        banco.enfileirar_downloads(con, [{"titulo": "Cotidiano",
                                          "artista": "Chico",
                                          "uri": "spotify:track:1"}])
-        core.enfileirar_downloads(con, [{"titulo": "Ruim",
+        banco.enfileirar_downloads(con, [{"titulo": "Ruim",
                                          "artista": "X",
                                          "uri": "spotify:track:2"}])
-        did = core.listar_downloads(con)[0]["id"]
-        did2 = core.listar_downloads(con)[1]["id"]
+        did = banco.listar_downloads(con)[0]["id"]
+        did2 = banco.listar_downloads(con)[1]["id"]
         (stage / "abc123.m4a").write_bytes(b"audio" * 100)
         vistos = []
         BX.subprocess.run = lambda *a, **k: R(0, "abc123\tTitulo X\n")
@@ -218,13 +218,13 @@ def teste_baixar_faixa_mock():
                             progresso=lambda i, p: vistos.append(p))
         afirmar(r.get("ok") and r.get("video_id") == "abc123", r)
         afirmar(vistos and vistos[-1] == 100.0, vistos)
-        d = core.listar_downloads(con, estado="baixado")
+        d = banco.listar_downloads(con, estado="baixado")
         afirmar(len(d) == 1 and d[0]["musica_path"].endswith("abc123.m4a"), d)
         # rc != 0 vira falha com video_id guardado
         BX.subprocess.Popen = lambda *a, **k: P(1)
         r = BX.baixar_faixa(con, did2, ytdlp="yt-fake", destino=stage)
         afirmar(not r.get("ok"), r)
-        d = core.listar_downloads(con, estado="falha")
+        d = banco.listar_downloads(con, estado="falha")
         afirmar(len(d) == 1 and d[0]["video_id"] == "abc123", d)
         # estado final não baixa de novo; id inexistente não levanta
         r = BX.baixar_faixa(con, did, ytdlp="yt-fake", destino=stage)
@@ -281,14 +281,14 @@ def teste_baixar_converter_ffmpeg_mock():
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
     stage = tmp / "stage"
     stage.mkdir()
-    con = core.get_db(tmp / "b.db")
+    con = banco.get_db(tmp / "b.db")
     velho_run, velho_loc = BX.subprocess.run, BX.localizar_ffmpeg
     try:
         (stage / "vid1.m4a").write_bytes(b"audio" * 500)
-        core.enfileirar_downloads(con, [{"titulo": "Bee", "artista": "Aaa",
+        banco.enfileirar_downloads(con, [{"titulo": "Bee", "artista": "Aaa",
                                          "uri": "u1"}])
-        did = core.listar_downloads(con)[0]["id"]
-        core.marcar_download(con, did, "baixado", video_id="vid1",
+        did = banco.listar_downloads(con)[0]["id"]
+        banco.marcar_download(con, did, "baixado", video_id="vid1",
                              musica_path=str(stage / "vid1.m4a"))
 
         def _ff(*a, **k):
@@ -303,16 +303,16 @@ def teste_baixar_converter_ffmpeg_mock():
         afirmar(r.get("ok") and r["path"].endswith(".mp3")
                 and "aviso" not in r, r)
         afirmar(not (stage / "vid1.m4a").exists(), "staging devia sumir")
-        d = core.listar_downloads(con, estado="pronta")
+        d = banco.listar_downloads(con, estado="pronta")
         afirmar(len(d) == 1 and d[0]["musica_sha"], d)
-        lst = core.listar_musicas(con, q="bee")
+        lst = banco.listar_musicas(con, q="bee")
         afirmar(len(lst) == 1 and lst[0]["artista"] == "Aaa", lst)
         # ffmpeg quebrado vira falha (staging preservado p/ retry)
         (stage / "vid2.m4a").write_bytes(b"audio" * 500)
-        core.enfileirar_downloads(con, [{"titulo": "Cee", "artista": "Dee",
+        banco.enfileirar_downloads(con, [{"titulo": "Cee", "artista": "Dee",
                                          "uri": "u2"}])
-        did2 = core.listar_downloads(con, estado="pendente")[0]["id"]
-        core.marcar_download(con, did2, "baixado", video_id="vid2",
+        did2 = banco.listar_downloads(con, estado="pendente")[0]["id"]
+        banco.marcar_download(con, did2, "baixado", video_id="vid2",
                              musica_path=str(stage / "vid2.m4a"))
 
         def _ff_ruim(*a, **k):
@@ -324,7 +324,7 @@ def teste_baixar_converter_ffmpeg_mock():
         r = BX.converter_faixa(con, did2, ffmpeg="ff-fake", capa_auto=False)
         afirmar(not r.get("ok") and "codec" in r.get("erro", ""), r)
         afirmar((stage / "vid2.m4a").is_file(), "staging devia ficar")
-        afirmar(core.listar_downloads(con, estado="falha")[0]["id"] == did2)
+        afirmar(banco.listar_downloads(con, estado="falha")[0]["id"] == did2)
         # estado errado e id inexistente não levantam
         afirmar(not BX.converter_faixa(con, did, ffmpeg="ff")["ok"])
         afirmar(not BX.converter_faixa(con, 9999, ffmpeg="ff")["ok"])
@@ -353,29 +353,29 @@ def teste_baixar_converter_sem_ffmpeg():
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
     stage = tmp / "stage"
     stage.mkdir()
-    con = core.get_db(tmp / "b.db")
+    con = banco.get_db(tmp / "b.db")
     velho_loc = BX.localizar_ffmpeg
     BX.localizar_ffmpeg = lambda: ""
     try:
         (stage / "n1.m4a").write_bytes(b"audio" * 500)
         (stage / "n2.webm").write_bytes(b"video" * 500)
-        core.enfileirar_downloads(con, [{"titulo": "Nat", "artista": "A",
+        banco.enfileirar_downloads(con, [{"titulo": "Nat", "artista": "A",
                                          "uri": "u1"}])
-        core.enfileirar_downloads(con, [{"titulo": "Web", "artista": "B",
+        banco.enfileirar_downloads(con, [{"titulo": "Web", "artista": "B",
                                          "uri": "u2"}])
-        ids = [d["id"] for d in core.listar_downloads(con)]
-        core.marcar_download(con, ids[0], "baixado", video_id="n1",
+        ids = [d["id"] for d in banco.listar_downloads(con)]
+        banco.marcar_download(con, ids[0], "baixado", video_id="n1",
                              musica_path=str(stage / "n1.m4a"))
-        core.marcar_download(con, ids[1], "baixado", video_id="n2",
+        banco.marcar_download(con, ids[1], "baixado", video_id="n2",
                              musica_path=str(stage / "n2.webm"))
         r = BX.importar_fila_pronta(con, capa_auto=False)
         afirmar(r["novas"] == 1 and r["ignoradas"] == 1, r)
         afirmar(r["avisos"] and "ffmpeg" in r["avisos"][0].lower(), r)
-        d = core.listar_downloads(con, estado="pronta")
+        d = banco.listar_downloads(con, estado="pronta")
         afirmar(len(d) == 1 and d[0]["musica_path"].endswith(".m4a"), d)
-        f = core.listar_downloads(con, estado="falha")
+        f = banco.listar_downloads(con, estado="falha")
         afirmar(len(f) == 1 and "ffmpeg" in f[0]["erro"].lower(), f)
-        afirmar(core.listar_downloads(con, estado="baixado") == [])
+        afirmar(banco.listar_downloads(con, estado="baixado") == [])
     finally:
         BX.localizar_ffmpeg = velho_loc
         con.close()
@@ -492,12 +492,12 @@ def teste_baixar_pronto_e_ferramentas():
 
 def teste_download_state_preserva_staging_apos_falha():
     tmp = Path(tempfile.mkdtemp(prefix="suite-bx-"))
-    con = core.get_db(tmp / "b.db")
+    con = banco.get_db(tmp / "b.db")
     try:
-        core.enfileirar_downloads(con, [{"titulo": "T", "uri": "u"}])
-        did = core.listar_downloads(con)[0]["id"]
-        core.marcar_download(con, did, "baixado", video_id="id", musica_path="stage/audio.m4a")
-        r = core.marcar_download(con, did, "falha", erro="codec indisponível")
+        banco.enfileirar_downloads(con, [{"titulo": "T", "uri": "u"}])
+        did = banco.listar_downloads(con)[0]["id"]
+        banco.marcar_download(con, did, "baixado", video_id="id", musica_path="stage/audio.m4a")
+        r = banco.marcar_download(con, did, "falha", erro="codec indisponível")
         afirmar(r["musica_path"] == "stage/audio.m4a" and r["video_id"] == "id", r)
     finally:
         con.close()

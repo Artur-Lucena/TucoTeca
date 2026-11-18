@@ -62,7 +62,6 @@ from bib_nucleo.banco.jogos import (
     atualizar_jogo,
     caminho_capa,
     chave_dedup,
-    contar_por_origem,
     criar_jogo,
     etiquetas_de,
     excluir_jogo,
@@ -94,7 +93,7 @@ __all__ = [
     'SCHEMA_DESEJOS', 'desejo_to_dict', 'listar_desejos', 'sincronizar_desejos',
     'adicionar_desejo', 'marcar_desejo_obtido', 'remover_desejo', 'CAPA_EXTS',
     'CAPA_LARG', 'CAPA_ALT', 'salvar_capa_bytes',
-    'caminho_capa', 'marcar_execucao', 'adicionar_horas', 'contar_por_origem',
+    'caminho_capa', 'marcar_execucao', 'adicionar_horas',
     'selo_confianca', 'SCHEMA_VIDEOS', 'video_to_dict', 'criar_video',
     'listar_videos', 'excluir_video',
 ]

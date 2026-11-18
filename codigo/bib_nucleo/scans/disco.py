@@ -7,7 +7,7 @@ import os
 import re
 from pathlib import Path
 
-from bib_nucleo.base import LINUX_ROOT, WIN_ROOT
+from bib_nucleo.base import LINUX_ROOT, MAC_ROOT, WIN_ROOT, eh_mac
 from bib_nucleo.scans.lojas import (
     _appid_de_manifest,
     _item_steam_manifest,
@@ -51,11 +51,12 @@ def default_scan_roots() -> list[str]:
     if os.name == "nt":
         base = WIN_ROOT.rstrip("\\")
         return [f"{base}\\Games", f"{base}\\SteamLibrary", f"{base}\\Riot Games"]
-    base = LINUX_ROOT.rstrip("/")
+    base = (MAC_ROOT if eh_mac() else LINUX_ROOT).rstrip("/")
     roots = [f"{base}/Games", f"{base}/SteamLibrary"]
-    # Steam nativo do Linux (fora da partilha): só entra se existir
+    # Steam nativo (fora da partilha): só entra se existir
     for cand in (Path.home() / ".steam/steam/steamapps",
-                 Path.home() / ".local/share/Steam/steamapps"):
+                 Path.home() / ".local/share/Steam/steamapps",
+                 Path.home() / "Library/Application Support/Steam/steamapps"):
         if cand.is_dir():
             roots.append(str(cand))
     return roots

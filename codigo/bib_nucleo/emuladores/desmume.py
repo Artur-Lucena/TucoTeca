@@ -83,7 +83,8 @@ def default_emu_nds() -> str:
 def desmume_user_dir(exe: str = "") -> str:
     """DeSmuME é portátil por natureza: config (desmume.ini) mora ao lado do exe.
 
-    No Linux com DeSmuME do sistema, a config fica em ~/.config/desmume.
+    No Linux com DeSmuME do sistema, a config fica em ~/.config/desmume; no
+    macOS, o app guarda tudo em ~/Library/Application Support/DeSmuME.
     """
     exe = exe or default_emu_nds()
     if exe:
@@ -93,6 +94,10 @@ def desmume_user_dir(exe: str = "") -> str:
         cfg = Path.home() / ".config" / "desmume"
         if (cfg / "desmume.ini").is_file():
             return str(cfg)
+        if _E.eh_mac():
+            suporte = Path.home() / "Library" / "Application Support" / "DeSmuME"
+            if suporte.is_dir():
+                return str(suporte)
         if base.is_dir():
             return str(base)
     return ""

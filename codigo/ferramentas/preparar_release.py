@@ -1,17 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Prepara os anexos de uma release: instalador, fontes, notas e checksums.
+"""Prepara os anexos de uma release: instaladores, fontes, notas e checksums.
 
 Fluxo (detalhado em docs/RELEASES.md):
 
+    # no Mac (o CI faz isto e publica as .dmg + conferencia-mac.json como artefato)
+    python3 codigo/ferramentas/preparar_runtime_python.py --plataforma macos-arm64
+    python3 codigo/ferramentas/preparar_runtime_python.py --plataforma macos-x64
+    npm --prefix codigo/frontends/electron run dist:mac
+    python3 codigo/ferramentas/preparar_release.py --revisao <SHA> --conferir-mac
+
+    # no Windows
     py -3.14 -B codigo/ferramentas/preparar_runtime_python.py
     npm --prefix codigo/frontends/electron run dist
-    py -3.14 -B codigo/ferramentas/preparar_release.py --revisao <SHA> --saida dist/release/v<versao>
+    py -3.14 -B codigo/ferramentas/preparar_release.py --revisao <SHA> --saida dist/release/v<versao> \
+        [--mac <pasta com as .dmg e conferencia-mac.json>]
 
 Exige checkout limpo no SHA informado, versões coerentes (codigo/VERSION,
-pyproject.toml e seção em docs/CHANGELOG.md), o instalador da mesma versão e a
-árvore `win-unpacked` sem dados pessoais. Não publica nada: criar a release
-no GitHub é um passo posterior e explícito. Recusa sobrescrever entregas.
+pyproject.toml e seção em docs/CHANGELOG.md), os instaladores da mesma versão
+e as árvores dos apps sem dados pessoais. As .dmg só entram com a conferência
+feita no Mac na mesma revisão (SHA-256 conferido aqui). Não publica nada:
+criar a release no GitHub é um passo posterior e explícito. Recusa
+sobrescrever entregas.
 """
 from __future__ import annotations
 
@@ -98,15 +108,24 @@ def localizar_instalador(dist: Path, versao: str) -> Path:
     return instalador
 
 
-# o que o app instalado precisa para abrir a ponte (conferido em win-unpacked)
+# pasta do núcleo dentro de cada app que o electron-builder gera
+RECURSOS = {
+    "windows-x64": "win-unpacked/resources/tucoteca",
+    "macos-x64": "mac/TucoTeca.app/Contents/Resources/tucoteca",
+    "macos-arm64": "mac-arm64/TucoTeca.app/Contents/Resources/tucoteca",
+}
+PYTHON_EMBUTIDO = {"windows-x64": "python.exe", "macos-x64": "bin/python3", "macos-arm64": "bin/python3"}
+CONFERENCIA_MAC = "conferencia-mac.json"
+
+# o que o app instalado precisa para abrir a ponte (conferido no app empacotado)
 ESSENCIAIS_APP = ("codigo/frontends/ponte.py", "codigo/frontends/ponte_paridade.py",
                   "codigo/frontends/ponte_params.py", "codigo/frontends/ponte_dominios.py",
-                  "codigo/bib_core.py", "codigo/ferramentas/abrir_hub.py", "codigo/VERSION", "LICENSE")
+                  "codigo/bib_nucleo/__init__.py", "codigo/ferramentas/abrir_hub.py", "codigo/VERSION", "LICENSE")
 
 
-def conferir_app(dist: Path, exigir_runtime: bool = True) -> dict:
-    """Confere a árvore win-unpacked que gerou o instalador."""
-    recursos = dist / "win-unpacked" / "resources" / "tucoteca"
+def conferir_app(dist: Path, exigir_runtime: bool = True, plataforma: str = "windows-x64") -> dict:
+    """Confere a árvore do app (win-unpacked ou TucoTeca.app) que gerou o instalador."""
+    recursos = dist / RECURSOS[plataforma]
     if not recursos.is_dir():
         raise ValueError(f"{recursos} ausente: o instalador não veio do build atual")
     for obrigatorio in ESSENCIAIS_APP:
@@ -116,11 +135,13 @@ def conferir_app(dist: Path, exigir_runtime: bool = True) -> dict:
                        if p.is_file() and PROIBIDOS.search(p.relative_to(recursos).as_posix()))
     if proibidos:
         raise ValueError("estado pessoal no app empacotado: " + ", ".join(proibidos[:10]))
-    python = recursos / "programa/windows-x64/python/python.exe"
+    pasta_python = recursos / "programa" / plataforma / "python"
+    python = pasta_python / PYTHON_EMBUTIDO[plataforma]
     if exigir_runtime and not python.is_file():
-        raise ValueError("app empacotado sem Python embutido (use --sem-runtime para aceitar)")
+        raise ValueError(f"app empacotado ({plataforma}) sem Python embutido "
+                         "(use --sem-runtime para aceitar)")
     versao_runtime = None
-    marcador = python.parent / "TUCOTECA-RUNTIME.json"
+    marcador = pasta_python / "TUCOTECA-RUNTIME.json"
     if marcador.is_file():
         versao_runtime = json.loads(marcador.read_text(encoding="utf-8")).get("versao")
     return {"python_embutido": python.is_file(), "python_versao": versao_runtime,
@@ -143,21 +164,43 @@ definido) e **não** é apagada ao atualizar ou desinstalar.
 O instalador não é assinado: na primeira execução o Windows SmartScreen pode
 avisar ("O Windows protegeu o computador" → "Mais informações" →
 "Executar assim mesmo"). Confira o SHA-256 em `SHA256SUMS.txt` antes.
-{aviso_runtime}
+{aviso_runtime}{secao_mac}
 ## Novidades
 
 {novidades}
 """
 
 
+NOTAS_MAC = """
+## Instalação (macOS 13 Ventura ou mais novo — Apple Silicon ou Intel)
+
+1. Baixe a imagem do seu Mac:{lista}
+2. Abra a `.dmg` e arraste o TucoTeca para **Aplicativos**.
+3. Na primeira vez, clique com o botão direito no TucoTeca → **Abrir** →
+   **Abrir**. O app não é notarizado pela Apple (exige conta paga), então o
+   macOS pergunta uma vez. Se ele disser que o app "está danificado", rode no
+   Terminal: `xattr -dr com.apple.quarantine /Applications/TucoTeca.app`.
+
+A coleção fica em `Documentos/TucoTeca`. Ferramentas opcionais (FFmpeg,
+yt-dlp, 7-Zip) vêm do Homebrew: `brew install ffmpeg yt-dlp sevenzip`.
+"""
+
+ROTULO_ARCH = {"macos-arm64": "Apple Silicon (M1, M2, M3…)", "macos-x64": "Intel"}
+
+
 def escrever_notas(destino: Path, versao: str, revisao: str, instalador: str,
-                   novidades: str, app: dict) -> Path:
+                   novidades: str, app: dict, dmgs: dict | None = None) -> Path:
     aviso = "" if app["python_embutido"] else (
         "\n**Atenção:** este build não embute Python; é preciso ter o Python 3.14 "
         "instalado (`py -3.14`).\n")
+    secao_mac = ""
+    if dmgs:
+        lista = "".join(f"\n   - {ROTULO_ARCH.get(info['plataforma'], info['plataforma'])}: `{nome}`"
+                        for nome, info in sorted(dmgs.items()))
+        secao_mac = NOTAS_MAC.format(lista=lista)
     texto = NOTAS.format(versao=versao, revisao=revisao, instalador=instalador,
                          data=datetime.date.today().isoformat(), aviso_runtime=aviso,
-                         novidades=novidades or "Veja docs/CHANGELOG.md.")
+                         secao_mac=secao_mac, novidades=novidades or "Veja docs/CHANGELOG.md.")
     caminho = destino / "NOTAS-RELEASE.md"
     caminho.write_text(texto, encoding="utf-8")
     return caminho
@@ -167,8 +210,61 @@ def _ativo(p: Path) -> dict:
     return {"bytes": p.stat().st_size, "sha256": sha_arquivo(p)}
 
 
+def dmg_mac(versao: str, arch: str) -> str:
+    return f"TucoTeca-{versao}-mac-{arch}.dmg"
+
+
+def conferir_mac(revisao: str, *, repo: Path = REPO, dist: Path = DIST_ELECTRON,
+                 exigir_runtime: bool = True) -> dict:
+    """No Mac, depois do `dist:mac`: confere cada .app e grava conferencia-mac.json."""
+    if not re.fullmatch(r"[0-9a-f]{40}", revisao):
+        raise ValueError("--revisao deve ser o SHA Git completo (40 caracteres hexadecimais).")
+    versao = ler_versao(repo)
+    dmgs = {}
+    for arch in ("arm64", "x64"):
+        dmg = dist / dmg_mac(versao, arch)
+        if not dmg.is_file():
+            continue
+        plataforma = f"macos-{arch}"
+        app = conferir_app(dist, exigir_runtime, plataforma)
+        if app["versao_app"] != versao:
+            raise ValueError(f"{dmg.name}: app empacotado é {app['versao_app']}, VERSION é {versao}")
+        dmgs[dmg.name] = {"plataforma": plataforma, **_ativo(dmg),
+                          "python_embutido": app["python_embutido"], "python_versao": app["python_versao"]}
+    if not dmgs:
+        raise ValueError(f"nenhuma {dmg_mac(versao, '<arch>')} em {dist}; rode `npm run dist:mac`")
+    conferencia = {"versao": versao, "revisao": revisao, "dmgs": dmgs}
+    (dist / CONFERENCIA_MAC).write_text(json.dumps(conferencia, ensure_ascii=False, indent=2) + "\n",
+                                        encoding="utf-8")
+    return conferencia
+
+
+def ler_conferencia_mac(pasta: Path, versao: str, revisao: str, exigir_runtime: bool = True) -> dict:
+    """As .dmg trazidas do Mac: mesma versão e revisão, e SHA-256 igual ao conferido lá."""
+    arquivo = Path(pasta) / CONFERENCIA_MAC
+    try:
+        conferencia = json.loads(arquivo.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as erro:
+        raise ValueError(f"{arquivo} ilegível ou ausente: {erro}") from erro
+    if conferencia.get("versao") != versao or conferencia.get("revisao") != revisao:
+        raise ValueError(f"conferência do Mac é de {conferencia.get('versao')} @ "
+                         f"{str(conferencia.get('revisao'))[:7]}, a release é {versao} @ {revisao[:7]}")
+    dmgs = conferencia.get("dmgs") or {}
+    if not dmgs:
+        raise ValueError("conferência do Mac sem .dmg")
+    for nome, info in dmgs.items():
+        dmg = Path(pasta) / nome
+        if not dmg.is_file():
+            raise ValueError(f"{nome} ausente em {pasta}")
+        if sha_arquivo(dmg) != info.get("sha256"):
+            raise ValueError(f"{nome} não é a .dmg conferida no Mac (SHA-256 diferente)")
+        if exigir_runtime and not info.get("python_embutido"):
+            raise ValueError(f"{nome} sem Python embutido (use --sem-runtime para aceitar)")
+    return dmgs
+
+
 def preparar(revisao: str, saida: Path, *, repo: Path = REPO, dist: Path = DIST_ELECTRON,
-             exigir_runtime: bool = True, conferir_git: bool = True) -> dict:
+             exigir_runtime: bool = True, conferir_git: bool = True, mac: Path | None = None) -> dict:
     saida = Path(saida).resolve()
     if saida.exists():
         raise ValueError(f"{saida} já existe; entregas antigas não são sobrescritas")
@@ -179,18 +275,26 @@ def preparar(revisao: str, saida: Path, *, repo: Path = REPO, dist: Path = DIST_
     app = conferir_app(dist, exigir_runtime)
     if app["versao_app"] != versao:
         raise ValueError(f"app empacotado é {app['versao_app']}, VERSION é {versao}; refaça o dist")
+    dmgs = ler_conferencia_mac(Path(mac), versao, revisao, exigir_runtime) if mac else {}
 
     saida.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{saida.name}-", dir=saida.parent))
     try:
         shutil.copy2(instalador, staging / instalador.name)
+        for nome in dmgs:
+            shutil.copy2(Path(mac) / nome, staging / nome)  # type: ignore[arg-type]
         empacotar_fontes(staging / f"tucoteca-{versao}-fontes.zip", repo=repo, revisao=revisao)
         escrever_notas(staging, versao, revisao, instalador.name,
-                       secao_changelog(repo, versao), app)
+                       secao_changelog(repo, versao), app, dmgs)
         anexos = {p.name: _ativo(p) for p in sorted(staging.iterdir())}
-        release = {"esquema": 2, "projeto": "TucoTeca", "versao": versao, "revisao": revisao,
+        instaladores = {instalador.name: {"plataforma": "windows-x64",
+                                          "python_embutido": app["python_embutido"],
+                                          "python_versao": app["python_versao"]}}
+        instaladores.update({nome: {k: info[k] for k in ("plataforma", "python_embutido", "python_versao")}
+                             for nome, info in dmgs.items()})
+        release = {"esquema": 3, "projeto": "TucoTeca", "versao": versao, "revisao": revisao,
                    "gerado_em": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                   "plataforma": "windows-x64", "instalador": instalador.name,
+                   "instaladores": instaladores,
                    "python_embutido": app["python_embutido"],
                    "python_versao": app["python_versao"], "anexos": anexos}
         (staging / "release.json").write_text(
@@ -208,13 +312,24 @@ def preparar(revisao: str, saida: Path, *, repo: Path = REPO, dist: Path = DIST_
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--revisao", required=True, help="SHA completo do commit congelado")
-    ap.add_argument("--saida", type=Path, required=True, help="pasta nova, ex.: dist/release/v1.2.0")
+    ap.add_argument("--saida", type=Path, help="pasta nova, ex.: dist/release/v1.2.0")
     ap.add_argument("--dist", type=Path, default=DIST_ELECTRON, help="saída do electron-builder")
+    ap.add_argument("--mac", type=Path, help="pasta com as .dmg e o conferencia-mac.json do Mac")
+    ap.add_argument("--conferir-mac", action="store_true",
+                    help="no Mac: confere os .app e grava conferencia-mac.json em --dist")
     ap.add_argument("--sem-runtime", action="store_true",
                     help="aceita app sem Python embutido (fica avisado nas notas)")
     args = ap.parse_args(argv)
     try:
-        r = preparar(args.revisao, args.saida, dist=args.dist, exigir_runtime=not args.sem_runtime)
+        if args.conferir_mac:
+            c = conferir_mac(args.revisao, dist=args.dist, exigir_runtime=not args.sem_runtime)
+            for nome, info in c["dmgs"].items():
+                print(f"[ok] {nome} ({info['plataforma']}, Python {info['python_versao']})")
+            return 0
+        if args.saida is None:
+            raise ValueError("--saida é obrigatório (ou use --conferir-mac)")
+        r = preparar(args.revisao, args.saida, dist=args.dist, exigir_runtime=not args.sem_runtime,
+                     mac=args.mac)
     except (OSError, ValueError) as erro:
         print(f"ERRO: {erro}", file=sys.stderr)
         return 1

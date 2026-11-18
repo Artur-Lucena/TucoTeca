@@ -41,7 +41,7 @@ def resolve_home() -> Path:
         return Path(env)
     # 2. Um pacote real sempre vence a instalação canônica do PC de build.
     if (BASE_DIR / "manifesto-runtime.json").is_file() or (
-            (BASE_DIR / "app/bib_core.py").is_file() and (BASE_DIR / "python/python.exe").is_file()):
+            (BASE_DIR / "app/bib_nucleo/__init__.py").is_file() and (BASE_DIR / "python/python.exe").is_file()):
         return BASE_DIR
     # 3. Pasta única do projeto: coleção dentro da própria árvore de fontes
     # (dev/uso no repo) vence a instalação canônica de build.
@@ -96,10 +96,6 @@ MUSICAS_DIR = DADOS_DIR / "musicas"
 # p/ `musicas/`). Fora do git, do scanner (SKIP) e dos pacotes.
 BAIXAR_DIR = DADOS_DIR / "baixados"
 
-# WAVs decodificados p/ o player interno (MCI-waveaudio; mp3/m4a via
-# ffmpeg em cache com teto LRU). Fora do git, do scanner e dos pacotes.
-CACHE_WAV_DIR = DADOS_DIR / "cache-wav"
-
 # Texturas HD por jogo (Azahar custom textures): texturas/<title-id>/ com PNGs.
 # Toggle por rename (<tid> ativo, <tid>.off desligado — sem privilégio, sem
 # cópia, vale nos 3 SOs). Fora do git, do scanner e dos instaladores
@@ -123,7 +119,6 @@ def garantir_dirs() -> None:
     MODS_DIR.mkdir(parents=True, exist_ok=True)
     MUSICAS_DIR.mkdir(parents=True, exist_ok=True)
     BAIXAR_DIR.mkdir(parents=True, exist_ok=True)
-    CACHE_WAV_DIR.mkdir(parents=True, exist_ok=True)
     TEXTURAS_DIR.mkdir(parents=True, exist_ok=True)
     VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -435,5 +430,5 @@ MUSICA_EXTS = {".mp3", ".ogg", ".opus", ".m4a", ".flac", ".wav"}
 # Vídeo da 2.0: contêineres que os 3 reprodutores (VLC/MPV/MPC-HC) abrem.
 VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v", ".ogv"}
 
-__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'MAC_ROOT', 'eh_mac', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'MODS_DIR', 'MUSICAS_DIR', 'BAIXAR_DIR', 'CACHE_WAV_DIR', 'TEXTURAS_DIR', 'VIDEOS_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'win_para_mac', 'mac_para_win', 'linux_para_mac', 'mac_para_linux', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
+__all__ = ['BASE_DIR', 'WIN_ROOT', 'LINUX_ROOT', 'MAC_ROOT', 'eh_mac', 'REL_HOME', 'resolve_home', 'HOME_DIR', 'DADOS_DIR', 'DEFAULT_DB', 'BACKUP_DIR', 'CAPAS_DIR', 'PRESETS_DIR', 'SESSOES_DIR', 'SAVES_DIR', 'WINE_PREFIXO', 'MODS_DIR', 'MUSICAS_DIR', 'BAIXAR_DIR', 'TEXTURAS_DIR', 'VIDEOS_DIR', 'garantir_dirs', 'win_para_linux', 'linux_para_win', 'win_para_mac', 'mac_para_win', 'linux_para_mac', 'mac_para_linux', 'traduzir_para_atual', 'existe_aqui_ou_traduzido', 'resolver_exe', 'agora_iso', 'log_erro', 'lock_path', 'adquirir_lock', 'liberar_lock', 'slugify',
  'ROM_EXTS_3DS', 'MUSICA_EXTS', 'VIDEO_EXTS', 'nome_arquivo_portatil']
