@@ -110,13 +110,16 @@ def icns(imagens: dict[int, bytes]) -> bytes:
     return b"icns" + struct.pack(">I", 8 + len(corpo)) + corpo
 
 
-def gerar(destino: Path = DESTINO) -> list[Path]:
+def gerar(destino: Path = DESTINO, mac: bool = True) -> list[Path]:
+    """Escreve icon.ico e, com `mac`, icon.icns (o 1024 px leva segundos em Python puro)."""
     destino.mkdir(parents=True, exist_ok=True)
     saida = destino / "icon.ico"
     saida.write_bytes(ico({lado: png(lado) for lado in TAMANHOS}))
-    mac = destino / "icon.icns"
-    mac.write_bytes(icns({lado: png(lado, _pixel_mac) for lado in {lado for _, lado in ICNS_TIPOS}}))
-    return [saida, mac]
+    if not mac:
+        return [saida]
+    icns_ = destino / "icon.icns"
+    icns_.write_bytes(icns({lado: png(lado, _pixel_mac) for lado in {lado for _, lado in ICNS_TIPOS}}))
+    return [saida, icns_]
 
 
 def main(argv=None) -> int:

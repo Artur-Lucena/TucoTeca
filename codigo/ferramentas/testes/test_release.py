@@ -256,20 +256,22 @@ def teste_versoes_do_repositorio_coerentes():
 
 def teste_icone_ico_valido_e_reproduzivel():
     destino = Path(tempfile.mkdtemp(prefix="suite-icone-"))
-    ico, mac = ICONE.gerar(destino)
-    cru = mac.read_bytes()
+    [ico] = ICONE.gerar(destino, mac=False)
+    # o .icns versionado: estrutura aqui, pixels mais abaixo (regerar o de 1024 px
+    # em Python puro passa de 2 min num runner lento)
+    cru = (REL.REPO / "codigo/frontends/electron/resources/icon.icns").read_bytes()
     afirmar(cru[:4] == b"icns" and int.from_bytes(cru[4:8], "big") == len(cru), "cabeçalho ICNS")
     tipos, pos = [], 8
     while pos < len(cru):
         tipos.append(cru[pos:pos + 4].decode("ascii"))
         afirmar(cru[pos + 8:pos + 16] == b"\x89PNG\r\n\x1a\n", "entrada ICNS sem PNG")
         pos += int.from_bytes(cru[pos + 4:pos + 8], "big")
-    afirmar(pos == len(cru) and "ic10" in tipos and "ic07" in tipos, tipos)
+    afirmar(pos == len(cru) and tipos == [t for t, _ in ICONE.ICNS_TIPOS], tipos)
     dados = ico.read_bytes()
     afirmar(dados[:4] == b"\0\0\1\0", "cabeçalho ICO")
     afirmar(int.from_bytes(dados[4:6], "little") == len(ICONE.TAMANHOS))
     afirmar(b"\x89PNG" in dados)
-    afirmar(ICONE.gerar(destino)[0].read_bytes() == dados, "ícone não é reproduzível")
+    afirmar(ICONE.gerar(destino, mac=False)[0].read_bytes() == dados, "ícone não é reproduzível")
     # versionados: mesmos pixels do gerador (os bytes do PNG dependem do zlib do SO)
     recursos = REL.REPO / "codigo/frontends/electron/resources"
     pngs_ico = _pngs_ico((recursos / "icon.ico").read_bytes())
