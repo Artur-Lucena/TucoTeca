@@ -69,6 +69,17 @@ class MixColecoes:
             self._marcar(s["itens"])
         return secoes
 
+    def loja_generos(self):
+        from bib_nucleo.rede import loja_steam
+        return [{"chave": c, "nome": n} for c, n, _ in loja_steam.GENEROS]
+
+    def loja_genero(self, chave, pagina=0):
+        from bib_nucleo.rede import exigir_rede, loja_steam
+        exigir_rede("Ver jogos por gênero na Steam")
+        r = loja_steam.por_genero(chave, pagina)
+        self._marcar(r["itens"])
+        return r
+
     def loja_buscar(self, termo):
         from bib_nucleo.rede import exigir_rede, loja_steam
         exigir_rede("Buscar na Steam")

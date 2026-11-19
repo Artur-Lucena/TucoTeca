@@ -104,6 +104,15 @@ def metodos_colecoes(trabalhos) -> dict:
     def loja_buscar(servico, params):
         return servico.loja_buscar(texto(params, "termo", maximo=100))
 
+    def loja_generos(servico, params):
+        return servico.loja_generos()
+
+    def loja_genero(servico, params):
+        pagina = params.get("pagina", 0)
+        if isinstance(pagina, bool) or not isinstance(pagina, int) or not 0 <= pagina <= 40:
+            raise ValueError("pagina deve ser um inteiro entre 0 e 40")
+        return servico.loja_genero(texto(params, "genero", maximo=30), pagina)
+
     def loja_pagina(servico, params):
         appid = texto(params, "appid", maximo=12)
         if not appid.isdigit():
@@ -129,6 +138,8 @@ def metodos_colecoes(trabalhos) -> dict:
         "jogo.colecoes": do_jogo,
         "loja.destaques": loja_destaques,
         "loja.buscar": loja_buscar,
+        "loja.generos": loja_generos,
+        "loja.genero": loja_genero,
         "loja.pagina": loja_pagina,
         "loja.desejar": loja_desejar,
         "jogos.lojas_prever": lojas_prever,

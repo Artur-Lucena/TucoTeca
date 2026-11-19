@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { GaleriaJogo } from '../../componentes/jogo/GaleriaJogo'
+import { OndeBaixar } from '../../componentes/jogo/OndeBaixar'
 import { BlocoDescricao, EmptyState, FichaLateral, Hero } from '../../componentes/ui'
 import { formatarPreco, type PrecoSteam } from '../../estado/desejos'
 import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
@@ -94,6 +95,7 @@ export function PaginaLoja({ appid, aoMudou, aoAvisar }: Props) {
                 ☆ Adicionar aos Desejos
               </button>
             )}
+            <OndeBaixar titulo={pagina.nome} aoAvisar={aoAvisar} />
             <button type="button" class="acao" onClick={() => void window.tucoteca.abrirUrl(pagina.url_loja)}>
               Ver na Steam ↗
             </button>

@@ -70,6 +70,64 @@ def destaques() -> list[dict]:
     return saida
 
 
+# (chave, nome, id da tag Steam) — gêneros da vitrine "Descobrir por gênero"
+GENEROS = (("acao", "Ação", 19), ("aventura", "Aventura", 21), ("rpg", "RPG", 122),
+           ("estrategia", "Estratégia", 9), ("simulacao", "Simulação", 599),
+           ("corrida", "Corrida", 699), ("esportes", "Esportes", 701), ("terror", "Terror", 1667),
+           ("plataforma", "Plataforma", 1625), ("puzzle", "Quebra-cabeça", 1664),
+           ("indie", "Indie", 492), ("casual", "Casual", 597), ("multiplayer", "Multijogador", 3859),
+           ("mundo-aberto", "Mundo aberto", 1695))
+_GENERO = {g[0]: g for g in GENEROS}
+POR_PAGINA = 24
+
+
+def capa_vertical(appid: str) -> str:
+    """Capa em pé (600×900) da biblioteca Steam; nem todo app tem, o renderer cai na horizontal."""
+    return f"{CDN}/{appid}/library_600x900.jpg"
+
+
+def _cartoes_da_busca(html: str) -> list[dict]:
+    """Linhas de /search/results (HTML): appid, nome e preço final em centavos."""
+    import re
+    saida, vistos = [], set()
+    for bloco in re.split(r'(?=<a [^>]*data-ds-appid=")', html or ""):
+        m = re.match(r'<a [^>]*data-ds-appid="(\d+)"', bloco)
+        nome = re.search(r'<span class="title">([^<]+)</span>', bloco)
+        if not m or not nome or m.group(1) in vistos:
+            continue
+        appid = m.group(1)
+        preco_final = re.search(r'data-price-final="(\d+)"', bloco)
+        desconto = re.search(r'discount_pct">\s*-?(\d+)%', bloco)
+        preco = _preco(preco_final.group(1), None, desconto.group(1) if desconto else 0) if preco_final else None
+        if preco is not None and preco["final"] == 0:
+            preco = _preco(0, gratis=True)
+        cartao = _cartao(appid, html_para_texto(nome.group(1), 200), f"{CDN}/{appid}/header.jpg", preco)
+        if cartao:
+            vistos.add(appid)
+            saida.append(dict(cartao, capa=capa_vertical(appid)))
+    return saida
+
+
+def por_genero(chave: str, pagina: int = 0) -> dict:
+    """Mais vendidos de um gênero na loja Steam: {genero, itens, total, pagina} (cache de 6 h)."""
+    if chave not in _GENERO:
+        raise ValueError("Gênero desconhecido.")
+    pagina = max(0, int(pagina or 0))
+    _, nome, tag = _GENERO[chave]
+
+    def baixar():
+        respeitar_ritmo("store.steampowered.com", 1.0)
+        q = urllib.parse.urlencode({"tags": tag, "category1": 998, "filter": "topsellers", "cc": "BR",
+                                    "l": "brazilian", "start": pagina * POR_PAGINA, "count": POR_PAGINA,
+                                    "infinite": 1, "json": 1})
+        return online.requisitar_json(f"{LOJA}/search/results/?{q}")
+    dados = obter("loja-genero", f"{chave}:{pagina}", 6 * 3600, baixar)
+    dados = dados if isinstance(dados, dict) else {}
+    return {"genero": chave, "nome": nome, "pagina": pagina,
+            "total": int(dados.get("total_count") or 0),
+            "itens": _cartoes_da_busca(str(dados.get("results_html") or ""))}
+
+
 def buscar(termo: str) -> list[dict]:
     termo = " ".join(str(termo or "").split())
     if len(termo) < 2:
@@ -121,4 +179,4 @@ def pagina(appid: str) -> dict:
     }
 
 
-__all__ = ["SECOES", "destaques", "buscar", "pagina"]
+__all__ = ["SECOES", "GENEROS", "destaques", "por_genero", "capa_vertical", "buscar", "pagina"]
