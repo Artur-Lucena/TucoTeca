@@ -38,8 +38,6 @@ LibRetro e SponsorBlock.
 
 Ainda só por simulação, respostas falsas ou em ambiente de desenvolvimento:
 
-- HowLongToBeat: a API não oficial recusou a consulta ao vivo (o site mudou);
-  segue desligado por padrão e a página do jogo pede as horas à mão.
 - SteamGridDB e RetroAchievements de verdade (exigem a chave do usuário).
 - Reprodução real de vídeo no player interno (retomada e legendas na tela).
 - Controle físico (mapeamento padrão Xbox/PlayStation),

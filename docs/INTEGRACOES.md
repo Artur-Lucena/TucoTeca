@@ -116,7 +116,7 @@ derivam a capacidade do `tipo` e da presença de `url` (`_capacidades_para`).
 ## Provedores de metadados de jogos
 
 A página do jogo é alimentada por provedores em `bib_nucleo/rede/provedores/`
-(Steam, SteamGridDB, RetroAchievements, HowLongToBeat). Para acrescentar um:
+(Steam, SteamGridDB, RetroAchievements). Para acrescentar um:
 
 1. Crie `bib_nucleo/rede/provedores/<nome>.py` com
    `buscar(jogo: dict, meta: dict) -> dict`. Devolva só campos de

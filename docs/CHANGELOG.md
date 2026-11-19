@@ -3,6 +3,15 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [Não lançado]
+
+### Removido
+
+- HowLongToBeat da página do jogo: o site passou a exigir um token de
+  segurança na busca e a API não oficial deixou de responder (já vinha
+  desligado por padrão). Horas jogadas e conquistas continuam; configurações
+  antigas que citavam o provedor são ignoradas.
+
 ## [2.0.1] - 2026-11-18
 
 Instalação mais simples.

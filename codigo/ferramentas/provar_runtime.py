@@ -4,8 +4,8 @@
         qBittorrent isolado: API, torrent local, pausa/retomada.
     py -3.14 -B codigo/ferramentas/provar_runtime.py rede --saida PASTA [...]
         provedores oficiais (LRCLIB, LibRetro, SponsorBlock e, se pedido,
-        yt-dlp/FFmpeg, catálogos, Steam/Cinemeta/HowLongToBeat com
-        --provedores e um vídeo público curto). Não baixa jogos nem exige
+        yt-dlp/FFmpeg, catálogos, Steam/Cinemeta com --provedores e um
+        vídeo público curto). Não baixa jogos nem exige
         credenciais; falha externa é relatada, não vira sucesso.
 """
 from __future__ import annotations
@@ -167,7 +167,7 @@ def provar_rede(args):
         if args.provedores:
             # provedores sem chave do usuário (SteamGridDB e RetroAchievements pedem a dele)
             from bib_nucleo.rede import cinemeta, metadados
-            from bib_nucleo.rede.provedores import hltb, steam
+            from bib_nucleo.rede.provedores import steam
 
             def exigir(valor, oque):
                 if not valor:
@@ -196,13 +196,9 @@ def provar_rede(args):
             def cine_catalogo():
                 return {"series": len(exigir(cinemeta.catalogo("series"), "catálogo"))}
 
-            def hltb_horas():
-                return exigir(hltb.buscar({"titulo": "Hollow Knight"}, {}), "resultado")
-
             for nome, f in (("steam-appdetails", steam_app), ("steam-canonizar", steam_canon),
                             ("steam-precos", steam_preco), ("cinemeta-busca", cine_busca),
-                            ("cinemeta-meta", cine_meta), ("cinemeta-catalogo", cine_catalogo),
-                            ("howlongtobeat", hltb_horas)):
+                            ("cinemeta-meta", cine_meta), ("cinemeta-catalogo", cine_catalogo)):
                 testar(nome, f)
         if args.youtube:
             con = get_db(DEFAULT_DB)
@@ -231,7 +227,7 @@ def main():
     pr.add_argument("--youtube", action="store_true")
     pr.add_argument("--catalogos", action="store_true")
     pr.add_argument("--provedores", action="store_true",
-                    help="Steam, Cinemeta e HowLongToBeat de verdade (sem chave)")
+                    help="Steam e Cinemeta de verdade (sem chave)")
     pr.add_argument("--somente-youtube", action="store_true")
     pr.add_argument("--video-teste", default="jNQXAC9IVRw",
                     help="ID de vídeo público curto; default: Me at the zoo (19 s)")

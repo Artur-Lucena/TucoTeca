@@ -176,7 +176,6 @@ Instalação do usuário: README; build e publicação: `docs/RELEASES.md`.
   Cinemeta é só catálogo e os vídeos são os arquivos do usuário.
 - O player interno toca o que o Chromium toca (MP4/H.264, WebM…); MKV com
   HEVC/DTS/AC3 vai para o reprodutor externo. Textos do Cinemeta vêm em inglês.
-- HowLongToBeat usa uma API não oficial (desligado por padrão).
 - Controle físico, UAC real, FFmpeg instalado e atualização real de emulador
   foram provados por simulação; a validação no hardware do usuário segue
   pendente (ver `ROADMAP.md`). No macOS, o CI prova suíte, build e selftest
