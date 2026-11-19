@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from bib_nucleo import banco, pacotes, scans
-from bib_nucleo.rede import online
+from bib_nucleo.rede import loja_steam, online
 from executar import afirmar
 from ponte import Ponte, Trabalhos
 from servicos_ui import ServicoBiblioteca
@@ -174,3 +174,51 @@ def teste_lojas_instaladas_so_mostra_novos():
     det = fim["detalhe"]
     afirmar([i["titulo"] for i in det["itens"]] == ["Celeste"] and det["ja_na_biblioteca"] == 1, det)
     afirmar("Epic: 2" in det["aviso"], det["aviso"])
+
+
+HTML_BUSCA = """
+<a href="https://store.steampowered.com/app/367520/" data-ds-appid="367520" class="search_result_row">
+ <div class="search_name"><span class="title">Hollow Knight</span></div>
+ <div class="discount_block" data-price-final="4699"><div class="discount_pct">-50%</div></div></a>
+<a href="https://store.steampowered.com/app/730/" data-ds-appid="730" class="search_result_row">
+ <span class="title">Counter-Strike 2</span><div data-price-final="0"></div></a>
+<a href="https://store.steampowered.com/app/367520/" data-ds-appid="367520"><span class="title">dup</span></a>
+"""
+
+
+def teste_loja_por_genero_le_a_busca_da_steam():
+    cartoes = loja_steam._cartoes_da_busca(HTML_BUSCA)
+    afirmar([c["appid"] for c in cartoes] == ["367520", "730"], cartoes)
+    afirmar(cartoes[0]["nome"] == "Hollow Knight" and cartoes[0]["preco"]["final"] == 4699
+            and cartoes[0]["preco"]["desconto_pct"] == 50, cartoes[0])
+    afirmar(cartoes[1]["preco"]["gratis"] is True, cartoes[1])
+    afirmar(cartoes[0]["capa"].endswith("/367520/library_600x900.jpg"), cartoes[0])
+    pedidos = []
+
+    def falso(url, **kw):
+        pedidos.append(url)
+        return {"total_count": 99, "results_html": HTML_BUSCA}
+    with tempfile.TemporaryDirectory() as tmp, patch.dict("os.environ", {"BIBLIOTECA_HOME": tmp}), \
+            patch.object(loja_steam.online, "requisitar_json", side_effect=falso), \
+            patch.object(loja_steam, "respeitar_ritmo", lambda *a: None):
+        r = loja_steam.por_genero("rpg", 1)
+    afirmar(r["nome"] == "RPG" and r["total"] == 99 and len(r["itens"]) == 2, r)
+    afirmar("tags=122" in pedidos[0] and "start=24" in pedidos[0] and "filter=topsellers" in pedidos[0], pedidos)
+    try:
+        loja_steam.por_genero("nao-existe")
+        afirmar(False, "gênero desconhecido passou")
+    except ValueError:
+        pass
+    afirmar(len({g[2] for g in loja_steam.GENEROS}) == len(loja_steam.GENEROS), "tag repetida")
+
+def _chamar_v(ponte, metodo, **params):
+    """Pedido NDJSON pela ponte em processo; devolve a resposta decodificada."""
+    import json
+    return json.loads(ponte.executar_linha(json.dumps({"id": 1, "metodo": metodo, "params": params})))
+
+
+def teste_ponte_loja_generos_sem_rede():
+    ponte = Ponte(ServicoBiblioteca(Path(tempfile.mkdtemp(prefix="suite-gen-")) / "hub.db"))
+    r = _chamar_v(ponte, "loja.generos")
+    afirmar(r["ok"] and {"chave": "rpg", "nome": "RPG"} in r["resultado"], r)
+    afirmar(_chamar_v(ponte, "loja.genero", genero="rpg", pagina=-1)["ok"] is False)

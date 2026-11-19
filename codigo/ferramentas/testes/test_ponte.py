@@ -271,8 +271,12 @@ def _semear_banco(db: Path) -> None:
     con.close()
 
 
-def _esperar(condicao, limite=5.0):
-    """Aguarda um estado assíncrono (jobs) sem depender de sleep fixo."""
+def _esperar(condicao, limite=30.0):
+    """Aguarda um estado assíncrono (jobs) sem depender de sleep fixo.
+
+    O limite é só o teto: volta assim que a condição vale. É folgado porque no CI
+    vários casos rodam ao mesmo tempo em máquinas lentas.
+    """
     fim = time.time() + limite
     while time.time() < fim:
         if condicao():

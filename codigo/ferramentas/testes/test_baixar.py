@@ -501,3 +501,28 @@ def teste_download_state_preserva_staging_apos_falha():
         afirmar(r["musica_path"] == "stage/audio.m4a" and r["video_id"] == "id", r)
     finally:
         con.close()
+
+
+def _chamar_v(ponte, metodo, **params):
+    """Pedido NDJSON pela ponte em processo; devolve a resposta decodificada."""
+    import json
+    return json.loads(ponte.executar_linha(json.dumps({"id": 1, "metodo": metodo, "params": params})))
+
+
+def teste_ponte_limpar_fila_tira_so_as_baixadas():
+    from ponte import Ponte
+    from servicos_ui import ServicoBiblioteca
+    servico = ServicoBiblioteca(Path(tempfile.mkdtemp(prefix="suite-fila-")) / "hub.db")
+    con = banco.get_db(servico.db_path)
+    try:
+        banco.enfileirar_downloads(con, [{"titulo": "A", "artista": "X"}, {"titulo": "B", "artista": "Y"}])
+        banco.marcar_download(con, banco.listar_downloads(con)[0]["id"], "pronta")
+    finally:
+        con.close()
+    r = _chamar_v(Ponte(servico), "musicas.limpar_fila")
+    afirmar(r["ok"] and r["resultado"]["removidas"] == 1, r)
+    con = banco.get_db(servico.db_path)
+    try:
+        afirmar([d["titulo"] for d in banco.listar_downloads(con)] == ["B"])
+    finally:
+        con.close()

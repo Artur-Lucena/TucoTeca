@@ -122,7 +122,7 @@ def teste_jogo_aberto_bloqueia_mudancas_mas_nao_leitura():
         _ok(ponte, "emulacao.mod", {"id": gid, "acao": "importar", "arquivo": str(origem)})
 
 
-def _esperar_fim(ponte, ident, limite=5.0):
+def _esperar_fim(ponte, ident, limite=30.0):
     import time
     fim = time.monotonic() + limite
     while time.monotonic() < fim:

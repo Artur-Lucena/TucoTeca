@@ -2,6 +2,7 @@
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 from bib_nucleo import torrents as TT
 from executar import afirmar
@@ -136,3 +137,34 @@ def teste_torrents_localappdata_e_metadados_invalidos():
         pass
     else:
         afirmar(False, "nome fora da pasta aceito")
+
+
+def teste_qbit_remover_mantem_arquivos():
+    from bib_nucleo import qbit
+    chamadas = []
+    with patch.object(qbit, "qbit_request", side_effect=lambda ep, dados=None, **kw: chamadas.append((ep, dados))):
+        afirmar(qbit.qbit_controlar("ABCDEF0123", "remover")["ok"])
+        afirmar(not qbit.qbit_controlar("xyz", "remover")["ok"])
+        afirmar(not qbit.qbit_controlar("ABCDEF0123", "apagar")["ok"])
+    afirmar(chamadas == [("torrents/delete", {"hashes": "ABCDEF0123", "deleteFiles": "false"})], chamadas)
+
+def _chamar_v(ponte, metodo, **params):
+    """Pedido NDJSON pela ponte em processo; devolve a resposta decodificada."""
+    import json
+    return json.loads(ponte.executar_linha(json.dumps({"id": 1, "metodo": metodo, "params": params})))
+
+
+def teste_ponte_limpar_torrents_concluidos():
+    from bib_nucleo import qbit
+    from ponte import Ponte
+    from servicos_ui import ServicoBiblioteca
+    ponte = Ponte(ServicoBiblioteca(Path(tempfile.mkdtemp(prefix="suite-tor-")) / "hub.db"))
+    lista = {"torrents": [{"hash": "AA11", "nome": "pronto", "pct": 100.0, "completo": True},
+                          {"hash": "BB22", "nome": "baixando", "pct": 40.0, "completo": False}], "erros": []}
+    removidos = []
+    with patch("bib_nucleo.rede.torrents.listar_torrents", return_value=lista), \
+            patch.object(qbit, "qbit_controlar", side_effect=lambda h, a: removidos.append((h, a)) or {"ok": True}):
+        r = _chamar_v(ponte, "torrents.limpar_concluidos")
+    afirmar(r["ok"] and r["resultado"] == {"removidos": 1, "erros": []}, r)
+    afirmar(removidos == [("AA11", "remover")], removidos)
+    afirmar(_chamar_v(ponte, "torrents.controlar", ident="AA11", acao="apagar")["ok"] is False)

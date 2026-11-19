@@ -1,6 +1,6 @@
 # Roadmap — TucoTeca
 
-Estado: **2.1 publicada.** O app desktop é a única interface, no Windows e no
+Estado: **2.1 publicada** (2.1.1: acabamento). O app desktop é a única interface, no Windows e no
 macOS (Apple Silicon e Intel). A 2.1 trouxe descobrir jogos por gênero, "Onde
 baixar", galeria de capas, YouTube ↔ Spotify (clipe ou MP3 com os dados da
 música), limpezas e testes rápidos e localizados. Antes: 2.0.x (sem TUI, porte

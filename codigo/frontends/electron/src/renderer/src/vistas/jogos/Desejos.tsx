@@ -7,6 +7,7 @@ import {
   validarTituloDesejo,
   type PrecoSteam,
 } from '../../estado/desejos'
+import { OndeBaixar } from '../../componentes/jogo/OndeBaixar'
 import { EmptyState } from '../../componentes/ui'
 import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 import { confirmar } from '../../componentes/ui/Confirmacao'
@@ -29,13 +30,6 @@ interface DesejoItem {
 }
 
 /** Tela Desejos: lista, preços (cache Steam), adicionar/remover e nota das pendências. */
-interface FontesDesejo {
-  titulo: string
-  steamrip: Array<{ titulo: string; url: string }>
-  fitgirl: Array<{ titulo: string; url: string }>
-  erros: string[]
-}
-
 export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props) {
   const desejos = (snapshot.value?.desejos ?? []) as DesejoItem[]
   const [busca, setBusca] = useState('')
@@ -115,8 +109,6 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
     }
   }
 
-  const [fontes, setFontes] = useState<FontesDesejo | null>(null)
-  const [buscandoFontes, setBuscandoFontes] = useState(false)
 
   const sincronizarSteam = async () => {
     try {
@@ -135,28 +127,6 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
       const r = await window.tucoteca.chamar<{ avisos?: string[] }>('desejos.importar_wishlist', { caminho })
       aoAvisar(r?.avisos?.[0] ?? 'Wishlist importada.')
       aoMudou()
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const buscarFontes = async () => {
-    const titulo = String(escolhido?.titulo ?? '').trim()
-    if (titulo === '') return
-    setBuscandoFontes(true)
-    try {
-      const r = await window.tucoteca.chamar<FontesDesejo>('desejos.buscar_fontes', { titulo })
-      setFontes({ titulo, steamrip: r?.steamrip ?? [], fitgirl: r?.fitgirl ?? [], erros: r?.erros ?? [] })
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    } finally {
-      setBuscandoFontes(false)
-    }
-  }
-
-  const abrirFonte = async (url: string) => {
-    try {
-      await window.tucoteca.abrirUrl(url)
     } catch (falha) {
       aoAvisar(textoDeFalha(falha), 'atencao')
     }
@@ -207,15 +177,12 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
           >
             {consultando ? 'Ver preços…' : 'Ver preços'}
           </button>
-          <button
-            type="button"
-            class="acao"
-            onClick={() => void buscarFontes()}
-            disabled={escolhido === undefined || buscandoFontes}
-            title="Procura o título selecionado nas fontes (abre a página no navegador)"
-          >
-            {buscandoFontes ? 'Buscando…' : 'Buscar fontes'}
-          </button>
+          <OndeBaixar
+            titulo={String(escolhido?.titulo ?? '')}
+            aoAvisar={aoAvisar}
+            rotulo="Buscar fontes"
+            desligado={escolhido === undefined}
+          />
           <button type="button" class="acao" onClick={() => setFormAberto((atual) => !atual)}>
             + Adicionar
           </button>
@@ -270,34 +237,6 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
         </div>
       )}
 
-      {fontes !== null && (
-        <div class="form-config painel-paridade fontes-desejo">
-          <h2>Fontes para “{fontes.titulo}”</h2>
-          {(['steamrip', 'fitgirl'] as const).map((chave) => (
-            <div key={chave}>
-              <h4>{chave === 'steamrip' ? 'SteamRip' : 'FitGirl'}</h4>
-              {fontes[chave].length === 0 ? (
-                <p class="sub">Nada encontrado.</p>
-              ) : (
-                <ul class="lista-simples">
-                  {fontes[chave].map((item, i) => (
-                    <li key={`${chave}-${i}`}>
-                      <span>{item.titulo}</span>
-                      <button type="button" class="acao" onClick={() => void abrirFonte(item.url)}>
-                        Abrir página ↗
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-          {fontes.erros.length > 0 && <p class="sub">Avisos: {fontes.erros.join(' · ')}</p>}
-          <button type="button" class="acao" onClick={() => setFontes(null)}>
-            Fechar
-          </button>
-        </div>
-      )}
 
       {lista.length === 0 ? (
         <EmptyState icone="★" titulo="Nada por aqui." descricao="Adicione um appid, sincronize com a Steam ou importe o JSON da wishlist." />

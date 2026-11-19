@@ -1,9 +1,9 @@
 import { useState } from 'preact/hooks'
-import { candidatosDeCapa, errosDeCapa, type CandidatoCapa } from '../../estado/capas'
 import { STATUS_JOGOS, normalizarEtiquetas, validarHoras, validarNota, type JogoDaLista } from '../../estado/jogos'
 import { textoDeFalha } from '../../estado/notificacoes'
 import type { PaginaJogo } from '../../estado/paginaJogo'
 import { ehMac } from '../../plataforma'
+import { EscolherCapa } from './EscolherCapa'
 
 type Avisar = (texto: string, tom?: 'info' | 'atencao') => void
 
@@ -175,7 +175,6 @@ interface CandidatoArte {
 }
 
 function CapaEArte({ id, pagina, aoMudou, aoAvisar }: Props) {
-  const [capas, setCapas] = useState<CandidatoCapa[]>([])
   const [arte, setArte] = useState<{ tipo: string; itens: CandidatoArte[] } | null>(null)
   const [ocupado, setOcupado] = useState(false)
 
@@ -189,24 +188,6 @@ function CapaEArte({ id, pagina, aoMudou, aoAvisar }: Props) {
       setOcupado(false)
     }
   }
-
-  const buscarCapas = () =>
-    comTrava(async () => {
-      const r = await window.tucoteca.chamar('capas.buscar', { categoria: 'jogos', id, provedor: '', atualizar: false })
-      const lista = candidatosDeCapa(r)
-      setCapas(lista)
-      const erros = errosDeCapa(r)
-      if (lista.length > 0) aoAvisar(`${lista.length} capa(s) encontrada(s). Clique em uma para aplicar.`)
-      else aoAvisar(erros[0] ? `Nenhuma capa encontrada (${erros[0]}).` : 'Nenhuma capa encontrada.', 'atencao')
-    })
-
-  const aplicarCapa = (candidato: Record<string, unknown>) =>
-    comTrava(async () => {
-      await window.tucoteca.chamar('capas.aplicar', { categoria: 'jogos', id, candidato })
-      aoAvisar('Capa aplicada.')
-      setCapas([])
-      aoMudou()
-    })
 
   const capaLibretro = () =>
     comTrava(async () => {
@@ -235,9 +216,7 @@ function CapaEArte({ id, pagina, aoMudou, aoAvisar }: Props) {
     <section class="bloco-jogo">
       <h3>Capa e arte</h3>
       <div class="detalhe-linha">
-        <button type="button" class="acao" onClick={() => void buscarCapas()} disabled={ocupado}>
-          Buscar capas
-        </button>
+        <EscolherCapa id={id} titulo={String(pagina.jogo.titulo ?? '')} aoMudou={aoMudou} aoAvisar={aoAvisar} />
         {String(pagina.jogo.launch_options ?? '').trim() !== '' && (
           <button type="button" class="acao" onClick={() => void capaLibretro()} disabled={ocupado} title="Capa de ROM pelo acervo libretro-thumbnails">
             Capa libretro
@@ -249,19 +228,6 @@ function CapaEArte({ id, pagina, aoMudou, aoAvisar }: Props) {
           </button>
         ))}
       </div>
-      {capas.length > 0 && (
-        <div class="capas-candidatas">
-          {capas.map((c, i) => {
-            const url = window.tucoteca.imagemUrl(c.preview)
-            return (
-              <button key={i} type="button" class="capa-candidata" title={`Aplicar capa${c.fonte ? ` de ${c.fonte}` : ''}`} onClick={() => void aplicarCapa(c.original)}>
-                {url !== '' ? <img src={url} alt="" loading="lazy" /> : <span class="capa-vazia">{i + 1}</span>}
-                <span>{c.fonte || `Capa ${i + 1}`}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
       {arte !== null && arte.itens.length > 0 && (
         <div class={`artes-candidatas tipo-${arte.tipo}`}>
           {arte.itens.map((a) => (
