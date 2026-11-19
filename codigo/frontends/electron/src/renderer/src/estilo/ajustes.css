@@ -130,14 +130,6 @@ label.marcar {
   white-space: nowrap;
 }
 
-.capa-candidata img,
-.capa-candidata .capa-vazia {
-  width: 100%;
-  aspect-ratio: 2 / 3;
-  border-radius: 6px;
-  object-fit: cover;
-}
-
 .vista-acoes select,
 .filtros select {
   padding: 6px var(--espaco-sm);

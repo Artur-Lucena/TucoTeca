@@ -367,35 +367,6 @@
 
 /* ---- Fase 4: acabamento ---- */
 
-.capas-candidatas {
-  display: flex;
-  gap: var(--espaco-sm);
-  flex-wrap: wrap;
-  margin: var(--espaco-sm) 0;
-}
-
-.capa-candidata {
-  display: grid;
-  gap: var(--espaco-xs);
-  width: 96px;
-  padding: var(--espaco-xs);
-  border: 1px solid var(--borda);
-  border-radius: var(--raio-sm);
-  background: var(--cartao);
-  color: var(--texto2);
-  font: inherit;
-  font-size: 11px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color var(--transicao);
-}
-
-.capa-candidata:hover,
-.capa-candidata:focus-visible {
-  border-color: var(--realce);
-  color: var(--texto);
-}
-
 .kpi-row {
   margin-bottom: var(--espaco-lg);
   display: flex;
@@ -1093,7 +1064,8 @@
   transition: border-color var(--transicao), transform var(--transicao);
 }
 
-.capa-opcao img {
+.capa-opcao img,
+.capa-opcao .capa-vazia {
   width: 100%;
   aspect-ratio: 2 / 3;
   object-fit: cover;

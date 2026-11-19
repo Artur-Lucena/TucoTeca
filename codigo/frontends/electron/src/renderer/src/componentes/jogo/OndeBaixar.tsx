@@ -16,7 +16,14 @@ interface Resultado {
 const NOMES = { steamrip: 'SteamRIP', fitgirl: 'FitGirl' } as const
 
 /** "Onde baixar": procura o título nos catálogos (SteamRIP, FitGirl) e abre a página escolhida no navegador. */
-export function OndeBaixar({ titulo, aoAvisar }: { titulo: string; aoAvisar: AoAvisar }) {
+interface Props {
+  titulo: string
+  aoAvisar: AoAvisar
+  rotulo?: string
+  desligado?: boolean
+}
+
+export function OndeBaixar({ titulo, aoAvisar, rotulo = 'Onde baixar', desligado = false }: Props) {
   const [aberto, setAberto] = useState(false)
   const [r, setR] = useState<Resultado | null>(null)
 
@@ -41,8 +48,14 @@ export function OndeBaixar({ titulo, aoAvisar }: { titulo: string; aoAvisar: AoA
 
   return (
     <>
-      <button type="button" class="acao" onClick={() => void procurar()} title="Procura nos catálogos e abre a página no navegador">
-        Onde baixar
+      <button
+        type="button"
+        class="acao"
+        disabled={desligado || titulo.trim() === ''}
+        onClick={() => void procurar()}
+        title="Procura nos catálogos e abre a página no navegador"
+      >
+        {rotulo}
       </button>
       <Modal aberto={aberto} aoFechar={() => setAberto(false)} titulo={`Onde baixar ${titulo}`} largura="620px">
         {r === null ? (
