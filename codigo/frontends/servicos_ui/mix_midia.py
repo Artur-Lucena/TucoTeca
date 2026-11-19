@@ -190,8 +190,26 @@ class MixMidia:
             raise ValueError(r.get("erro", "Falha ao abrir a ferramenta."))
         return r
 
-    def baixar_mp3(self, video, progresso=None):
-        return self.alterar(lambda con: videos_youtube.baixar_audio_youtube(con, video, progresso))
+    def baixar_mp3(self, video, progresso=None, musica=None):
+        """MP3 do vídeo; com `musica` (faixa do Spotify), entra com os dados e a capa dela."""
+        r = self.alterar(lambda con: videos_youtube.baixar_audio_youtube(con, video, progresso, musica))
+        capa = str((musica or {}).get("capa_url") or "") if isinstance(musica, dict) else ""
+        if r.get("ok") and r.get("id") and online.url_https(capa):
+            try:
+                self.aplicar_capa("musicas", r["id"], {"url": capa, "provedor": "spotify"})
+            except (OSError, ValueError) as erro:
+                r["aviso"] = f"MP3 baixado; a capa do Spotify não veio ({erro})."
+        return r
+
+    def versao_musica(self, video):
+        """A mesma música no Spotify para o vídeo (para oferecer MP3 com os dados dela)."""
+        from bib_nucleo.rede import exigir_rede, musica_video
+        exigir_rede("Procurar a música no Spotify")
+        return musica_video.versao_spotify(self.spotify, video)
+
+    def limpar_fila_musicas(self):
+        """Tira da fila de downloads as faixas já baixadas."""
+        return {"removidas": self.alterar(lambda con: banco.limpar_downloads(con, ("pronta",)))}
 
     def video_local(self, ident):
         from bib_nucleo.apps_externos import resolver_video

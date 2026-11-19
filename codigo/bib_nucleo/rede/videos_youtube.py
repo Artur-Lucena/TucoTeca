@@ -272,8 +272,12 @@ def baixar_video_youtube(con, video_id: str, progresso=None) -> dict:
             "titulo": meta["titulo"], "sha": sha}
 
 
-def baixar_audio_youtube(con, video, progresso=None):
-    """MP3 por URL/ID validado; sem busca aproximada nem configuração externa do yt-dlp."""
+def baixar_audio_youtube(con, video, progresso=None, musica=None):
+    """MP3 por URL/ID validado; sem busca aproximada nem configuração externa do yt-dlp.
+
+    `musica` (opcional, faixa do Spotify escolhida pelo usuário) dá título,
+    artista e álbum no lugar do título do vídeo e do canal.
+    """
     from bib_nucleo.arquivos import destino_temporario
     from bib_nucleo.baixar import localizar_ffmpeg
     from bib_nucleo.banco import criar_musica
@@ -314,13 +318,17 @@ def baixar_audio_youtube(con, video, progresso=None):
                 raise ValueError("Download/conversão MP3 não concluído.")
             mp3.replace(parcial)
         sha = sha_arquivo(destino)
+        dados = {"titulo": meta["titulo"], "artista": meta["canal"], "album": ""}
+        if isinstance(musica, dict) and str(musica.get("titulo") or "").strip():
+            dados = {"titulo": str(musica["titulo"]).strip(), "artista": str(musica.get("artista") or "").strip(),
+                     "album": str(musica.get("album") or "").strip()}
         try:
-            criar_musica(con, {"titulo": meta["titulo"], "artista": meta["canal"],
-                         "musica_path": str(destino), "musica_sha": sha, "origem": "youtube"})
+            criada = criar_musica(con, {**dados, "musica_path": str(destino), "musica_sha": sha,
+                                        "origem": "youtube"})
         except Exception:
             destino.unlink(missing_ok=True)
             raise
-        return {"ok": True, "path": str(destino), "titulo": meta["titulo"], "sha": sha}
+        return {"ok": True, "id": criada.get("id"), "path": str(destino), "titulo": dados["titulo"], "sha": sha}
     except (OSError, ValueError, sqlite3.Error, subprocess.SubprocessError) as e:
         return {"ok": False, "erro": str(e)}
 

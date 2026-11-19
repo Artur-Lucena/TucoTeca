@@ -500,3 +500,53 @@
 .midia-biblioteca > .midia-barra {
   margin-bottom: 0;
 }
+
+/* 2.1: escolha do download do YouTube (MP4, MP3, MP3 com dados do Spotify) */
+.escolha-video {
+  margin-top: 0;
+}
+
+.opcoes-download {
+  display: grid;
+  gap: var(--espaco-sm);
+  margin-bottom: var(--espaco-md);
+}
+
+.opcao-download {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+  padding: var(--espaco-md);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--cartao);
+  color: var(--texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.opcao-download span {
+  color: var(--texto2);
+  font-size: 13px;
+}
+
+.opcao-download.destaque {
+  grid-template-columns: 56px 1fr;
+  column-gap: var(--espaco-md);
+  border-color: var(--realce);
+  background: var(--realce-suave);
+}
+
+.opcao-download.destaque img {
+  grid-row: span 2;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--raio-sm);
+  object-fit: cover;
+}
+
+.opcao-download:hover:not(:disabled),
+.opcao-download:focus-visible {
+  border-color: var(--realce);
+}

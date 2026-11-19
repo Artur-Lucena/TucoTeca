@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
+import { EscolhaDownload } from '../../componentes/midia/EscolhaDownload'
 import { NavegadorYouTube } from '../../componentes/midia/NavegadorYouTube'
 import { listaTrabalhos } from '../../estado/trabalhos'
 
@@ -23,6 +24,7 @@ export function YouTube({ aoAvisar, aoMudou }: Props) {
   const [resultados, setResultados] = useState<ResultadoYouTube[]>([])
   const [buscando, setBuscando] = useState(false)
   const [videoAtual, setVideoAtual] = useState<string | null>(null)
+  const [escolha, setEscolha] = useState<ResultadoYouTube | null>(null)
 
   useEffect(() => {
     if (termo.trim().length < 2) {
@@ -49,26 +51,6 @@ export function YouTube({ aoAvisar, aoMudou }: Props) {
     }, 350)
     return () => window.clearTimeout(timer)
   }, [termo])
-
-  const baixar = async (item: ResultadoYouTube) => {
-    if (!item.video_id) return
-    try {
-      await window.tucoteca.chamar('videos.baixar', { video_id: item.video_id })
-      aoAvisar(`Baixando "${item.titulo ?? item.video_id}"…`)
-      aoMudou()
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
-
-  const baixarMp3 = async (item: ResultadoYouTube) => {
-    try {
-      await window.tucoteca.chamar('videos.baixar_mp3', { video: item })
-      aoAvisar(`Baixando MP3 de "${item.titulo ?? ''}"…`)
-    } catch (falha) {
-      aoAvisar(textoDeFalha(falha), 'atencao')
-    }
-  }
 
   const trabalhoAtivo = listaTrabalhos.value.find(
     (t) => t.escopo === 'videos' && (t.estado === 'rodando' || t.estado === 'cancelando'),
@@ -117,17 +99,16 @@ export function YouTube({ aoAvisar, aoMudou }: Props) {
                 <button type="button" class="acao" onClick={() => setVideoAtual(item.video_id ?? null)}>
                   Assistir
                 </button>
-                <button type="button" class="acao" onClick={() => void baixar(item)}>
-                  Baixar
-                </button>
-                <button type="button" class="acao" onClick={() => void baixarMp3(item)}>
-                  MP3
+                <button type="button" class="acao" onClick={() => setEscolha(item)} title="Clipe (MP4) ou música (MP3)">
+                  Baixar…
                 </button>
               </div>
             </li>
           ))}
         </ul>
       )}
+
+      <EscolhaDownload video={escolha} aoFechar={() => setEscolha(null)} aoAvisar={aoAvisar} aoMudou={aoMudou} />
 
       {trabalhoAtivo !== undefined && trabalhoAtivo !== null && (
         <p class="aviso">Baixando… {trabalhoAtivo.rotulo}</p>
