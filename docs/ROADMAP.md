@@ -48,6 +48,13 @@ Ainda só por simulação, respostas falsas ou em ambiente de desenvolvimento:
   quarentena), controle, emuladores (Azahar/DeSmuME `.app`), vídeo e música.
   O CI prova suíte, build e selftest do app nas duas arquiteturas.
 
+## 2.1 (em andamento)
+
+- Descobrir jogos por gênero, "Onde baixar" na loja e galeria de capas.
+- YouTube ↔ Spotify: escolher clipe (MP4) ou música (MP3 com os dados do Spotify).
+- Limpar notificações, fila de músicas baixadas e torrents concluídos.
+- HowLongToBeat removido (o site passou a exigir token).
+
 ## Depois da 2.0
 
 - Validadores restantes da ponte para `ponte_params` e `estado/formato.ts` nos

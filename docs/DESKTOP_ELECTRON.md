@@ -30,7 +30,7 @@ Intel). Linux roda pelos fontes.
   demorar mais roda como **trabalho** (`trabalhos.listar/cancelar`) e aparece no
   rodapé (`Atividade`).
 
-## Métodos da ponte (136)
+## Métodos da ponte (141)
 
 Contrato provado por `test_ponte.py`, `test_paridade.py`, `test_provedores.py`,
 `test_colecoes.py` e `test_midia.py`. Ações que mexem em
@@ -43,14 +43,14 @@ jogo aberto antes…"); confirmações de ações destrutivas ficam na interface
 | jogos | `jogo.ler/salvar/favoritar/observacoes/jogar`*, `jogo.registrar_horas`, `jogo.diagnosticar/religar/disco/jogar_elevado`, `jogos.importar`*, `jogos.prever`, `jogos.importar_selecionados` |
 | emulação | `emulacao.jogo/mod/cheat/textura/preset`, `emulacao.status/consultar/atualizar`*, `controles.listar/fotografar/aplicar/gerar/estado` |
 | saves e capas | `saves.configurar/snapshot/restaurar`, `ferramentas.jogo`, `capas.buscar/aplicar/libretro`, `conquistas.avaliar/sincronizar/regras` |
-| músicas | `musicas.importar`*, `musicas.baixar_fila`*, `musicas.buscar_online/enfileirar/letras`, `musicas.eq_presets`, `musicas.eq`* |
-| vídeos | `videos.local/salvar_posicao/reproduzir/buscar_online`, `videos.importar/baixar/baixar_mp3`* |
+| músicas | `musicas.importar`*, `musicas.baixar_fila`*, `musicas.buscar_online/enfileirar/letras/limpar_fila`, `musicas.eq_presets`, `musicas.eq`* |
+| vídeos | `videos.local/salvar_posicao/reproduzir/buscar_online/versao_musica`, `videos.importar/baixar/baixar_mp3`* (MP3 com os dados da faixa do Spotify, se escolhida) |
 | desejos | `desejos.adicionar/precos/sincronizar_steam/importar_wishlist/buscar_fontes` |
-| downloads | `torrents.listar` (com `fora_destino`), `torrents.controlar/organizar`, `torrents.importar`*, `pacotes.importar/abrir_instalador` |
+| downloads | `torrents.listar` (com `fora_destino`), `torrents.controlar/organizar/limpar_concluidos` (remover tira da lista e mantém os arquivos), `torrents.importar`*, `pacotes.importar/abrir_instalador` |
 | integrações | `integracoes.listar/adicionar/remover/url/buscar` |
 | coleção e sistema | `colecao.backup/exportar/importar`, `backups.listar`, `estatisticas.ler`, `item.excluir/desfazer`, `lixeira.estado`, `sessoes.listar/encerrar`, `sistema.erros/volume/volume_definir/volume_mudo`, `manutencao.plano/sanear`, `ferramentas.listar/abrir`, `provedores.configurar` |
 | página do jogo e provedores | `jogo.pagina`, `jogo.enriquecer`*, `jogos.enriquecer_lote`*, `jogo.meta_salvar/artes_buscar/arte_aplicar`, `metadados.provedores/configurar` |
-| coleções e loja | `colecoes.criar/renomear/apagar/definir`, `jogo.colecoes`, `loja.destaques/buscar/pagina/desejar`, `jogos.lojas_prever`* |
+| coleções e loja | `colecoes.criar/renomear/apagar/definir`, `jogo.colecoes`, `loja.destaques/buscar/pagina/desejar/generos/genero`, `jogos.lojas_prever`* |
 | filmes e séries | `midia.pastas/pasta_adicionar/pasta_remover`, `midia.varrer`*, `midia.biblioteca/titulo/descobrir/continuar/lista/lista_alternar/seguir/calendario`, `midia.atualizar_seguidas`*, `midia.corrigir/reproduzir/externo/salvar_posicao/marcar/legenda` |
 | trabalhos | `trabalhos.listar/cancelar` |
 

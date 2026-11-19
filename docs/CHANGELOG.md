@@ -5,6 +5,21 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
 
 ## [Não lançado]
 
+### Adicionado
+
+- Jogos › Catálogo: **descobrir por gênero** (Ação, RPG, Terror, Corrida…),
+  com os mais vendidos de cada um em capas em pé e "Mais jogos".
+- Página da loja: **Onde baixar** procura o jogo nos catálogos (SteamRIP,
+  FitGirl) e abre a página escolhida no navegador.
+- Página do jogo: **Capas…** abre a galeria das capas das fontes (Steam,
+  SteamGridDB, Wikipedia, LibRetro) para escolher a da biblioteca.
+- YouTube: **Baixar…** pergunta o que baixar — o clipe (MP4) ou só a música
+  (MP3). Se a mesma música estiver no Spotify (Client ID/Secret ou conta
+  conectada), o MP3 entra com título, artista, álbum e capa de lá.
+- Limpezas: **Limpar tudo** no sino de notificações, **Limpar baixadas** na
+  fila de músicas e **Limpar concluídos** em Downloads (tira da lista do
+  qBittorrent; os arquivos ficam).
+
 ### Removido
 
 - HowLongToBeat da página do jogo: o site passou a exigir um token de
