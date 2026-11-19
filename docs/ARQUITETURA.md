@@ -272,10 +272,12 @@ consome `cfg`; o helper `_env` atende chamadas legadas.
 
 Casos cobrem persistência, identidade, scanners, overlays, rollback,
 downloads simulados, ponte, áudio, volume e as diferenças de macOS;
-o renderer/main do Electron têm testes vitest próprios. `executar.py` cria sandbox,
-descobre `teste_*` e informa os pulos e falhas por ambiente.
-`testes/conftest.py` coleta por AST e executa os mesmos casos em processos separados;
-`pytest --cobertura` agrega cobertura dos subprocessos. Provas nativas e
+o renderer/main do Electron têm testes vitest próprios. `executar.py` cria uma
+sandbox e um processo por caso, roda um caso por núcleo, mede cobertura na
+mesma passada (`--cobertura`) e guarda o mapa caso → funções executadas que o
+`--alterados` usa para rodar só o que uma mudança afeta. `test_arquitetura.py`
+garante as fronteiras (núcleo ← serviços ← ponte ← Electron) que tornam isso
+possível. `testes/conftest.py` deixa o pytest coletar os mesmos casos. Provas nativas e
 smokes remotos são separados dos casos herméticos e não usam jogos reais.
 
 O maior ponto de acoplamento continua `scans/` (`emuladores` foi fatiado na F1 do O2 em

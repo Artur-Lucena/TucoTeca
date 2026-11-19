@@ -41,8 +41,9 @@ entram no Git.
 - Raiz enxuta: só README, LICENSE, AGENTS.md, pyproject.toml, `.git*`,
   `TucoTeca.bat` e as pastas `.github`, `codigo`, `docs`.
 - Não reescrever o domínio para implementar a paridade visual.
-- Testes: `py -3.14 -B codigo/ferramentas/testes/executar.py [--modulo <modulo>]`.
-  Suíte completa: sem argumentos. Pytest/cobertura quando disponíveis.
+- Testes: `py -3.14 -B codigo/ferramentas/testes/executar.py --alterados` durante o
+  trabalho (só os casos afetados); `-k`, `--modulo`, `--falhas`; sem argumentos =
+  tudo, em paralelo. Camadas só dependem para baixo (`test_arquitetura.py`).
   Electron: `npm --prefix codigo/frontends/electron run typecheck` e `npm test`.
   Gates juntos: `py -3.14 -B codigo/ferramentas/validar.py`. O CI
   (`.github/workflows/testes.yml`) roda a suíte em Windows, Linux e macOS e

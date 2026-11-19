@@ -72,22 +72,37 @@ O mapa completo está em [ARQUITETURA](ARQUITETURA.md).
 ## Testar a alteração
 
 ```powershell
-py -3.14 codigo/ferramentas/testes/executar.py --modulo test_musica
-py -3.14 codigo/ferramentas/testes/executar.py --caso test_fontes.py teste_steamrip_nome_e_download_incompleto
-py -3.14 -B codigo/ferramentas/validar.py                 # todos os gates (~12 min)
-py -3.14 -B codigo/ferramentas/validar.py --sem-pytest    # rápido (~2 min)
+py -3.14 -B codigo/ferramentas/testes/executar.py --alterados   # só o que toca o que você mudou (segundos)
+py -3.14 -B codigo/ferramentas/testes/executar.py -k loja       # casos com "loja" no nome
+py -3.14 -B codigo/ferramentas/testes/executar.py --falhas      # só o que falhou da última vez
+py -3.14 -B codigo/ferramentas/testes/executar.py --modulo test_musica
+py -3.14 -B codigo/ferramentas/testes/executar.py               # tudo, em paralelo (~40 s)
+py -3.14 -B codigo/ferramentas/validar.py --rapido              # lint + testes do que mudou + Electron
+py -3.14 -B codigo/ferramentas/validar.py                       # todos os gates, com cobertura (~1,5 min)
 ```
 
-`validar.py` roda Ruff, o mypy dos builders (pula se ausente), a suíte, a
-cobertura, typecheck + vitest do Electron e confere a árvore Git; o relatório
-vai para `.provas/gates-local-<timestamp>.json`. A matriz hospedada
-(`.github/workflows/testes.yml`) só roda manualmente (`workflow_dispatch`): o
-billing da conta bloqueia jobs automáticos. Fora do alcance local: gitleaks,
-Python 3.10, Ubuntu e macOS reais. Rode `validar.py` antes de commitar.
+Cada caso roda no seu processo e na sua sandbox, um por núcleo ao mesmo
+tempo. Cada execução grava em `.provas/testes-estado.json` quanto cada caso
+levou (os lentos começam primeiro), o que falhou (`--falhas`) e quais funções
+do projeto cada caso executou: é esse mapa que o `--alterados` usa para
+escolher só os casos afetados (mais os que importam o módulo mudado; mexer
+no runner ou no `pyproject.toml` roda tudo). Sem mapa ainda, rode a suíte
+inteira uma vez. `--cobertura` mede na mesma passada (relatório em
+`.provas/cobertura/`).
+
+`validar.py` roda Ruff, o mypy dos builders (pula se ausente;
+`TUCOTECA_MYPY_PY` aponta um Python com mypy fora do repositório), a suíte
+com cobertura, typecheck + vitest do Electron e confere a árvore Git; o
+relatório vai para `.provas/gates-local-<timestamp>.json`. O CI
+(`.github/workflows/testes.yml`) roda a suíte em Windows, Ubuntu e macOS
+(Python 3.10 e 3.14), gera os instaladores e passa o gitleaks.
 
 - Casos são funções `teste_*` em `codigo/ferramentas/testes/test_*.py`; a
-  suíte cria a sandbox sozinha, inclusive com `--caso`. O pytest coleta pelo
-  mesmo runner (`--cobertura` mede os casos; saída em `.provas/cobertura/`).
+  suíte cria a sandbox sozinha. O pytest coleta pelo mesmo runner (opcional).
+- Um arquivo de teste não importa outro, e as camadas só dependem para baixo
+  (núcleo ← serviços ← ponte ← Electron; renderer só por IPC):
+  `test_arquitetura.py` reprova o contrário. É isso que mantém os testes
+  localizados.
 - Lint: `ruff check codigo` limpo; as exceções (`E501`, `E402` e
   `F403` nas fachadas de pacote) estão justificadas no `pyproject.toml`. Um
   `--fix` automático não é neutro (`F401`, `F841`, `I001`): rode a suíte depois.

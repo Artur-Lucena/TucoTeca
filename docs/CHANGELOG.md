@@ -20,6 +20,14 @@ seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0
   fila de músicas e **Limpar concluídos** em Downloads (tira da lista do
   qBittorrent; os arquivos ficam).
 
+### Interno
+
+- Testes rápidos e localizados: a suíte roda um caso por núcleo (de ~5 min
+  para ~40 s), `--alterados` roda só os casos que executam o código mudado
+  (mapa gravado a cada execução), `-k` e `--falhas` filtram, e a cobertura
+  sai na mesma passada (`validar.py` de ~7 min para ~1,5 min). Fronteiras
+  entre núcleo, serviços, ponte e renderer viraram teste.
+
 ### Removido
 
 - HowLongToBeat da página do jogo: o site passou a exigir um token de
