@@ -3,6 +3,24 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2.1.1] - 2026-11-19
+
+Acabamento da 2.1.
+
+### Alterado
+
+- Desejos: "Buscar fontes" abre a mesma janela do "Onde baixar" da loja.
+- Editar jogo: a troca de capa usa a mesma galeria do "Capas…" da página do jogo.
+
+### Interno
+
+- Sem código repetido para fontes e capas (107 linhas e CSS órfão a menos).
+- Testes da 2.1 nos arquivos de cada assunto (`test_musica_video.py` e casos
+  em coleções, torrents e fila de músicas).
+- CI roda sozinho em todo push de branch.
+- Espera de trabalhos assíncronos nos testes com teto de 30 s (máquina lenta
+  do CI com casos em paralelo).
+
 ## [2.1.0] - 2026-11-19
 
 Descobrir jogos por gênero, escolher capa, YouTube ligado ao Spotify,
