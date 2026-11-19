@@ -1,11 +1,11 @@
 # Roadmap — TucoTeca
 
-Estado: **2.0 — estável.** O app desktop é a única interface, no Windows e
-no macOS (Apple Silicon e Intel); a TUI e a fachada `bib_core` saíram. A
-linha 2.0.x recebe só correções; recurso novo vira 2.1. Antes: 1.4.7
-(revisão geral e raiz enxuta), 1.4.6 (interface por seção), 1.4.5 (hub em
-três pilares: Jogos à la Hydra, Filmes e Séries com Cinemeta e Músicas;
-controle e Big Picture), 1.3.x (primeiro instalador Electron), 1.0.x e 1.2.0.
+Estado: **2.1 publicada.** O app desktop é a única interface, no Windows e no
+macOS (Apple Silicon e Intel). A 2.1 trouxe descobrir jogos por gênero, "Onde
+baixar", galeria de capas, YouTube ↔ Spotify (clipe ou MP3 com os dados da
+música), limpezas e testes rápidos e localizados. Antes: 2.0.x (sem TUI, porte
+para o macOS, instalador de um clique), 1.4.x (hub em três pilares), 1.3.x
+(primeiro instalador Electron), 1.0.x e 1.2.0.
 
 ## 2.0 (entregue)
 
@@ -48,7 +48,7 @@ Ainda só por simulação, respostas falsas ou em ambiente de desenvolvimento:
   quarentena), controle, emuladores (Azahar/DeSmuME `.app`), vídeo e música.
   O CI prova suíte, build e selftest do app nas duas arquiteturas.
 
-## 2.1 (em andamento)
+## 2.1 (entregue)
 
 - Descobrir jogos por gênero, "Onde baixar" na loja e galeria de capas.
 - YouTube ↔ Spotify: escolher clipe (MP4) ou música (MP3 com os dados do Spotify).

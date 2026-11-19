@@ -1,6 +1,6 @@
 {
   "name": "tucoteca-electron",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "private": true,
   "description": "TucoTeca — hub local de jogos, músicas e vídeos (interface Electron)",
   "author": "Tuco",
