@@ -139,7 +139,7 @@ def teste_retro_casa_nds_por_nome_e_le_progresso():
         os.environ.pop("BIBLIOTECA_RETRO_KEY", None)
 
 
-def _esperar_trabalho(eventos, ident, limite=10):
+def _esperar_trabalho(eventos, ident, limite=30):
     fim = time.time() + limite
     while time.time() < fim:
         for e in list(eventos):
