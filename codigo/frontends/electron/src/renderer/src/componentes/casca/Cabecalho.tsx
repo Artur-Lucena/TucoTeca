@@ -8,13 +8,14 @@ interface Props {
   titulo: string
   avisos: Aviso[]
   aoDispensarAviso: (id: string) => void
+  aoLimparAvisos: () => void
   aoBuscar: () => void
   perfil: string
   aoTrocarPerfil: () => void
 }
 
 /** Topo do app: voltar/avançar, título da tela, busca (paleta), sino e perfil. */
-export function Cabecalho({ titulo, avisos, aoDispensarAviso, aoBuscar, perfil, aoTrocarPerfil }: Props) {
+export function Cabecalho({ titulo, avisos, aoDispensarAviso, aoLimparAvisos, aoBuscar, perfil, aoTrocarPerfil }: Props) {
   const h = historico.value
   const mac = ehMac()
   const busca = rotuloAtalho('Ctrl+K', mac)
@@ -33,7 +34,7 @@ export function Cabecalho({ titulo, avisos, aoDispensarAviso, aoBuscar, perfil, 
         <span>Buscar jogos, músicas, desejos…</span>
         <kbd>{mac ? busca : busca.replace('+', ' ')}</kbd>
       </button>
-      <Avisos avisos={avisos} aoDispensar={aoDispensarAviso} aoVerTodas={() => ir('#/notificacoes')} />
+      <Avisos avisos={avisos} aoDispensar={aoDispensarAviso} aoLimpar={aoLimparAvisos} aoVerTodas={() => ir('#/notificacoes')} />
       <button type="button" class="perfil" onClick={aoTrocarPerfil} title="Trocar de perfil">
         <span class="icone" aria-hidden="true">
           {perfil.trim().charAt(0)}

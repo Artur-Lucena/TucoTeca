@@ -52,4 +52,20 @@ class MixTorrents:
             raise ValueError(r.get("erro", "Não foi possível controlar o torrent."))
         return {"ok": True}
 
+    def limpar_torrents_concluidos(self):
+        """Tira da lista do qBittorrent os torrents já baixados; os arquivos ficam no disco."""
+        from bib_nucleo import qbit
+        lista = torrents.listar_torrents()
+        itens = lista.get("torrents") if isinstance(lista, dict) else lista
+        removidos, erros = 0, []
+        for t in itens or []:
+            if not isinstance(t, dict) or not (t.get("completo") or float(t.get("pct") or 0) >= 100):
+                continue
+            r = qbit.qbit_controlar(str(t.get("hash") or ""), "remover")
+            if r.get("ok"):
+                removidos += 1
+            else:
+                erros.append(f"{t.get('nome') or t.get('hash')}: {r.get('erro')}")
+        return {"removidos": removidos, "erros": erros}
+
 __all__ = ["MixTorrents"]

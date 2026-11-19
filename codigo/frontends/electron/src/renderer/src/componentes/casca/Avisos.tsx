@@ -5,10 +5,11 @@ interface Props {
   avisos: Aviso[]
   aoDispensar: (id: string) => void
   aoVerTodas?: () => void
+  aoLimpar?: () => void
 }
 
 /** Sino do cabeçalho: contador e painel com os avisos recentes. */
-export function Avisos({ avisos, aoDispensar, aoVerTodas }: Props) {
+export function Avisos({ avisos, aoDispensar, aoVerTodas, aoLimpar }: Props) {
   const [aberto, setAberto] = useState(false)
   const raiz = useRef<HTMLDivElement>(null)
 
@@ -61,6 +62,11 @@ export function Avisos({ avisos, aoDispensar, aoVerTodas }: Props) {
                 </li>
               ))}
             </ul>
+          )}
+          {aoLimpar !== undefined && avisos.length > 0 && (
+            <button type="button" class="avisos-ver-todas" onClick={aoLimpar}>
+              Limpar tudo
+            </button>
           )}
           {aoVerTodas !== undefined && (
             <button

@@ -163,11 +163,15 @@ def qbit_listar() -> dict:
 
 
 def qbit_controlar(hash_torrent: str, acao: str) -> dict:
-    endpoints = {"pausar": "torrents/stop", "retomar": "torrents/start"}
+    """pausar/retomar, ou remover da lista do cliente (os arquivos baixados ficam)."""
+    endpoints = {"pausar": "torrents/stop", "retomar": "torrents/start", "remover": "torrents/delete"}
     if acao not in endpoints or not hash_torrent or any(c not in "0123456789abcdefABCDEF" for c in hash_torrent):
         return {"ok": False, "erro": "ação/hash inválido"}
+    dados = {"hashes": hash_torrent}
+    if acao == "remover":
+        dados["deleteFiles"] = "false"
     try:
-        qbit_request(endpoints[acao], {"hashes": hash_torrent})
+        qbit_request(endpoints[acao], dados)
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "erro": str(e)}
