@@ -404,6 +404,7 @@ export function App() {
               titulo={titulo}
               avisos={avisos}
               aoDispensarAviso={(id) => setAvisos((lista) => dispensarAviso(lista, id))}
+              aoLimparAvisos={() => setAvisos([])}
               aoBuscar={() => setPaleta((estado) => reduzirPaleta(estado, { tipo: 'abrir' }))}
               perfil={perfil}
               aoTrocarPerfil={alternarPerfil}

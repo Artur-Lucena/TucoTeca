@@ -246,9 +246,24 @@ def _torrents_controlar(servico, params) -> dict:
     acao = params.get("acao")
     if not isinstance(ident, str) or not ident.strip():
         raise ValueError("ident deve ser o hash do torrent")
-    if acao not in ("pausar", "retomar"):
-        raise ValueError("acao deve ser pausar ou retomar")
+    if acao not in ("pausar", "retomar", "remover"):
+        raise ValueError("acao deve ser pausar, retomar ou remover")
     return servico.torrent_controlar(ident.strip(), acao)
+
+
+def _torrents_limpar_concluidos(servico, params) -> dict:
+    return servico.limpar_torrents_concluidos()
+
+
+def _musicas_limpar_fila(servico, params) -> dict:
+    return servico.limpar_fila_musicas()
+
+
+def _videos_versao_musica(servico, params) -> dict:
+    video = objeto(params, "video")
+    if not str(video.get("titulo") or "").strip():
+        raise ValueError("video.titulo é obrigatório")
+    return servico.versao_musica(video)
 
 
 def _torrents_organizar(servico, params) -> dict:
@@ -559,6 +574,7 @@ METODOS = {
     "integracoes.buscar": _integracoes_buscar,
     "torrents.listar": _torrents_listar,
     "torrents.controlar": _torrents_controlar,
+    "torrents.limpar_concluidos": _torrents_limpar_concluidos,
     "torrents.organizar": _torrents_organizar,
     "videos.local": _videos_local,
     "videos.salvar_posicao": _videos_salvar_posicao,
@@ -589,6 +605,8 @@ METODOS = {
     "desejos.buscar_fontes": _buscar_fontes_desejo,
     "musicas.buscar_online": _musicas_buscar_online,
     "musicas.enfileirar": _musicas_enfileirar,
+    "musicas.limpar_fila": _musicas_limpar_fila,
+    "videos.versao_musica": _videos_versao_musica,
     "musicas.letras": _musicas_letras,
     "pacotes.importar": _pacotes_importar,
     "pacotes.abrir_instalador": _pacotes_abrir_instalador,
@@ -875,12 +893,15 @@ class Ponte:
 
     def _videos_baixar_mp3(self, servico, params) -> dict:
         video = objeto(params, "video")
+        musica = params.get("musica")
+        if musica is not None and not isinstance(musica, dict):
+            raise ValueError("musica deve ser um objeto (faixa do Spotify) ou ausente")
 
         def tarefa(progresso, cancelado):
             if cancelado.is_set():
                 raise ValueError("Download cancelado.")
             progresso(10)
-            resultado = servico.baixar_mp3(video, progresso)
+            resultado = servico.baixar_mp3(video, progresso, musica)
             progresso(100)
             detalhe = dict(resultado) if isinstance(resultado, dict) else {}
             detalhe.setdefault("aviso", "MP3 baixado.")

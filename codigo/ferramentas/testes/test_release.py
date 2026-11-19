@@ -259,33 +259,31 @@ def teste_versoes_do_repositorio_coerentes():
 
 
 def teste_icone_ico_valido_e_reproduzivel():
-    destino = Path(tempfile.mkdtemp(prefix="suite-icone-"))
-    [ico] = ICONE.gerar(destino, mac=False)
-    # o .icns versionado: estrutura aqui, pixels mais abaixo (regerar o de 1024 px
-    # em Python puro passa de 2 min num runner lento)
-    cru = (REL.REPO / "codigo/frontends/electron/resources/icon.icns").read_bytes()
-    afirmar(cru[:4] == b"icns" and int.from_bytes(cru[4:8], "big") == len(cru), "cabeçalho ICNS")
+    """Formatos ICO/ICNS e os ícones versionados com os pixels do gerador.
+
+    Só tamanhos pequenos são renderizados aqui: o desenho é o mesmo em todos e
+    o de 256/1024 px em Python puro levaria dezenas de segundos.
+    """
+    pequenos = {lado: ICONE.png(lado) for lado in (16, 32)}
+    ico = ICONE.ico(pequenos)
+    afirmar(ico[:4] == b"\0\0\1\0" and int.from_bytes(ico[4:6], "little") == 2, "cabeçalho ICO")
+    afirmar(ICONE.ico({lado: ICONE.png(lado) for lado in (16, 32)}) == ico, "ícone não é reproduzível")
+    icns = ICONE.icns({lado: pequenos[16] for _, lado in ICONE.ICNS_TIPOS})
+    afirmar(icns[:4] == b"icns" and int.from_bytes(icns[4:8], "big") == len(icns), "cabeçalho ICNS")
+    recursos = REL.REPO / "codigo/frontends/electron/resources"
+    cru = (recursos / "icon.icns").read_bytes()
     tipos, pos = [], 8
     while pos < len(cru):
         tipos.append(cru[pos:pos + 4].decode("ascii"))
         afirmar(cru[pos + 8:pos + 16] == b"\x89PNG\r\n\x1a\n", "entrada ICNS sem PNG")
         pos += int.from_bytes(cru[pos + 4:pos + 8], "big")
     afirmar(pos == len(cru) and tipos == [t for t, _ in ICONE.ICNS_TIPOS], tipos)
-    dados = ico.read_bytes()
-    afirmar(dados[:4] == b"\0\0\1\0", "cabeçalho ICO")
-    afirmar(int.from_bytes(dados[4:6], "little") == len(ICONE.TAMANHOS))
-    afirmar(b"\x89PNG" in dados)
-    afirmar(ICONE.gerar(destino, mac=False)[0].read_bytes() == dados, "ícone não é reproduzível")
     # versionados: mesmos pixels do gerador (os bytes do PNG dependem do zlib do SO)
-    recursos = REL.REPO / "codigo/frontends/electron/resources"
     pngs_ico = _pngs_ico((recursos / "icon.ico").read_bytes())
     afirmar(sorted(pngs_ico) == sorted(ICONE.TAMANHOS), sorted(pngs_ico))
-    for lado in (16, 48, 256):
+    for lado in (16, 48):
         afirmar(pngs_ico[lado] == ICONE.renderizar(lado), f"icon.ico {lado}px difere do gerador")
-    pngs_icns = _pngs_icns((recursos / "icon.icns").read_bytes())
-    for tipo, lado in (("ic11", 32), ("ic07", 128)):
-        afirmar(pngs_icns[tipo] == ICONE.renderizar(lado, 4, ICONE._pixel_mac),
-                f"icon.icns {tipo} difere do gerador")
+    afirmar(_pngs_icns(cru)["ic11"] == ICONE.renderizar(32, 4, ICONE._pixel_mac), "icon.icns 32px difere do gerador")
 
 
 def _pixels_png(png: bytes) -> bytes:

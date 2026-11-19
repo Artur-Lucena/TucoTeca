@@ -114,6 +114,22 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
 
   const concluidos = itens.filter((item) => item.pct >= 100 || item.estado === 'completo')
 
+  const limparConcluidos = async () => {
+    const ok = await confirmar({
+      titulo: 'Limpar concluídos',
+      texto: `Tirar ${concluidos.length} torrent(s) concluído(s) da lista do qBittorrent? Os arquivos baixados continuam na pasta.`,
+      confirmar: 'Limpar',
+    })
+    if (!ok) return
+    try {
+      const r = await window.tucoteca.chamar<{ removidos?: number; erros?: string[] }>('torrents.limpar_concluidos')
+      aoAvisar(`${r?.removidos ?? 0} torrent(s) saíram da lista.${r?.erros?.length ? ` Avisos: ${r.erros.join(' · ')}` : ''}`)
+      await carregar()
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
   const sistema = snapshot.value?.sistema as { disco_livre_gb?: number } | undefined
   const livres = sistema?.disco_livre_gb
 
@@ -124,6 +140,9 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
         <div class="vista-acoes">
           <button type="button" class="acao" onClick={() => setModal(true)} disabled={concluidos.length === 0}>
             Importar concluídos… ({concluidos.length})
+          </button>
+          <button type="button" class="acao" onClick={() => void limparConcluidos()} disabled={concluidos.length === 0}>
+            Limpar concluídos
           </button>
         </div>
       </header>

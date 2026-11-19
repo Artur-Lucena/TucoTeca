@@ -72,12 +72,4 @@ def pytest_sessionstart(session):
 def pytest_sessionfinish(session, exitstatus):
     if not session.config.getoption("--cobertura"):
         return
-    import coverage
-    pasta = session.config._tucoteca_cobertura
-    cov = coverage.Coverage(data_file=str(pasta / ".coverage"), config_file=str(RAIZ / "pyproject.toml"))
-    cov.combine(data_paths=[str(pasta)])
-    cov.save()
-    cov.json_report(outfile=str(pasta / "coverage.json"))
-    cov.html_report(directory=str(pasta / "html"))
-    cov.report()
-    print(f"Relatório de cobertura real dos subprocessos: {pasta}")
+    EXECUTAR.combinar_cobertura(session.config._tucoteca_cobertura)

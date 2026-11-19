@@ -1047,3 +1047,67 @@
 .hero-acoes .colecoes-jogo > .acao {
   flex: none;
 }
+
+/* 2.1: vitrine por gênero (capas em pé) e galeria de capas da página do jogo */
+.generos-loja {
+  margin-bottom: var(--espaco-md);
+}
+
+.grade-loja.vertical {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.grade-loja.vertical .cartao-loja img {
+  aspect-ratio: 600 / 900;
+}
+
+.grade-loja.vertical .cartao-loja img.horizontal {
+  object-fit: contain;
+}
+
+.catalogo-mais {
+  margin-top: var(--espaco-md);
+}
+
+.galeria-capas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--espaco-md);
+  max-height: 60vh;
+  overflow-y: auto;
+  margin-bottom: var(--espaco-md);
+}
+
+.capa-opcao {
+  display: grid;
+  gap: var(--espaco-xs);
+  padding: var(--espaco-xs);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+  color: var(--texto2);
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transicao), transform var(--transicao);
+}
+
+.capa-opcao img {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: var(--raio-sm);
+  background: var(--sobreposicao);
+}
+
+.capa-opcao:hover,
+.capa-opcao:focus-visible {
+  border-color: var(--realce);
+  color: var(--texto);
+  transform: translateY(-2px);
+}
+
+.onde-baixar-bloco h4 {
+  margin: var(--espaco-sm) 0;
+}

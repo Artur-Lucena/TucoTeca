@@ -37,7 +37,6 @@ interface MetaJogo {
   logo_url: string
   icone_url: string
   screenshots_urls: string[]
-  hltb: { principal: number; extra: number; completo: number } | null
   retro: RetroProgresso | null
   fontes: Record<string, string>
   travado: string[]
@@ -94,7 +93,6 @@ function normalizarRetro(v: unknown): RetroProgresso | null {
 export function normalizarPagina(bruto: unknown): PaginaJogo {
   const r = (bruto ?? {}) as Record<string, unknown>
   const m = (r.meta ?? {}) as Record<string, unknown>
-  const hltb = m.hltb !== null && typeof m.hltb === 'object' ? (m.hltb as Record<string, unknown>) : null
   return {
     jogo: (r.jogo ?? {}) as JogoDaLista,
     meta: {
@@ -112,7 +110,6 @@ export function normalizarPagina(bruto: unknown): PaginaJogo {
       logo_url: texto(m.logo_url),
       icone_url: texto(m.icone_url),
       screenshots_urls: textos(m.screenshots_urls),
-      hltb: hltb === null ? null : { principal: numero(hltb.principal), extra: numero(hltb.extra), completo: numero(hltb.completo) },
       retro: normalizarRetro(m.retro),
       fontes: m.fontes !== null && typeof m.fontes === 'object' ? (m.fontes as Record<string, string>) : {},
       travado: textos(m.travado),
@@ -127,7 +124,7 @@ interface Metrica {
   valor: string
 }
 
-/** Números do topo da página: horas, última vez, conquistas e HLTB (só os que existem). */
+/** Números do topo da página: horas, última vez e conquistas (só os que existem). */
 export function metricasDoJogo(pagina: PaginaJogo, agora: Date = new Date()): Metrica[] {
   const { jogo, meta } = pagina
   const saida: Metrica[] = [{ rotulo: 'Jogado', valor: formatarHoras(Number(jogo.horas ?? 0)) }]
@@ -135,9 +132,6 @@ export function metricasDoJogo(pagina: PaginaJogo, agora: Date = new Date()): Me
   saida.push({ rotulo: 'Última vez', valor: ultima !== '' ? relativo(ultima, agora) || '—' : 'nunca' })
   if (meta.retro !== null && meta.retro.total > 0) {
     saida.push({ rotulo: 'Conquistas', valor: `${meta.retro.ganhas}/${meta.retro.total}` })
-  }
-  if (meta.hltb !== null && meta.hltb.principal > 0) {
-    saida.push({ rotulo: 'Para zerar', valor: formatarHoras(meta.hltb.principal) })
   }
   return saida
 }

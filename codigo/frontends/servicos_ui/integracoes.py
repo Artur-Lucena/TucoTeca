@@ -176,8 +176,8 @@ def integracoes_padrao():
                    "musicas_online", "SP", "#7ce3b8", capacidades=("midia",)),
         Integracao("capas", "Capas online", "Steam, SteamGridDB, Wikipedia, iTunes, MusicBrainz e Deezer.",
                    "provedores", "AR", "#6cd5f5", capacidades=("midia",)),
-        Integracao("metadados", "Dados dos jogos", "Steam, SteamGridDB, RetroAchievements e "
-                   "HowLongToBeat: descrição, arte, conquistas e horas.",
+        Integracao("metadados", "Dados dos jogos", "Steam, SteamGridDB e RetroAchievements: "
+                   "descrição, arte e conquistas.",
                    "provedores", "MD", "#9fd36c", capacidades=("metadados",)),
     ):
         registro.registrar(item)

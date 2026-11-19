@@ -1,4 +1,4 @@
-"""Metadados de jogo vindos dos provedores (descrição, arte, HLTB, RetroAchievements).
+"""Metadados de jogo vindos dos provedores (descrição, arte, RetroAchievements).
 
 Uma linha por `uuid` do jogo em `jogos_meta`: ids externos em colunas e o resto
 em JSON (`dados`). Campos editados à mão entram em `travado` e nenhum provedor
@@ -37,7 +37,6 @@ CAMPOS: dict[str, type | tuple[type, ...]] = {
     "logo": str,
     "icone": str,
     "screenshots": list,
-    "hltb": dict,
     "retro": dict,
     "fontes": dict,
     "travado": list,

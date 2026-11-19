@@ -3,6 +3,41 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2.1.0] - 2026-11-19
+
+Descobrir jogos por gênero, escolher capa, YouTube ligado ao Spotify,
+limpezas e testes muito mais rápidos.
+
+### Adicionado
+
+- Jogos › Catálogo: **descobrir por gênero** (Ação, RPG, Terror, Corrida…),
+  com os mais vendidos de cada um em capas em pé e "Mais jogos".
+- Página da loja: **Onde baixar** procura o jogo nos catálogos (SteamRIP,
+  FitGirl) e abre a página escolhida no navegador.
+- Página do jogo: **Capas…** abre a galeria das capas das fontes (Steam,
+  SteamGridDB, Wikipedia, LibRetro) para escolher a da biblioteca.
+- YouTube: **Baixar…** pergunta o que baixar — o clipe (MP4) ou só a música
+  (MP3). Se a mesma música estiver no Spotify (Client ID/Secret ou conta
+  conectada), o MP3 entra com título, artista, álbum e capa de lá.
+- Limpezas: **Limpar tudo** no sino de notificações, **Limpar baixadas** na
+  fila de músicas e **Limpar concluídos** em Downloads (tira da lista do
+  qBittorrent; os arquivos ficam).
+
+### Interno
+
+- Testes rápidos e localizados: a suíte roda um caso por núcleo (de ~5 min
+  para ~40 s), `--alterados` roda só os casos que executam o código mudado
+  (mapa gravado a cada execução), `-k` e `--falhas` filtram, e a cobertura
+  sai na mesma passada (`validar.py` de ~7 min para ~1,5 min). Fronteiras
+  entre núcleo, serviços, ponte e renderer viraram teste.
+
+### Removido
+
+- HowLongToBeat da página do jogo: o site passou a exigir um token de
+  segurança na busca e a API não oficial deixou de responder (já vinha
+  desligado por padrão). Horas jogadas e conquistas continuam; configurações
+  antigas que citavam o provedor são ignoradas.
+
 ## [2.0.1] - 2026-11-18
 
 Instalação mais simples.

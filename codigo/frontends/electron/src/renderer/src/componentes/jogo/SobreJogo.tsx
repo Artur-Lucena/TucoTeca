@@ -1,4 +1,3 @@
-import { horas } from '../../estado/formato'
 import { origemDosDados, type PaginaJogo } from '../../estado/paginaJogo'
 import { BlocoDescricao, FichaLateral } from '../ui'
 import { GaleriaJogo } from './GaleriaJogo'
@@ -9,7 +8,7 @@ interface Props {
   aoBuscarDados: () => void
 }
 
-/** Visão geral: descrição, galeria e ficha (estúdio, lançamento, gêneros, horas para zerar). */
+/** Visão geral: descrição, galeria e ficha (estúdio, lançamento, gêneros). */
 export function SobreJogo({ pagina, buscando, aoBuscarDados }: Props) {
   const { jogo, meta } = pagina
   const capa = window.tucoteca.imagemUrl(String(jogo.capa_url ?? ''))
@@ -50,14 +49,6 @@ export function SobreJogo({ pagina, buscando, aoBuscarDados }: Props) {
         origem={origem}
         extras={
           <>
-            {meta.hltb !== null && meta.hltb.principal > 0 && (
-              <div>
-                <dt>Para zerar</dt>
-                <dd>
-                  {horas(meta.hltb.principal)} · com extras {horas(meta.hltb.extra)} · 100% {horas(meta.hltb.completo)}
-                </dd>
-              </div>
-            )}
             {String(jogo.etiquetas ?? '').trim() !== '' && (
               <div>
                 <dt>Etiquetas</dt>

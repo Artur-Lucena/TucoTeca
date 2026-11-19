@@ -138,6 +138,16 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
     }
   }
 
+  const limparFila = async () => {
+    try {
+      const r = await window.tucoteca.chamar<{ removidas?: number }>('musicas.limpar_fila')
+      aoAvisar(`${r?.removidas ?? 0} faixa(s) baixada(s) saíram da fila.`)
+      aoMudou()
+    } catch (falha) {
+      aoAvisar(textoDeFalha(falha), 'atencao')
+    }
+  }
+
   const pararTrabalho = async (id: number) => {
     try {
       await cancelarTrabalho(id)
@@ -334,9 +344,20 @@ export function Musicas({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
             ))}
           </ul>
         )}
-        <button type="button" class="acao" onClick={() => void baixar()}>
-          Baixar pendentes
-        </button>
+        <div class="detalhe-linha">
+          <button type="button" class="acao" onClick={() => void baixar()}>
+            Baixar pendentes
+          </button>
+          <button
+            type="button"
+            class="acao"
+            disabled={!filaDownloads.some((item) => item.estado === 'pronta')}
+            onClick={() => void limparFila()}
+            title="Tira da fila as faixas já baixadas (as músicas continuam na coleção)"
+          >
+            Limpar baixadas
+          </button>
+        </div>
       </section>
     </section>
   )

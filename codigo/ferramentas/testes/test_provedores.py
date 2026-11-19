@@ -92,10 +92,14 @@ def teste_enriquecer_junta_provedores_e_pula_sem_credencial():
     afirmar(artes["hero"] == ["https://a/h.jpg"] and erros == [], (artes, erros))
     _, _, erros = provedores.enriquecer({"titulo": "X"}, {}, chaves=["sgdb"])
     afirmar(erros and "SteamGridDB" in erros[0], erros)
-    afirmar(provedores.ligados()["hltb"] is False, "HLTB nasce desligado")
-    provedores.definir_ligados({"hltb": True})
-    afirmar(provedores.ligados()["hltb"] is True)
-    provedores.definir_ligados({"hltb": False})
+    afirmar(provedores.ligados()["sgdb"] is True, "SteamGridDB nasce ligado")
+    provedores.definir_ligados({"sgdb": False})
+    afirmar(provedores.ligados()["sgdb"] is False)
+    provedores.definir_ligados({"sgdb": True})
+    # config antiga ainda cita o HowLongToBeat removido: é ignorada
+    from bib_nucleo.arquivos import gravar_json
+    gravar_json(provedores._arquivo_config(), {"hltb": True, "steam": True})
+    afirmar("hltb" not in provedores.ligados() and provedores.ligados()["steam"] is True)
     os.environ["BIBLIOTECA_REDE"] = "0"
     try:
         provedores.enriquecer({"titulo": "X"}, {})
@@ -135,16 +139,6 @@ def teste_retro_casa_nds_por_nome_e_le_progresso():
         os.environ.pop("BIBLIOTECA_RETRO_KEY", None)
 
 
-def teste_hltb_converte_segundos_em_horas():
-    from bib_nucleo.rede import online
-    from bib_nucleo.rede.provedores import hltb
-    resposta = {"data": [{"game_name": "Hades", "comp_main": 80000, "comp_plus": 160000, "comp_100": 340000}]}
-    with patch.object(online, "requisitar_json", return_value=resposta) as req:
-        r = hltb.buscar({"titulo": "Hades"}, {})
-    afirmar(r == {"hltb": {"principal": 22.0, "extra": 44.5, "completo": 94.5}}, r)
-    afirmar(json.loads(req.call_args.kwargs["dados"])["searchTerms"] == ["Hades"])
-
-
 def _esperar_trabalho(eventos, ident, limite=10):
     fim = time.time() + limite
     while time.time() < fim:
@@ -171,7 +165,7 @@ def teste_ponte_pagina_enriquecer_e_editar():
 
     r = chamar("jogo.pagina", id=gid)
     afirmar(r["ok"] and r["resultado"]["enriquecido"] is False and r["resultado"]["meta"]["hero_url"] == "", r)
-    afirmar({p["chave"] for p in r["resultado"]["provedores"]} == {"steam", "sgdb", "retro", "hltb"}, r)
+    afirmar({p["chave"] for p in r["resultado"]["provedores"]} == {"steam", "sgdb", "retro"}, r)
 
     def imagem(url, timeout=15, limite=2_000_000):
         return PNG, ".png", ""
@@ -198,9 +192,9 @@ def teste_ponte_pagina_enriquecer_e_editar():
     r = chamar("jogo.arte_aplicar", id=gid, tipo="capa_errada", url="https://a")
     afirmar(not r["ok"], r)
 
-    r = chamar("metadados.configurar", ligados={"hltb": True}, retro_user="tuco", retro_key="k" * 32)
+    r = chamar("metadados.configurar", ligados={"sgdb": False}, retro_user="tuco", retro_key="k" * 32)
     afirmar(r["ok"] and r["resultado"]["retro_user"] == "tuco" and r["resultado"]["retro_key"] is True, r)
-    afirmar(any(p["chave"] == "hltb" and p["ligado"] for p in r["resultado"]["provedores"]), r)
+    afirmar(any(p["chave"] == "sgdb" and not p["ligado"] for p in r["resultado"]["provedores"]), r)
     r = chamar("metadados.configurar", ligados={"nada": True})
     afirmar(not r["ok"], r)
 

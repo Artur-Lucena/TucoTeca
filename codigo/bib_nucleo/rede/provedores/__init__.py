@@ -20,7 +20,7 @@ from pathlib import Path
 from bib_nucleo import base
 from bib_nucleo.arquivos import gravar_atomico, gravar_json, ler_json
 from bib_nucleo.rede import exigir_rede, online
-from bib_nucleo.rede.provedores import hltb, retro, sgdb, steam
+from bib_nucleo.rede.provedores import retro, sgdb, steam
 
 
 @dataclass(frozen=True)
@@ -42,8 +42,6 @@ PROVEDORES: tuple[Provedor, ...] = (
              ("hero", "logo", "icone"), lambda j, m: sgdb.buscar(j, m), credenciais=("steamgriddb_key",)),
     Provedor("retro", "RetroAchievements", "Conquistas e o seu progresso (Nintendo DS e ids manuais).",
              ("conquistas",), lambda j, m: retro.buscar(j, m), credenciais=("retro_user", "retro_key")),
-    Provedor("hltb", "HowLongToBeat", "Horas para zerar. API não oficial: pode falhar.",
-             ("hltb",), lambda j, m: hltb.buscar(j, m), ligado_padrao=False),
 )
 _POR_CHAVE = {p.chave: p for p in PROVEDORES}
 _lock = threading.RLock()

@@ -5,9 +5,8 @@ const agora = new Date(2026, 10, 16, 12, 0, 0)
 
 describe('paginaJogo', () => {
   it('normaliza a resposta e tolera campos faltando ou com tipo errado', () => {
-    const p = normalizarPagina({ jogo: { id: 1, titulo: 'X' }, meta: { generos: ['RPG', 3], hltb: 'x', retro: null } })
+    const p = normalizarPagina({ jogo: { id: 1, titulo: 'X' }, meta: { generos: ['RPG', 3], retro: null } })
     expect(p.meta.generos).toEqual(['RPG'])
-    expect(p.meta.hltb).toBeNull()
     expect(p.meta.retro).toBeNull()
     expect(p.meta.hero_url).toBe('')
     expect(p.enriquecido).toBe(false)
@@ -23,11 +22,10 @@ describe('paginaJogo', () => {
     const cheio = normalizarPagina({
       jogo: { horas: 3, ultima_execucao: new Date(2026, 10, 15, 11, 0).toISOString() },
       meta: {
-        hltb: { principal: 22, extra: 40, completo: 90 },
         retro: { total: 40, ganhas: 7, conquistas: [{ id: 1, titulo: 'A', pontos: 5 }] },
       },
     })
-    expect(metricasDoJogo(cheio, agora).map((m) => m.valor)).toEqual(['3 h', 'ontem', '7/40', '22 h'])
+    expect(metricasDoJogo(cheio, agora).map((m) => m.valor)).toEqual(['3 h', 'ontem', '7/40'])
   })
 
   it('Emulação só aparece para jogo emulado', () => {

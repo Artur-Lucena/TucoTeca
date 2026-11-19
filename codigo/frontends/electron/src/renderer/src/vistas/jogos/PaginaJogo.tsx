@@ -3,6 +3,7 @@ import { confirmar } from '../../componentes/ui/Confirmacao'
 import { ColecoesDoJogo } from '../../componentes/jogo/ColecoesDoJogo'
 import { ConquistasJogo } from '../../componentes/jogo/ConquistasJogo'
 import { EditarJogo } from '../../componentes/jogo/EditarJogo'
+import { EscolherCapa } from '../../componentes/jogo/EscolherCapa'
 import { HeroJogo } from '../../componentes/jogo/HeroJogo'
 import { SobreJogo } from '../../componentes/jogo/SobreJogo'
 import { PainelEmulacao } from '../../componentes/jogo/PainelEmulacao'
@@ -128,7 +129,12 @@ export function PaginaJogo({ id, aba, revisao, aoMudou, aoAvisar }: Props) {
         aoFavoritar={() => void favoritar()}
         aoBuscarDados={() => void buscarDados()}
         aoRemover={() => void remover()}
-        extras={<ColecoesDoJogo id={id} aoMudou={aoMudou} aoAvisar={aoAvisar} />}
+        extras={
+          <>
+            <ColecoesDoJogo id={id} aoMudou={aoMudou} aoAvisar={aoAvisar} />
+            <EscolherCapa id={id} titulo={String(pagina.jogo.titulo ?? '')} aoMudou={recarregar} aoAvisar={aoAvisar} />
+          </>
+        }
       />
       <nav class="abas" aria-label="Abas do jogo">
         {abas.map((a) => (
