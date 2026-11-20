@@ -90,6 +90,9 @@ module.exports = {
     installerIcon: 'resources/icon.ico',
     uninstallerIcon: 'resources/icon.ico',
     artifactName: 'TucoTeca-Setup-${version}-x64.${ext}',
+    // sempre %LOCALAPPDATA%\Programs\TucoTeca (sem isso, uma atualização sem
+    // registro anterior instalava em Programs\tucoteca-electron, uma 2ª cópia)
+    include: 'resources/instalador.nsh',
   },
   mac: {
     // uma .dmg por arquitetura presente em programa/ (sem runtime: as duas)

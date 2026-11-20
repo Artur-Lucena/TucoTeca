@@ -294,6 +294,16 @@ def teste_runtime_python_mac_extrai_install_only():
     afirmar(r["plataforma"] == "linux-x64" and (tmp / "programa/linux-x64/python/bin/python3").is_file(), r)
 
 
+def teste_instalador_windows_tem_pasta_fixa():
+    """Atualizar não pode criar uma 2ª cópia em Programs\\tucoteca-electron (2.3.1)."""
+    electron = REL.REPO / "codigo/frontends/electron"
+    config = (electron / "electron-builder.config.cjs").read_text(encoding="utf-8")
+    afirmar("include: 'resources/instalador.nsh'" in config, "nsis.include sumiu da configuração")
+    nsh = (electron / "resources/instalador.nsh").read_text(encoding="utf-8")
+    afirmar("!macro preInit" in nsh and "!ifndef BUILD_UNINSTALLER" in nsh, nsh)
+    afirmar('InstallLocation "$LOCALAPPDATA\\Programs\\TucoTeca"' in nsh, nsh)
+
+
 def teste_versoes_do_repositorio_coerentes():
     """O próprio checkout precisa passar no gate de versão do preparador."""
     versao = REL.ler_versao(REL.REPO)

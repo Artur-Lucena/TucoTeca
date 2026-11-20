@@ -3,6 +3,16 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2.3.2] - 2026-11-20
+
+### Corrigido
+
+- Windows: atualizar podia instalar numa segunda pasta
+  (`Programs\tucoteca-electron`), com os atalhos numa cópia e o desinstalador
+  na outra. O instalador agora usa sempre `%LOCALAPPDATA%\Programs\TucoTeca`
+  quando não há pasta registrada (quem já tem uma continua nela). Se você ficou
+  com as duas pastas, instale a 2.3.2 e apague `Programs\tucoteca-electron`.
+
 ## [2.3.1] - 2026-11-20
 
 Acabamento da 2.3, achado testando as telas novas no app.
