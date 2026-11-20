@@ -89,7 +89,7 @@ def salvar_preset_de_atual(nome: str, chave: str = "azahar") -> dict:
     if cfg is None:
         return {"ok": False,
                 "erro": f"config não encontrada (abra o {chave} uma vez)."}
-    slug = slugify(nome or "")
+    slug = slugify(nome) if (nome or "").strip() else ""  # slugify("") devolve "capa"
     if not slug:
         return {"ok": False, "erro": "nome de preset vazio."}
     dest = presets_prov_dir(chave) / f"{slug}.ini"
