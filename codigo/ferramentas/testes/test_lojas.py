@@ -126,14 +126,18 @@ def teste_gog_info_nas_raizes():
     jogo.mkdir(parents=True)
     (jogo / "goggame-1.info").write_text(json.dumps({"name": "Celeste", "gameId": 1,
                                                      "playTasks": [{"path": "/bin/Celeste.exe"}]}), encoding="utf-8")
-    (jogo / "goggame-2.info").write_text(json.dumps({"gameId": 2, "playTasks": []}), encoding="utf-8")
     (jogo / "goggame-3.info").write_text("nao e json", encoding="utf-8")
+    sem_nome = raiz / "GOG Games" / "Pasta Do Jogo"  # sem "name": vale o nome da pasta
+    sem_nome.mkdir()
+    (sem_nome / "goggame-2.info").write_text(json.dumps({"gameId": 2, "playTasks": []}), encoding="utf-8")
     fundo = raiz / "a" / "b" / "c" / "d" / "e" / "f"
     fundo.mkdir(parents=True)
     (fundo / "goggame-9.info").write_text(json.dumps({"name": "Fundo Demais"}), encoding="utf-8")
     fonte, itens, det = lojas._detector_gog([str(raiz), str(raiz / "nao-existe")])
-    afirmar(det == "1 jogo(s)" and itens[0]["titulo"] == "Celeste" and itens[0]["object_id"] == "1", itens)
-    afirmar(itens[0]["executable_path"] == str(jogo / "bin" / "Celeste.exe"), itens[0])
+    por = {i["titulo"]: i for i in itens}
+    afirmar(det == "2 jogo(s)" and set(por) == {"Celeste", "Pasta Do Jogo"}, itens)
+    afirmar(por["Celeste"]["object_id"] == "1" and por["Pasta Do Jogo"]["executable_path"] == "", por)
+    afirmar(por["Celeste"]["executable_path"] == str(jogo / "bin" / "Celeste.exe"), por["Celeste"])
     afirmar(lojas._detector_gog([str(raiz / "nao-existe")])[2] == "sem goggame-*.info nas raízes")
 
 
