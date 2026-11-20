@@ -21,7 +21,9 @@ class Trabalhos:
         self._proximo = 1
         self._itens = {}
 
-    def iniciar(self, rotulo, funcao, cancelavel=False, escopo=None) -> dict:
+    def iniciar(self, rotulo, funcao, cancelavel=False, escopo=None, grupo=None) -> dict:
+        """`escopo`: um por vez (outro do mesmo escopo é recusado). `grupo`: só rótulo
+        para a interface juntar (ex.: "download" aparece na tela Downloads)."""
         with self._travas:
             if escopo:
                 for outro in self._itens.values():
@@ -32,7 +34,7 @@ class Trabalhos:
             self._proximo += 1
             bandeira = threading.Event()
             item = {"id": ident, "rotulo": str(rotulo or "Tarefa"), "estado": "rodando",
-                    "pct": None, "cancelavel": bool(cancelavel), "escopo": escopo,
+                    "pct": None, "cancelavel": bool(cancelavel), "escopo": escopo, "grupo": grupo,
                     "iniciado_em": datetime.now().astimezone().isoformat(timespec="seconds"),
                     "aviso": "", "erro": "", "detalhe": {}, "_bandeira": bandeira}
             self._itens[ident] = item
@@ -77,6 +79,15 @@ class Trabalhos:
         with self._travas:
             return [self.publico(item) for item in self._itens.values()]
 
+    def limpar(self, grupo=None) -> int:
+        """Tira da lista os trabalhos já terminados (do grupo, se informado)."""
+        with self._travas:
+            fim = [i for i, item in self._itens.items()
+                   if item["estado"] not in ("rodando", "cancelando") and (grupo is None or item["grupo"] == grupo)]
+            for i in fim:
+                del self._itens[i]
+        return len(fim)
+
     def cancelar(self, params) -> dict:
         ident = inteiro(params, "id")
         with self._travas:
@@ -101,6 +112,7 @@ def metodos_trabalhos(trabalhos) -> dict:
     return {
         "trabalhos.listar": lambda servico, params: trabalhos.listar(),
         "trabalhos.cancelar": lambda servico, params: trabalhos.cancelar(params),
+        "trabalhos.limpar": lambda servico, params: {"removidos": trabalhos.limpar(params.get("grupo") or None)},
     }
 
 

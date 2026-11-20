@@ -51,7 +51,7 @@ def metodos_fontes(trabalhos) -> dict:
 
         def tarefa(progresso, cancelado):
             return servico.baixar_da_fonte(uri, titulo, progresso, cancelado.is_set)
-        return {"trabalho": trabalhos.iniciar(f"Baixar {titulo}", tarefa, cancelavel=True)}
+        return {"trabalho": trabalhos.iniciar(f"Baixar {titulo}", tarefa, cancelavel=True, grupo="download")}
 
     return {
         "fontes.listar": listar,
