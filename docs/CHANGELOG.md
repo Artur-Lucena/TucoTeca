@@ -3,7 +3,9 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
-## [Não lançado]
+## [2.2.0] - 2026-11-19
+
+Baixar jogos dentro do app, pelas fontes de download que você adicionar.
 
 ### Adicionado
 
