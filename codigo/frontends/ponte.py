@@ -728,8 +728,9 @@ class Ponte:
         # paridade com o antigo desktop Qt (emulação, controles, manutenção…);
         # import tardio: no app instalado o sys.path só fica pronto em preparar_ambiente()
         from ponte_dominios import metodos_colecoes, metodos_meta, metodos_midia
+        from ponte_fontes import metodos_fontes
         from ponte_paridade import metodos_paridade
-        for metodos in (metodos_paridade, metodos_meta, metodos_colecoes, metodos_midia):
+        for metodos in (metodos_paridade, metodos_meta, metodos_colecoes, metodos_midia, metodos_fontes):
             base.update(metodos(self.trabalhos))
         self.metodos = base
 

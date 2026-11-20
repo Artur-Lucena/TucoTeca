@@ -13,7 +13,7 @@ from pathlib import Path
 
 from executar import CODIGO, TESTES_DIR, afirmar
 
-PONTE = {"ponte", "ponte_paridade", "ponte_params", "ponte_dominios"}
+PONTE = {"ponte", "ponte_paridade", "ponte_params", "ponte_dominios", "ponte_fontes"}
 INTERFACE = PONTE | {"servicos_ui", "desktop"}
 
 
