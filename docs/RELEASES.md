@@ -26,8 +26,9 @@ seção do `docs/CHANGELOG.md` — o preparador recusa divergência. Gates verde
   (confere cada `.app` e grava `conferencia-mac.json` com os SHA-256) e
   selftest — o da Intel instalado a partir da `.dmg` num Mac Intel.
   `gh run download <run> --name mac-dmgs --dir dist/mac-v<versão>`.
-- **Windows:** de um `git archive $sha` extraído num caminho curto (o NSIS
-  falha com caminho longo), com `node_modules` e o runtime copiados:
+- **Windows:** no próprio checkout, com a árvore limpa na revisão da release (o
+  repositório fica num caminho curto, como `C:\Projetos\TucoTeca`: o NSIS falha
+  com caminho longo):
 
 ```powershell
 py -3.14 -B codigo/ferramentas/preparar_runtime_python.py   # python.org, SHA-256 fixado
