@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { avisosDoResumo, dispensarAviso, juntarAvisos } from './notificacoes'
+import { avisoDeEvento, avisosDoResumo, dispensarAviso, juntarAvisos } from './notificacoes'
 
 describe('avisosDoResumo', () => {
   it('avisa sessões pendentes com plural correto', () => {
@@ -34,5 +34,16 @@ describe('juntarAvisos / dispensarAviso', () => {
     const lista = [{ id: 'a', texto: 'x', tom: 'info' as const }]
     expect(dispensarAviso(lista, 'a')).toEqual([])
     expect(dispensarAviso(lista, 'z')).toEqual(lista)
+  })
+})
+
+describe('avisoDeEvento', () => {
+  it('aceita texto ou objeto e ignora vazio', () => {
+    expect(avisoDeEvento('  Pronto  ')).toEqual({ id: 'Pronto', texto: 'Pronto', tom: 'info' })
+    expect(avisoDeEvento({ id: 'x', texto: 'Falhou', tom: 'atencao' })).toEqual({ id: 'x', texto: 'Falhou', tom: 'atencao' })
+    expect(avisoDeEvento({ texto: 'Sem id', tom: 'outro' })).toEqual({ id: 'Sem id', texto: 'Sem id', tom: 'info' })
+    expect(avisoDeEvento('')).toBeNull()
+    expect(avisoDeEvento({ texto: ' ' })).toBeNull()
+    expect(avisoDeEvento(42)).toBeNull()
   })
 })

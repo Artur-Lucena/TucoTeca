@@ -71,6 +71,25 @@ export function dispensarAviso(atual: Aviso[], id: string): Aviso[] {
   return atual.filter((aviso) => aviso.id !== id)
 }
 
+/** Evento `aviso` vindo da ponte (texto simples ou `{id, texto, tom}`). */
+export function avisoDeEvento(dados: unknown): Aviso | null {
+  if (typeof dados === 'string') {
+    const texto = dados.trim()
+    return texto === '' ? null : { id: texto, texto, tom: 'info' }
+  }
+  if (dados !== null && typeof dados === 'object') {
+    const objeto = dados as { id?: unknown; texto?: unknown; tom?: unknown }
+    const texto = String(objeto.texto ?? '').trim()
+    if (texto === '') return null
+    return {
+      id: String(objeto.id ?? texto),
+      texto,
+      tom: objeto.tom === 'atencao' ? 'atencao' : 'info',
+    }
+  }
+  return null
+}
+
 /** Texto limpo de falha do IPC: tira o embrulho "Error invoking remote method …". */
 export function textoDeFalha(falha: unknown): string {
   const objeto = falha as { message?: unknown } | null
