@@ -118,7 +118,12 @@ não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 | Arquivo | Função |
 |---|---|
 | `frontends/desktop.py` | Abre o app Electron pelo checkout (exige `npm install` + `npm run build`); o usuário final usa o instalador |
-| `frontends/ponte.py` | Ponte NDJSON (stdin/stdout, sem TCP) entre o Electron e os casos de uso; lock com evento `bloqueio`, jobs com progresso |
+| `frontends/ponte.py` | Só o protocolo NDJSON (stdin/stdout, sem TCP) e o lock com evento `bloqueio`; junta os métodos de cada `ponte_<assunto>.py` (lista `MODULOS`) |
+| `frontends/ponte_trabalhos.py` | `Trabalhos`: operações longas em thread, eventos de progresso e cancelamento |
+| `frontends/ponte_sistema.py` | núcleo, preferências, aparência, provedores, backups e exportar/importar coleção |
+| `frontends/ponte_jogos.py` | ficha do jogo, jogar (sessão rastreada + backup pós-sessão), conquistas, capas, saves e desejos |
+| `frontends/ponte_downloads.py` | integrações, torrents (qBittorrent) e pacotes baixados |
+| `frontends/ponte_musica_video.py` | músicas e vídeos: busca online, fila, downloads e reprodução |
 | `frontends/ponte_paridade.py` | Métodos da ponte que devolvem ao Electron o que o antigo Qt fazia (emulação, controles, manutenção, letras/EQ/volume, arrastar-soltar); trava de jogo aberto |
 | `frontends/ponte_fontes.py` | métodos `fontes.*` (listar, adicionar/atualizar como trabalho, buscar, baixar) |
 | `frontends/ponte_dominios.py` | métodos da ponte da 1.4: página do jogo e provedores, coleções/loja/lojas instaladas e Filmes e Séries (rede e varreduras como trabalho) |
