@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filtrarJogos, normalizarEtiquetas, ordenarJogos, validarHoras, validarNota } from './jogos'
+import { filtrarJogos, generosDaColecao, normalizarEtiquetas, ordenarJogos, validarHoras, validarNota } from './jogos'
 
 const jogo = (campos: Record<string, unknown>) => ({ titulo: 'Jogo', ...campos })
 
@@ -186,5 +186,28 @@ describe('normalizarEtiquetas', () => {
     const tags = Array.from({ length: 25 }, (_, i) => `tag${i}`).join(', ')
     expect(normalizarEtiquetas(tags).split(', ')).toHaveLength(20)
     expect(normalizarEtiquetas('x'.repeat(40))).toHaveLength(30)
+  })
+})
+
+describe('gêneros da coleção', () => {
+  const jogos = [
+    jogo({ id: 1, generos: ['RPG', 'Ação'] }),
+    jogo({ id: 2, generos: ['Ação', 'Ação'] }),
+    jogo({ id: 3, generos: ['Aventura'] }),
+    jogo({ id: 4 }),
+  ]
+
+  it('conta cada gênero uma vez por jogo, mais comuns primeiro', () => {
+    expect(generosDaColecao(jogos)).toEqual([
+      { nome: 'Ação', total: 2 },
+      { nome: 'Aventura', total: 1 },
+      { nome: 'RPG', total: 1 },
+    ])
+    expect(generosDaColecao(undefined)).toEqual([])
+  })
+
+  it('filtra pelo gênero junto com o resto', () => {
+    expect(filtrarJogos(jogos, { genero: 'Ação' }).map((j) => j.id)).toEqual([1, 2])
+    expect(filtrarJogos(jogos, { genero: '' }).length).toBe(4)
   })
 })

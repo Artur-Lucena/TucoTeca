@@ -161,6 +161,22 @@ def uuids_sem_meta(con: sqlite3.Connection) -> list[tuple[int, str]]:
         "ORDER BY j.titulo COLLATE NOCASE")]
 
 
+def generos_por_uuid(con: sqlite3.Connection) -> dict[str, list[str]]:
+    """Gêneros gravados de cada jogo (uma consulta só, para a lista da biblioteca)."""
+    garantir_tabela_meta(con)
+    saida: dict[str, list[str]] = {}
+    # JSON lido aqui (não com json_extract): uma linha corrompida não derruba a lista toda
+    for uuid, dados in con.execute("SELECT uuid, dados FROM jogos_meta"):
+        try:
+            generos = (json.loads(dados) or {}).get("generos") if dados else []
+        except (TypeError, ValueError, AttributeError):
+            continue
+        limpos = [g.strip() for g in generos if isinstance(g, str) and g.strip()] if isinstance(generos, list) else []
+        if limpos:
+            saida[str(uuid)] = limpos[:8]
+    return saida
+
+
 ARTE_LOCAL = ("hero", "logo", "icone", "screenshots")
 
 
@@ -190,4 +206,4 @@ def importar_meta(con: sqlite3.Connection, lista) -> int:
 
 
 __all__ = ["exportar_meta", "importar_meta", "SCHEMA_META", "CAMPOS", "EDITAVEIS", "garantir_tabela_meta", "ler_meta",
-           "gravar_meta", "salvar_edicao", "uuids_sem_meta"]
+           "gravar_meta", "salvar_edicao", "uuids_sem_meta", "generos_por_uuid"]

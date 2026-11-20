@@ -19,6 +19,8 @@
   --espaco-sm: 8px;
   --espaco-md: 12px;
   --espaco-lg: 16px;
+  /* largura mínima de cada capa na grade (a tela Jogos troca: pequenas/médias/grandes) */
+  --capa-min: 168px;
   --espaco-xl: 24px;
   --aviso: #ffb84d;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);

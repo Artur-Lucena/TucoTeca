@@ -31,6 +31,21 @@ def _banco(titulo="Portal 2", **extra):
     return db, con, jogo["id"], uuid
 
 
+def teste_generos_da_colecao_na_lista_de_jogos():
+    from bib_nucleo.banco import meta
+    from servicos_ui import ServicoBiblioteca
+    db, con, ident, uuid = _banco()
+    try:
+        meta.gravar_meta(con, uuid, {"generos": ["RPG", " ", 3, "Ação"]})
+        con.execute("INSERT INTO jogos_meta(uuid, dados) VALUES ('quebrado', 'nao e json')")
+        con.commit()
+        afirmar(meta.generos_por_uuid(con) == {uuid: ["RPG", "Ação"]})
+    finally:
+        con.close()
+    jogos = ServicoBiblioteca(db).snapshot(partes=["jogos"])["jogos"]
+    afirmar([j["generos"] for j in jogos if j["id"] == ident] == [["RPG", "Ação"]], jogos)
+
+
 def teste_meta_mescla_trava_e_lista_pendentes():
     from bib_nucleo.banco import meta
     _, con, _, uuid = _banco()

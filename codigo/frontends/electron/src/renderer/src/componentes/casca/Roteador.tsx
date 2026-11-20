@@ -46,7 +46,7 @@ export function Roteador({ rota, ctx }: { rota: Rota; ctx: ContextoVistas }) {
   }
   switch (rota.secao) {
     case 'inicio':
-      return <Inicio snapshot={ctx.snapshot} aoAvisar={aoAvisar} aoMudou={aoMudou} />
+      return <Inicio snapshot={ctx.snapshot} aoAvisar={aoAvisar} aoMudou={aoMudou} aoJogar={ctx.aoJogar} />
     case 'jogos':
       return (
         <>

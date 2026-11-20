@@ -24,7 +24,16 @@ export function PosterCard({ jogo, selecionado, aoSelecionar, aoAbrir, aoJogar }
     >
       <div class="capa">
         {url ? (
-          <img src={url} alt="" loading="lazy" />
+          <img
+            src={url}
+            alt=""
+            loading="lazy"
+            // arte horizontal (cabeçalho da loja) aparece inteira em vez de cortada na capa em pé
+            onLoad={(evento) => {
+              const img = evento.currentTarget as HTMLImageElement
+              img.classList.toggle('horizontal', img.naturalWidth > img.naturalHeight)
+            }}
+          />
         ) : (
           <div class="capa-vazia">{iniciais(jogo.titulo)}</div>
         )}

@@ -25,13 +25,33 @@ export interface JogoDaLista extends JogoResumo {
   favorito?: boolean
   etiquetas?: string
   etiquetas_lista?: string[]
+  /** Gêneros gravados nos metadados do jogo (página do jogo / provedores). */
+  generos?: string[]
 }
 
 interface OpcoesFiltroJogos {
   filtro?: FiltroJogo
   busca?: string
   idsPendentes?: number[]
+  /** Gênero da própria coleção ('' = todos). */
+  genero?: string
 }
+
+/** Gêneros que existem na coleção, os mais comuns primeiro (empate: alfabético). */
+export function generosDaColecao(jogos: JogoDaLista[] | undefined): { nome: string; total: number }[] {
+  const contagem = new Map<string, number>()
+  for (const jogo of jogos ?? []) {
+    for (const genero of new Set(jogo.generos ?? [])) contagem.set(genero, (contagem.get(genero) ?? 0) + 1)
+  }
+  return [...contagem.entries()]
+    .map(([nome, total]) => ({ nome, total }))
+    .sort((a, b) => b.total - a.total || semAcento(a.nome).localeCompare(semAcento(b.nome)))
+}
+
+/** Tamanhos da grade de capas (largura mínima de cada capa). */
+export const TAMANHOS_CAPA = { pequenas: 132, medias: 168, grandes: 220 } as const
+
+export type TamanhoCapa = keyof typeof TAMANHOS_CAPA
 
 function etiquetasDe(jogo: JogoDaLista): string {
   if (Array.isArray(jogo.etiquetas_lista)) return jogo.etiquetas_lista.join(' ')
@@ -57,6 +77,8 @@ export function filtrarJogos(
   } else if (filtro === 'pendencias') {
     itens = lista.filter((jogo) => pendentes.has(Number(jogo.id)))
   }
+  const genero = opcoes.genero ?? ''
+  if (genero !== '') itens = itens.filter((jogo) => (jogo.generos ?? []).includes(genero))
   const palavras = semAcento(opcoes.busca).split(/\s+/).filter(Boolean)
   if (palavras.length === 0) return [...itens]
   return itens.filter((jogo) => {
