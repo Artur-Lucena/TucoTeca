@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks'
 import { EmptyState } from '../componentes/ui'
-import type { Aviso } from '../estado/notificacoes'
+import { quandoCurto, type Aviso } from '../estado/notificacoes'
 
 interface Props {
   avisos: Aviso[]
@@ -8,7 +8,7 @@ interface Props {
   aoLimpar: () => void
 }
 
-/** Tela Notificações: histórico completo dos avisos do sistema. */
+/** Tela Notificações: histórico dos avisos (fica gravado entre aberturas do app). */
 export function Notificacoes({ avisos, aoDispensar, aoLimpar }: Props) {
   const [filtro, setFiltro] = useState<'todos' | 'atencao' | 'info'>('todos')
   const [busca, setBusca] = useState('')
@@ -53,6 +53,7 @@ export function Notificacoes({ avisos, aoDispensar, aoLimpar }: Props) {
           {lista.map((aviso) => (
             <li key={aviso.id} class={`linha-aviso${aviso.tom === 'atencao' ? ' atencao' : ''}`}>
               <span class="aviso-texto">{aviso.texto}</span>
+              {aviso.em !== undefined && <time class="aviso-quando" dateTime={aviso.em}>{quandoCurto(aviso.em)}</time>}
               <button type="button" class="acao" onClick={() => aoDispensar(aviso.id)}>
                 Dispensar
               </button>

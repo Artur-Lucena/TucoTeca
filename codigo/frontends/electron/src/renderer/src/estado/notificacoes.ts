@@ -7,9 +7,33 @@ export interface Aviso {
   id: string
   texto: string
   tom: 'info' | 'atencao'
+  /** Quando aconteceu (ISO); os avisos derivados do resumo não têm. */
+  em?: string
 }
 
-const LIMITE = 50
+const LIMITE = 200
+
+/** Avisos recalculados a cada abertura (estado atual, não histórico): não vão para o disco. */
+export const DERIVADOS = new Set(['sessoes-pendentes', 'backup-ausente', 'backup-velho', 'disco-baixo', 'ponte-ok', 'ponte-erro'])
+
+/** Os avisos que entram no histórico gravado (`avisos.registrar`). */
+export function persistiveis(avisos: Aviso[]): Aviso[] {
+  return avisos.filter((aviso) => !DERIVADOS.has(aviso.id))
+}
+
+/** `2026-11-20T15:04:00-03:00` → `20/11 15:04` (vazio fica vazio). */
+export function quandoCurto(iso: string | undefined): string {
+  const m = /^\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso ?? '')
+  return m ? `${m[2]}/${m[1]} ${m[3]}:${m[4]}` : ''
+}
+
+/** Agora em ISO com o fuso local (igual ao que o núcleo grava). */
+export function agoraIso(data = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  const fuso = -data.getTimezoneOffset()
+  const sinal = fuso >= 0 ? '+' : '-'
+  return `${data.getFullYear()}-${p(data.getMonth() + 1)}-${p(data.getDate())}T${p(data.getHours())}:${p(data.getMinutes())}:${p(data.getSeconds())}${sinal}${p(Math.floor(Math.abs(fuso) / 60))}:${p(Math.abs(fuso) % 60)}`
+}
 
 /** Avisos derivados do resumo do sistema (snapshot): só o que o usuário precisa saber. */
 export function avisosDoResumo(sistema: SistemaResumo): Aviso[] {
@@ -55,7 +79,7 @@ export function avisosDoResumo(sistema: SistemaResumo): Aviso[] {
   return avisos
 }
 
-/** Junta avisos novos com os atuais: dedup por id, mais novos primeiro, teto de 50. */
+/** Junta avisos novos com os atuais: dedup por id, mais novos primeiro, teto de 200. */
 export function juntarAvisos(atual: Aviso[], novos: Aviso[]): Aviso[] {
   const vistos = new Set<string>()
   const resultado: Aviso[] = []
