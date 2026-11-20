@@ -7,6 +7,7 @@ import {
   validarTituloDesejo,
   type PrecoSteam,
 } from '../../estado/desejos'
+import { BaixarDasFontes } from '../../componentes/jogo/BaixarDasFontes'
 import { OndeBaixar } from '../../componentes/jogo/OndeBaixar'
 import { EmptyState } from '../../componentes/ui'
 import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
@@ -177,6 +178,11 @@ export function Desejos({ focoBusca = 0, perfil = '', aoAvisar, aoMudou }: Props
           >
             {consultando ? 'Ver preços…' : 'Ver preços'}
           </button>
+          <BaixarDasFontes
+            titulo={String(escolhido?.titulo ?? '')}
+            aoAvisar={aoAvisar}
+            desligado={escolhido === undefined}
+          />
           <OndeBaixar
             titulo={String(escolhido?.titulo ?? '')}
             aoAvisar={aoAvisar}

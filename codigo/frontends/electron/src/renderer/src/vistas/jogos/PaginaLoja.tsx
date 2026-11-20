@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { GaleriaJogo } from '../../componentes/jogo/GaleriaJogo'
+import { BaixarDasFontes } from '../../componentes/jogo/BaixarDasFontes'
 import { OndeBaixar } from '../../componentes/jogo/OndeBaixar'
 import { BlocoDescricao, EmptyState, FichaLateral, Hero } from '../../componentes/ui'
 import { formatarPreco, type PrecoSteam } from '../../estado/desejos'
@@ -86,13 +87,16 @@ export function PaginaLoja({ appid, aoMudou, aoAvisar }: Props) {
               <button type="button" class="acao primaria hero-jogar" onClick={() => ir(`#/jogo/${pagina.na_biblioteca}`)}>
                 Já na biblioteca · abrir
               </button>
-            ) : pagina.nos_desejos ? (
+            ) : (
+              <BaixarDasFontes titulo={pagina.nome} aoAvisar={aoAvisar} primario />
+            )}
+            {pagina.nos_desejos ? (
               <button type="button" class="acao" disabled>
                 ★ Nos desejos
               </button>
             ) : (
-              <button type="button" class="acao primaria hero-jogar" onClick={() => void desejar()}>
-                ☆ Adicionar aos Desejos
+              <button type="button" class="acao" onClick={() => void desejar()}>
+                ☆ Desejos
               </button>
             )}
             <OndeBaixar titulo={pagina.nome} aoAvisar={aoAvisar} />

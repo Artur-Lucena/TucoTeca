@@ -1083,3 +1083,87 @@
 .onde-baixar-bloco h4 {
   margin: var(--espaco-sm) 0;
 }
+
+/* 2.2: baixar pelas fontes de download (formato do Hydra) */
+.opcoes-fontes {
+  display: grid;
+  gap: var(--espaco-sm);
+  margin: 0 0 var(--espaco-md);
+  padding: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.opcoes-fontes li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--espaco-md);
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: var(--cartao);
+}
+
+.opcao-fonte-textos {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.opcao-fonte-textos strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.opcao-fonte-textos span,
+.fonte-textos span {
+  color: var(--texto2);
+  font-size: 12px;
+}
+
+.opcao-fonte-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--espaco-xs);
+}
+
+.fontes-vazio {
+  display: grid;
+  gap: var(--espaco-sm);
+  justify-items: start;
+}
+
+.fontes-download {
+  margin-bottom: var(--espaco-xl);
+}
+
+.fontes-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-sm);
+  margin: var(--espaco-sm) 0;
+}
+
+.fontes-form .busca {
+  flex: 1 1 320px;
+}
+
+.fontes-lista li {
+  align-items: center;
+}
+
+.fonte-textos {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fonte-url {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
