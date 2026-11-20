@@ -30,7 +30,7 @@ Intel). Linux roda pelos fontes.
   demorar mais roda como **trabalho** (`trabalhos.listar/cancelar`) e aparece no
   rodapé (`Atividade`).
 
-## Métodos da ponte (141)
+## Métodos da ponte (147)
 
 Contrato provado por `test_ponte.py`, `test_paridade.py`, `test_provedores.py`,
 `test_colecoes.py` e `test_midia.py`. Ações que mexem em
@@ -47,6 +47,7 @@ jogo aberto antes…"); confirmações de ações destrutivas ficam na interface
 | vídeos | `videos.local/salvar_posicao/reproduzir/buscar_online/versao_musica`, `videos.importar/baixar/baixar_mp3`* (MP3 com os dados da faixa do Spotify, se escolhida) |
 | desejos | `desejos.adicionar/precos/sincronizar_steam/importar_wishlist/buscar_fontes` |
 | downloads | `torrents.listar` (com `fora_destino`), `torrents.controlar/organizar/limpar_concluidos` (remover tira da lista e mantém os arquivos), `torrents.importar`*, `pacotes.importar/abrir_instalador` |
+| fontes de download | `fontes.listar/remover/buscar`, `fontes.adicionar/atualizar`* (baixam a lista), `fontes.baixar` (magnet → qBittorrent na hora; https → trabalho cancelável) |
 | integrações | `integracoes.listar/adicionar/remover/url/buscar` |
 | coleção e sistema | `colecao.backup/exportar/importar`, `backups.listar`, `estatisticas.ler`, `item.excluir/desfazer`, `lixeira.estado`, `sessoes.listar/encerrar`, `sistema.erros/volume/volume_definir/volume_mudo`, `manutencao.plano/sanear`, `ferramentas.listar/abrir`, `provedores.configurar` |
 | página do jogo e provedores | `jogo.pagina`, `jogo.enriquecer`*, `jogos.enriquecer_lote`*, `jogo.meta_salvar/artes_buscar/arte_aplicar`, `metadados.provedores/configurar` |

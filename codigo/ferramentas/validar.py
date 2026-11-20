@@ -90,6 +90,9 @@ def passo_tipos():
     """
     externo = os.environ.get("TUCOTECA_MYPY_PY", "").strip()
     venv = REPO / ".provas" / "venv-tipos" / "Scripts" / "python.exe"
+    if externo and not Path(externo).is_file():
+        print(f"  [aviso] TUCOTECA_MYPY_PY não existe ({externo}); procurando outro mypy")
+        externo = ""
     if externo:
         cmd = [externo, "-m", "mypy"]
     elif venv.is_file():
