@@ -3,6 +3,18 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2.3.1] - 2026-11-20
+
+Acabamento da 2.3, achado testando as telas novas no app.
+
+### Corrigido
+
+- Cancelar um download aparecia como "Falhou: Download cancelado." e gerava
+  um aviso de atenção; agora fica "Cancelado", sem aviso.
+- A tela Notificações estava sem estilo (marcadores de lista, hora grudada no
+  texto): agora cada aviso é uma linha com a hora à direita e uma faixa de cor
+  por tipo.
+
 ## [2.3.0] - 2026-11-20
 
 Downloads num lugar só, notificações que ficam, atualização pelo próprio app,
