@@ -112,6 +112,8 @@ não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 | `preferencias_pessoais.py` | Tuco/Isa, favoritos/filtros, atalhos e recursos opt-in |
 | `everything.py` | `es.exe` BYOB, limitado às raízes escolhidas; scanner como fallback |
 | `versao.py` | versão (`codigo/VERSION`) e User-Agent das requisições, num lugar só |
+| `notificacoes.py` | histórico de notificações do app (`dados/notificacoes.json`, 200 mais recentes) |
+| `rede/versao_nova.py` | última release no GitHub (só ao clicar), instalador da plataforma e download com SHA-256 conferido |
 
 ### Frontends e ferramentas
 
@@ -124,6 +126,7 @@ não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 | `frontends/ponte_jogos.py` | ficha do jogo, jogar (sessão rastreada + backup pós-sessão), conquistas, capas, saves e desejos |
 | `frontends/ponte_downloads.py` | integrações, torrents (qBittorrent) e pacotes baixados |
 | `frontends/ponte_musica_video.py` | músicas e vídeos: busca online, fila, downloads e reprodução |
+| `frontends/ponte_app.py` | o app em si: histórico de notificações (`avisos.*`) e verificar/baixar atualização |
 | `frontends/ponte_paridade.py` | Métodos da ponte que devolvem ao Electron o que o antigo Qt fazia (emulação, controles, manutenção, letras/EQ/volume, arrastar-soltar); trava de jogo aberto |
 | `frontends/ponte_fontes.py` | métodos `fontes.*` (listar, adicionar/atualizar como trabalho, buscar, baixar) |
 | `frontends/ponte_dominios.py` | métodos da ponte da 1.4: página do jogo e provedores, coleções/loja/lojas instaladas e Filmes e Séries (rede e varreduras como trabalho) |
