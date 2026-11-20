@@ -137,4 +137,17 @@ def teste_ponte_avisos_e_downloads_no_grupo():
     trava.set()
     _esperar(ponte, rodando["id"])
     afirmar(d("trabalhos.limpar")["resultado"] == {"removidos": 1} and ponte.trabalhos.listar() == [])
+    # cancelar um download que para levantando erro conta como cancelado, não como falha
+    comecou = threading.Event()
+
+    def baixando(progresso, cancelado):
+        comecou.set()
+        while not cancelado.is_set():
+            time.sleep(0.01)
+        raise ValueError("Download cancelado.")
+
+    t = ponte.trabalhos.iniciar("Baixar x", baixando, cancelavel=True, grupo="download")
+    comecou.wait(5)
+    d("trabalhos.cancelar", {"id": t["id"]})
+    afirmar(_esperar(ponte, t["id"])["estado"] == "cancelado")
     afirmar(tempfile.gettempdir())  # sandbox ativo
