@@ -109,6 +109,8 @@ def baixar_instalador(instalador: dict, progresso=None, cancelado=None, baixar=N
     if not any(p.match(nome) for p in PADROES.values()) or not url.startswith("https://github.com/"):
         raise ValueError("Instalador inválido.")
     pasta = pasta_atualizacoes()
+    # baixar de novo: o download direto não sobrescreve (salvaria "…-2.exe", nome que o app recusa abrir)
+    (pasta / nome).unlink(missing_ok=True)
     r = (baixar or baixar_direto)(url, nome, pasta, progresso, cancelado)
     arquivo = Path(r["path"])
     esperado = str(instalador.get("sha256") or "").lower()

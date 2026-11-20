@@ -70,12 +70,16 @@ def teste_baixar_instalador_confere_sha256():
 
     def baixar(url, titulo, destino, progresso, cancelado):
         alvo = Path(destino) / titulo
+        if alvo.exists():  # como o download direto: nunca sobrescreve
+            alvo = alvo.with_name(alvo.stem + "-2" + alvo.suffix)
         alvo.write_bytes(conteudo)
         return {"ok": True, "path": str(alvo)}
 
     inst = {"nome": "TucoTeca-Setup-2.3.0-x64.exe", "url": "https://github.com/x/TucoTeca-Setup-2.3.0-x64.exe", "sha256": certo}
     r = V.baixar_instalador(inst, baixar=baixar)
     afirmar(r["ok"] and r["conferido"] and [p.name for p in pasta.iterdir()] == ["TucoTeca-Setup-2.3.0-x64.exe"], r)
+    de_novo = V.baixar_instalador(inst, baixar=baixar)  # baixar outra vez mantém o nome
+    afirmar(Path(de_novo["arquivo"]).name == "TucoTeca-Setup-2.3.0-x64.exe", de_novo)
     try:
         V.baixar_instalador({**inst, "sha256": "f" * 64}, baixar=baixar)
         raise AssertionError("aceitou SHA-256 diferente")
