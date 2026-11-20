@@ -24,6 +24,9 @@
   é um firewall: um cliente torrent já aberto ou ferramenta externa pode usar
   rede independentemente; pause/feche esses programas se necessário.
 - SponsorBlock consulta IDs de vídeos somente depois de ser ativado pelo usuário.
+- *Verificar atualização* (Configurações) consulta a última release do
+  TucoTeca no GitHub só quando você clica; o instalador só é baixado se você
+  pedir e só fica no disco se o SHA-256 bater com o publicado.
 
 ## Integrações e termos de terceiros
 

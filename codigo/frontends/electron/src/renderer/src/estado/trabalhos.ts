@@ -12,6 +12,8 @@ export interface Trabalho {
   pct: number | null
   cancelavel: boolean
   escopo?: string | null
+  /** Rótulo para juntar na interface (`download` aparece na tela Downloads). */
+  grupo?: string | null
   iniciado_em?: string
   aviso?: string
   erro?: string

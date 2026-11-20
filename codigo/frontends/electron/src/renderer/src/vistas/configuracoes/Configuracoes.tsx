@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
+import { PainelAtualizacao } from '../../componentes/config/PainelAtualizacao'
 import { PainelColecao } from '../../componentes/config/PainelColecao'
 import { PainelControles } from '../../componentes/config/PainelControles'
 import { PainelEmuladores } from '../../componentes/config/PainelEmuladores'
@@ -76,6 +77,8 @@ export function Configuracoes({ aoAvisar, aoMudou }: Props) {
       <header class="vista-topo">
         <h1>Configurações</h1>
       </header>
+
+      <PainelAtualizacao aoAvisar={aoAvisar} />
 
       <div class="form-config">
         <h2>Aparência</h2>

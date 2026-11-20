@@ -2,7 +2,7 @@
 """Prepara o Python embutido do app (programa/<plataforma>/python).
 
 - windows-x64: "Windows embeddable package (64-bit)" oficial do python.org.
-- macos-x64 / macos-arm64: build `install_only` do python-build-standalone
+- macos-x64 / macos-arm64 / linux-x64: build `install_only` do python-build-standalone
   (o mesmo CPython, relocável, sem depender do Python do sistema).
 
 Baixa o pacote, confere o SHA-256 fixado abaixo, extrai num staging e só
@@ -53,6 +53,11 @@ PLATAFORMAS = {
         "sha256": "30a18bcb9ab75e485b4bf4e5d783dde165571e7e42c56dff47a2d2c5345183a4",
         "exe": "bin/python3",
     },
+    "linux-x64": {
+        "url": _PBS.format(alvo="x86_64-unknown-linux-gnu"),
+        "sha256": "1b38024924eb7f4cf0cab45d7b871d1f1991354190fccd2625ac7529a43786e2",
+        "exe": "bin/python3",
+    },
 }
 # compat: o preparador nasceu só para Windows
 SHA256 = PLATAFORMAS["windows-x64"]["sha256"]
@@ -64,6 +69,8 @@ MARCADOR = "TUCOTECA-RUNTIME.json"
 def plataforma_atual() -> str:
     if sys.platform == "darwin":
         return "macos-arm64" if platform.machine().lower() in ("arm64", "aarch64") else "macos-x64"
+    if sys.platform.startswith("linux"):
+        return "linux-x64"
     return "windows-x64"
 
 
@@ -97,7 +104,7 @@ def _extrair_tar(pacote: Path, staging: Path) -> None:
             if PurePosixPath(m.name).parts[:1] != ("python",):
                 raise ValueError(f"pacote fora do formato install_only: {m.name!r}")
         if not hasattr(tarfile, "data_filter"):
-            raise ValueError("extrair o runtime do Mac exige Python 3.12+ (filtro seguro do tarfile)")
+            raise ValueError("extrair o runtime do Mac/Linux exige Python 3.12+ (filtro seguro do tarfile)")
         tmp = staging / ".tar"
         # filtro 'data': recusa links para fora, dispositivos e setuid
         t.extractall(tmp, filter="data")

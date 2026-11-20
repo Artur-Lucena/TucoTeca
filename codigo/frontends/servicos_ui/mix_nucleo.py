@@ -23,11 +23,13 @@ class MixNucleo:
     def snapshot(self, partes=None):
         """Coleção para o desktop. `partes` limita as listas devolvidas (o
         `sistema` vem sempre); sem `partes`, tudo — como os testes usam."""
+        from bib_nucleo.banco.meta import generos_por_uuid
         from bib_nucleo.preferencias_pessoais import aplicar_perfil
         pedidas = set(self.PARTES if partes is None else partes)
         saida = {}
         with closing(banco.get_db(self.db_path)) as con:
             jogos = aplicar_perfil(banco.listar_jogos(con))
+            generos = generos_por_uuid(con) if "jogos" in pedidas else {}
             musicas = banco.listar_musicas(con)
             desejos = banco.listar_desejos(con)
             if "fila_musicas" in pedidas:
@@ -39,7 +41,8 @@ class MixNucleo:
                 saida["colecoes"] = listar_colecoes(con)
         if "jogos" in pedidas:
             for j in jogos:
-                j.update(capa_url=capa_url(j.get("capa")), plataforma=banco.plataforma_jogo(j))
+                j.update(capa_url=capa_url(j.get("capa")), plataforma=banco.plataforma_jogo(j),
+                         generos=generos.get(str(j.get("uuid") or ""), []))
             saida["jogos"] = jogos
         if "musicas" in pedidas:
             for m in musicas:

@@ -8,11 +8,14 @@ import { juntarPrevias, type ItemPrevia } from '../../estado/importacao'
 import {
   FILTROS_JOGOS,
   ORDENS_JOGOS,
+  TAMANHOS_CAPA,
   filtrarJogos,
+  generosDaColecao,
   ordenarJogos,
   type FiltroJogo,
   type JogoDaLista,
   type OrdemJogo,
+  type TamanhoCapa,
 } from '../../estado/jogos'
 import { teclaDaLista } from '../../navegacao/setas'
 import { ehMac } from '../../plataforma'
@@ -31,6 +34,19 @@ const ROTULO_ORDEM: Record<OrdemJogo, string> = {
   titulo: 'Título',
   recentes: 'Recentes',
   horas: 'Horas',
+}
+
+const ROTULO_TAMANHO: Record<TamanhoCapa, string> = { pequenas: 'Pequenas', medias: 'Médias', grandes: 'Grandes' }
+const CHAVE_TAMANHO = 'tucoteca.capas'
+
+/** Tamanho das capas é preferência desta máquina (sem localStorage, fica o médio). */
+function tamanhoSalvo(): TamanhoCapa {
+  try {
+    const valor = localStorage.getItem(CHAVE_TAMANHO) ?? ''
+    return valor in TAMANHOS_CAPA ? (valor as TamanhoCapa) : 'medias'
+  } catch {
+    return 'medias'
+  }
 }
 
 interface Props {
@@ -52,6 +68,8 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
   const [filtro, setFiltro] = useState<FiltroJogo>('todos')
   const [ordem, setOrdem] = useState<OrdemJogo>('titulo')
   const [busca, setBusca] = useState('')
+  const [genero, setGenero] = useState('')
+  const [tamanho, setTamanho] = useState<TamanhoCapa>(tamanhoSalvo)
   const [selecionado, setSelecionado] = useState(0)
   const campo = useRef<HTMLInputElement>(null)
   const grade = useRef<HTMLDivElement>(null)
@@ -133,10 +151,20 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
   const jogos = snapshot.value?.jogos
   const total = jogos?.length ?? 0
   const pendentes = saude.value?.ids_pendentes ?? []
+  const generos = generosDaColecao(jogos as JogoDaLista[] | undefined)
   const lista = ordenarJogos(
-    filtrarJogos(jogos as JogoDaLista[] | undefined, { filtro, busca, idsPendentes: pendentes }),
+    filtrarJogos(jogos as JogoDaLista[] | undefined, { filtro, busca, idsPendentes: pendentes, genero }),
     ordem,
   )
+
+  const mudarTamanho = (novo: TamanhoCapa) => {
+    setTamanho(novo)
+    try {
+      localStorage.setItem(CHAVE_TAMANHO, novo)
+    } catch {
+      // sem armazenamento local o tamanho vale só nesta sessão
+    }
+  }
   const indice = Math.min(selecionado, Math.max(0, lista.length - 1))
 
   const mudarFiltro = (novo: FiltroJogo) => {
@@ -230,7 +258,7 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
         <button type="button" class="acao" onClick={() => void lerLojas()} disabled={lendoLojas !== null} title={ehMac() ? 'Steam, Hydra e pastas de jogos deste Mac' : 'Steam, Epic, GOG, Hydra, Riot e programas do Windows'}>
           {lendoLojas !== null ? 'Lendo lojas…' : 'Importar de lojas instaladas'}
         </button>
-        <p>{resumoDe(lista.length, total, filtro, ordem, busca)}</p>
+        <p>{resumoDe(lista.length, total, filtro, ordem, busca, genero)}</p>
       </header>
       <div class="filtros">
         {FILTROS_JOGOS.map((chave) => (
@@ -254,6 +282,35 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
             ))}
           </select>
         </label>
+        {generos.length > 0 && (
+          <label class="ordem">
+            <span>Gênero</span>
+            <select
+              value={genero}
+              onChange={(evento) => {
+                setGenero((evento.target as HTMLSelectElement).value)
+                setSelecionado(0)
+              }}
+            >
+              <option value="">Todos</option>
+              {generos.map((g) => (
+                <option key={g.nome} value={g.nome}>
+                  {g.nome} ({g.total})
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label class="ordem">
+          <span>Capas</span>
+          <select value={tamanho} onChange={(evento) => mudarTamanho((evento.target as HTMLSelectElement).value as TamanhoCapa)}>
+            {(Object.keys(TAMANHOS_CAPA) as TamanhoCapa[]).map((chave) => (
+              <option key={chave} value={chave}>
+                {ROTULO_TAMANHO[chave]}
+              </option>
+            ))}
+          </select>
+        </label>
         <input
           ref={campo}
           class="busca"
@@ -270,10 +327,10 @@ export function Jogos({ focoBusca = 0, perfil = '', aoAbrirJogo, aoJogarJogo, ao
         <EmptyState
           icone="🎮"
           titulo="Nenhum jogo com esse filtro."
-          descricao="Limpe a busca, troque o filtro ou arraste pastas, executáveis e ROMs para cá."
+          descricao="Limpe a busca, troque o filtro ou o gênero, ou arraste pastas, executáveis e ROMs para cá."
         />
       ) : (
-        <div class="grade" ref={grade}>
+        <div class="grade" ref={grade} style={{ '--capa-min': `${TAMANHOS_CAPA[tamanho]}px` }}>
           {lista.map((jogo, posicao) => {
             const id = jogo.id === undefined ? null : Number(jogo.id)
             return (
@@ -314,8 +371,10 @@ function resumoDe(
   filtro: FiltroJogo,
   ordem: OrdemJogo,
   busca: string,
+  genero = '',
 ): string {
   const partes = [`${visiveis} de ${total} jogos`, ROTULO_FILTRO[filtro], ROTULO_ORDEM[ordem]]
+  if (genero !== '') partes.push(genero)
   const termo = busca.trim()
   if (termo !== '') partes.push(`busca "${termo}"`)
   return partes.join(' · ')

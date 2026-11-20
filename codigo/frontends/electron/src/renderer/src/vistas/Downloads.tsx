@@ -5,6 +5,8 @@ import { EmptyState } from '../componentes/ui'
 import { type AoAvisar, textoDeFalha } from '../estado/notificacoes'
 import { listaTrabalhos } from '../estado/trabalhos'
 import { confirmar } from '../componentes/ui/Confirmacao'
+import { DownloadsNoApp } from '../componentes/casca/DownloadsNoApp'
+import { downloadsNoApp, emAndamento } from '../estado/downloads'
 
 interface Props {
   aoAvisar: AoAvisar
@@ -33,7 +35,7 @@ interface RespostaListar {
 
 const formatarBytes = (n: number): string => bytes(Number(n || 0))
 
-/** Tela Downloads: torrents em andamento/concluídos, importar e organizar. */
+/** Tela Downloads: o que o app baixa (fontes https, atualização) e os torrents do qBittorrent. */
 export function Downloads({ aoAvisar, aoMudou }: Props) {
   const [itens, setItens] = useState<TorrentItem[]>([])
   const [erros, setErros] = useState<string[]>([])
@@ -113,8 +115,19 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
   }
 
   const concluidos = itens.filter((item) => item.pct >= 100 || item.estado === 'completo')
+  const diretos = downloadsNoApp(listaTrabalhos.value)
+  const diretosFeitos = diretos.filter((t) => !emAndamento(t))
+
+  const limparDiretos = async () => {
+    await window.tucoteca.chamar('trabalhos.limpar', { grupo: 'download' })
+    listaTrabalhos.value = listaTrabalhos.value.filter((t) => t.grupo !== 'download' || emAndamento(t))
+  }
 
   const limparConcluidos = async () => {
+    if (concluidos.length === 0) {
+      await limparDiretos().catch((falha) => aoAvisar(textoDeFalha(falha), 'atencao'))
+      return
+    }
     const ok = await confirmar({
       titulo: 'Limpar concluídos',
       texto: `Tirar ${concluidos.length} torrent(s) concluído(s) da lista do qBittorrent? Os arquivos baixados continuam na pasta.`,
@@ -123,6 +136,7 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
     if (!ok) return
     try {
       const r = await window.tucoteca.chamar<{ removidos?: number; erros?: string[] }>('torrents.limpar_concluidos')
+      if (diretosFeitos.length > 0) await limparDiretos()
       aoAvisar(`${r?.removidos ?? 0} torrent(s) saíram da lista.${r?.erros?.length ? ` Avisos: ${r.erros.join(' · ')}` : ''}`)
       await carregar()
     } catch (falha) {
@@ -136,12 +150,12 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
   return (
     <section class="vista downloads">
       <header class="vista-topo">
-        <h1>Downloads ({itens.length})</h1>
+        <h1>Downloads ({itens.length + diretos.length})</h1>
         <div class="vista-acoes">
           <button type="button" class="acao" onClick={() => setModal(true)} disabled={concluidos.length === 0}>
             Importar concluídos… ({concluidos.length})
           </button>
-          <button type="button" class="acao" onClick={() => void limparConcluidos()} disabled={concluidos.length === 0}>
+          <button type="button" class="acao" onClick={() => void limparConcluidos()} disabled={concluidos.length === 0 && diretosFeitos.length === 0}>
             Limpar concluídos
           </button>
         </div>
@@ -151,8 +165,16 @@ export function Downloads({ aoAvisar, aoMudou }: Props) {
         <p class="aviso">{erros.join(' · ')}</p>
       )}
 
+      <DownloadsNoApp aoAvisar={aoAvisar} />
+
       {itens.length === 0 ? (
-        <EmptyState icone="↓" titulo="Nenhum torrent conhecido." descricao="Adicione torrents no qBittorrent." />
+        diretos.length === 0 && (
+          <EmptyState
+            icone="↓"
+            titulo="Nenhum download."
+            descricao="Use “⬇ Baixar” na página de um jogo (com suas fontes) ou adicione torrents no qBittorrent."
+          />
+        )
       ) : (
         <ul class="lista-downloads">
           {itens.map((item) => {

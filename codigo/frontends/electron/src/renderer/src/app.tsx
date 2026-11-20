@@ -115,7 +115,9 @@ export function App() {
       const aviso = typeof evento.detalhe?.aviso === 'string' ? evento.detalhe.aviso : ''
       const erro = evento.estado === 'erro' ? String(evento.erro ?? 'A tarefa falhou.') : ''
       const texto = aviso !== '' ? aviso : erro
-      if (texto !== '') juntar([{ id: `trabalho-${evento.id}`, texto, tom: erro !== '' ? 'atencao' : 'info' }])
+      // id com o início: os ids de trabalho recomeçam a cada abertura e o histórico fica
+      const id = `trabalho-${evento.id}-${evento.iniciado_em ?? ''}`
+      if (texto !== '') juntar([{ id, texto, tom: erro !== '' ? 'atencao' : 'info' }])
       void atualizarTudo()
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- atualizarTudo só usa setters

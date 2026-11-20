@@ -167,3 +167,12 @@
   padding: 0;
   list-style: none;
 }
+
+.notas-versao {
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font: inherit;
+  font-size: 13px;
+  color: var(--texto2);
+}

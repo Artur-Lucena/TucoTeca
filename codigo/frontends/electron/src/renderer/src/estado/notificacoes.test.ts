@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { avisoDeEvento, avisosDoResumo, dispensarAviso, juntarAvisos } from './notificacoes'
+import { agoraIso, avisoDeEvento, avisosDoResumo, dispensarAviso, juntarAvisos, persistiveis, quandoCurto } from './notificacoes'
 
 describe('avisosDoResumo', () => {
   it('avisa sessões pendentes com plural correto', () => {
@@ -45,5 +45,20 @@ describe('avisoDeEvento', () => {
     expect(avisoDeEvento('')).toBeNull()
     expect(avisoDeEvento({ texto: ' ' })).toBeNull()
     expect(avisoDeEvento(42)).toBeNull()
+  })
+})
+describe('histórico gravado', () => {
+  it('só o que não é derivado vai para o disco', () => {
+    const avisos = [
+      { id: 'backup-velho', texto: 'x', tom: 'atencao' as const },
+      { id: 'trabalho-1-2026', texto: 'Baixado', tom: 'info' as const },
+    ]
+    expect(persistiveis(avisos).map((a) => a.id)).toEqual(['trabalho-1-2026'])
+  })
+
+  it('hora curta e agora com fuso', () => {
+    expect(quandoCurto('2026-11-20T15:04:09-03:00')).toBe('20/11 15:04')
+    expect(quandoCurto(undefined)).toBe('')
+    expect(agoraIso(new Date(2026, 10, 20, 9, 5, 7))).toMatch(/^2026-11-20T09:05:07[+-]\d{2}:\d{2}$/)
   })
 })

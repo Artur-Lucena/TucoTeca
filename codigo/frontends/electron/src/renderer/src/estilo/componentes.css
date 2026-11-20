@@ -386,3 +386,9 @@
   border-color: var(--perigo);
   color: var(--perigo);
 }
+
+.aviso-quando {
+  color: var(--texto2);
+  font-size: 12px;
+  white-space: nowrap;
+}

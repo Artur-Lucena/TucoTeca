@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, shell } from 'elec
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { registrarProtocoloMedia, registrarProtocoloMidia } from './arquivos'
+import { acaoDoInstalador } from './atualizacao'
 import { raizesDaResposta } from './midia'
 import { caminhoPermitido, resolverRaizHome } from './caminhos'
 import { lockOrfao } from './lock'
@@ -286,6 +287,22 @@ async function principal(): Promise<void> {
     if (!caminhoPermitido(HOME, resolvido)) throw new Error('caminho fora da coleção')
     const erro = await shell.openPath(resolvido)
     if (erro) throw new Error(erro)
+  })
+
+  // Só o instalador conferido que o núcleo baixou em dados/atualizacoes/.
+  ipcMain.handle('app:instalar-atualizacao', async (_evento, caminho: string) => {
+    const acao = acaoDoInstalador(HOME, String(caminho ?? ''))
+    if (acao === null) throw new Error('instalador inválido para este sistema')
+    const alvo = resolve(String(caminho).trim())
+    if (!existsSync(alvo)) throw new Error('o instalador não está mais na pasta; baixe de novo')
+    if (acao === 'mostrar') {
+      shell.showItemInFolder(alvo)
+      return { fechando: false }
+    }
+    const erro = await shell.openPath(alvo)
+    if (erro) throw new Error(erro)
+    if (acao === 'abrir-e-fechar') setTimeout(() => void finalizar(0), 1500)
+    return { fechando: acao === 'abrir-e-fechar' }
   })
 
   ipcMain.handle('ponte:reabrir', async () => {

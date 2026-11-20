@@ -3,6 +3,39 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2.3.0] - 2026-11-20
+
+Downloads num lugar só, notificações que ficam, atualização pelo próprio app,
+biblioteca por gênero e o TucoTeca no Linux.
+
+### Adicionado
+
+- **Linux (x64)**: AppImage com Python embutido, gerado e testado no CI.
+- **Verificar atualização** em Configurações: consulta o GitHub só quando você
+  clica, mostra o que mudou, baixa o instalador do seu sistema (conferido pelo
+  SHA-256 publicado) e o abre — no Windows o app fecha para atualizar.
+- **Notificações que ficam**: o histórico sobrevive a fechar e abrir o app,
+  com a hora de cada aviso.
+- **Downloads unificados**: o que o app baixa (fontes https e a atualização)
+  aparece em Downloads com progresso, Cancelar, Importar/Instalar e Abrir
+  pasta, junto dos torrents; Limpar concluídos limpa os dois.
+- **Biblioteca em capas**: filtro pelos gêneros da sua coleção, capas
+  pequenas/médias/grandes, arte horizontal sem corte e Jogar direto do
+  Continuar jogando no Início.
+
+### Corrigido
+
+- Preset de emulador com nome em branco era salvo como "capa".
+
+### Interno
+
+- Projeto num caminho curto: mypy e o instalador do Windows funcionam no
+  próprio checkout (sem cópia para `%TEMP%`).
+- `ponte.py` só com o protocolo; os 154 métodos em `ponte_<assunto>.py`.
+  `app.tsx` dividido em hooks (avisos, atalhos, controle, paleta).
+- Testes novos para lojas instaladas, qBittorrent, lançamento e presets
+  (cobertura 75% → 78%).
+
 ## [2.2.0] - 2026-11-19
 
 Baixar jogos dentro do app, pelas fontes de download que você adicionar.

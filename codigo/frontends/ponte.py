@@ -47,6 +47,7 @@ MODULOS = (
     ("ponte_downloads", "metodos_downloads"),
     ("ponte_musica_video", "metodos_musica_video"),
     ("ponte_fontes", "metodos_fontes"),
+    ("ponte_app", "metodos_app"),
     ("ponte_paridade", "metodos_paridade"),
     ("ponte_dominios", "metodos_meta"),
     ("ponte_dominios", "metodos_colecoes"),

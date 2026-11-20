@@ -12,9 +12,11 @@ interface Props {
   snapshot: Snapshot
   aoAvisar?: AoAvisar
   aoMudou?: () => void
+  /** Joga direto da capa (duplo clique ou botão Jogar). */
+  aoJogar?: (id: number) => void
 }
 
-export function Inicio({ snapshot, aoAvisar = () => undefined, aoMudou = () => undefined }: Props) {
+export function Inicio({ snapshot, aoAvisar = () => undefined, aoMudou = () => undefined, aoJogar }: Props) {
   const continuar = continuarJogando(snapshot.jogos)
   const [assistindo, setAssistindo] = useState<ItemContinuar[]>([])
   useEffect(() => {
@@ -50,9 +52,11 @@ export function Inicio({ snapshot, aoAvisar = () => undefined, aoMudou = () => u
         ) : (
           <div class="grade">
             {continuar.map((jogo, indice) => {
-              const abrir = () => ir(`#/jogo/${Number(jogo.id)}`)
+              const id = Number(jogo.id)
+              const abrir = () => ir(`#/jogo/${id}`)
+              const jogar = aoJogar !== undefined && Number.isFinite(id) ? () => aoJogar(id) : undefined
               return (
-                <PosterCard key={`${String(jogo.titulo)}-${indice}`} jogo={jogo} selecionado={false} aoSelecionar={abrir} aoAbrir={abrir} />
+                <PosterCard key={`${String(jogo.titulo)}-${indice}`} jogo={jogo} selecionado={false} aoSelecionar={abrir} aoAbrir={abrir} aoJogar={jogar} />
               )
             })}
           </div>

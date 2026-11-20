@@ -18,6 +18,8 @@ export interface ApiTucoteca {
   abrirUrl(url: string): Promise<void>
   abrirPasta(caminho: string): Promise<void>
   reabrir(): Promise<void>
+  /** Abre o instalador baixado em dados/atualizacoes/ (no Windows o app fecha em seguida). */
+  instalarAtualizacao(caminho: string): Promise<{ fechando: boolean }>
   /** Zoom da janela (0,5–2), usado pela densidade e escala de texto. */
   definirZoom(fator: number): void
   /** `process.platform` do app (o renderer sandboxed não tem `process`). */

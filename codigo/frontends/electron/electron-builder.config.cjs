@@ -1,4 +1,4 @@
-// Instaladores do TucoTeca: Windows (NSIS) e macOS (.dmg, Intel e Apple Silicon).
+// Instaladores do TucoTeca: Windows (NSIS), macOS (.dmg, Intel e Apple Silicon) e Linux (AppImage x64).
 //
 // O app instalado leva, em resources/tucoteca/, só o que a ponte precisa:
 // núcleo Python (bib_nucleo), ponte.py + servicos_ui, abrir_hub,
@@ -7,7 +7,7 @@
 //
 // Python: o runtime embutido vem de programa/<plataforma>/python
 // (codigo/ferramentas/preparar_runtime_python.py --plataforma ...). Cada build
-// roda no SO de destino: Windows no Windows, macOS no macOS (as duas
+// roda no SO de destino: Windows no Windows, Linux no Linux, macOS no macOS (as duas
 // arquiteturas saem do mesmo Mac). Sem runtime o build falha, a não ser com
 // TUCOTECA_SEM_RUNTIME=1 — aí o app depende do Python 3.14 do sistema e isso
 // deve constar nas notas da release.
@@ -18,15 +18,18 @@ const REPO = join(__dirname, '..', '..', '..')
 const versao = readFileSync(join(REPO, 'codigo', 'VERSION'), 'utf8').trim()
 const semRuntime = process.env.TUCOTECA_SEM_RUNTIME === '1'
 const mac = process.platform === 'darwin'
+const linux = process.platform === 'linux'
 
 const runtimeWin = join(REPO, 'programa', 'windows-x64', 'python')
 const temRuntimeWin = existsSync(join(runtimeWin, 'python.exe'))
+const runtimeLinux = join(REPO, 'programa', 'linux-x64', 'python')
+const temRuntimeLinux = existsSync(join(runtimeLinux, 'bin', 'python3'))
 const archsMac = ['arm64', 'x64'].filter((arch) =>
   existsSync(join(REPO, 'programa', `macos-${arch}`, 'python', 'bin', 'python3')),
 )
 
-if (!semRuntime && (mac ? archsMac.length === 0 : !temRuntimeWin)) {
-  const plataforma = mac ? 'macos-arm64 e/ou macos-x64' : 'windows-x64'
+if (!semRuntime && (mac ? archsMac.length === 0 : linux ? !temRuntimeLinux : !temRuntimeWin)) {
+  const plataforma = mac ? 'macos-arm64 e/ou macos-x64' : linux ? 'linux-x64' : 'windows-x64'
   throw new Error(
     `Runtime Python ausente em programa/${plataforma}. Rode ` +
       '`codigo/ferramentas/preparar_runtime_python.py --plataforma <...>` ou, ' +
@@ -112,6 +115,19 @@ module.exports = {
       NSRemovableVolumesUsageDescription: 'Para ler jogos, ROMs e vídeos em discos externos.',
       NSNetworkVolumesUsageDescription: 'Para ler jogos, ROMs e vídeos em pastas de rede.',
     },
+  },
+  linux: {
+    target: [{ target: 'AppImage', arch: ['x64'] }],
+    icon: 'resources/icon.icns',
+    category: 'Game',
+    executableName: 'tucoteca',
+    synopsis: 'Jogos, músicas e vídeos da sua coleção num lugar só',
+    extraResources: temRuntimeLinux
+      ? [{ from: runtimeLinux, to: 'tucoteca/programa/linux-x64/python', filter: runtimeFiltro }]
+      : [],
+  },
+  appImage: {
+    artifactName: 'TucoTeca-${version}-linux-x64.${ext}',
   },
   dmg: {
     artifactName: 'TucoTeca-${version}-mac-${arch}.${ext}',

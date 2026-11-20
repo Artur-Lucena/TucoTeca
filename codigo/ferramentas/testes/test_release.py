@@ -178,6 +178,44 @@ def teste_release_com_dmgs_conferidas_no_mac():
     afirmar("Python embutido" in _erro(REL.conferir_mac, SHA, repo=repo, dist=mac3))
 
 
+def _linux_falso(versao="1.2.0") -> Path:
+    """dist do Linux: linux-unpacked (como o electron-builder) e o AppImage."""
+    dist = Path(tempfile.mkdtemp(prefix="suite-dist-linux-"))
+    recursos = dist / REL.RECURSOS["linux-x64"]
+    for nome in REL.ESSENCIAIS_APP:
+        (recursos / nome).parent.mkdir(parents=True, exist_ok=True)
+        (recursos / nome).write_text(versao + "\n" if nome == "codigo/VERSION" else "#", encoding="utf-8")
+    py = recursos / "programa/linux-x64/python"
+    (py / "bin").mkdir(parents=True)
+    (py / "bin/python3").write_bytes(b"\x7fELF")
+    (py / "TUCOTECA-RUNTIME.json").write_text('{"versao": "3.14.10"}', encoding="utf-8")
+    (dist / REL.appimage_linux(versao)).write_bytes(b"\x7fELF AppImage")
+    return dist
+
+
+def teste_release_com_appimage_conferido_no_linux():
+    repo = _repo_falso()
+    dist = _dist_falso(repo)
+    linux = _linux_falso()
+    c = REL.conferir_linux(SHA, repo=repo, dist=linux)
+    nome = "TucoTeca-1.2.0-linux-x64.AppImage"
+    afirmar(list(c["appimages"]) == [nome] and c["appimages"][nome]["python_versao"] == "3.14.10", c)
+    mac = _mac_falso(repo)
+    REL.conferir_mac(SHA, repo=repo, dist=mac)
+    saida = repo / "dist/release/v1.2.0"
+    r = REL.preparar(SHA, saida, repo=repo, dist=dist, conferir_git=False, mac=mac, linux=linux)
+    afirmar(nome in r["anexos"], r)
+    release = json.loads((saida / "release.json").read_text(encoding="utf-8"))
+    plataformas = {i["plataforma"] for i in release["instaladores"].values()}
+    afirmar(plataformas == {"windows-x64", "macos-arm64", "macos-x64", "linux-x64"}, release)
+    notas = (saida / "NOTAS-RELEASE.md").read_text(encoding="utf-8")
+    afirmar(f"chmod +x {nome}" in notas and "--no-sandbox" in notas, notas)
+    (linux / nome).write_bytes(b"trocado")
+    afirmar("SHA-256" in _erro(REL.preparar, SHA, repo / "s1", repo=repo, dist=dist, conferir_git=False, linux=linux))
+    afirmar("ausente" in _erro(REL.conferir_linux, SHA, repo=repo, dist=_linux_falso(versao="1.1.0")))
+    afirmar("SHA Git completo" in _erro(REL.conferir_linux, "abc", repo=repo, dist=linux))
+
+
 def teste_release_nao_sobrescreve_e_exige_sha_completo():
     repo = _repo_falso()
     dist = _dist_falso(repo)
@@ -249,7 +287,11 @@ def teste_runtime_python_mac_extrai_install_only():
     afirmar("install_only" in _erro(RUNTIME.instalar, torto, tmp / "py", plataforma="macos-x64",
                                     sha256=hashlib.sha256(torto.read_bytes()).hexdigest()))
     afirmar(RUNTIME.PLATAFORMAS["macos-x64"]["url"].endswith("x86_64-apple-darwin-install_only.tar.gz"))
+    afirmar(RUNTIME.PLATAFORMAS["linux-x64"]["url"].endswith("x86_64-unknown-linux-gnu-install_only.tar.gz"))
     afirmar(all(len(p["sha256"]) == 64 for p in RUNTIME.PLATAFORMAS.values()))
+    # o mesmo pacote serve de runtime do Linux (mesmo formato install_only)
+    r = RUNTIME.instalar(pacote, tmp / "programa/linux-x64/python", sha256=sha, plataforma="linux-x64")
+    afirmar(r["plataforma"] == "linux-x64" and (tmp / "programa/linux-x64/python/bin/python3").is_file(), r)
 
 
 def teste_versoes_do_repositorio_coerentes():
