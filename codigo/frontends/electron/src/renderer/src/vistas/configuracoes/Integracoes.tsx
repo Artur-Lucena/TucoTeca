@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
+import { FontesDownload } from '../../componentes/config/FontesDownload'
 import { acaoDaIntegracao, rotuloTipo, selosDaIntegracao, type IntegracaoDTO } from '../../estado/integracoes'
 import { type AoAvisar, textoDeFalha } from '../../estado/notificacoes'
 
@@ -147,6 +148,8 @@ export function Integracoes({ aoAvisar, aoNavegar }: Props) {
           </button>
         </div>
       </header>
+
+      <FontesDownload aoAvisar={aoAvisar} />
 
       {formAberto && (
         <div class="form-integracao">

@@ -3,6 +3,19 @@
 Todas as mudanças relevantes do TucoTeca. Formato: [SemVer](https://semver.org/),
 seções inspiradas em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2.2.0] - 2026-11-19
+
+Baixar jogos dentro do app, pelas fontes de download que você adicionar.
+
+### Adicionado
+
+- **Baixar dentro do app**, à la Hydra: fontes de download no formato do Hydra
+  (listas JSON por endereço https) em Configurações → Integrações. "Baixar" na
+  página da loja e nos Desejos mostra as opções das suas fontes (tamanho,
+  data) e baixa com um clique: torrent pelo qBittorrent integrado, link
+  direto pelo próprio app (com progresso e cancelamento), sempre para Meus
+  Jogos Locais. O app não traz nenhuma fonte.
+
 ## [2.1.1] - 2026-11-19
 
 Acabamento da 2.1.

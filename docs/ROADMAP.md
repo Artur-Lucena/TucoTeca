@@ -1,6 +1,6 @@
 # Roadmap — TucoTeca
 
-Estado: **2.1 publicada** (2.1.1: acabamento). O app desktop é a única interface, no Windows e no
+Estado: **2.2 publicada** — baixar dentro do app pelas fontes de download do usuário (formato do Hydra). O app desktop é a única interface, no Windows e no
 macOS (Apple Silicon e Intel). A 2.1 trouxe descobrir jogos por gênero, "Onde
 baixar", galeria de capas, YouTube ↔ Spotify (clipe ou MP3 com os dados da
 música), limpezas e testes rápidos e localizados. Antes: 2.0.x (sem TUI, porte
@@ -47,6 +47,11 @@ Ainda só por simulação, respostas falsas ou em ambiente de desenvolvimento:
 - macOS num Mac de verdade: abrir a `.dmg` baixada (Gatekeeper com
   quarentena), controle, emuladores (Azahar/DeSmuME `.app`), vídeo e música.
   O CI prova suíte, build e selftest do app nas duas arquiteturas.
+
+## 2.2 (entregue)
+
+- Fontes de download no formato do Hydra, adicionadas pelo usuário (o app não traz nenhuma);
+  "Baixar" na loja e nos Desejos, torrent pelo qBittorrent integrado e link direto pelo app.
 
 ## 2.1 (entregue)
 

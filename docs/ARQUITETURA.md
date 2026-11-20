@@ -96,6 +96,7 @@ não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 | `baixar.py` | Exportify, yt-dlp/FFmpeg, staging, conversão e fila persistente |
 | `volume.py` | volume geral Windows Core Audio; COM com vida limitada |
 | `rede/fontes.py` | busca nos catálogos SteamRip/FitGirl e wishlist da Steam (só título e link; abrir/baixar é com o usuário) |
+| `rede/fontes_download.py` | fontes de download no formato do Hydra **adicionadas pelo usuário** (o app não traz nenhuma): cache local, busca por título sem rede, magnet → qBittorrent integrado e download https direto com publicação atômica |
 | `rede/metadados.py` / `rede/binarios.py` | Steam de referência e instalação verificada de ferramentas |
 | `rede/letras.py` / `rede/capas_libretro.py` / `rede/sponsorblock.py` | LRCLIB/LRC, capas e segmentos opt-in |
 | `rede/provedores/` | Steam, SteamGridDB e RetroAchievements para a página do jogo: cache com validade, ritmo por host, HTML vira texto, arte em `dados/artes/<uuid>/` |
@@ -119,6 +120,7 @@ não são copiáveis pelo Windows e são recriados pelo Wine no primeiro uso.
 | `frontends/desktop.py` | Abre o app Electron pelo checkout (exige `npm install` + `npm run build`); o usuário final usa o instalador |
 | `frontends/ponte.py` | Ponte NDJSON (stdin/stdout, sem TCP) entre o Electron e os casos de uso; lock com evento `bloqueio`, jobs com progresso |
 | `frontends/ponte_paridade.py` | Métodos da ponte que devolvem ao Electron o que o antigo Qt fazia (emulação, controles, manutenção, letras/EQ/volume, arrastar-soltar); trava de jogo aberto |
+| `frontends/ponte_fontes.py` | métodos `fontes.*` (listar, adicionar/atualizar como trabalho, buscar, baixar) |
 | `frontends/ponte_dominios.py` | métodos da ponte da 1.4: página do jogo e provedores, coleções/loja/lojas instaladas e Filmes e Séries (rede e varreduras como trabalho) |
 | `frontends/ponte_params.py` | validação de parâmetros da ponte com mensagens padronizadas (`texto`, `inteiro`, `ident`, `opcao`, …) |
 | `frontends/servicos_ui/` (pacote) | Casos de uso do desktop em mixins por domínio, `resumo_sistema`, `busca_global`, registro de módulos |

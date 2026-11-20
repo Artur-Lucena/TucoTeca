@@ -39,6 +39,16 @@ Algumas integrações acessam serviços que têm termos próprios. Ao usá-las, 
   o que você escolhe. A licitude do conteúdo obtido é de responsabilidade do
   usuário.
 
+## Fontes de download
+
+- O TucoTeca lê fontes de download no formato do Hydra (listas JSON com
+  títulos e links), mas **não traz nenhuma fonte**: só as que o usuário
+  adiciona são consultadas, quando ele adiciona ou atualiza.
+- Escolher uma fonte, e o que baixar por ela, é decisão e responsabilidade de
+  quem a adicionou. Baixe só o que você tem direito de baixar.
+- O app não lê páginas de sites de download nem extrai links delas: baixa só
+  os links (magnet ou https) que a própria fonte informa.
+
 ## Conteúdo e direitos autorais
 
 - A árvore atual **não contém** capas comerciais versionadas; as provas usam
