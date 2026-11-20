@@ -107,9 +107,13 @@ describe('descobrirPython', () => {
     expect(r).toEqual({ comando: 'py', prefixo: ['-3.14'] })
   })
 
-  it('outras plataformas usam python3', () => {
-    const r = descobrirPython('/raiz', { env: {}, plataforma: 'linux', existe: () => true })
-    expect(r).toEqual({ comando: 'python3', prefixo: [] })
+  it('Linux x64 usa o runtime embutido do AppImage; sem ele, python3', () => {
+    const r = descobrirPython('/raiz', { env: {}, plataforma: 'linux', arquitetura: 'x64', existe: () => true })
+    expect(r.comando.replaceAll('\\', '/')).toBe('/raiz/programa/linux-x64/python/bin/python3')
+    const semRuntime = descobrirPython('/raiz', { env: {}, plataforma: 'linux', arquitetura: 'x64', existe: () => false })
+    expect(semRuntime).toEqual({ comando: 'python3', prefixo: [] })
+    const arm = descobrirPython('/raiz', { env: {}, plataforma: 'linux', arquitetura: 'arm64', existe: () => true })
+    expect(arm).toEqual({ comando: 'python3', prefixo: [] })
   })
 
   it('macOS: runtime embutido da arquitetura do processo', () => {

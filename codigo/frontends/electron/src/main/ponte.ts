@@ -15,6 +15,7 @@ interface DepsDescoberta {
 export function pastaRuntime(plataforma: NodeJS.Platform, arquitetura: string): string | null {
   if (plataforma === 'win32') return 'windows-x64'
   if (plataforma === 'darwin') return arquitetura === 'arm64' ? 'macos-arm64' : 'macos-x64'
+  if (plataforma === 'linux' && arquitetura === 'x64') return 'linux-x64'
   return null
 }
 

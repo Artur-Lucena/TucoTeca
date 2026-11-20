@@ -13,10 +13,12 @@ Baixe o arquivo do seu sistema na [última release](https://github.com/Artur-Luc
   `…-mac-x64.dmg` (Intel) — abra e arraste o TucoTeca para *Aplicativos*. Na
   primeira vez, botão direito no app → *Abrir* (no macOS 15+: *Ajustes do
   Sistema → Privacidade e Segurança → Abrir Mesmo Assim*).
-- **Linux:** pelos fontes (abaixo).
+- **Linux (x64):** `…-linux-x64.AppImage` — marque como executável
+  (`chmod +x`) e abra. Se o Ubuntu 24.04+ não abrir, rode com `--no-sandbox`.
 
-A coleção fica em *Documentos/TucoTeca* e continua lá ao atualizar (é só
-instalar a versão nova por cima) ou desinstalar. FFmpeg, yt-dlp e 7-Zip são
+A coleção fica em *Documentos/TucoTeca* e continua lá ao atualizar ou
+desinstalar. Para atualizar: Configurações → *Verificar atualização* (ou
+instale a versão nova por cima). FFmpeg, yt-dlp e 7-Zip são
 opcionais; no Mac, `brew install ffmpeg yt-dlp sevenzip`.
 
 ## Executar pelos fontes (desenvolvimento)

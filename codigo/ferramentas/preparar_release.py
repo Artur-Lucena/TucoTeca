@@ -10,11 +10,16 @@ Fluxo (detalhado em docs/RELEASES.md):
     npm --prefix codigo/frontends/electron run dist:mac
     python3 codigo/ferramentas/preparar_release.py --revisao <SHA> --conferir-mac
 
+    # no Linux (o CI faz isto e publica o AppImage + conferencia-linux.json)
+    python3 codigo/ferramentas/preparar_runtime_python.py --plataforma linux-x64
+    npm --prefix codigo/frontends/electron run dist:linux
+    python3 codigo/ferramentas/preparar_release.py --revisao <SHA> --conferir-linux
+
     # no Windows
     py -3.14 -B codigo/ferramentas/preparar_runtime_python.py
     npm --prefix codigo/frontends/electron run dist
     py -3.14 -B codigo/ferramentas/preparar_release.py --revisao <SHA> --saida dist/release/v<versao> \
-        [--mac <pasta com as .dmg e conferencia-mac.json>]
+        [--mac <pasta com as .dmg e conferencia-mac.json>] [--linux <pasta com o AppImage e conferencia-linux.json>]
 
 Exige checkout limpo no SHA informado, versões coerentes (codigo/VERSION,
 pyproject.toml e seção em docs/CHANGELOG.md), os instaladores da mesma versão
@@ -113,9 +118,12 @@ RECURSOS = {
     "windows-x64": "win-unpacked/resources/tucoteca",
     "macos-x64": "mac/TucoTeca.app/Contents/Resources/tucoteca",
     "macos-arm64": "mac-arm64/TucoTeca.app/Contents/Resources/tucoteca",
+    "linux-x64": "linux-unpacked/resources/tucoteca",
 }
-PYTHON_EMBUTIDO = {"windows-x64": "python.exe", "macos-x64": "bin/python3", "macos-arm64": "bin/python3"}
+PYTHON_EMBUTIDO = {"windows-x64": "python.exe", "macos-x64": "bin/python3", "macos-arm64": "bin/python3",
+                   "linux-x64": "bin/python3"}
 CONFERENCIA_MAC = "conferencia-mac.json"
+CONFERENCIA_LINUX = "conferencia-linux.json"
 NOTAS_ARQUIVO = "NOTAS-RELEASE.md"  # corpo da release; não é anexo
 
 # o que o app instalado precisa para abrir a ponte (conferido no app empacotado)
@@ -138,14 +146,14 @@ def conferir_app(dist: Path, exigir_runtime: bool = True, plataforma: str = "win
         raise ValueError("estado pessoal no app empacotado: " + ", ".join(proibidos[:10]))
     pasta_python = recursos / "programa" / plataforma / "python"
     python = pasta_python / PYTHON_EMBUTIDO[plataforma]
-    if exigir_runtime and not python.is_file():
+    if exigir_runtime and not (python.is_file() or python.is_symlink()):
         raise ValueError(f"app empacotado ({plataforma}) sem Python embutido "
                          "(use --sem-runtime para aceitar)")
     versao_runtime = None
     marcador = pasta_python / "TUCOTECA-RUNTIME.json"
     if marcador.is_file():
         versao_runtime = json.loads(marcador.read_text(encoding="utf-8")).get("versao")
-    return {"python_embutido": python.is_file(), "python_versao": versao_runtime,
+    return {"python_embutido": python.is_file() or python.is_symlink(), "python_versao": versao_runtime,
             "versao_app": (recursos / "codigo/VERSION").read_text(encoding="utf-8").strip()}
 
 
@@ -154,7 +162,7 @@ NOTAS = """## Instalar
 **Windows 10/11** — baixe `{instalador}` e abra. Ele instala para o seu
 usuário e já abre o TucoTeca. Se o Windows avisar que protegeu o computador:
 *Mais informações → Executar assim mesmo*.
-{secao_mac}
+{secao_mac}{secao_linux}
 A coleção fica em *Documentos/TucoTeca* e continua lá ao atualizar ou
 desinstalar. Para atualizar, é só instalar a versão nova por cima.
 {aviso_runtime}
@@ -174,11 +182,18 @@ Privacidade e Segurança → Abrir Mesmo Assim*). O macOS pergunta uma vez
 porque o app não é notarizado pela Apple.
 """
 
+NOTAS_LINUX = """
+**Linux (x64)** — baixe `{nome}`, marque como executável (`chmod +x {nome}`,
+ou Propriedades → Permitir executar) e abra. Se o Ubuntu 24.04 ou mais novo
+não abrir o app, rode `./{nome} --no-sandbox`.
+"""
+
 ROTULO_ARCH = {"macos-arm64": "Apple Silicon: M1, M2…", "macos-x64": "Intel"}
 
 
 def escrever_notas(destino: Path, versao: str, revisao: str, instalador: str,
-                   novidades: str, app: dict, dmgs: dict | None = None) -> Path:
+                   novidades: str, app: dict, dmgs: dict | None = None,
+                   appimages: dict | None = None) -> Path:
     """Texto da página da release (vai no corpo, não como anexo)."""
     aviso = "" if app["python_embutido"] else (
         "\n**Atenção:** este build não embute Python; é preciso ter o Python 3.14 "
@@ -188,9 +203,11 @@ def escrever_notas(destino: Path, versao: str, revisao: str, instalador: str,
         opcoes = [f"`{nome}` ({ROTULO_ARCH.get(info['plataforma'], info['plataforma'])})"
                   for nome, info in sorted(dmgs.items())]
         secao_mac = NOTAS_MAC.format(lista=" ou ".join(opcoes))
+    secao_linux = "".join(NOTAS_LINUX.format(nome=nome) for nome in sorted(appimages or {}))
     texto = NOTAS.format(versao=versao, revisao=revisao, instalador=instalador,
                          data=datetime.date.today().isoformat(), aviso_runtime=aviso,
-                         secao_mac=secao_mac, novidades=novidades or "Veja docs/CHANGELOG.md.")
+                         secao_mac=secao_mac, secao_linux=secao_linux,
+                         novidades=novidades or "Veja docs/CHANGELOG.md.")
     caminho = destino / NOTAS_ARQUIVO
     caminho.write_text(texto, encoding="utf-8")
     return caminho
@@ -229,32 +246,68 @@ def conferir_mac(revisao: str, *, repo: Path = REPO, dist: Path = DIST_ELECTRON,
     return conferencia
 
 
-def ler_conferencia_mac(pasta: Path, versao: str, revisao: str, exigir_runtime: bool = True) -> dict:
-    """As .dmg trazidas do Mac: mesma versão e revisão, e SHA-256 igual ao conferido lá."""
-    arquivo = Path(pasta) / CONFERENCIA_MAC
+def appimage_linux(versao: str) -> str:
+    return f"TucoTeca-{versao}-linux-x64.AppImage"
+
+
+def conferir_linux(revisao: str, *, repo: Path = REPO, dist: Path = DIST_ELECTRON,
+                   exigir_runtime: bool = True) -> dict:
+    """No Linux, depois do `dist:linux`: confere o app e grava conferencia-linux.json."""
+    if not re.fullmatch(r"[0-9a-f]{40}", revisao):
+        raise ValueError("--revisao deve ser o SHA Git completo (40 caracteres hexadecimais).")
+    versao = ler_versao(repo)
+    imagem = dist / appimage_linux(versao)
+    if not imagem.is_file():
+        raise ValueError(f"{imagem.name} ausente em {dist}; rode `npm run dist:linux`")
+    app = conferir_app(dist, exigir_runtime, "linux-x64")
+    if app["versao_app"] != versao:
+        raise ValueError(f"{imagem.name}: app empacotado é {app['versao_app']}, VERSION é {versao}")
+    conferencia = {"versao": versao, "revisao": revisao, "appimages": {imagem.name: {
+        "plataforma": "linux-x64", **_ativo(imagem),
+        "python_embutido": app["python_embutido"], "python_versao": app["python_versao"]}}}
+    (dist / CONFERENCIA_LINUX).write_text(json.dumps(conferencia, ensure_ascii=False, indent=2) + "\n",
+                                          encoding="utf-8")
+    return conferencia
+
+
+def _ler_conferencia(pasta: Path, versao: str, revisao: str, exigir_runtime: bool,
+                     arquivo_nome: str, chave: str, rotulo: str) -> dict:
+    """Instaladores trazidos de outro SO: mesma versão e revisão, e SHA-256 igual ao conferido lá."""
+    arquivo = Path(pasta) / arquivo_nome
     try:
         conferencia = json.loads(arquivo.read_text(encoding="utf-8"))
     except (OSError, ValueError) as erro:
         raise ValueError(f"{arquivo} ilegível ou ausente: {erro}") from erro
     if conferencia.get("versao") != versao or conferencia.get("revisao") != revisao:
-        raise ValueError(f"conferência do Mac é de {conferencia.get('versao')} @ "
+        raise ValueError(f"conferência do {rotulo} é de {conferencia.get('versao')} @ "
                          f"{str(conferencia.get('revisao'))[:7]}, a release é {versao} @ {revisao[:7]}")
-    dmgs = conferencia.get("dmgs") or {}
-    if not dmgs:
-        raise ValueError("conferência do Mac sem .dmg")
-    for nome, info in dmgs.items():
-        dmg = Path(pasta) / nome
-        if not dmg.is_file():
+    itens = conferencia.get(chave) or {}
+    if not itens:
+        raise ValueError(f"conferência do {rotulo} sem instalador")
+    for nome, info in itens.items():
+        alvo = Path(pasta) / nome
+        if not alvo.is_file():
             raise ValueError(f"{nome} ausente em {pasta}")
-        if sha_arquivo(dmg) != info.get("sha256"):
-            raise ValueError(f"{nome} não é a .dmg conferida no Mac (SHA-256 diferente)")
+        if sha_arquivo(alvo) != info.get("sha256"):
+            raise ValueError(f"{nome} não é o instalador conferido no {rotulo} (SHA-256 diferente)")
         if exigir_runtime and not info.get("python_embutido"):
             raise ValueError(f"{nome} sem Python embutido (use --sem-runtime para aceitar)")
-    return dmgs
+    return itens
+
+
+def ler_conferencia_mac(pasta: Path, versao: str, revisao: str, exigir_runtime: bool = True) -> dict:
+    """As .dmg trazidas do Mac (conferidas lá, na mesma revisão)."""
+    return _ler_conferencia(pasta, versao, revisao, exigir_runtime, CONFERENCIA_MAC, "dmgs", "Mac")
+
+
+def ler_conferencia_linux(pasta: Path, versao: str, revisao: str, exigir_runtime: bool = True) -> dict:
+    """O AppImage trazido do Linux (conferido lá, na mesma revisão)."""
+    return _ler_conferencia(pasta, versao, revisao, exigir_runtime, CONFERENCIA_LINUX, "appimages", "Linux")
 
 
 def preparar(revisao: str, saida: Path, *, repo: Path = REPO, dist: Path = DIST_ELECTRON,
-             exigir_runtime: bool = True, conferir_git: bool = True, mac: Path | None = None) -> dict:
+             exigir_runtime: bool = True, conferir_git: bool = True, mac: Path | None = None,
+             linux: Path | None = None) -> dict:
     saida = Path(saida).resolve()
     if saida.exists():
         raise ValueError(f"{saida} já existe; entregas antigas não são sobrescritas")
@@ -266,6 +319,7 @@ def preparar(revisao: str, saida: Path, *, repo: Path = REPO, dist: Path = DIST_
     if app["versao_app"] != versao:
         raise ValueError(f"app empacotado é {app['versao_app']}, VERSION é {versao}; refaça o dist")
     dmgs = ler_conferencia_mac(Path(mac), versao, revisao, exigir_runtime) if mac else {}
+    appimages = ler_conferencia_linux(Path(linux), versao, revisao, exigir_runtime) if linux else {}
 
     saida.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{saida.name}-", dir=saida.parent))
@@ -273,15 +327,17 @@ def preparar(revisao: str, saida: Path, *, repo: Path = REPO, dist: Path = DIST_
         shutil.copy2(instalador, staging / instalador.name)
         for nome in dmgs:
             shutil.copy2(Path(mac) / nome, staging / nome)  # type: ignore[arg-type]
+        for nome in appimages:
+            shutil.copy2(Path(linux) / nome, staging / nome)  # type: ignore[arg-type]
         empacotar_fontes(staging / f"tucoteca-{versao}-fontes.zip", repo=repo, revisao=revisao)
         escrever_notas(staging, versao, revisao, instalador.name,
-                       secao_changelog(repo, versao), app, dmgs)
+                       secao_changelog(repo, versao), app, dmgs, appimages)
         anexos = {p.name: _ativo(p) for p in sorted(staging.iterdir()) if p.name != NOTAS_ARQUIVO}
         instaladores = {instalador.name: {"plataforma": "windows-x64",
                                           "python_embutido": app["python_embutido"],
                                           "python_versao": app["python_versao"]}}
         instaladores.update({nome: {k: info[k] for k in ("plataforma", "python_embutido", "python_versao")}
-                             for nome, info in dmgs.items()})
+                             for nome, info in {**dmgs, **appimages}.items()})
         release = {"esquema": 3, "projeto": "TucoTeca", "versao": versao, "revisao": revisao,
                    "gerado_em": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                    "instaladores": instaladores,
@@ -308,6 +364,9 @@ def main(argv=None) -> int:
     ap.add_argument("--mac", type=Path, help="pasta com as .dmg e o conferencia-mac.json do Mac")
     ap.add_argument("--conferir-mac", action="store_true",
                     help="no Mac: confere os .app e grava conferencia-mac.json em --dist")
+    ap.add_argument("--linux", type=Path, help="pasta com o AppImage e o conferencia-linux.json do Linux")
+    ap.add_argument("--conferir-linux", action="store_true",
+                    help="no Linux: confere o app e grava conferencia-linux.json em --dist")
     ap.add_argument("--sem-runtime", action="store_true",
                     help="aceita app sem Python embutido (fica avisado nas notas)")
     args = ap.parse_args(argv)
@@ -317,10 +376,15 @@ def main(argv=None) -> int:
             for nome, info in c["dmgs"].items():
                 print(f"[ok] {nome} ({info['plataforma']}, Python {info['python_versao']})")
             return 0
+        if args.conferir_linux:
+            c = conferir_linux(args.revisao, dist=args.dist, exigir_runtime=not args.sem_runtime)
+            for nome, info in c["appimages"].items():
+                print(f"[ok] {nome} ({info['plataforma']}, Python {info['python_versao']})")
+            return 0
         if args.saida is None:
-            raise ValueError("--saida é obrigatório (ou use --conferir-mac)")
+            raise ValueError("--saida é obrigatório (ou use --conferir-mac / --conferir-linux)")
         r = preparar(args.revisao, args.saida, dist=args.dist, exigir_runtime=not args.sem_runtime,
-                     mac=args.mac)
+                     mac=args.mac, linux=args.linux)
     except (OSError, ValueError) as erro:
         print(f"ERRO: {erro}", file=sys.stderr)
         return 1

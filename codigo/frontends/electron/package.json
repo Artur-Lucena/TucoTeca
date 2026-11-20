@@ -1,6 +1,6 @@
 {
   "name": "tucoteca-electron",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "description": "TucoTeca — hub local de jogos, músicas e vídeos (interface Electron)",
   "author": "Tuco",
@@ -14,7 +14,8 @@
     "test": "vitest run",
     "selftest": "electron-vite build && electron . --selftest",
     "dist": "electron-vite build && electron-builder --win --config electron-builder.config.cjs",
-    "dist:mac": "electron-vite build && electron-builder --mac --config electron-builder.config.cjs"
+    "dist:mac": "electron-vite build && electron-builder --mac --config electron-builder.config.cjs",
+    "dist:linux": "electron-vite build && electron-builder --linux --config electron-builder.config.cjs"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",

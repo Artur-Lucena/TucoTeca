@@ -175,6 +175,45 @@ jobs:
           BIBLIOTECA_HOME="$RUNNER_TEMP/home" TUCOTECA_USERDATA="$RUNNER_TEMP/userdata" BIBLIOTECA_REDE=0 \
             "$RUNNER_TEMP/TucoTeca.app/Contents/MacOS/TucoTeca" --selftest
 
+  app-linux:
+    needs: electron
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: codigo/frontends/electron/package-lock.json
+      - name: Python embutido (python-build-standalone, SHA-256 fixado)
+        run: python -B codigo/ferramentas/preparar_runtime_python.py --plataforma linux-x64
+      - name: AppImage (x64)
+        working-directory: codigo/frontends/electron
+        run: |
+          npm ci
+          npm run dist:linux
+      - name: Conferência do app (núcleo, runtime, sem dados pessoais)
+        run: python -B codigo/ferramentas/preparar_release.py --revisao "$GITHUB_SHA" --conferir-linux
+      - name: Selftest do AppImage (coleção sintética, Python embutido, tela virtual)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          python -B codigo/ferramentas/semear_prova_electron.py --destino "$RUNNER_TEMP/home" --limpar
+          imagem=$(ls codigo/frontends/electron/dist/*-linux-x64.AppImage)
+          chmod +x "$imagem"
+          # sem FUSE no runner: o AppImage se extrai e roda; o sandbox do Chromium
+          # precisa de namespaces que o Ubuntu 24.04 restringe (mesma dica das notas)
+          APPIMAGE_EXTRACT_AND_RUN=1 BIBLIOTECA_HOME="$RUNNER_TEMP/home" TUCOTECA_USERDATA="$RUNNER_TEMP/userdata" \
+            BIBLIOTECA_REDE=0 xvfb-run -a "$imagem" --no-sandbox --selftest
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-appimage
+          path: |
+            codigo/frontends/electron/dist/*.AppImage
+            codigo/frontends/electron/dist/conferencia-linux.json
+          if-no-files-found: error
   segredos:
     runs-on: ubuntu-24.04
     steps:

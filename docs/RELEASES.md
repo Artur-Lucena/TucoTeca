@@ -8,10 +8,13 @@ usam coleções sintéticas).
 |---|---|---|
 | Windows 10/11 | `TucoTeca-Setup-<versão>-x64.exe` (NSIS, sem assinatura) | um clique: instala para o usuário, sem admin, e abre o app |
 | macOS 13+ | `TucoTeca-<versão>-mac-<arm64\|x64>.dmg` (ad-hoc, sem notarização) | arrastar para *Aplicativos*; 1ª vez: botão direito → *Abrir* (macOS 15+: *Abrir Mesmo Assim* em Privacidade e Segurança) |
+| Linux x64 | `TucoTeca-<versão>-linux-x64.AppImage` | `chmod +x` e abrir; Ubuntu 24.04+ pode pedir `--no-sandbox` |
 
-Os dois levam, em `resources/tucoteca/`, o núcleo (`bib_nucleo`), a ponte
+Todos levam, em `resources/tucoteca/`, o núcleo (`bib_nucleo`), a ponte
 (`ponte*.py`, `servicos_ui`), `abrir_hub.py`, `VERSION`, `LICENSE`, os docs do
-menu Ajuda e o Python 3.14 da plataforma. Linux roda pelos fontes.
+menu Ajuda e o Python 3.14 da plataforma. O app instalado verifica
+atualização só quando o usuário clica (Configurações) e reconhece os anexos
+pelo nome — mantenha os nomes acima.
 
 ## 1. Congelar
 
@@ -26,6 +29,10 @@ seção do `docs/CHANGELOG.md` — o preparador recusa divergência. Gates verde
   (confere cada `.app` e grava `conferencia-mac.json` com os SHA-256) e
   selftest — o da Intel instalado a partir da `.dmg` num Mac Intel.
   `gh run download <run> --name mac-dmgs --dir dist/mac-v<versão>`.
+- **Linux:** sai do CI (job `app-linux`): runtime `linux-x64`,
+  `npm run dist:linux`, `preparar_release.py --conferir-linux` (grava
+  `conferencia-linux.json`) e selftest do AppImage numa tela virtual.
+  `gh run download <run> --name linux-appimage --dir dist/linux-v<versão>`.
 - **Windows:** no próprio checkout, com a árvore limpa na revisão da release (o
   repositório fica num caminho curto, como `C:\Projetos\TucoTeca`: o NSIS falha
   com caminho longo):
@@ -44,11 +51,12 @@ notas avisam. Ícones: `gerar_icone.py` (o teste confere os pixels).
 
 ```powershell
 py -3.14 -B codigo/ferramentas/preparar_release.py --revisao $sha `
-    --saida dist/release/v<versão> --dist <dist do Windows> --mac dist/mac-v<versão>
+    --saida dist/release/v<versão> --dist <dist do Windows> --mac dist/mac-v<versão> `
+    --linux dist/linux-v<versão>
 ```
 
 Exige HEAD limpo no `$sha`, confere versões, o app empacotado (núcleo,
-runtime, nada pessoal) e só aceita `.dmg` conferidas no Mac na mesma revisão
+runtime, nada pessoal) e só aceita `.dmg`/AppImage conferidos no Mac/Linux na mesma revisão
 com o mesmo SHA-256. Gera, sem sobrescrever entrega antiga:
 
 - anexos: os instaladores, `tucoteca-<versão>-fontes.zip`, `release.json`
