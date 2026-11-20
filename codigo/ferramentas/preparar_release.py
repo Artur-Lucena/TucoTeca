@@ -119,9 +119,8 @@ CONFERENCIA_MAC = "conferencia-mac.json"
 NOTAS_ARQUIVO = "NOTAS-RELEASE.md"  # corpo da release; não é anexo
 
 # o que o app instalado precisa para abrir a ponte (conferido no app empacotado)
-ESSENCIAIS_APP = ("codigo/frontends/ponte.py", "codigo/frontends/ponte_paridade.py",
-                  "codigo/frontends/ponte_params.py", "codigo/frontends/ponte_dominios.py",
-                  "codigo/frontends/ponte_fontes.py",
+# a ponte inteira (ponte.py + ponte_<assunto>.py) mais o mínimo para ela subir
+ESSENCIAIS_APP = (*(f"codigo/frontends/{p.name}" for p in sorted((REPO / "codigo/frontends").glob("ponte*.py"))),
                   "codigo/bib_nucleo/__init__.py", "codigo/ferramentas/abrir_hub.py", "codigo/VERSION", "LICENSE")
 
 
