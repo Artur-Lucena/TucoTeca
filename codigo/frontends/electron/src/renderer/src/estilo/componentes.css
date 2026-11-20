@@ -387,6 +387,32 @@
   color: var(--perigo);
 }
 
+/* tela Notificações: uma linha por aviso (texto, hora, Dispensar) */
+.lista-notificacoes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.linha-aviso {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--espaco-md);
+  align-items: center;
+  padding: 10px var(--espaco-md);
+  border: 1px solid var(--borda);
+  border-left: 3px solid var(--realce);
+  border-radius: 10px;
+  background: var(--cartao);
+}
+
+.linha-aviso.atencao {
+  border-left-color: var(--aviso);
+}
+
 .aviso-quando {
   color: var(--texto2);
   font-size: 12px;

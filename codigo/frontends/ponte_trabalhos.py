@@ -64,7 +64,9 @@ class Trabalhos:
             self._publicar(item, "fim")
         except Exception as erro:
             with self._travas:
-                item["estado"] = "erro"
+                # a operação costuma parar levantando ("Download cancelado."):
+                # com a bandeira ligada foi o usuário que cancelou, não uma falha
+                item["estado"] = "cancelado" if bandeira.is_set() else "erro"
                 item["erro"] = str(erro) or type(erro).__name__
             self._publicar(item, "fim")
 
